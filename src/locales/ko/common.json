@@ -1,0 +1,330 @@
+{
+  "header": {
+    "searchPlaceholder": "유닛, 임차인 또는 계약을 검색하세요...",
+    "role": "관리자",
+    "languageLabel": "언어"
+  },
+  "nav": {
+    "menu": {
+      "dashboard": "대시보드",
+      "units": "유닛 및 공실",
+      "contracts": "계약 및 운영",
+      "crm": "CRM 및 임차인",
+      "ledger": "임대 원장",
+      "calendar": "캘린더",
+      "agentPortal": "에이전트 포털 (데모)",
+      "portal": "임차인 포털 (데모)"
+    },
+    "settings": "설정",
+    "logout": "로그아웃"
+  },
+  "views": {
+    "dashboard": {
+      "title": "경영 대시보드",
+      "subtitle": "부동산 포트폴리오 성과를 실시간으로 확인하세요.",
+      "last30Days": "최근 30일",
+      "cards": {
+        "totalProfit": "총 수익",
+        "profitTrend": "지난달 대비 +12.5%",
+        "netProfit": "순이익(월 임대료 기준)",
+        "netProfitHint": "기본 월 임대료 기준을 사용하려면 비워두세요.",
+        "defaultProfit": "기본값: ₱{{amount}}",
+        "activeLeases": "활성 임대 계약",
+        "activeTrend": "이번 주 신규 +3건",
+        "vacancyRate": "공실률",
+        "vacancyTrend": "지난달 대비 -2.1%",
+        "overdueRent": "연체 임대료",
+        "overdueHint": "즉시 조치가 필요합니다"
+      },
+      "charts": {
+        "salesTitle": "매출 성과",
+        "salesDescription": "월별 수익 및 계약 성사 건수",
+        "unitStatusTitle": "유닛 상태",
+        "unitStatusDescription": "포트폴리오 분포",
+        "profitLabel": "수익",
+        "statuses": {
+          "occupied": "입주 중",
+          "available": "공실",
+          "maintenance": "유지보수"
+        }
+      },
+      "vacancies": {
+        "title": "다가오는 공실",
+        "description": "60일 이내 만료되는 계약",
+        "unit": "유닛",
+        "tenant": "임차인",
+        "expiryDate": "만료일",
+        "notice": "사전 통지",
+        "oneMonth": "1개월",
+        "twoMonth": "2개월",
+        "fallbackTenant": "Michael Chen"
+      },
+      "payments": {
+        "title": "다가오는 납부(7일 이내)",
+        "description": "다음 주 내 미납 또는 연체 예정 내역입니다.",
+        "unit": "유닛",
+        "tenant": "임차인",
+        "dueDate": "납부일",
+        "amount": "금액",
+        "empty": "향후 7일 내 예정된 납부가 없습니다."
+      },
+      "agents": {
+        "title": "에이전트 성과",
+        "description": "직원 책임성과 계약 추적",
+        "agentName": "에이전트 이름",
+        "deals": "계약 건수",
+        "profit": "수익",
+        "status": "상태",
+        "statusTopPerformer": "최우수 성과자",
+        "statusActive": "활동 중",
+        "statusOnProbation": "수습 중"
+      }
+    },
+    "units": {
+      "title": "유닛 및 공실",
+      "subtitle": "부동산 재고와 가용 상태를 관리하세요.",
+      "addUnit": "새 유닛 추가",
+      "searchPlaceholder": "유닛, 건물 또는 지역으로 검색...",
+      "filter": "필터",
+      "table": {
+        "unit": "유닛",
+        "building": "건물",
+        "area": "지역",
+        "type": "유형",
+        "status": "상태",
+        "monthlyRate": "월 임대료",
+        "actions": "작업",
+        "floor": "층",
+        "viewDetails": "상세 보기",
+        "editUnit": "유닛 수정",
+        "manageInventory": "재고 관리",
+        "delete": "삭제"
+      },
+      "statuses": {
+        "available": "공실",
+        "occupied": "입주 중",
+        "maintenance": "유지보수"
+      },
+      "unitLabel": "유닛 {{unitNumber}}",
+      "details": {
+        "monthlyRate": "월 임대료",
+        "unitType": "유닛 유형",
+        "inventoryAssets": "비품 및 자산",
+        "legalAddress": "법적 주소 및 세부 정보",
+        "historicalTenants": "이전 임차인(과거 계약)",
+        "specialRequests": "특별 요청 / 비고",
+        "close": "닫기",
+        "editUnitInfo": "유닛 정보 수정",
+        "good": "양호",
+        "completed": "완료",
+        "addressTemplate": "{{unitNumber}}, {{tower}}, {{buildingName}}, Ayala Avenue, Makati City, Metro Manila, Philippines.",
+        "remarksText": "\"집주인은 반려동물 금지를 요청했습니다. 임차인은 입주 전 커튼 추가를 요청했습니다.\""
+      }
+    },
+    "contracts": {
+      "title": "계약 및 운영",
+      "subtitle": "임대 계약, 문서 생성 및 갱신을 관리하세요.",
+      "newLeaseWorkflow": "신규 임대 워크플로우",
+      "newLeaseAgreement": "신규 임대 계약",
+      "newLeaseDescription": "계약서와 초기 청구서를 생성하려면 이 절차를 완료하세요.",
+      "selectUnit": "유닛 선택",
+      "chooseUnit": "유닛 선택",
+      "selectTenant": "임차인 선택",
+      "chooseTenant": "임차인 선택",
+      "startDate": "시작일",
+      "endDate": "종료일",
+      "monthlyRent": "월 임대료 (₱)",
+      "securityDeposit": "보증금 (₱)",
+      "cancel": "취소",
+      "generateActivate": "생성 및 활성화",
+      "searchPlaceholder": "유닛, 임차인 또는 에이전트로 검색...",
+      "filter": "필터",
+      "archive": "보관함",
+      "table": {
+        "contractId": "계약 ID",
+        "unitTenant": "유닛 및 임차인",
+        "period": "기간",
+        "agent": "에이전트",
+        "status": "상태",
+        "documents": "문서",
+        "to": "부터",
+        "contract": "계약서",
+        "invoice": "청구서"
+      },
+      "statuses": {
+        "active": "활성"
+      }
+    },
+    "crm": {
+      "title": "CRM 및 임차인",
+      "subtitle": "임차인 관계, KYC 및 중개사 협업을 관리하세요.",
+      "registerTenant": "새 임차인 등록",
+      "tabs": {
+        "tenants": "임차인",
+        "brokers": "중개사",
+        "blacklist": "블랙리스트"
+      },
+      "searchPlaceholder": "이름, 이메일 또는 전화번호로 임차인 검색...",
+      "table": {
+        "tenant": "임차인",
+        "contactInfo": "연락처",
+        "kycStatus": "KYC 상태",
+        "currentUnit": "현재 유닛",
+        "status": "상태",
+        "actions": "작업",
+        "idLabel": "ID: {{id}}",
+        "verified": "인증 완료",
+        "unitLabel": "유닛 {{unitNumber}}",
+        "noActiveLease": "활성 계약 없음",
+        "blacklisted": "블랙리스트",
+        "active": "활동 중",
+        "viewPortal": "포털 보기",
+        "history": "이력"
+      },
+      "brokers": {
+        "partner": "파트너",
+        "officialPartner": "공식 부동산 파트너",
+        "contactPerson": "담당자:",
+        "phone": "전화:",
+        "viewLogs": "협업 기록 보기",
+        "addAgency": "파트너 중개사 추가"
+      },
+      "blacklist": {
+        "title": "문제 이력 임차인 및 집주인",
+        "description": "납부 문제 또는 행동 위반 이력이 있는 개인 기록입니다.",
+        "name": "이름",
+        "type": "유형",
+        "reason": "블랙리스트 사유",
+        "dateAdded": "등록일",
+        "actions": "작업",
+        "tenant": "임차인",
+        "landlord": "집주인",
+        "details": "상세"
+      }
+    },
+    "ledger": {
+      "title": "임대 원장",
+      "subtitle": "임대료 수납, 연체 납부, 금융 이력을 추적하세요.",
+      "exportReport": "보고서 내보내기",
+      "recordPayment": "납부 기록",
+      "expectedCollection": "예상 수납액(이번 달)",
+      "actualCollected": "실제 수납액",
+      "outstandingBalance": "미수 잔액",
+      "searchPlaceholder": "유닛, 임차인 또는 청구서 번호로 검색...",
+      "filter": "필터",
+      "upcomingTitle": "다가오는 납부(7일 이내)",
+      "upcomingDescription": "다음 주 내 임대료 납부 우선 목록입니다.",
+      "collectionTitle": "수납 원장",
+      "collectionDescription": "모든 임대 거래의 상세 기록입니다.",
+      "table": {
+        "unit": "유닛",
+        "tenant": "임차인",
+        "dueDate": "납부일",
+        "amount": "금액",
+        "status": "상태",
+        "paidDate": "납부일자",
+        "actions": "작업",
+        "emptyUpcoming": "향후 7일 내 납부 예정이 없습니다.",
+        "paid": "납부 완료",
+        "overdue": "연체",
+        "pending": "대기 중",
+        "viewInvoice": "청구서 보기"
+      }
+    },
+    "calendar": {
+      "title": "운영 타임라인",
+      "subtitle": "포트폴리오 전체의 입주, 퇴거, 납부 일정을 추적하세요.",
+      "units": "유닛",
+      "dailySchedule": "일일 일정",
+      "selectDate": "타임라인에서 날짜를 선택하세요",
+      "today": "오늘",
+      "viewDetails": "상세 보기",
+      "noEvents": "해당 날짜에 예정된 운영 이벤트가 없습니다.",
+      "timelineLegend": "타임라인 범례",
+      "moveIn": "입주",
+      "moveOut": "퇴거",
+      "paymentPaid": "납부(완료)",
+      "paymentPending": "납부(대기)",
+      "infoText": "타임라인은 유닛 관련 운영을 한눈에 보여줍니다. 날짜 또는 유닛 셀을 클릭하면 해당 일자의 상세 이벤트를 볼 수 있습니다.",
+      "eventTypes": {
+        "moveIn": "입주",
+        "moveOut": "퇴거",
+        "paymentDue": "납부 예정"
+      },
+      "unitLabel": "유닛 {{unitNumber}}"
+    },
+    "portal": {
+      "welcome": "{{name}}님, 다시 오신 것을 환영합니다!",
+      "unitInfo": "유닛 {{unitNumber}}, {{buildingName}}",
+      "contactManagement": "관리팀 문의",
+      "currentStatus": "현재 상태",
+      "paidActive": "납부 완료 및 활성",
+      "nextPaymentDue": "다음 납부까지 12일 남음",
+      "contractPeriod": "계약 기간",
+      "leaseExpires": "임대 계약 만료까지 8개월",
+      "recentPayments": "최근 납부 내역",
+      "recentPaymentsDescription": "청구 이력을 확인하고 영수증을 다운로드하세요.",
+      "table": {
+        "date": "날짜",
+        "reference": "참조",
+        "amount": "금액",
+        "status": "상태",
+        "action": "작업",
+        "paid": "납부 완료"
+      },
+      "unitInventory": "유닛 비품 목록",
+      "unitInventoryDescription": "입주 점검용 포함 비품 목록입니다.",
+      "inventoryStatus": {
+        "good": "양호",
+        "maintenanceNeeded": "유지보수 필요"
+      },
+      "kycTitle": "KYC 및 신분 확인",
+      "kycDescription": "필리핀 거주 외국인 임차인에게 필요합니다.",
+      "passportCard": "여권 / ACR I-Card",
+      "passportHint": "유효한 신분증 사본을 선명하게 업로드하세요",
+      "updateDocument": "문서 업데이트",
+      "verificationProgress": "인증 진행률",
+      "lastUpdated": "마지막 업데이트: 2개월 전",
+      "myDocuments": "내 문서",
+      "myDocumentsDescription": "임대 계약 및 청구 문서에 접근하세요.",
+      "maintenanceTitle": "유지보수 요청",
+      "maintenanceHint": "유닛 문제(예: 배관, 전기)를 신고하세요.",
+      "submitRequest": "요청 제출"
+    },
+    "agentPortal": {
+      "welcome": "{{name}}님, 환영합니다!",
+      "subtitle": "담당 계약, 고객, 오늘의 업무를 관리하세요.",
+      "contactManagement": "관리팀 연락",
+      "stats": {
+        "activeDeals": "활성 계약",
+        "clients": "고객 수",
+        "upcomingRenewals": "다가오는 갱신"
+      },
+      "contracts": {
+        "title": "담당 계약",
+        "description": "현재 담당 중인 계약 목록입니다.",
+        "unit": "유닛",
+        "tenant": "임차인",
+        "endDate": "종료일",
+        "status": "상태",
+        "active": "활성"
+      },
+      "tasks": {
+        "title": "오늘의 업무",
+        "description": "오늘 처리할 빠른 체크리스트입니다.",
+        "followUps": "활성 리드 후속 연락",
+        "scheduleVisits": "현장 방문 일정 조율",
+        "sendProposals": "갱신 제안서 발송",
+        "today": "오늘"
+      },
+      "docs": {
+        "title": "리소스",
+        "description": "자주 사용하는 문서 및 참고자료입니다.",
+        "contractTemplates": "계약서 템플릿",
+        "rateCards": "요율표",
+        "policyGuide": "정책 가이드",
+        "open": "열기"
+      }
+    }
+  }
+}

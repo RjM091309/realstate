@@ -1,0 +1,330 @@
+{
+  "header": {
+    "searchPlaceholder": "Search units, tenants, or contracts...",
+    "role": "Administrator",
+    "languageLabel": "Language"
+  },
+  "nav": {
+    "menu": {
+      "dashboard": "Dashboard",
+      "units": "Units & Vacancy",
+      "contracts": "Contracts & Operations",
+      "crm": "CRM & Tenants",
+      "ledger": "Lease Ledger",
+      "calendar": "Calendar",
+      "agentPortal": "Agent Portal (Demo)",
+      "portal": "Tenant Portal (Demo)"
+    },
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "views": {
+    "dashboard": {
+      "title": "Executive Dashboard",
+      "subtitle": "Real-time overview of your property portfolio performance.",
+      "last30Days": "Last 30 Days",
+      "cards": {
+        "totalProfit": "Total Profit",
+        "profitTrend": "+12.5% from last month",
+        "netProfit": "Net Profit (Monthly Rent Base)",
+        "netProfitHint": "Leave blank to use default monthly rent base.",
+        "defaultProfit": "Default: ₱{{amount}}",
+        "activeLeases": "Active Leases",
+        "activeTrend": "+3 new this week",
+        "vacancyRate": "Vacancy Rate",
+        "vacancyTrend": "-2.1% from last month",
+        "overdueRent": "Overdue Rent",
+        "overdueHint": "Requires immediate attention"
+      },
+      "charts": {
+        "salesTitle": "Sales Performance",
+        "salesDescription": "Profit and closed deals by month",
+        "unitStatusTitle": "Unit Status",
+        "unitStatusDescription": "Portfolio distribution",
+        "profitLabel": "Profit",
+        "statuses": {
+          "occupied": "Occupied",
+          "available": "Available",
+          "maintenance": "Maintenance"
+        }
+      },
+      "vacancies": {
+        "title": "Upcoming Vacancies",
+        "description": "Contracts expiring within 60 days",
+        "unit": "Unit",
+        "tenant": "Tenant",
+        "expiryDate": "Expiry Date",
+        "notice": "Notice",
+        "oneMonth": "1-Month",
+        "twoMonth": "2-Month",
+        "fallbackTenant": "Michael Chen"
+      },
+      "payments": {
+        "title": "Upcoming Payments (Next 7 Days)",
+        "description": "Units with pending or overdue dues in the next week.",
+        "unit": "Unit",
+        "tenant": "Tenant",
+        "dueDate": "Due Date",
+        "amount": "Amount",
+        "empty": "No upcoming payments in the next 7 days."
+      },
+      "agents": {
+        "title": "Agent Performance",
+        "description": "Staff accountability and deal tracking",
+        "agentName": "Agent Name",
+        "deals": "Deals",
+        "profit": "Profit",
+        "status": "Status",
+        "statusTopPerformer": "Top Performer",
+        "statusActive": "Active",
+        "statusOnProbation": "On Probation"
+      }
+    },
+    "units": {
+      "title": "Units & Vacancy",
+      "subtitle": "Manage your property inventory and availability.",
+      "addUnit": "Add New Unit",
+      "searchPlaceholder": "Search by unit, building, or area...",
+      "filter": "Filter",
+      "table": {
+        "unit": "Unit",
+        "building": "Building",
+        "area": "Area",
+        "type": "Type",
+        "status": "Status",
+        "monthlyRate": "Monthly Rate",
+        "actions": "Actions",
+        "floor": "Floor",
+        "viewDetails": "View Details",
+        "editUnit": "Edit Unit",
+        "manageInventory": "Manage Inventory",
+        "delete": "Delete"
+      },
+      "statuses": {
+        "available": "Available",
+        "occupied": "Occupied",
+        "maintenance": "Maintenance"
+      },
+      "unitLabel": "Unit {{unitNumber}}",
+      "details": {
+        "monthlyRate": "Monthly Rate",
+        "unitType": "Unit Type",
+        "inventoryAssets": "Inventory & Assets",
+        "legalAddress": "Legal Address & Details",
+        "historicalTenants": "Historical Tenants (Past Contracts)",
+        "specialRequests": "Special Requests / Remarks",
+        "close": "Close",
+        "editUnitInfo": "Edit Unit Info",
+        "good": "Good",
+        "completed": "Completed",
+        "addressTemplate": "{{unitNumber}}, {{tower}}, {{buildingName}}, Ayala Avenue, Makati City, Metro Manila, Philippines.",
+        "remarksText": "\"Landlord requests strictly no pets. Tenant requested for additional curtains before move-in.\""
+      }
+    },
+    "contracts": {
+      "title": "Contracts & Operations",
+      "subtitle": "Manage lease agreements, document generation, and renewals.",
+      "newLeaseWorkflow": "New Lease Workflow",
+      "newLeaseAgreement": "New Lease Agreement",
+      "newLeaseDescription": "Complete this workflow to generate the contract and initial billing.",
+      "selectUnit": "Select Unit",
+      "chooseUnit": "Choose unit",
+      "selectTenant": "Select Tenant",
+      "chooseTenant": "Choose tenant",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "monthlyRent": "Monthly Rent (₱)",
+      "securityDeposit": "Security Deposit (₱)",
+      "cancel": "Cancel",
+      "generateActivate": "Generate & Activate",
+      "searchPlaceholder": "Search by unit, tenant, or agent...",
+      "filter": "Filter",
+      "archive": "Archive",
+      "table": {
+        "contractId": "Contract ID",
+        "unitTenant": "Unit & Tenant",
+        "period": "Period",
+        "agent": "Agent",
+        "status": "Status",
+        "documents": "Documents",
+        "to": "to",
+        "contract": "Contract",
+        "invoice": "Invoice"
+      },
+      "statuses": {
+        "active": "Active"
+      }
+    },
+    "crm": {
+      "title": "CRM & Tenants",
+      "subtitle": "Manage tenant relationships, KYC, and broker collaborations.",
+      "registerTenant": "Register New Tenant",
+      "tabs": {
+        "tenants": "Tenants",
+        "brokers": "Broker Agencies",
+        "blacklist": "Blacklist"
+      },
+      "searchPlaceholder": "Search tenants by name, email, or phone...",
+      "table": {
+        "tenant": "Tenant",
+        "contactInfo": "Contact Info",
+        "kycStatus": "KYC Status",
+        "currentUnit": "Current Unit",
+        "status": "Status",
+        "actions": "Actions",
+        "idLabel": "ID: {{id}}",
+        "verified": "Verified",
+        "unitLabel": "Unit {{unitNumber}}",
+        "noActiveLease": "No active lease",
+        "blacklisted": "Blacklisted",
+        "active": "Active",
+        "viewPortal": "View Portal",
+        "history": "History"
+      },
+      "brokers": {
+        "partner": "Partner",
+        "officialPartner": "Official Real Estate Partner",
+        "contactPerson": "Contact Person:",
+        "phone": "Phone:",
+        "viewLogs": "View Collaboration Logs",
+        "addAgency": "Add Partner Agency"
+      },
+      "blacklist": {
+        "title": "Problematic Tenants & Landlords",
+        "description": "Historical record of individuals with payment issues or behavioral violations.",
+        "name": "Name",
+        "type": "Type",
+        "reason": "Reason for Blacklisting",
+        "dateAdded": "Date Added",
+        "actions": "Actions",
+        "tenant": "Tenant",
+        "landlord": "Landlord",
+        "details": "Details"
+      }
+    },
+    "ledger": {
+      "title": "Lease Ledger",
+      "subtitle": "Track rental collections, overdue payments, and financial history.",
+      "exportReport": "Export Report",
+      "recordPayment": "Record Payment",
+      "expectedCollection": "Expected Collection (This Month)",
+      "actualCollected": "Actually Collected",
+      "outstandingBalance": "Outstanding Balance",
+      "searchPlaceholder": "Search by unit, tenant, or invoice #...",
+      "filter": "Filter",
+      "upcomingTitle": "Upcoming Payments (Next 7 Days)",
+      "upcomingDescription": "Priority list for rent due within the next week.",
+      "collectionTitle": "Collection Ledger",
+      "collectionDescription": "Detailed record of all rental transactions.",
+      "table": {
+        "unit": "Unit",
+        "tenant": "Tenant",
+        "dueDate": "Due Date",
+        "amount": "Amount",
+        "status": "Status",
+        "paidDate": "Paid Date",
+        "actions": "Actions",
+        "emptyUpcoming": "No due payments within the next 7 days.",
+        "paid": "Paid",
+        "overdue": "Overdue",
+        "pending": "Pending",
+        "viewInvoice": "View Invoice"
+      }
+    },
+    "calendar": {
+      "title": "Operational Timeline",
+      "subtitle": "Track move-ins, move-outs, and payments across your portfolio.",
+      "units": "Units",
+      "dailySchedule": "Daily Schedule",
+      "selectDate": "Select a date on the timeline",
+      "today": "Today",
+      "viewDetails": "View Details",
+      "noEvents": "No operational events scheduled for this date.",
+      "timelineLegend": "Timeline Legend",
+      "moveIn": "Move-in",
+      "moveOut": "Move-out",
+      "paymentPaid": "Payment (Paid)",
+      "paymentPending": "Payment (Pending)",
+      "infoText": "The timeline provides a visual overview of all unit-related operations. Click on any date or unit cell to view detailed events for that specific day.",
+      "eventTypes": {
+        "moveIn": "Move-in",
+        "moveOut": "Move-out",
+        "paymentDue": "Payment Due"
+      },
+      "unitLabel": "Unit {{unitNumber}}"
+    },
+    "portal": {
+      "welcome": "Welcome back, {{name}}!",
+      "unitInfo": "Unit {{unitNumber}}, {{buildingName}}",
+      "contactManagement": "Contact Management",
+      "currentStatus": "Current Status",
+      "paidActive": "Paid & Active",
+      "nextPaymentDue": "Next payment due in 12 days",
+      "contractPeriod": "Contract Period",
+      "leaseExpires": "Lease expires in 8 months",
+      "recentPayments": "Recent Payments",
+      "recentPaymentsDescription": "View your billing history and download receipts.",
+      "table": {
+        "date": "Date",
+        "reference": "Reference",
+        "amount": "Amount",
+        "status": "Status",
+        "action": "Action",
+        "paid": "Paid"
+      },
+      "unitInventory": "Unit Inventory",
+      "unitInventoryDescription": "Items included in your unit for move-in inspection.",
+      "inventoryStatus": {
+        "good": "Good",
+        "maintenanceNeeded": "Maintenance Needed"
+      },
+      "kycTitle": "KYC & ID Verification",
+      "kycDescription": "Required for foreign tenants in the Philippines.",
+      "passportCard": "Passport / ACR I-Card",
+      "passportHint": "Upload a clear copy of your valid ID",
+      "updateDocument": "Update Document",
+      "verificationProgress": "Verification Progress",
+      "lastUpdated": "Last updated: 2 months ago",
+      "myDocuments": "My Documents",
+      "myDocumentsDescription": "Access your lease and billing documents.",
+      "maintenanceTitle": "Maintenance Request",
+      "maintenanceHint": "Report an issue with your unit (e.g., plumbing, electrical).",
+      "submitRequest": "Submit Request"
+    },
+    "agentPortal": {
+      "welcome": "Welcome, {{name}}!",
+      "subtitle": "Manage your assigned deals, clients, and daily tasks.",
+      "contactManagement": "Contact Management",
+      "stats": {
+        "activeDeals": "Active Deals",
+        "clients": "Clients",
+        "upcomingRenewals": "Upcoming Renewals"
+      },
+      "contracts": {
+        "title": "Assigned Contracts",
+        "description": "Current contracts under your portfolio.",
+        "unit": "Unit",
+        "tenant": "Tenant",
+        "endDate": "End Date",
+        "status": "Status",
+        "active": "Active"
+      },
+      "tasks": {
+        "title": "Today Tasks",
+        "description": "Quick checklist for today.",
+        "followUps": "Follow up active leads",
+        "scheduleVisits": "Schedule property visits",
+        "sendProposals": "Send renewal proposals",
+        "today": "Today"
+      },
+      "docs": {
+        "title": "Resources",
+        "description": "Frequently used documents and references.",
+        "contractTemplates": "Contract Templates",
+        "rateCards": "Rate Cards",
+        "policyGuide": "Policy Guide",
+        "open": "Open"
+      }
+    }
+  }
+}

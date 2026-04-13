@@ -1,0 +1,185 @@
+import { Unit, Tenant, Contract, Payment, Agent, BrokerAgency } from '@/types';
+import { addDays, subDays, format, startOfMonth, endOfMonth } from 'date-fns';
+
+export const agents: Agent[] = [
+  { id: 'a1', name: 'John Doe', email: 'john@example.com' },
+  { id: 'a2', name: 'Jane Smith', email: 'jane@example.com' },
+  { id: 'a3', name: 'Robert Wilson', email: 'robert@example.com' },
+];
+
+export const brokerAgencies: BrokerAgency[] = [
+  { id: 'ba1', name: 'Prime Realty', contactPerson: 'Alice Brown', phone: '0917-123-4567' },
+  { id: 'ba2', name: 'Elite Estates', contactPerson: 'Bob Green', phone: '0918-987-6543' },
+];
+
+export const units: Unit[] = [
+  {
+    id: 'u1',
+    unitNumber: '1201',
+    floor: '12',
+    tower: 'Tower A',
+    buildingName: 'The Rise',
+    commonAddress: 'The Rise Makati',
+    legalAddress: '7248 Malugay St, Makati, 1203 Metro Manila',
+    type: '1BR',
+    status: 'Occupied',
+    area: 'Makati',
+    monthlyRate: 35000,
+    inventory: [
+      { id: 'i1', name: 'Refrigerator', condition: 'Good', quantity: 1 },
+      { id: 'i2', name: 'Aircon', condition: 'New', quantity: 1 },
+    ],
+  },
+  {
+    id: 'u2',
+    unitNumber: '2505',
+    floor: '25',
+    tower: 'West Tower',
+    buildingName: 'One Serendra',
+    commonAddress: 'One Serendra BGC',
+    legalAddress: '11th Ave, Taguig, Metro Manila',
+    type: '2BR',
+    status: 'Available',
+    area: 'BGC',
+    monthlyRate: 85000,
+    inventory: [],
+  },
+  {
+    id: 'u3',
+    unitNumber: '808',
+    floor: '8',
+    tower: 'South Wing',
+    buildingName: 'Park Terraces',
+    commonAddress: 'Park Terraces Makati',
+    legalAddress: 'Arnaiz Ave, Makati, Metro Manila',
+    type: 'Studio',
+    status: 'Occupied',
+    area: 'Makati',
+    monthlyRate: 28000,
+    inventory: [],
+  },
+  {
+    id: 'u4',
+    unitNumber: '1510',
+    floor: '15',
+    tower: 'Tower 1',
+    buildingName: 'The Sapphire Bloc',
+    commonAddress: 'Sapphire Bloc Pasig',
+    legalAddress: 'Sapphire Road, Ortigas Center, Pasig',
+    type: 'Loft',
+    status: 'Occupied',
+    area: 'Pasig',
+    monthlyRate: 45000,
+    inventory: [],
+  },
+  {
+    id: 'u5',
+    unitNumber: '302',
+    floor: '3',
+    tower: 'North Tower',
+    buildingName: 'Avida Towers',
+    commonAddress: 'Avida BGC',
+    legalAddress: '9th Ave, Taguig, Metro Manila',
+    type: '1BR',
+    status: 'Available',
+    area: 'BGC',
+    monthlyRate: 32000,
+    inventory: [],
+  },
+];
+
+export const tenants: Tenant[] = [
+  {
+    id: 't1',
+    name: 'Michael Chen',
+    email: 'michael@example.com',
+    phone: '+63 917 555 0101',
+    idType: 'Passport',
+    idNumber: 'P1234567A',
+    idExpiry: '2028-12-31',
+    isBlacklisted: false,
+  },
+  {
+    id: 't2',
+    name: 'Sarah Johnson',
+    email: 'sarah@example.com',
+    phone: '+63 918 555 0202',
+    idType: 'UMID',
+    idNumber: '1234-5678901-2',
+    idExpiry: '2030-01-01',
+    isBlacklisted: false,
+  },
+];
+
+const today = new Date();
+
+export const contracts: Contract[] = [
+  {
+    id: 'c1',
+    unitId: 'u1',
+    tenantId: 't1',
+    agentId: 'a1',
+    startDate: format(subDays(today, 180), 'yyyy-MM-dd'),
+    endDate: format(addDays(today, 25), 'yyyy-MM-dd'),
+    monthlyRent: 35000,
+    securityDeposit: 70000,
+    advanceRent: 35000,
+    type: 'Monthly Rental',
+    status: 'Active',
+    remarks: 'Foreign tenant, requires monthly receipt.',
+  },
+  {
+    id: 'c2',
+    unitId: 'u3',
+    tenantId: 't2',
+    agentId: 'a2',
+    startDate: format(subDays(today, 300), 'yyyy-MM-dd'),
+    endDate: format(addDays(today, 45), 'yyyy-MM-dd'),
+    monthlyRent: 28000,
+    securityDeposit: 56000,
+    advanceRent: 28000,
+    type: 'Monthly Rental',
+    status: 'Active',
+  },
+  {
+    id: 'c3',
+    unitId: 'u4',
+    tenantId: 't1',
+    agentId: 'a3',
+    startDate: format(subDays(today, 15), 'yyyy-MM-dd'),
+    endDate: format(addDays(today, 350), 'yyyy-MM-dd'),
+    monthlyRent: 45000,
+    securityDeposit: 90000,
+    advanceRent: 45000,
+    type: 'Monthly Rental',
+    status: 'Active',
+  },
+];
+
+export const payments: Payment[] = [
+  {
+    id: 'p1',
+    contractId: 'c1',
+    unitId: 'u1',
+    amount: 35000,
+    dueDate: format(startOfMonth(today), 'yyyy-MM-dd'),
+    paidDate: format(startOfMonth(today), 'yyyy-MM-dd'),
+    status: 'Paid',
+  },
+  {
+    id: 'p2',
+    contractId: 'c2',
+    unitId: 'u3',
+    amount: 28000,
+    dueDate: format(subDays(today, 5), 'yyyy-MM-dd'),
+    status: 'Overdue',
+  },
+  {
+    id: 'p3',
+    contractId: 'c3',
+    unitId: 'u4',
+    amount: 45000,
+    dueDate: format(addDays(today, 3), 'yyyy-MM-dd'),
+    status: 'Pending',
+  },
+];
