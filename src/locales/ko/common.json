@@ -4,7 +4,23 @@
     "role": "관리자",
     "languageLabel": "언어"
   },
+  "login": {
+    "brand": "리얼스테이트",
+    "heroTitle": "부동산 운영을 한곳에서.",
+    "heroSubtitle": "임대, 계약, 임차인 관리를 하나의 작업 공간에서.",
+    "heroBullet1": "포트폴리오·유닛·지점 도구를 업무 흐름에 맞춰 제공합니다.",
+    "heroBullet2": "안전한 직원 로그인 — 사무실에서 쓰는 계정과 동일합니다.",
+    "title": "로그인",
+    "subtitle": "직원 계정으로 계속하세요.",
+    "username": "사용자 이름",
+    "password": "비밀번호",
+    "submit": "로그인",
+    "loading": "로그인 중…",
+    "error": "사용자 이름 또는 비밀번호가 올바르지 않습니다.",
+    "hint": "로컬 시드: admin / admin123 또는 manager1 / admin123"
+  },
   "nav": {
+    "appName": "리얼스테이트",
     "menu": {
       "dashboard": "대시보드",
       "units": "유닛 및 공실",
@@ -13,12 +29,46 @@
       "ledger": "임대 원장",
       "calendar": "캘린더",
       "agentPortal": "에이전트 포털 (데모)",
-      "portal": "임차인 포털 (데모)"
+      "portal": "임차인 포털 (데모)",
+      "controlPanelAccess": "제어 패널"
     },
     "settings": "설정",
     "logout": "로그아웃"
   },
   "views": {
+    "userAccess": {
+      "title": "사용자 접근",
+      "subtitle": "역할별 사이드바 메뉴와 CRUD 권한을 설정합니다. 관리자만 사용할 수 있습니다.",
+      "save": "저장",
+      "saved": "저장되었습니다.",
+      "saving": "저장 중…",
+      "loadError": "접근 설정을 불러올 수 없습니다.",
+      "forbidden": "접근을 관리하려면 관리자 권한이 필요합니다.",
+      "threeColumnRolesTitle": "사용자 역할",
+      "threeColumnRolesDesc": "역할을 선택하세요. 배지는 사이드바에 켜진 모듈 수입니다.",
+      "threeColumnModulesTitle": "모듈",
+      "threeColumnModulesDesc": "스위치로 왼쪽 사이드바에 표시할 항목을 켜거나 끕니다. 행을 선택하면 CRUD 표에서 강조됩니다.",
+      "modulesSidebarToggleLabel": "메뉴",
+      "modulesSidebarToggleTitle": "이 역할의 사이드바에 이 항목을 표시할지 여부",
+      "permHeading": "모듈별 작업 (CRUD)",
+      "permSub": "이 역할이 각 모듈에서 수행할 수 있는 작업을 설정합니다.",
+      "permFooter": "해제하면 해당 모듈에서 해당 작업에 대한 컨트롤이 숨겨집니다.",
+      "colModule": "모듈",
+      "colAdd": "추가",
+      "colEdit": "수정",
+      "colDelete": "삭제",
+      "dirtyHint": "저장하지 않은 변경 사항이 있습니다.",
+      "moduleDesc": {
+        "dashboard": "요약 및 KPI",
+        "units": "매물·공실",
+        "contracts": "임대·문서",
+        "crm": "연락처·임차인",
+        "ledger": "임대료·결제",
+        "calendar": "일정·일정표",
+        "tenant_portal": "임차인 포털 (데모)",
+        "agent_portal": "에이전트 포털 (데모)"
+      }
+    },
     "dashboard": {
       "title": "경영 대시보드",
       "subtitle": "부동산 포트폴리오 성과를 실시간으로 확인하세요.",

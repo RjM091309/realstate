@@ -4,7 +4,23 @@
     "role": "Administrator",
     "languageLabel": "Language"
   },
+  "login": {
+    "brand": "Realstate",
+    "heroTitle": "Property operations, simplified.",
+    "heroSubtitle": "Leasing, contracts, and tenant management in one calm workspace.",
+    "heroBullet1": "Portfolio, units, and branch tools aligned to your workflow.",
+    "heroBullet2": "Secure staff sign-in — same credentials you use in the office.",
+    "title": "Sign in",
+    "subtitle": "Use your staff account to continue.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "loading": "Signing in…",
+    "error": "Invalid username or password.",
+    "hint": "Local seed users: admin / admin123 or manager1 / admin123"
+  },
   "nav": {
+    "appName": "Realstate",
     "menu": {
       "dashboard": "Dashboard",
       "units": "Units & Vacancy",
@@ -13,12 +29,46 @@
       "ledger": "Lease Ledger",
       "calendar": "Calendar",
       "agentPortal": "Agent Portal (Demo)",
-      "portal": "Tenant Portal (Demo)"
+      "portal": "Tenant Portal (Demo)",
+      "controlPanelAccess": "Control Panel"
     },
     "settings": "Settings",
     "logout": "Logout"
   },
   "views": {
+    "userAccess": {
+      "title": "User Access",
+      "subtitle": "Configure sidebar menus and CRUD rights per role. Administrators only.",
+      "save": "Save",
+      "saved": "Saved successfully.",
+      "saving": "Saving…",
+      "loadError": "Could not load access settings.",
+      "forbidden": "You need administrator rights to manage access.",
+      "threeColumnRolesTitle": "User roles",
+      "threeColumnRolesDesc": "Select a role. The badge shows how many modules are enabled in the sidebar.",
+      "threeColumnModulesTitle": "Modules",
+      "threeColumnModulesDesc": "Use the switch to show or hide each item in the left sidebar. Select a row to highlight it in the CRUD table.",
+      "modulesSidebarToggleLabel": "Menu",
+      "modulesSidebarToggleTitle": "Show or hide this item in the sidebar for this role",
+      "permHeading": "Actions per module (CRUD)",
+      "permSub": "Toggle which actions this role can perform in each module.",
+      "permFooter": "Turning off an action hides the corresponding controls for that role in that module.",
+      "colModule": "Module",
+      "colAdd": "Add",
+      "colEdit": "Edit",
+      "colDelete": "Delete",
+      "dirtyHint": "You have unsaved changes.",
+      "moduleDesc": {
+        "dashboard": "Overview and KPIs",
+        "units": "Listings and occupancy",
+        "contracts": "Leases and documents",
+        "crm": "Contacts and tenants",
+        "ledger": "Rent and payments",
+        "calendar": "Viewings and milestones",
+        "tenant_portal": "Tenant-facing portal (demo)",
+        "agent_portal": "Agent-facing portal (demo)"
+      }
+    },
     "dashboard": {
       "title": "Executive Dashboard",
       "subtitle": "Real-time overview of your property portfolio performance.",
