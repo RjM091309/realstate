@@ -51,13 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (input: RegisterInput) => {
     const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        username: input.username,
-        password: input.password,
-        roleId: input.roleId,
-      }),
+      body: JSON.stringify(input),
     });
     setToken(data.token);
     setSession(data.session);

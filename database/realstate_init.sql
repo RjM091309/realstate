@@ -45,7 +45,6 @@ COMMENT='Staff roles; IDNo referenced by user_info.PERMISSIONS and user_role_cru
 -- ---------------------------------------------------------------------------
 CREATE TABLE `user_info` (
   `IDNO` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `TABLE_ID` INT UNSIGNED NULL DEFAULT NULL COMMENT 'Optional legacy / linking id',
   `FIRSTNAME` VARCHAR(128) NOT NULL,
   `LASTNAME` VARCHAR(128) NOT NULL,
   `USERNAME` VARCHAR(64) NOT NULL,
@@ -134,11 +133,10 @@ INSERT INTO `user_role` (`IDNo`, `ROLE`, `ENCODED_BY`, `ENCODED_DT`, `EDITED_BY`
 -- Seed: user_info — default admin (password: admin123, bcrypt)
 -- ---------------------------------------------------------------------------
 INSERT INTO `user_info` (
-  `IDNO`, `TABLE_ID`, `FIRSTNAME`, `LASTNAME`, `USERNAME`, `PASSWORD`, `SALT`,
+  `IDNO`, `FIRSTNAME`, `LASTNAME`, `USERNAME`, `PASSWORD`, `SALT`,
   `PERMISSIONS`, `LAST_LOGIN`, `ENCODED_BY`, `ENCODED_DT`, `EDITED_BY`, `EDITED_DT`, `ACTIVE`, `BRANCH_ID`
 ) VALUES (
   1,
-  NULL,
   'Admin',
   'System',
   'admin',
@@ -156,11 +154,10 @@ INSERT INTO `user_info` (
 
 -- Optional sample user: Property Manager (same branch)
 INSERT INTO `user_info` (
-  `IDNO`, `TABLE_ID`, `FIRSTNAME`, `LASTNAME`, `USERNAME`, `PASSWORD`, `SALT`,
+  `IDNO`, `FIRSTNAME`, `LASTNAME`, `USERNAME`, `PASSWORD`, `SALT`,
   `PERMISSIONS`, `LAST_LOGIN`, `ENCODED_BY`, `ENCODED_DT`, `EDITED_BY`, `EDITED_DT`, `ACTIVE`, `BRANCH_ID`
 ) VALUES (
   2,
-  NULL,
   'Maria',
   'Santos',
   'manager1',

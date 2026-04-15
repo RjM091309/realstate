@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -9,6 +9,25 @@ import { getJwtSecret, type JwtPayload } from './jwt.js';
 const router = Router();
 
 export type { JwtPayload };
+
+async function sendTokenAndSession(
+  res: Response,
+  userId: number,
+  opts?: { status?: number; sessionError?: string },
+): Promise<void> {
+  const status = opts?.status ?? 200;
+  const sessionError = opts?.sessionError ?? 'Could not load session';
+  const payload: JwtPayload = { userId };
+  const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+  const session = await loadSessionPayload(userId);
+  if (!session) {
+    res.status(500).json({ error: sessionError });
+    return;
+  }
+  const body = { token, session };
+  if (status === 201) res.status(201).json(body);
+  else res.json(body);
+}
 
 router.get('/roles', async (_req, res) => {
   try {
@@ -68,7 +87,7 @@ router.post('/register', async (req, res) => {
     const [branchRows] = await pool.query<RowDataPacket[]>(
       `SELECT id FROM branch WHERE ACTIVE = 1 ORDER BY id ASC LIMIT 1`,
     );
-    const branchId = branchRows[0] != null ? Number((branchRows[0] as RowDataPacket).id) : 1;
+    const branchId = branchRows[0] ? Number(branchRows[0].id) : 1;
 
     const [dup] = await pool.query<RowDataPacket[]>(
       `SELECT IDNO FROM user_info WHERE USERNAME = ? LIMIT 1`,
@@ -82,9 +101,9 @@ router.post('/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const [insertResult] = await pool.execute<ResultSetHeader>(
       `INSERT INTO user_info (
-        TABLE_ID, FIRSTNAME, LASTNAME, USERNAME, PASSWORD, SALT, PERMISSIONS,
+        FIRSTNAME, LASTNAME, USERNAME, PASSWORD, SALT, PERMISSIONS,
         LAST_LOGIN, ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT, ACTIVE, BRANCH_ID
-      ) VALUES (NULL, ?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 1, ?)`,
+      ) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 1, ?)`,
       [firstName, lastName, username, hash, roleId, branchId],
     );
 
@@ -94,15 +113,10 @@ router.post('/register', async (req, res) => {
       return;
     }
 
-    const payload: JwtPayload = { userId };
-    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
-    const session = await loadSessionPayload(userId);
-    if (!session) {
-      res.status(500).json({ error: 'Account created but session could not be loaded' });
-      return;
-    }
-
-    res.status(201).json({ token, session });
+    await sendTokenAndSession(res, userId, {
+      status: 201,
+      sessionError: 'Account created but session could not be loaded',
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Registration failed' });
@@ -137,17 +151,7 @@ router.post('/login', async (req, res) => {
     }
 
     const userId = Number(row.IDNO);
-    const payload: JwtPayload = { userId };
-
-    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
-    const session = await loadSessionPayload(userId);
-
-    if (!session) {
-      res.status(500).json({ error: 'Could not load session' });
-      return;
-    }
-
-    res.json({ token, session });
+    await sendTokenAndSession(res, userId);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Login failed' });

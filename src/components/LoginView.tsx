@@ -49,9 +49,9 @@ export function LoginView() {
   }, [t]);
 
   useEffect(() => {
-    if (mode !== 'register') return;
+    if (mode !== 'register' || roles.length > 0 || rolesLoading || rolesErr) return;
     void loadRoles();
-  }, [mode, loadRoles]);
+  }, [mode, roles.length, rolesLoading, rolesErr, loadRoles]);
 
   function switchMode(next: AuthMode) {
     setMode(next);
@@ -113,6 +113,11 @@ export function LoginView() {
     'flex h-11 w-full rounded-md border border-stone-200 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 shadow-xs transition-colors',
     'focus-visible:border-emerald-700/50 focus-visible:ring-[3px] focus-visible:ring-emerald-700/20 focus-visible:outline-none',
     'disabled:cursor-not-allowed disabled:opacity-50',
+  );
+  const submitBtnClass = cn(
+    'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
+    'bg-stone-900 text-white hover:bg-stone-800',
+    'focus-visible:ring-emerald-700/30',
   );
 
   return (
@@ -219,15 +224,7 @@ export function LoginView() {
                   {err}
                 </p>
               ) : null}
-              <Button
-                type="submit"
-                disabled={busy}
-                className={cn(
-                  'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
-                  'bg-stone-900 text-white hover:bg-stone-800',
-                  'focus-visible:ring-emerald-700/30',
-                )}
-              >
+              <Button type="submit" disabled={busy} className={submitBtnClass}>
                 {busy ? t('login.loading') : t('login.submit')}
               </Button>
               <p className="text-center text-xs leading-relaxed text-stone-400">{t('login.hint')}</p>
@@ -244,7 +241,7 @@ export function LoginView() {
           ) : (
             <form onSubmit={onRegister} className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-1">
+                <div className="space-y-2">
                   <Label htmlFor="firstName" className="text-stone-700">
                     {t('login.register.firstName')}
                   </Label>
@@ -259,7 +256,7 @@ export function LoginView() {
                     className={inputClass}
                   />
                 </div>
-                <div className="space-y-2 sm:col-span-1">
+                <div className="space-y-2">
                   <Label htmlFor="lastName" className="text-stone-700">
                     {t('login.register.lastName')}
                   </Label>
@@ -359,11 +356,7 @@ export function LoginView() {
               <Button
                 type="submit"
                 disabled={busy || rolesLoading || !!rolesErr || roles.length === 0}
-                className={cn(
-                  'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
-                  'bg-stone-900 text-white hover:bg-stone-800',
-                  'focus-visible:ring-emerald-700/30',
-                )}
+                className={submitBtnClass}
               >
                 {busy ? t('login.register.loading') : t('login.register.submit')}
               </Button>
