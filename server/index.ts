@@ -1,10 +1,11 @@
-import 'dotenv/config';
+import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
 import { pool } from './db.js';
 import { ensureSchema } from './ensureSchema.js';
 import { authRouter } from './authRoutes.js';
 import { adminRouter } from './adminRoutes.js';
+import { unitsRouter } from './unitsRoutes.js';
 
 const app = express();
 const apiPort = Number(process.env.API_PORT ?? 3001);
@@ -24,6 +25,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/units', unitsRouter);
 
 void (async () => {
   try {
@@ -39,7 +41,7 @@ void (async () => {
   const server = app.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      `[realstate-api] GET /api/health  GET /api/auth/roles  POST /api/auth/login  POST /api/auth/register  GET /api/auth/session  /api/admin/*`,
+      `[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*`,
     );
   });
 

@@ -1,17 +1,50 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Briefcase, TrendingUp, Users, CalendarDays, PhoneCall, FileText, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DataTable, type ColumnDef } from '@/components/ui/data-table';
 import { agents, contracts, tenants, units } from '@/lib/mockData';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import type { Contract } from '@/types';
 
 export function AgentPortalView() {
   const { t } = useTranslation();
   const agent = agents[0];
   const assignedContracts = contracts.filter((c) => c.agentId === agent?.id);
+
+  const contractColumns: ColumnDef<Contract>[] = useMemo(
+    () => [
+      {
+        header: t('views.agentPortal.contracts.unit'),
+        render: (contract) => {
+          const unit = units.find((u) => u.id === contract.unitId);
+          return <span>{unit?.unitNumber}</span>;
+        },
+      },
+      {
+        header: t('views.agentPortal.contracts.tenant'),
+        render: (contract) => {
+          const tenant = tenants.find((x) => x.id === contract.tenantId);
+          return <span>{tenant?.name}</span>;
+        },
+      },
+      {
+        header: t('views.agentPortal.contracts.endDate'),
+        render: (contract) => <span>{format(new Date(contract.endDate), 'MMM dd, yyyy')}</span>,
+      },
+      {
+        header: t('views.agentPortal.contracts.status'),
+        render: (contract) => (
+          <Badge variant={contract.status === 'Active' ? 'default' : 'outline'}>
+            {contract.status === 'Active' ? t('views.agentPortal.contracts.active') : contract.status}
+          </Badge>
+        ),
+      },
+    ],
+    [t]
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 animate-in fade-in duration-500">
@@ -75,35 +108,8 @@ export function AgentPortalView() {
                 <CardTitle>{t('views.agentPortal.contracts.title')}</CardTitle>
                 <CardDescription>{t('views.agentPortal.contracts.description')}</CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('views.agentPortal.contracts.unit')}</TableHead>
-                      <TableHead>{t('views.agentPortal.contracts.tenant')}</TableHead>
-                      <TableHead>{t('views.agentPortal.contracts.endDate')}</TableHead>
-                      <TableHead>{t('views.agentPortal.contracts.status')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {assignedContracts.map((contract) => {
-                      const unit = units.find((u) => u.id === contract.unitId);
-                      const tenant = tenants.find((x) => x.id === contract.tenantId);
-                      return (
-                        <TableRow key={contract.id}>
-                          <TableCell>{unit?.unitNumber}</TableCell>
-                          <TableCell>{tenant?.name}</TableCell>
-                          <TableCell>{format(new Date(contract.endDate), 'MMM dd, yyyy')}</TableCell>
-                          <TableCell>
-                            <Badge variant={contract.status === 'Active' ? 'default' : 'outline'}>
-                              {contract.status === 'Active' ? t('views.agentPortal.contracts.active') : contract.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <CardContent className="p-0 overflow-hidden">
+                <DataTable data={assignedContracts} columns={contractColumns} keyExtractor={(c) => c.id} />
               </CardContent>
             </Card>
           </div>

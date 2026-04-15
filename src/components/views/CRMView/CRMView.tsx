@@ -1,43 +1,216 @@
-import React, { useState } from 'react';
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Mail, 
-  Phone, 
-  ShieldCheck, 
-  ShieldAlert,
-  FileText,
+import React, { useMemo, useState } from 'react';
+import {
+  Users,
+  Search,
+  Plus,
+  Mail,
+  Phone,
+  ShieldCheck,
   History,
   MoreVertical,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { DataTable, type ColumnDef } from '@/components/ui/data-table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { tenants, brokerAgencies, contracts, units } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import type { Tenant } from '@/types';
+
+type BlacklistRow = {
+  id: string;
+  name: string;
+  type: 'Tenant' | 'Landlord';
+  reason: string;
+  date: string;
+};
+
+const blacklistRows: BlacklistRow[] = [
+  {
+    id: 'bl1',
+    name: 'Robert Wilson',
+    type: 'Tenant',
+    reason: 'Unpaid rent for 3 months & property damage',
+    date: '2025-11-12',
+  },
+  {
+    id: 'bl2',
+    name: 'Sarah Jenkins',
+    type: 'Landlord',
+    reason: 'Multiple security deposit refund violations',
+    date: '2026-01-05',
+  },
+  {
+    id: 'bl3',
+    name: 'Kevin Lee',
+    type: 'Tenant',
+    reason: 'Illegal subletting and noise complaints',
+    date: '2025-08-20',
+  },
+];
 
 export function CRMView() {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredTenants = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return tenants;
+    return tenants.filter(
+      (tenant) =>
+        tenant.name.toLowerCase().includes(q) ||
+        tenant.email.toLowerCase().includes(q) ||
+        tenant.phone.includes(q)
+    );
+  }, [searchTerm]);
+
+  const filteredBlacklist = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return blacklistRows;
+    return blacklistRows.filter(
+      (row) =>
+        row.name.toLowerCase().includes(q) ||
+        row.reason.toLowerCase().includes(q) ||
+        row.type.toLowerCase().includes(q)
+    );
+  }, [searchTerm]);
+
+  const tenantColumns: ColumnDef<Tenant>[] = useMemo(
+    () => [
+      {
+        header: t('views.crm.table.tenant'),
+        render: (tenant) => (
+          <div className="flex items-center gap-3">
+            <Avatar>
+              <AvatarFallback>{tenant.name.split(' ').map((n) => n[0]).join('')}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="font-bold text-slate-900">{tenant.name}</span>
+              <span className="text-xs text-slate-500">{t('views.crm.table.idLabel', { id: tenant.idNumber })}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: t('views.crm.table.contactInfo'),
+        render: (tenant) => (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Mail className="w-3 h-3" />
+              {tenant.email}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Phone className="w-3 h-3" />
+              {tenant.phone}
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: t('views.crm.table.kycStatus'),
+        render: () => (
+          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+            <ShieldCheck className="w-3 h-3 mr-1" />
+            {t('views.crm.table.verified')}
+          </Badge>
+        ),
+      },
+      {
+        header: t('views.crm.table.currentUnit'),
+        render: (tenant) => {
+          const activeContract = contracts.find((c) => c.tenantId === tenant.id && c.status === 'Active');
+          const unit = activeContract ? units.find((u) => u.id === activeContract.unitId) : null;
+          return unit ? (
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-slate-700">{t('views.crm.table.unitLabel', { unitNumber: unit.unitNumber })}</span>
+              <span className="text-xs text-slate-500">{unit.buildingName}</span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400 italic">{t('views.crm.table.noActiveLease')}</span>
+          );
+        },
+      },
+      {
+        header: t('views.crm.table.status'),
+        render: (tenant) =>
+          tenant.isBlacklisted ? (
+            <Badge variant="destructive">{t('views.crm.table.blacklisted')}</Badge>
+          ) : (
+            <Badge variant="default" className="bg-indigo-500">
+              {t('views.crm.table.active')}
+            </Badge>
+          ),
+      },
+      {
+        header: t('views.crm.table.actions'),
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: () => (
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="icon" title={t('views.crm.table.viewPortal')}>
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title={t('views.crm.table.history')}>
+              <History className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const blacklistColumns: ColumnDef<BlacklistRow>[] = useMemo(
+    () => [
+      {
+        header: t('views.crm.blacklist.name'),
+        render: (item) => <span className="font-bold pl-0">{item.name}</span>,
+      },
+      {
+        header: t('views.crm.blacklist.type'),
+        render: (item) => (
+          <Badge
+            variant="outline"
+            className={cn(
+              item.type === 'Tenant' ? 'text-blue-600 border-blue-100 bg-blue-50' : 'text-amber-600 border-amber-100 bg-amber-50'
+            )}
+          >
+            {item.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.landlord')}
+          </Badge>
+        ),
+      },
+      {
+        header: t('views.crm.blacklist.reason'),
+        render: (item) => <span className="text-sm text-slate-600">{item.reason}</span>,
+      },
+      {
+        header: t('views.crm.blacklist.dateAdded'),
+        render: () => <span className="text-xs text-slate-400">Nov 12, 2025</span>,
+      },
+      {
+        header: t('views.crm.blacklist.actions'),
+        className: 'text-right pr-6',
+        headerClassName: 'text-right pr-6',
+        cellClassName: 'text-right pr-6',
+        render: () => (
+          <Button variant="ghost" size="sm" className="text-rose-600">
+            {t('views.crm.blacklist.details')}
+          </Button>
+        ),
+      },
+    ],
+    [t]
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -52,6 +225,18 @@ export function CRMView() {
         </Button>
       </div>
 
+      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder={t('views.crm.searchPlaceholder')}
+            className="pl-10 border-slate-200"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <Tabs defaultValue="tenants" className="w-full">
         <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
           <TabsTrigger value="tenants">{t('views.crm.tabs.tenants')}</TabsTrigger>
@@ -60,106 +245,7 @@ export function CRMView() {
         </TabsList>
 
         <TabsContent value="tenants" className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input 
-                placeholder={t('views.crm.searchPlaceholder')}
-                className="pl-10 border-slate-200"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6">
-            <Card className="border-none shadow-md">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50/50">
-                      <TableHead>{t('views.crm.table.tenant')}</TableHead>
-                      <TableHead>{t('views.crm.table.contactInfo')}</TableHead>
-                      <TableHead>{t('views.crm.table.kycStatus')}</TableHead>
-                      <TableHead>{t('views.crm.table.currentUnit')}</TableHead>
-                      <TableHead>{t('views.crm.table.status')}</TableHead>
-                      <TableHead className="text-right">{t('views.crm.table.actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tenants.map((tenant) => {
-                      const activeContract = contracts.find(c => c.tenantId === tenant.id && c.status === 'Active');
-                      const unit = activeContract ? units.find(u => u.id === activeContract.unitId) : null;
-                      
-                      return (
-                        <TableRow key={tenant.id} className="hover:bg-slate-50/50 transition-colors">
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarFallback>{tenant.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-900">{tenant.name}</span>
-                                <span className="text-xs text-slate-500">{t('views.crm.table.idLabel', { id: tenant.idNumber })}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2 text-xs text-slate-600">
-                                <Mail className="w-3 h-3" />
-                                {tenant.email}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-slate-600">
-                                <Phone className="w-3 h-3" />
-                                {tenant.phone}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                              <ShieldCheck className="w-3 h-3 mr-1" />
-                              {t('views.crm.table.verified')}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {unit ? (
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium text-slate-700">{t('views.crm.table.unitLabel', { unitNumber: unit.unitNumber })}</span>
-                                <span className="text-xs text-slate-500">{unit.buildingName}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">{t('views.crm.table.noActiveLease')}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {tenant.isBlacklisted ? (
-                              <Badge variant="destructive">{t('views.crm.table.blacklisted')}</Badge>
-                            ) : (
-                              <Badge variant="default" className="bg-indigo-500">{t('views.crm.table.active')}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="ghost" size="icon" title={t('views.crm.table.viewPortal')}>
-                                <ExternalLink className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" title={t('views.crm.table.history')}>
-                                <History className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+          <DataTable data={filteredTenants} columns={tenantColumns} keyExtractor={(tenant) => tenant.id} />
         </TabsContent>
 
         <TabsContent value="brokers" className="space-y-6">
@@ -187,7 +273,9 @@ export function CRMView() {
                       <span className="font-medium">{agency.phone}</span>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full">{t('views.crm.brokers.viewLogs')}</Button>
+                  <Button variant="outline" className="w-full">
+                    {t('views.crm.brokers.viewLogs')}
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -198,49 +286,16 @@ export function CRMView() {
           </div>
         </TabsContent>
         <TabsContent value="blacklist" className="space-y-6">
-          <Card className="border-none shadow-md border-rose-100">
+          <Card className="border-none shadow-md border-rose-100 overflow-hidden">
             <CardHeader className="bg-rose-50/50 border-b border-rose-100">
               <CardTitle className="text-rose-900 flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5" />
                 {t('views.crm.blacklist.title')}
               </CardTitle>
-              <CardDescription className="text-rose-700/70">
-                {t('views.crm.blacklist.description')}
-              </CardDescription>
+              <CardDescription className="text-rose-700/70">{t('views.crm.blacklist.description')}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50">
-                    <TableHead className="pl-6">{t('views.crm.blacklist.name')}</TableHead>
-                    <TableHead>{t('views.crm.blacklist.type')}</TableHead>
-                    <TableHead>{t('views.crm.blacklist.reason')}</TableHead>
-                    <TableHead>{t('views.crm.blacklist.dateAdded')}</TableHead>
-                    <TableHead className="text-right pr-6">{t('views.crm.blacklist.actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[
-                    { name: 'Robert Wilson', type: 'Tenant', reason: 'Unpaid rent for 3 months & property damage', date: '2025-11-12' },
-                    { name: 'Sarah Jenkins', type: 'Landlord', reason: 'Multiple security deposit refund violations', date: '2026-01-05' },
-                    { name: 'Kevin Lee', type: 'Tenant', reason: 'Illegal subletting and noise complaints', date: '2025-08-20' },
-                  ].map((item, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-bold pl-6">{item.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(item.type === 'Tenant' ? "text-blue-600 border-blue-100 bg-blue-50" : "text-amber-600 border-amber-100 bg-amber-50")}>
-                          {item.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.landlord')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">{item.reason}</TableCell>
-                      <TableCell className="text-xs text-slate-400">Nov 12, 2025</TableCell>
-                      <TableCell className="text-right pr-6">
-                        <Button variant="ghost" size="sm" className="text-rose-600">{t('views.crm.blacklist.details')}</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable data={filteredBlacklist} columns={blacklistColumns} keyExtractor={(row) => row.id} />
             </CardContent>
           </Card>
         </TabsContent>

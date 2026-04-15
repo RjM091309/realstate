@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { LoginView } from './components/LoginView';
 import { Sidebar, TopNav } from './components/Navigation';
 import { DashboardView } from './components/views/DashboardView/index';
 import { UnitsView } from './components/views/UnitsView/index';
@@ -16,10 +18,9 @@ import { UserAccessView } from './components/views/UserAccessView/index';
 import { TenantPortalView } from './components/views/TenantPortalView/index';
 import { AgentPortalView } from './components/views/AgentPortalView/index';
 import { DocumentPreview } from './components/DocumentPreview';
-import { LoginView } from './components/LoginView';
-import { useAuth } from './context/AuthContext';
 
 export default function App() {
+  // Check for standalone preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const isPreview = urlParams.get('view') === 'preview';
   const isPortalPage = urlParams.get('view') === 'portal';
@@ -29,7 +30,11 @@ export default function App() {
 
   if (isPreview && previewType && previewId) {
     return (
-      <DocumentPreview type={previewType} contractId={previewId} isStandalone />
+      <DocumentPreview 
+        type={previewType} 
+        contractId={previewId} 
+        isStandalone 
+      />
     );
   }
 
@@ -101,14 +106,19 @@ function MainApp() {
         setActiveTab={setActiveTab}
         allowedTabIds={session.sidebarTabIds}
         isAdmin={isAdmin}
-        onLogout={logout}
+        onLogout={() => {
+          setActiveTab('dashboard');
+          logout();
+        }}
       />
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav displayName={displayName} roleLabel={session.role.name} />
-
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-8 custom-scrollbar">
-          <div className="mx-auto w-full max-w-[min(100%,100rem)]">{renderView()}</div>
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNav />
+        
+        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          <div className="max-w-7xl mx-auto">
+            {renderView()}
+          </div>
         </main>
       </div>
     </div>

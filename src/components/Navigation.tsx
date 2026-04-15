@@ -1,10 +1,11 @@
-import React from 'react';
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  FileText,
-  Calendar,
+import React, { useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { 
+  LayoutDashboard, 
+  Building2, 
+  Users, 
+  FileText, 
+  Calendar, 
   Settings,
   LogOut,
   Search,
@@ -12,12 +13,18 @@ import {
   UserCircle,
   Briefcase,
   SlidersHorizontal,
+  CalendarDays,
+  ChevronDown,
 } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/context/AuthContext';
+import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -85,14 +92,10 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                 setActiveTab(item.id);
               }}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left',
-                activeTab === item.id
-                  ? item.id === 'access'
-                    ? 'bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-500/30'
-                    : 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
-                  : item.id === 'access'
-                    ? 'text-emerald-300/95 hover:bg-slate-800 hover:text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                activeTab === item.id 
+                  ? "bg-indigo-600 text-white" 
+                  : "hover:bg-slate-800 hover:text-white"
               )}
             >
               <item.icon className="w-4 h-4 shrink-0 opacity-90" />
@@ -120,30 +123,94 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   );
 }
 
-interface TopNavProps {
-  displayName?: string;
-  roleLabel?: string;
-}
-
-export function TopNav({ displayName, roleLabel }: TopNavProps) {
+export function TopNav() {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
-  const name = displayName?.trim() || 'RJ Manapsal';
-  const role = roleLabel ?? t('header.role');
+  const { session } = useAuth();
+  const { dateRange, setDateRange } = useDateRange();
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+  /** Local range while the popover is open so [start, null] partial selection works (controlled range bug). */
+  const [pickerRange, setPickerRange] = useState<[Date | null, Date | null]>([null, null]);
+
+  const showDateRangePicker = true;
+  const name =
+    session != null
+      ? `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username
+      : '';
+  const role = session?.role.name ?? '';
+
+  const labelText = `${format(parseISO(dateRange.start), 'MMM d, yyyy')} – ${format(parseISO(dateRange.end), 'MMM d, yyyy')}`;
+
+  function handleDateRangeChange(dates: [Date | null, Date | null] | null) {
+    if (!dates) return;
+    const [start, end] = dates;
+    setPickerRange(dates);
+    if (start != null && end != null) {
+      setDateRange({ start: toYYYYMMDD(start), end: toYYYYMMDD(end) });
+      setDateDropdownOpen(false);
+    }
+  }
 
   return (
     <header className="h-16 border-bottom bg-white flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
+          <Input 
             placeholder={t('header.searchPlaceholder')}
             className="pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
           />
         </div>
+
+        {showDateRangePicker && (
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (!dateDropdownOpen) {
+                  setPickerRange([
+                    dateRange.start ? parseISO(dateRange.start) : null,
+                    dateRange.end ? parseISO(dateRange.end) : null,
+                  ]);
+                  setDateDropdownOpen(true);
+                } else {
+                  setDateDropdownOpen(false);
+                }
+              }}
+              className="flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-2 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer"
+            >
+              <CalendarDays size={18} className="text-slate-500 shrink-0" />
+              <span className="text-sm text-slate-600 whitespace-nowrap max-w-[200px] sm:max-w-none truncate">
+                {labelText}
+              </span>
+              <ChevronDown size={16} className="text-slate-500 shrink-0" />
+            </button>
+
+            {dateDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} aria-hidden />
+                <div
+                  className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 z-50"
+                  onClick={(e) => e.stopPropagation()}
+                  role="presentation"
+                >
+                  <DatePicker
+                    inline
+                    selectsRange
+                    startDate={pickerRange[0] ?? undefined}
+                    endDate={pickerRange[1] ?? undefined}
+                    onChange={handleDateRangeChange}
+                    dateFormat="MMM d, yyyy"
+                    calendarClassName="react-datepicker-material"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 p-1">
           <span className="sr-only">{t('header.languageLabel')}</span>
           <Button
@@ -166,9 +233,9 @@ export function TopNav({ displayName, roleLabel }: TopNavProps) {
 
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5 text-slate-600" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+          <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </Button>
-        <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+        <div className="h-8 w-px bg-slate-200 hidden sm:block" />
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-semibold text-slate-900">{name}</p>

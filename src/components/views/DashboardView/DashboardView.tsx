@@ -33,11 +33,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DataTable, type ColumnDef } from '@/components/ui/data-table';
 import { units, payments, contracts, tenants } from '@/lib/mockData';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import type { Contract, Payment } from '@/types';
+import { useDateRange } from '@/context/DateRangeContext';
 
 const salesData = [
   { month: 'Jan', Profit: 450000, deals: 12 },
@@ -57,8 +59,22 @@ const occupancyData = (t: (key: string) => string) => [
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b'];
 
 export function DashboardView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { dateRange } = useDateRange();
   const [profitOverride, setProfitOverride] = useState<string>('');
+
+  const rangeLabel =
+    dateRange.start && dateRange.end
+      ? `${new Date(dateRange.start + 'T12:00:00').toLocaleDateString(i18n.language === 'ko' ? 'ko-KR' : 'en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })} – ${new Date(dateRange.end + 'T12:00:00').toLocaleDateString(i18n.language === 'ko' ? 'ko-KR' : 'en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}`
+      : t('views.dashboard.last30Days');
   const totalProfit = salesData.reduce((acc, curr) => acc + curr.Profit, 0);
   const activeContracts = contracts.filter(c => c.status === 'Active').length;
   const vacancyRate = ((units.filter(u => u.status === 'Available').length / units.length) * 100).toFixed(1);
@@ -76,11 +92,163 @@ export function DashboardView() {
     })
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
-  const upcomingVacancies = contracts.filter(c => {
-    const end = new Date(c.endDate);
-    const thirtyDaysFromNow = addDays(new Date(), 30);
-    return isBefore(end, thirtyDaysFromNow) && isAfter(end, new Date());
-  });
+  const vacancyContracts = useMemo(
+    () => contracts.filter((c) => isBefore(new Date(c.endDate), addDays(new Date(), 60))),
+    []
+  );
+
+  const vacancyColumns: ColumnDef<Contract>[] = useMemo(
+    () => [
+      {
+        header: t('views.dashboard.vacancies.unit'),
+        render: (c) => {
+          const unit = units.find((u) => u.id === c.unitId);
+          return (
+            <span className="font-medium">
+              {unit?.unitNumber} - {unit?.buildingName}
+            </span>
+          );
+        },
+      },
+      {
+        header: t('views.dashboard.vacancies.tenant'),
+        render: (c) => {
+          const tenant = tenants.find((ten) => ten.id === c.tenantId);
+          return <span>{tenant?.name || t('views.dashboard.vacancies.fallbackTenant')}</span>;
+        },
+      },
+      {
+        header: t('views.dashboard.vacancies.expiryDate'),
+        render: (c) => <span>{format(new Date(c.endDate), 'MMM dd, yyyy')}</span>,
+      },
+      {
+        header: t('views.dashboard.vacancies.notice'),
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: (c) => {
+          const daysLeft = Math.ceil((new Date(c.endDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+          return (
+            <Badge variant={daysLeft <= 30 ? 'destructive' : 'outline'}>
+              {daysLeft <= 30 ? t('views.dashboard.vacancies.oneMonth') : t('views.dashboard.vacancies.twoMonth')}
+            </Badge>
+          );
+        },
+      },
+    ],
+    [t]
+  );
+
+  const paymentColumns: ColumnDef<Payment>[] = useMemo(
+    () => [
+      {
+        header: t('views.dashboard.payments.unit'),
+        render: (payment) => {
+          const unit = units.find((u) => u.id === payment.unitId);
+          return (
+            <span className="font-medium">
+              {unit?.unitNumber} - {unit?.buildingName}
+            </span>
+          );
+        },
+      },
+      {
+        header: t('views.dashboard.payments.tenant'),
+        render: (payment) => {
+          const contract = contracts.find((c) => c.id === payment.contractId);
+          const tenant = contract ? tenants.find((ten) => ten.id === contract.tenantId) : null;
+          return <span>{tenant?.name}</span>;
+        },
+      },
+      {
+        header: t('views.dashboard.payments.dueDate'),
+        render: (payment) => <span>{format(new Date(payment.dueDate), 'MMM dd, yyyy')}</span>,
+      },
+      {
+        header: t('views.dashboard.payments.amount'),
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: (payment) => (
+          <span className="font-semibold">₱{payment.amount.toLocaleString()}</span>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
+  const agentRows: AgentRow[] = useMemo(
+    () => [
+      {
+        id: 'dash-a1',
+        name: 'Maria Santos',
+        deals: 14,
+        profit: 420000,
+        status: t('views.dashboard.agents.statusTopPerformer'),
+      },
+      {
+        id: 'dash-a2',
+        name: 'Juan Dela Cruz',
+        deals: 9,
+        profit: 280000,
+        status: t('views.dashboard.agents.statusActive'),
+      },
+      {
+        id: 'dash-a3',
+        name: 'Elena Reyes',
+        deals: 6,
+        profit: 195000,
+        status: t('views.dashboard.agents.statusActive'),
+      },
+      {
+        id: 'dash-a4',
+        name: 'Ricardo Gomez',
+        deals: 3,
+        profit: 90000,
+        status: t('views.dashboard.agents.statusOnProbation'),
+      },
+    ],
+    [t]
+  );
+
+  const agentColumns: ColumnDef<AgentRow>[] = useMemo(
+    () => [
+      {
+        header: t('views.dashboard.agents.agentName'),
+        render: (a) => <span className="font-medium pl-0">{a.name}</span>,
+      },
+      {
+        header: t('views.dashboard.agents.deals'),
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
+        render: (a) => <span>{a.deals}</span>,
+      },
+      {
+        header: t('views.dashboard.agents.profit'),
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: (a) => <span className="font-mono text-xs">₱{a.profit.toLocaleString()}</span>,
+      },
+      {
+        header: t('views.dashboard.agents.status'),
+        className: 'text-right pr-6',
+        headerClassName: 'text-right pr-6',
+        cellClassName: 'text-right pr-6',
+        render: (a) => (
+          <Badge
+            variant={a.status === t('views.dashboard.agents.statusTopPerformer') ? 'default' : 'outline'}
+            className={cn(a.status === t('views.dashboard.agents.statusTopPerformer') && 'bg-indigo-600')}
+          >
+            {a.status}
+          </Badge>
+        ),
+      },
+    ],
+    [t]
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -90,9 +258,9 @@ export function DashboardView() {
           <p className="text-slate-500 mt-1">{t('views.dashboard.subtitle')}</p>
         </div>
         <div className="flex gap-3">
-          <Badge variant="outline" className="px-3 py-1 bg-white">
-            <CalendarIcon className="w-3 h-3 mr-2" />
-            {t('views.dashboard.last30Days')}
+          <Badge variant="outline" className="px-3 py-1 bg-white max-w-full truncate">
+            <CalendarIcon className="w-3 h-3 mr-2 shrink-0" />
+            <span className="truncate">{rangeLabel}</span>
           </Badge>
         </div>
       </div>
@@ -239,39 +407,8 @@ export function DashboardView() {
             <CardTitle>{t('views.dashboard.vacancies.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.vacancies.description')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('views.dashboard.vacancies.unit')}</TableHead>
-                  <TableHead>{t('views.dashboard.vacancies.tenant')}</TableHead>
-                  <TableHead>{t('views.dashboard.vacancies.expiryDate')}</TableHead>
-                  <TableHead className="text-right">{t('views.dashboard.vacancies.notice')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {contracts
-                  .filter(c => isBefore(new Date(c.endDate), addDays(new Date(), 60)))
-                  .map((c) => {
-                    const unit = units.find(u => u.id === c.unitId);
-                    const tenant = tenants.find(t => t.id === c.tenantId);
-                    const daysLeft = Math.ceil((new Date(c.endDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-                    
-                    return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{unit?.unitNumber} - {unit?.buildingName}</TableCell>
-                        <TableCell>{tenant?.name || t('views.dashboard.vacancies.fallbackTenant')}</TableCell>
-                        <TableCell>{format(new Date(c.endDate), 'MMM dd, yyyy')}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={daysLeft <= 30 ? 'destructive' : 'outline'}>
-                            {daysLeft <= 30 ? t('views.dashboard.vacancies.oneMonth') : t('views.dashboard.vacancies.twoMonth')}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </Table>
+          <CardContent className="p-0 overflow-hidden rounded-b-xl">
+            <DataTable data={vacancyContracts} columns={vacancyColumns} keyExtractor={(c) => c.id} />
           </CardContent>
         </Card>
 
@@ -280,38 +417,12 @@ export function DashboardView() {
             <CardTitle>{t('views.dashboard.payments.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.payments.description')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('views.dashboard.payments.unit')}</TableHead>
-                  <TableHead>{t('views.dashboard.payments.tenant')}</TableHead>
-                  <TableHead>{t('views.dashboard.payments.dueDate')}</TableHead>
-                  <TableHead className="text-right">{t('views.dashboard.payments.amount')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {upcomingPayments7Days.length > 0 ? (
-                  upcomingPayments7Days.map((payment) => {
-                    const unit = units.find((u) => u.id === payment.unitId);
-                    const contract = contracts.find((c) => c.id === payment.contractId);
-                    const tenant = contract ? tenants.find((t) => t.id === contract.tenantId) : null;
-                    return (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-medium">{unit?.unitNumber} - {unit?.buildingName}</TableCell>
-                        <TableCell>{tenant?.name}</TableCell>
-                        <TableCell>{format(new Date(payment.dueDate), 'MMM dd, yyyy')}</TableCell>
-                        <TableCell className="text-right font-semibold">₱{payment.amount.toLocaleString()}</TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-slate-500">{t('views.dashboard.payments.empty')}</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+          <CardContent className="p-0 overflow-hidden rounded-b-xl">
+            <DataTable
+              data={upcomingPayments7Days}
+              columns={paymentColumns}
+              keyExtractor={(p) => p.id}
+            />
           </CardContent>
         </Card>
 
@@ -320,39 +431,8 @@ export function DashboardView() {
             <CardTitle>{t('views.dashboard.agents.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.agents.description')}</CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50/50">
-                  <TableHead className="pl-6">{t('views.dashboard.agents.agentName')}</TableHead>
-                  <TableHead className="text-center">{t('views.dashboard.agents.deals')}</TableHead>
-                  <TableHead className="text-right">{t('views.dashboard.agents.profit')}</TableHead>
-                  <TableHead className="text-right pr-6">{t('views.dashboard.agents.status')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  { name: 'Maria Santos', deals: 14, Profit: 420000, status: t('views.dashboard.agents.statusTopPerformer') },
-                  { name: 'Juan Dela Cruz', deals: 9, Profit: 280000, status: t('views.dashboard.agents.statusActive') },
-                  { name: 'Elena Reyes', deals: 6, Profit: 195000, status: t('views.dashboard.agents.statusActive') },
-                  { name: 'Ricardo Gomez', deals: 3, Profit: 90000, status: t('views.dashboard.agents.statusOnProbation') },
-                ].map((agent, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium pl-6">{agent.name}</TableCell>
-                    <TableCell className="text-center">{agent.deals}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">₱{agent.Profit.toLocaleString()}</TableCell>
-                    <TableCell className="text-right pr-6">
-                      <Badge
-                        variant={agent.status === t('views.dashboard.agents.statusTopPerformer') ? 'default' : 'outline'}
-                        className={cn(agent.status === t('views.dashboard.agents.statusTopPerformer') && "bg-indigo-600")}
-                      >
-                        {agent.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="p-0 overflow-hidden rounded-b-xl">
+            <DataTable data={agentRows} columns={agentColumns} keyExtractor={(a) => a.id} />
           </CardContent>
         </Card>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { 
   User, 
   FileText, 
@@ -16,19 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+import { DataTable, type ColumnDef } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { tenants, units, contracts, payments } from '@/lib/mockData';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import type { Payment } from '@/types';
 
 export function TenantPortalView() {
   const { t } = useTranslation();
@@ -38,7 +32,42 @@ export function TenantPortalView() {
   const unit = units.find(u => u.id === contract?.unitId);
   const tenantPayments = payments.filter(p => p.contractId === contract?.id);
 
-  const [isUploading, setIsUploading] = useState(false);
+  const paymentColumns: ColumnDef<Payment>[] = useMemo(
+    () => [
+      {
+        header: t('views.portal.table.date'),
+        render: (p) => <span>{format(new Date(p.paidDate || p.dueDate), 'MMM dd, yyyy')}</span>,
+      },
+      {
+        header: t('views.portal.table.reference'),
+        render: (p) => <span className="font-mono text-xs uppercase">{p.id}</span>,
+      },
+      {
+        header: t('views.portal.table.amount'),
+        render: (p) => <span className="font-bold">₱{p.amount.toLocaleString()}</span>,
+      },
+      {
+        header: t('views.portal.table.status'),
+        render: () => (
+          <Badge variant="default" className="bg-emerald-500">
+            {t('views.portal.table.paid')}
+          </Badge>
+        ),
+      },
+      {
+        header: t('views.portal.table.action'),
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: () => (
+          <Button variant="ghost" size="sm">
+            <Download className="w-4 h-4" />
+          </Button>
+        ),
+      },
+    ],
+    [t]
+  );
 
   const handlePreviewContract = () => {
     if (contract) {
@@ -107,35 +136,8 @@ export function TenantPortalView() {
               <CardTitle>{t('views.portal.recentPayments')}</CardTitle>
               <CardDescription>{t('views.portal.recentPaymentsDescription')}</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('views.portal.table.date')}</TableHead>
-                    <TableHead>{t('views.portal.table.reference')}</TableHead>
-                    <TableHead>{t('views.portal.table.amount')}</TableHead>
-                    <TableHead>{t('views.portal.table.status')}</TableHead>
-                    <TableHead className="text-right">{t('views.portal.table.action')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tenantPayments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{format(new Date(p.paidDate || p.dueDate), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell className="font-mono text-xs uppercase">{p.id}</TableCell>
-                      <TableCell className="font-bold">₱{p.amount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="default" className="bg-emerald-500">{t('views.portal.table.paid')}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <CardContent className="p-0 overflow-hidden">
+              <DataTable data={tenantPayments} columns={paymentColumns} keyExtractor={(p) => p.id} />
             </CardContent>
           </Card>
 

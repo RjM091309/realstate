@@ -1,8 +1,20 @@
 {
+  "common": {
+    "close": "Close",
+    "loading": "Loading...",
+    "select_placeholder": "Select an option..."
+  },
+  "datatable": {
+    "no_data": "No data available",
+    "show": "Show",
+    "entries": "entries",
+    "showing_info": "Showing {{from}} to {{to}} of {{total}} entries"
+  },
   "header": {
     "searchPlaceholder": "Search units, tenants, or contracts...",
     "role": "Administrator",
-    "languageLabel": "Language"
+    "languageLabel": "Language",
+    "dateRange": "Date range"
   },
   "login": {
     "brand": "Realstate",
@@ -170,7 +182,8 @@
       "statuses": {
         "available": "Available",
         "occupied": "Occupied",
-        "maintenance": "Maintenance"
+        "maintenance": "Maintenance",
+        "reserved": "Reserved"
       },
       "unitLabel": "Unit {{unitNumber}}",
       "details": {
@@ -186,7 +199,35 @@
         "completed": "Completed",
         "addressTemplate": "{{unitNumber}}, {{tower}}, {{buildingName}}, Ayala Avenue, Makati City, Metro Manila, Philippines.",
         "remarksText": "\"Landlord requests strictly no pets. Tenant requested for additional curtains before move-in.\""
-      }
+      },
+      "addModal": {
+        "title": "Add new unit",
+        "description": "Enter the unit details. Inventory can be managed after the unit is created.",
+        "unitNumber": "Unit number",
+        "floor": "Floor",
+        "tower": "Tower / wing",
+        "buildingName": "Building name",
+        "commonAddress": "Common address",
+        "legalAddress": "Legal address",
+        "type": "Unit type",
+        "status": "Status",
+        "area": "Area",
+        "monthlyRate": "Monthly rate (₱)",
+        "save": "Save unit",
+        "cancel": "Cancel",
+        "validationRequired": "Unit number and building name are required.",
+        "validationRate": "Enter a valid monthly rate.",
+        "saved": "Unit added to the list."
+      },
+      "editModal": {
+        "title": "Edit unit",
+        "save": "Save changes"
+      },
+      "loadError": "Could not load units from the server. Showing sample data.",
+      "updated": "Unit updated.",
+      "deleted": "Unit removed.",
+      "deleteConfirm": "Delete unit {{unitNumber}}? This cannot be undone.",
+      "inventoryEmpty": "No inventory recorded for this unit."
     },
     "contracts": {
       "title": "Contracts & Operations",

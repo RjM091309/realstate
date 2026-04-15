@@ -8,6 +8,27 @@ export interface AuthedRequest extends Request {
   userId?: number;
 }
 
+/** Verifies Bearer JWT and sets `req.userId`. */
+export async function requireAuth(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  try {
+    const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
+    req.userId = decoded.userId;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired session' });
+  }
+}
+
 /** Requires Bearer JWT and user role Administrator (PERMISSIONS = 1). */
 export async function requireAdministrator(
   req: AuthedRequest,
