@@ -17,7 +17,24 @@
     "submit": "Sign in",
     "loading": "Signing in…",
     "error": "Invalid username or password.",
-    "hint": "Local seed users: admin / admin123 or manager1 / admin123"
+    "hint": "Local seed users: admin / admin123 or manager1 / admin123",
+    "switchToRegister": "Create an account",
+    "switchToSignIn": "Already have an account? Sign in",
+    "register": {
+      "title": "Create account",
+      "subtitle": "Enter your details and choose your staff role.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "confirmPassword": "Confirm password",
+      "role": "Role",
+      "rolePlaceholder": "Select a role",
+      "roleRequired": "Please select a role.",
+      "loadingRoles": "Loading roles…",
+      "submit": "Create account",
+      "loading": "Creating account…",
+      "passwordMismatch": "Passwords do not match.",
+      "rolesError": "Could not load roles. Try again later."
+    }
   },
   "nav": {
     "appName": "Realstate",

@@ -16,8 +16,8 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // UI on 5173, API on API_PORT (default 3001) — avoids Vite stealing 3001 when 3000 is busy.
-      port: 5173,
+      // UI dev port: avoid 6000 — Chrome blocks it (X11 / ERR_UNSAFE_PORT). 6001 is fine.
+      port: 6001,
       strictPort: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

@@ -39,7 +39,7 @@ void (async () => {
   const server = app.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      `[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*`,
+      `[realstate-api] GET /api/health  GET /api/auth/roles  POST /api/auth/login  POST /api/auth/register  GET /api/auth/session  /api/admin/*`,
     );
   });
 

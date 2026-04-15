@@ -1,11 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { SessionPayload } from '@/types/session';
+import type { RegisterInput, SessionPayload } from '@/types/session';
 import { apiFetch, getToken, setToken } from '@/lib/api';
 
 interface AuthContextValue {
   session: SessionPayload | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   refreshSession: () => Promise<void>;
 }
@@ -47,6 +48,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(data.session);
   }, []);
 
+  const register = useCallback(async (input: RegisterInput) => {
+    const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        username: input.username,
+        password: input.password,
+        roleId: input.roleId,
+      }),
+    });
+    setToken(data.token);
+    setSession(data.session);
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setSession(null);
@@ -58,10 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       login,
+      register,
       logout,
       refreshSession,
     }),
-    [session, loading, login, logout, refreshSession],
+    [session, loading, login, register, logout, refreshSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

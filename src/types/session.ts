@@ -1,3 +1,11 @@
+export interface RegisterInput {
+  firstName: string;
+  lastName: string;
+  username: string;
+  password: string;
+  roleId: number;
+}
+
 export interface SessionPayload {
   user: {
     id: number;

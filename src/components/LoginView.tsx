@@ -1,21 +1,72 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Building2, KeyRound, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
+type AuthMode = 'signin' | 'register';
+
+interface RoleOption {
+  id: number;
+  name: string;
+}
+
 export function LoginView() {
   const { t } = useTranslation();
-  const { login } = useAuth();
+  const { login, register } = useAuth();
+  const [mode, setMode] = useState<AuthMode>('signin');
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [roleId, setRoleId] = useState('');
+
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesErr, setRolesErr] = useState<string | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  const loadRoles = useCallback(async () => {
+    setRolesErr(null);
+    setRolesLoading(true);
+    try {
+      const data = await apiFetch<{ roles: RoleOption[] }>('/api/auth/roles');
+      setRoles(data.roles ?? []);
+    } catch {
+      setRolesErr(t('login.register.rolesError'));
+      setRoles([]);
+    } finally {
+      setRolesLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (mode !== 'register') return;
+    void loadRoles();
+  }, [mode, loadRoles]);
+
+  function switchMode(next: AuthMode) {
+    setMode(next);
+    setErr(null);
+    setRolesErr(null);
+    if (next === 'signin') {
+      setFirstName('');
+      setLastName('');
+      setPasswordConfirm('');
+      setRoleId('');
+      setPassword('');
+    }
+  }
+
+  async function onSignIn(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setBusy(true);
@@ -28,9 +79,44 @@ export function LoginView() {
     }
   }
 
+  async function onRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    const rid = Number(roleId);
+    if (!Number.isFinite(rid) || rid < 1) {
+      setErr(t('login.register.roleRequired'));
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setErr(t('login.register.passwordMismatch'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        username: username.trim(),
+        password,
+        roleId: rid,
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('login.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputClass =
+    'h-11 border-stone-200 bg-stone-50/50 focus-visible:border-emerald-700/50 focus-visible:ring-emerald-700/20';
+  const selectClass = cn(
+    'flex h-11 w-full rounded-md border border-stone-200 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 shadow-xs transition-colors',
+    'focus-visible:border-emerald-700/50 focus-visible:ring-[3px] focus-visible:ring-emerald-700/20 focus-visible:outline-none',
+    'disabled:cursor-not-allowed disabled:opacity-50',
+  );
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-stone-100">
-      {/* Hero — desktop */}
       <aside
         className={cn(
           'relative hidden lg:flex lg:w-[44%] xl:w-[42%] min-h-screen flex-col justify-center overflow-hidden',
@@ -74,9 +160,7 @@ export function LoginView() {
         </div>
       </aside>
 
-      {/* Form column */}
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
-        {/* Mobile brand strip */}
         <div className="mb-8 flex w-full max-w-md items-center justify-center gap-2.5 lg:hidden">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-900 text-emerald-300 shadow-lg shadow-stone-900/15">
             <Building2 className="h-5 w-5" strokeWidth={1.75} />
@@ -91,58 +175,209 @@ export function LoginView() {
           )}
         >
           <div className="mb-8 space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-stone-900">{t('login.title')}</h2>
-            <p className="text-sm leading-relaxed text-stone-500">{t('login.subtitle')}</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-stone-900">
+              {mode === 'signin' ? t('login.title') : t('login.register.title')}
+            </h2>
+            <p className="text-sm leading-relaxed text-stone-500">
+              {mode === 'signin' ? t('login.subtitle') : t('login.register.subtitle')}
+            </p>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-stone-700">
-                {t('login.username')}
-              </Label>
-              <Input
-                id="username"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+          {mode === 'signin' ? (
+            <form onSubmit={onSignIn} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-stone-700">
+                  {t('login.username')}
+                </Label>
+                <Input
+                  id="username"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={busy}
+                  required
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-stone-700">
+                  {t('login.password')}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={busy}
+                  required
+                  className={inputClass}
+                />
+              </div>
+              {err ? (
+                <p className="text-sm font-medium text-rose-600" role="alert">
+                  {err}
+                </p>
+              ) : null}
+              <Button
+                type="submit"
                 disabled={busy}
-                required
-                className="h-11 border-stone-200 bg-stone-50/50 focus-visible:border-emerald-700/50 focus-visible:ring-emerald-700/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-stone-700">
-                {t('login.password')}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={busy}
-                required
-                className="h-11 border-stone-200 bg-stone-50/50 focus-visible:border-emerald-700/50 focus-visible:ring-emerald-700/20"
-              />
-            </div>
-            {err ? (
-              <p className="text-sm font-medium text-rose-600" role="alert">
-                {err}
+                className={cn(
+                  'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
+                  'bg-stone-900 text-white hover:bg-stone-800',
+                  'focus-visible:ring-emerald-700/30',
+                )}
+              >
+                {busy ? t('login.loading') : t('login.submit')}
+              </Button>
+              <p className="text-center text-xs leading-relaxed text-stone-400">{t('login.hint')}</p>
+              <p className="text-center text-sm text-stone-600">
+                <button
+                  type="button"
+                  className="font-medium text-emerald-800 underline-offset-4 hover:underline"
+                  onClick={() => switchMode('register')}
+                >
+                  {t('login.switchToRegister')}
+                </button>
               </p>
-            ) : null}
-            <Button
-              type="submit"
-              disabled={busy}
-              className={cn(
-                'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
-                'bg-stone-900 text-white hover:bg-stone-800',
-                'focus-visible:ring-emerald-700/30',
-              )}
-            >
-              {busy ? t('login.loading') : t('login.submit')}
-            </Button>
-            <p className="text-center text-xs leading-relaxed text-stone-400">{t('login.hint')}</p>
-          </form>
+            </form>
+          ) : (
+            <form onSubmit={onRegister} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="firstName" className="text-stone-700">
+                    {t('login.register.firstName')}
+                  </Label>
+                  <Input
+                    id="firstName"
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={busy}
+                    required
+                    maxLength={128}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="lastName" className="text-stone-700">
+                    {t('login.register.lastName')}
+                  </Label>
+                  <Input
+                    id="lastName"
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={busy}
+                    required
+                    maxLength={128}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-username" className="text-stone-700">
+                  {t('login.username')}
+                </Label>
+                <Input
+                  id="reg-username"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={busy}
+                  required
+                  minLength={3}
+                  maxLength={64}
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-password" className="text-stone-700">
+                  {t('login.password')}
+                </Label>
+                <Input
+                  id="reg-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={busy}
+                  required
+                  minLength={8}
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordConfirm" className="text-stone-700">
+                  {t('login.register.confirmPassword')}
+                </Label>
+                <Input
+                  id="passwordConfirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  disabled={busy}
+                  required
+                  minLength={8}
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role" className="text-stone-700">
+                  {t('login.register.role')}
+                </Label>
+                <select
+                  id="role"
+                  className={selectClass}
+                  value={roleId}
+                  onChange={(e) => setRoleId(e.target.value)}
+                  disabled={busy || rolesLoading}
+                  required
+                >
+                  <option value="">{t('login.register.rolePlaceholder')}</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                {rolesLoading ? (
+                  <p className="text-xs text-stone-500">{t('login.register.loadingRoles')}</p>
+                ) : null}
+                {rolesErr ? (
+                  <p className="text-xs font-medium text-rose-600" role="alert">
+                    {rolesErr}
+                  </p>
+                ) : null}
+              </div>
+              {err ? (
+                <p className="text-sm font-medium text-rose-600" role="alert">
+                  {err}
+                </p>
+              ) : null}
+              <Button
+                type="submit"
+                disabled={busy || rolesLoading || !!rolesErr || roles.length === 0}
+                className={cn(
+                  'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
+                  'bg-stone-900 text-white hover:bg-stone-800',
+                  'focus-visible:ring-emerald-700/30',
+                )}
+              >
+                {busy ? t('login.register.loading') : t('login.register.submit')}
+              </Button>
+              <p className="text-center text-sm text-stone-600">
+                <button
+                  type="button"
+                  className="font-medium text-emerald-800 underline-offset-4 hover:underline"
+                  onClick={() => switchMode('signin')}
+                >
+                  {t('login.switchToSignIn')}
+                </button>
+              </p>
+            </form>
+          )}
         </div>
       </div>
     </div>
