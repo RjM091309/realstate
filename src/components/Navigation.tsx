@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { 
   LayoutDashboard, 
@@ -13,11 +13,7 @@ import {
   UserCircle,
   Briefcase,
   SlidersHorizontal,
-  CalendarDays,
-  ChevronDown,
 } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +21,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
+import { DatePicker as AppDatePicker } from '@/components/DatePicker';
+import {
+  NotificationPanel,
+  createDefaultNotifications,
+  type Notification,
+} from '@/components/NotificationPanel';
 
 interface SidebarProps {
   activeTab: string;
@@ -128,9 +130,30 @@ export function TopNav() {
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
   const { session } = useAuth();
   const { dateRange, setDateRange } = useDateRange();
-  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
-  /** Local range while the popover is open so [start, null] partial selection works (controlled range bug). */
-  const [pickerRange, setPickerRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(() =>
+    createDefaultNotifications(t),
+  );
+  useEffect(() => {
+    setNotifications((prev) => {
+      const next = createDefaultNotifications(t);
+      return next.map((n) => {
+        const old = prev.find((p) => p.id === n.id);
+        return old ? { ...n, unread: old.unread } : n;
+      });
+    });
+  }, [t, i18n.language]);
+  const unreadCount = notifications.filter((n) => n.unread).length;
+  const [pickerRange, setPickerRange] = useState<[Date | null, Date | null]>(() => [
+    dateRange.start ? parseISO(dateRange.start) : null,
+    dateRange.end ? parseISO(dateRange.end) : null,
+  ]);
+  useEffect(() => {
+    setPickerRange([
+      dateRange.start ? parseISO(dateRange.start) : null,
+      dateRange.end ? parseISO(dateRange.end) : null,
+    ]);
+  }, [dateRange.start, dateRange.end]);
 
   const showDateRangePicker = true;
   const name =
@@ -139,15 +162,11 @@ export function TopNav() {
       : '';
   const role = session?.role.name ?? '';
 
-  const labelText = `${format(parseISO(dateRange.start), 'MMM d, yyyy')} – ${format(parseISO(dateRange.end), 'MMM d, yyyy')}`;
-
-  function handleDateRangeChange(dates: [Date | null, Date | null] | null) {
-    if (!dates) return;
-    const [start, end] = dates;
-    setPickerRange(dates);
+  function handleDateRangeChange(next: [Date | null, Date | null]) {
+    const [start, end] = next;
+    setPickerRange(next);
     if (start != null && end != null) {
       setDateRange({ start: toYYYYMMDD(start), end: toYYYYMMDD(end) });
-      setDateDropdownOpen(false);
     }
   }
 
@@ -158,54 +177,24 @@ export function TopNav() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input 
             placeholder={t('header.searchPlaceholder')}
-            className="pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
+            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
+            style={{
+              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
+              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
+            }}
           />
         </div>
 
         {showDateRangePicker && (
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (!dateDropdownOpen) {
-                  setPickerRange([
-                    dateRange.start ? parseISO(dateRange.start) : null,
-                    dateRange.end ? parseISO(dateRange.end) : null,
-                  ]);
-                  setDateDropdownOpen(true);
-                } else {
-                  setDateDropdownOpen(false);
-                }
-              }}
-              className="flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-2 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer"
-            >
-              <CalendarDays size={18} className="text-slate-500 shrink-0" />
-              <span className="text-sm text-slate-600 whitespace-nowrap max-w-[200px] sm:max-w-none truncate">
-                {labelText}
-              </span>
-              <ChevronDown size={16} className="text-slate-500 shrink-0" />
-            </button>
-
-            {dateDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} aria-hidden />
-                <div
-                  className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 z-50"
-                  onClick={(e) => e.stopPropagation()}
-                  role="presentation"
-                >
-                  <DatePicker
-                    inline
-                    selectsRange
-                    startDate={pickerRange[0] ?? undefined}
-                    endDate={pickerRange[1] ?? undefined}
-                    onChange={handleDateRangeChange}
-                    dateFormat="MMM d, yyyy"
-                    calendarClassName="react-datepicker-material"
-                  />
-                </div>
-              </>
-            )}
+          <div className="shrink-0 min-w-[240px] max-w-[320px] w-full sm:w-auto">
+            <AppDatePicker
+              mode="range"
+              value={pickerRange}
+              onChange={(next) => handleDateRangeChange(next as [Date | null, Date | null])}
+              placeholder="Date range"
+              showPresets
+              fullWidth
+            />
           </div>
         )}
       </div>
@@ -231,10 +220,30 @@ export function TopNav() {
           </Button>
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5 text-slate-600" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-        </Button>
+        <div className="relative shrink-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-expanded={notificationOpen}
+            aria-label={t('notifications.title')}
+            onClick={() => setNotificationOpen((open) => !open)}
+          >
+            <Bell className="w-5 h-5 text-slate-600" />
+            {unreadCount > 0 ? (
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full border-2 border-white bg-rose-500" />
+            ) : null}
+          </Button>
+          <NotificationPanel
+            isOpen={notificationOpen}
+            onClose={() => setNotificationOpen(false)}
+            notifications={notifications}
+            onMarkAllRead={() =>
+              setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+            }
+          />
+        </div>
         <div className="h-8 w-px bg-slate-200 hidden sm:block" />
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">

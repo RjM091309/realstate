@@ -3,7 +3,7 @@ import { Briefcase, TrendingUp, Users, CalendarDays, PhoneCall, FileText, CheckC
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, type ColumnDef } from '@/components/ui/data-table';
+import { DataTable, type ColumnDef } from '@/components/data-table';
 import { agents, contracts, tenants, units } from '@/lib/mockData';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
@@ -103,13 +103,19 @@ export function AgentPortalView() {
               </Card>
             </div>
 
-            <Card className="border-none shadow-md">
-              <CardHeader>
+            <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
+              <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
                 <CardTitle>{t('views.agentPortal.contracts.title')}</CardTitle>
                 <CardDescription>{t('views.agentPortal.contracts.description')}</CardDescription>
               </CardHeader>
-              <CardContent className="p-0 overflow-hidden">
-                <DataTable data={assignedContracts} columns={contractColumns} keyExtractor={(c) => c.id} />
+              <CardContent className="p-0">
+                <DataTable
+                  data={assignedContracts}
+                  columns={contractColumns}
+                  keyExtractor={(c) => c.id}
+                  embedded
+                  highlightFirstColumn={false}
+                />
               </CardContent>
             </Card>
           </div>

@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { contracts, units, tenants } from '@/lib/mockData';
+import { contracts as seedContracts, units as seedUnits, tenants as seedTenants } from '@/lib/mockData';
+import { fetchContracts } from '@/lib/contractsApi';
+import { fetchUnits } from '@/lib/unitsApi';
+import { fetchTenants } from '@/lib/tenantsApi';
 import { format } from 'date-fns';
+import type { Contract, Tenant, Unit } from '@/types';
 
 interface DocumentPreviewProps {
   type: 'contract' | 'invoice';
@@ -13,10 +17,53 @@ interface DocumentPreviewProps {
 }
 
 export function DocumentPreview({ type, contractId, onBack, isStandalone = false }: DocumentPreviewProps) {
-  const contract = contracts.find(c => c.id === contractId);
-  const unit = units.find(u => u.id === contract?.unitId);
-  const tenant = tenants.find(t => t.id === contract?.tenantId);
+  const [loading, setLoading] = useState(true);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const [contractsData, unitsData, tenantsData] = await Promise.all([
+          fetchContracts(),
+          fetchUnits(),
+          fetchTenants(),
+        ]);
+        if (!active) return;
+        setContracts(contractsData);
+        setUnits(unitsData);
+        setTenants(tenantsData);
+      } catch {
+        // Fallback keeps document preview usable when API is unavailable.
+        if (!active) return;
+        setContracts(seedContracts);
+        setUnits(seedUnits);
+        setTenants(seedTenants);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const contract = useMemo(
+    () => contracts.find((c) => c.id === contractId),
+    [contracts, contractId],
+  );
+  const unit = useMemo(
+    () => units.find((u) => u.id === contract?.unitId),
+    [units, contract?.unitId],
+  );
+  const tenant = useMemo(
+    () => tenants.find((t) => t.id === contract?.tenantId),
+    [tenants, contract?.tenantId],
+  );
+
+  if (loading) return <div className="p-8 text-center">Loading document...</div>;
   if (!contract) return <div className="p-8 text-center">Contract not found.</div>;
 
   return (

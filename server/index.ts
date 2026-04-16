@@ -6,6 +6,9 @@ import { ensureSchema } from './ensureSchema.js';
 import { authRouter } from './authRoutes.js';
 import { adminRouter } from './adminRoutes.js';
 import { unitsRouter } from './unitsRoutes.js';
+import { tenantsRouter } from './tenantsRoutes.js';
+import { contractsRouter } from './contractsRoutes.js';
+import { paymentsRouter } from './paymentsRoutes.js';
 
 const app = express();
 const apiPort = Number(process.env.API_PORT ?? 3001);
@@ -26,6 +29,9 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/units', unitsRouter);
+app.use('/api/tenants', tenantsRouter);
+app.use('/api/contracts', contractsRouter);
+app.use('/api/payments', paymentsRouter);
 
 void (async () => {
   try {
@@ -41,7 +47,7 @@ void (async () => {
   const server = app.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      `[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*`,
+      `[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments`,
     );
   });
 

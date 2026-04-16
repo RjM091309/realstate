@@ -16,6 +16,24 @@
     "languageLabel": "Language",
     "dateRange": "Date range"
   },
+  "notifications": {
+    "title": "Notifications",
+    "unread_messages": "You have {{count}} unread",
+    "no_notifications": "No notifications yet",
+    "mark_all_as_read": "Mark all as read",
+    "lease_inquiry_title": "New viewing request",
+    "lease_inquiry_message": "A prospect asked to tour Unit 1204 this Friday afternoon.",
+    "rent_payment_title": "Rent payment received",
+    "rent_payment_message": "Tenant payment for Suite 402 was posted to the lease ledger.",
+    "maintenance_title": "Maintenance ticket opened",
+    "maintenance_message": "HVAC inspection requested for Building A — priority normal.",
+    "lease_signed_title": "Lease executed",
+    "lease_signed_message": "The renewal for Unit 210 was signed and filed.",
+    "time_2_mins_ago": "2 mins ago",
+    "time_15_mins_ago": "15 mins ago",
+    "time_1_hour_ago": "1 hour ago",
+    "time_2_hours_ago": "2 hours ago"
+  },
   "login": {
     "brand": "Realstate",
     "heroTitle": "Property operations, simplified.",
@@ -287,7 +305,41 @@
         "blacklisted": "Blacklisted",
         "active": "Active",
         "viewPortal": "View Portal",
-        "history": "History"
+        "history": "History",
+        "viewDetails": "View details",
+        "editTenant": "Edit tenant",
+        "deleteTenant": "Delete tenant",
+        "kycPending": "Pending"
+      },
+      "details": {
+        "title": "Tenant profile",
+        "close": "Close",
+        "editTenant": "Edit tenant",
+        "contact": "Contact",
+        "identification": "Identification",
+        "notes": "Notes"
+      },
+      "tenantModal": {
+        "createTitle": "Register tenant",
+        "editTitle": "Edit tenant",
+        "description": "Enter tenant contact and ID details. Changes apply to this branch only.",
+        "name": "Full name",
+        "email": "Email",
+        "phone": "Phone",
+        "idType": "ID type",
+        "idNumber": "ID number",
+        "idExpiry": "ID expiry",
+        "kycVerified": "KYC verified",
+        "blacklisted": "Blacklisted",
+        "blacklistReason": "Blacklist reason (optional)",
+        "cancel": "Cancel",
+        "save": "Save",
+        "created": "Tenant registered.",
+        "updated": "Tenant updated.",
+        "deleted": "Tenant removed.",
+        "deleteConfirm": "Remove {{name}} from the directory?",
+        "validationRequired": "Please fill in name, email, phone, ID type, and ID number.",
+        "loadError": "Could not load tenants from the server. Showing sample data."
       },
       "brokers": {
         "partner": "Partner",

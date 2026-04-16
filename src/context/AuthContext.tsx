@@ -3,8 +3,26 @@ import type { RegisterInput, SessionPayload } from '@/types/session';
 import { apiFetch, getToken, setToken } from '@/lib/api';
 
 const BYPASS_LOGIN = true;
-const BYPASS_USERNAME = 'admin';
-const BYPASS_PASSWORD = 'admin23';
+
+function createBypassSession(): SessionPayload {
+  return {
+    user: {
+      id: 1,
+      username: 'admin',
+      firstName: 'System',
+      lastName: 'Admin',
+    },
+    role: { id: 1, name: 'Admin' },
+    branchId: 1,
+    sidebarTabIds: ['dashboard', 'units', 'contracts', 'crm', 'ledger', 'calendar', 'access'],
+    crud: {
+      units: { create: true, update: true, delete: true },
+      contracts: { create: true, update: true, delete: true },
+      crm: { create: true, update: true, delete: true },
+      ledger: { create: true, update: true, delete: true },
+    },
+  };
+}
 
 interface AuthContextValue {
   session: SessionPayload | null;
@@ -22,23 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshSession = useCallback(async () => {
+    if (BYPASS_LOGIN) {
+      setSession(createBypassSession());
+      setLoading(false);
+      return;
+    }
+
     const token = getToken();
     if (!token) {
-      if (BYPASS_LOGIN) {
-        try {
-          const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username: BYPASS_USERNAME, password: BYPASS_PASSWORD }),
-          });
-          setToken(data.token);
-          setSession(data.session);
-        } catch {
-          setSession(null);
-        } finally {
-          setLoading(false);
-        }
-        return;
-      }
       setSession(null);
       setLoading(false);
       return;
@@ -59,6 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   const login = useCallback(async (username: string, password: string) => {
+    if (BYPASS_LOGIN) {
+      setSession(createBypassSession());
+      return;
+    }
     const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
@@ -68,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
+    if (BYPASS_LOGIN) {
+      setSession(createBypassSession());
+      return;
+    }
     const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
@@ -77,6 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (BYPASS_LOGIN) {
+      setSession(null);
+      return;
+    }
     setToken(null);
     setSession(null);
     void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});

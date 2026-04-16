@@ -16,6 +16,24 @@
     "languageLabel": "언어",
     "dateRange": "기간"
   },
+  "notifications": {
+    "title": "알림",
+    "unread_messages": "읽지 않음 {{count}}건",
+    "no_notifications": "알림이 없습니다",
+    "mark_all_as_read": "모두 읽음으로 표시",
+    "lease_inquiry_title": "새 둘러보기 요청",
+    "lease_inquiry_message": "잠재 임차인이 금요일 오후에 유닛 1204 투어를 요청했습니다.",
+    "rent_payment_title": "임대료 입금",
+    "rent_payment_message": "스위트 402 임차인의 임대료가 원장에 반영되었습니다.",
+    "maintenance_title": "유지보수 티켓 생성",
+    "maintenance_message": "A동 HVAC 점검 요청이 접수되었습니다 — 우선순위 보통.",
+    "lease_signed_title": "계약 체결",
+    "lease_signed_message": "유닛 210 갱신 계약이 서명되어 등록되었습니다.",
+    "time_2_mins_ago": "2분 전",
+    "time_15_mins_ago": "15분 전",
+    "time_1_hour_ago": "1시간 전",
+    "time_2_hours_ago": "2시간 전"
+  },
   "login": {
     "brand": "리얼스테이트",
     "heroTitle": "부동산 운영을 한곳에서.",
@@ -287,7 +305,41 @@
         "blacklisted": "블랙리스트",
         "active": "활동 중",
         "viewPortal": "포털 보기",
-        "history": "이력"
+        "history": "이력",
+        "viewDetails": "상세 보기",
+        "editTenant": "임차인 수정",
+        "deleteTenant": "임차인 삭제",
+        "kycPending": "대기"
+      },
+      "details": {
+        "title": "임차인 프로필",
+        "close": "닫기",
+        "editTenant": "임차인 수정",
+        "contact": "연락처",
+        "identification": "신원 확인",
+        "notes": "비고"
+      },
+      "tenantModal": {
+        "createTitle": "임차인 등록",
+        "editTitle": "임차인 수정",
+        "description": "연락처 및 신분 정보를 입력하세요. 변경 사항은 이 지점에만 적용됩니다.",
+        "name": "이름",
+        "email": "이메일",
+        "phone": "전화",
+        "idType": "신분증 유형",
+        "idNumber": "신분증 번호",
+        "idExpiry": "만료일",
+        "kycVerified": "KYC 인증 완료",
+        "blacklisted": "블랙리스트",
+        "blacklistReason": "블랙리스트 사유 (선택)",
+        "cancel": "취소",
+        "save": "저장",
+        "created": "임차인이 등록되었습니다.",
+        "updated": "임차인 정보가 수정되었습니다.",
+        "deleted": "임차인이 삭제되었습니다.",
+        "deleteConfirm": "{{name}}을(를) 목록에서 삭제할까요?",
+        "validationRequired": "이름, 이메일, 전화, 신분증 유형, 신분증 번호를 입력하세요.",
+        "loadError": "서버에서 임차인을 불러오지 못했습니다. 샘플 데이터를 표시합니다."
       },
       "brokers": {
         "partner": "파트너",

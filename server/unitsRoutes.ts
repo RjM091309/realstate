@@ -53,6 +53,23 @@ function rowToUnit(row: UnitRow) {
   };
 }
 
+function payloadToUnit(id: string, parsed: NonNullable<ReturnType<typeof validatePayload>>) {
+  return {
+    id,
+    unitNumber: parsed.unitNumber,
+    floor: parsed.floor,
+    tower: parsed.tower,
+    buildingName: parsed.buildingName,
+    commonAddress: parsed.commonAddress,
+    legalAddress: parsed.legalAddress,
+    type: parsed.unitType,
+    status: parsed.status,
+    area: parsed.area,
+    monthlyRate: parsed.monthlyRate,
+    inventory: (parsed.inventory ?? []) as { id: string; name: string; condition: string; quantity: number }[],
+  };
+}
+
 function validatePayload(body: Record<string, unknown>): {
   unitNumber: string;
   floor: string;
@@ -174,13 +191,7 @@ router.post('/', async (req, res) => {
         invJson,
       ],
     );
-    const [[row]] = await pool.query<RowDataPacket[]>(
-      `SELECT id, branch_id, unit_number, floor, tower, building_name, common_address, legal_address,
-              unit_type, status, area, monthly_rate, inventory_json
-       FROM property_unit WHERE id = ? LIMIT 1`,
-      [id],
-    );
-    res.status(201).json({ unit: rowToUnit(row as UnitRow) });
+    res.status(201).json({ unit: payloadToUnit(id, parsed) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to create unit' });
@@ -239,13 +250,18 @@ router.patch('/:id', async (req, res) => {
       res.status(404).json({ error: 'Unit not found' });
       return;
     }
-    const [[row]] = await pool.query<RowDataPacket[]>(
+    const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT id, branch_id, unit_number, floor, tower, building_name, common_address, legal_address,
               unit_type, status, area, monthly_rate, inventory_json
        FROM property_unit WHERE id = ? AND branch_id = ? LIMIT 1`,
       [id, session.branchId],
     );
-    res.json({ unit: rowToUnit(row as UnitRow) });
+    const row = (rows as UnitRow[])[0];
+    if (!row) {
+      res.status(404).json({ error: 'Unit not found' });
+      return;
+    }
+    res.json({ unit: rowToUnit(row) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to update unit' });

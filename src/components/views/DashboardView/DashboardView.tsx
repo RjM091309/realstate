@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DataTable, type ColumnDef } from '@/components/ui/data-table';
+import { DataTable, type ColumnDef } from '@/components/data-table';
 import { units, payments, contracts, tenants } from '@/lib/mockData';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -402,37 +402,51 @@ export function DashboardView() {
 
       {/* Upcoming Vacancies, Upcoming Payments & Agent Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-none shadow-md">
-          <CardHeader>
+        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
+          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
             <CardTitle>{t('views.dashboard.vacancies.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.vacancies.description')}</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 overflow-hidden rounded-b-xl">
-            <DataTable data={vacancyContracts} columns={vacancyColumns} keyExtractor={(c) => c.id} />
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-md">
-          <CardHeader>
-            <CardTitle>{t('views.dashboard.payments.title')}</CardTitle>
-            <CardDescription>{t('views.dashboard.payments.description')}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 overflow-hidden rounded-b-xl">
+          <CardContent className="p-0">
             <DataTable
-              data={upcomingPayments7Days}
-              columns={paymentColumns}
-              keyExtractor={(p) => p.id}
+              data={vacancyContracts}
+              columns={vacancyColumns}
+              keyExtractor={(c) => c.id}
+              embedded
+              highlightFirstColumn={false}
             />
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md lg:col-span-2">
-          <CardHeader>
+        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
+          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
+            <CardTitle>{t('views.dashboard.payments.title')}</CardTitle>
+            <CardDescription>{t('views.dashboard.payments.description')}</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              data={upcomingPayments7Days}
+              columns={paymentColumns}
+              keyExtractor={(p) => p.id}
+              embedded
+              highlightFirstColumn={false}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md lg:col-span-2">
+          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
             <CardTitle>{t('views.dashboard.agents.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.agents.description')}</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 overflow-hidden rounded-b-xl">
-            <DataTable data={agentRows} columns={agentColumns} keyExtractor={(a) => a.id} />
+          <CardContent className="p-0">
+            <DataTable
+              data={agentRows}
+              columns={agentColumns}
+              keyExtractor={(a) => a.id}
+              embedded
+              highlightFirstColumn={false}
+            />
           </CardContent>
         </Card>
       </div>

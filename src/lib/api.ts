@@ -18,7 +18,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(path, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers });
+  } catch (e) {
+    const hint =
+      ' If the API is not running, use `npm run dev` (API + Vite) or `npm run dev:api` (see API_PORT in `.env`).';
+    throw new Error(e instanceof Error ? `${e.message}.${hint}` : `Request failed.${hint}`);
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = typeof err?.error === 'string' ? err.error : res.statusText;

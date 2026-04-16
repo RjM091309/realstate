@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { DataTable, type ColumnDef } from '@/components/ui/data-table';
+import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { tenants, units, contracts, payments } from '@/lib/mockData';
@@ -131,13 +131,19 @@ export function TenantPortalView() {
             </Card>
           </div>
 
-          <Card className="border-none shadow-md">
-            <CardHeader>
+          <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
+            <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
               <CardTitle>{t('views.portal.recentPayments')}</CardTitle>
               <CardDescription>{t('views.portal.recentPaymentsDescription')}</CardDescription>
             </CardHeader>
-            <CardContent className="p-0 overflow-hidden">
-              <DataTable data={tenantPayments} columns={paymentColumns} keyExtractor={(p) => p.id} />
+            <CardContent className="p-0">
+              <DataTable
+                data={tenantPayments}
+                columns={paymentColumns}
+                keyExtractor={(p) => p.id}
+                embedded
+                highlightFirstColumn={false}
+              />
             </CardContent>
           </Card>
 

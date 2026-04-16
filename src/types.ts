@@ -40,6 +40,8 @@ export interface Tenant {
   idNumber: string;
   idExpiry: string;
   idImageUrl?: string;
+  /** When false, KYC badge shows as pending (defaults true for legacy mock rows). */
+  kycVerified?: boolean;
   isBlacklisted: boolean;
   blacklistReason?: string;
 }

@@ -17,9 +17,26 @@ interface DataTableProps<T> {
   columns: ColumnDef<T>[];
   keyExtractor: (item: T) => string | number;
   onRowClick?: (item: T) => void;
+  /**
+   * When false, the first column uses the same neutral styling as other columns
+   * (no violet highlight stripe). Default true for backward compatibility.
+   */
+  highlightFirstColumn?: boolean;
+  /**
+   * When true, drops the inner white card frame (rounded-2xl, shadow) so the table
+   * can sit flush inside a parent Card without a double border/box.
+   */
+  embedded?: boolean;
 }
 
-export function DataTable<T>({ data, columns, keyExtractor, onRowClick }: DataTableProps<T>) {
+export function DataTable<T>({
+  data,
+  columns,
+  keyExtractor,
+  onRowClick,
+  highlightFirstColumn = true,
+  embedded = false,
+}: DataTableProps<T>) {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -32,7 +49,12 @@ export function DataTable<T>({ data, columns, keyExtractor, onRowClick }: DataTa
   const currentData = data.slice(startIndex, endIndex);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden w-full">
+    <div
+      className={cn(
+        'w-full overflow-hidden',
+        embedded ? '' : 'rounded-2xl bg-white shadow-sm',
+      )}
+    >
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -41,11 +63,14 @@ export function DataTable<T>({ data, columns, keyExtractor, onRowClick }: DataTa
                 <th
                   key={col.header}
                   className={cn(
-                    "px-6 py-4 text-[13px] font-medium whitespace-nowrap",
-                    i === 0 ? "bg-violet-50 text-brand-text uppercase tracking-wider" : "text-brand-muted uppercase tracking-wider",
+                    "px-6 text-[13px] font-medium whitespace-nowrap uppercase tracking-wider",
+                    highlightFirstColumn ? "py-4" : "py-3",
+                    highlightFirstColumn && i === 0
+                      ? "bg-violet-50 text-brand-text"
+                      : "text-brand-muted bg-white",
                     col.className,
                     col.headerClassName,
-                    i === 0 && "border-r-[3px] border-white"
+                    highlightFirstColumn && i === 0 && "border-r-[3px] border-white"
                   )}
                 >
                   {col.header}
@@ -67,11 +92,13 @@ export function DataTable<T>({ data, columns, keyExtractor, onRowClick }: DataTa
                   <td
                     key={i}
                     className={cn(
-                      "px-6 py-4 text-sm text-brand-text",
-                      i === 0 ? "bg-violet-50 font-medium group-hover:bg-violet-100" : "bg-white group-hover:bg-brand-bg/50",
+                      "px-6 text-sm text-brand-text align-top",
+                      highlightFirstColumn ? "py-4" : "py-3",
+                      highlightFirstColumn && i === 0
+                        ? "bg-violet-50 font-medium group-hover:bg-violet-100 border-r-[3px] border-white"
+                        : "bg-white group-hover:bg-slate-50/80",
                       col.className,
-                      col.cellClassName,
-                      i === 0 && "border-r-[3px] border-white"
+                      col.cellClassName
                     )}
                   >
                     {col.render
@@ -95,7 +122,12 @@ export function DataTable<T>({ data, columns, keyExtractor, onRowClick }: DataTa
       </div>
 
       {/* Pagination Container */}
-      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
+      <div
+        className={cn(
+          'flex items-center justify-between px-6 py-4 border-t border-gray-100',
+          embedded ? 'bg-slate-50/60' : 'bg-white',
+        )}
+      >
         <div className="flex items-center gap-4 text-sm text-brand-muted">
           <span>{t('datatable.show')}</span>
           <div className="relative">

@@ -24,9 +24,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DataTable, type ColumnDef } from '@/components/ui/data-table';
-import { Modal } from '@/components/ui/modal';
-import { Select2 } from '@/components/ui/select2';
+import { DataTable, type ColumnDef } from '@/components/data-table';
+import { Modal } from '@/components/modal';
+import { Select2 } from '@/components/select2';
+import { SkeletonTable } from '@/components/skeleton';
 import { units as seedUnits } from '@/lib/mockData';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
@@ -381,7 +382,11 @@ export function UnitsView() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder={t('views.units.searchPlaceholder')}
-            className="pl-10 border-slate-200"
+            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
+            style={{
+              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
+              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
+            }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -393,7 +398,9 @@ export function UnitsView() {
       </div>
 
       {unitsLoading ? (
-        <div className="py-24 text-center text-slate-500 text-sm">{t('common.loading')}</div>
+        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+          <SkeletonTable rows={8} columns={7} />
+        </div>
       ) : viewMode === 'list' ? (
         <DataTable
           data={filteredUnits}

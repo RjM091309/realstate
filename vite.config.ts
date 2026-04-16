@@ -6,12 +6,21 @@ import {defineConfig, loadEnv} from 'vite';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({mode}) => {
+export default defineConfig(({ mode }) => {
   // `.env` sa `realstate/` o isang level pataas (workspace root)
   const env = {
     ...loadEnv(mode, path.resolve(configDir, '..'), ''),
     ...loadEnv(mode, configDir, ''),
   };
+  const apiPort = env.API_PORT ?? '3001';
+  /** Same proxy for `vite` and `vite preview` so `/api/*` always reaches Express. */
+  const apiProxy = {
+    '/api': {
+      target: `http://127.0.0.1:${apiPort}`,
+      changeOrigin: true,
+    },
+  };
+
   return {
     plugins: [react(), tailwindcss()],
     define: {
@@ -29,12 +38,12 @@ export default defineConfig(({mode}) => {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      proxy: {
-        '/api': {
-          target: `http://127.0.0.1:${env.API_PORT ?? '3001'}`,
-          changeOrigin: true,
-        },
-      },
+      proxy: apiProxy,
+    },
+    preview: {
+      port: 6001,
+      strictPort: true,
+      proxy: apiProxy,
     },
   };
 });
