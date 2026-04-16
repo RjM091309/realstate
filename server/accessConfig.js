@@ -8,6 +8,4 @@ export const SIDEBAR_FEATURE_KEYS = [
   'calendar',
   'tenant_portal',
   'agent_portal',
-] as const;
-
-export type SidebarFeatureKey = (typeof SIDEBAR_FEATURE_KEYS)[number];
+];

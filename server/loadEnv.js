@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function loadServerEnv(): void {
+export function loadServerEnv() {
   const workspaceRoot = path.join(__dirname, '../../.env');
   const projectRoot = path.join(__dirname, '../.env');
   dotenv.config({ path: workspaceRoot });

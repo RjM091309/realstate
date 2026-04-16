@@ -1,23 +1,20 @@
-import { Router, type Response } from 'express';
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool } from './db.js';
-import { loadSessionPayload } from './session.js';
-import { getJwtSecret, type JwtPayload } from './jwt.js';
+import { getJwtSecret } from '../jwt.js';
+import { loadSessionPayload } from '../services/sessionService.js';
+import {
+  createUserAccount,
+  findUserByUsername,
+  getActiveRoleById,
+  getFirstActiveBranchId,
+  listActiveRoles,
+  usernameExists,
+} from '../models/authModel.js';
 
-const router = Router();
-
-export type { JwtPayload };
-
-async function sendTokenAndSession(
-  res: Response,
-  userId: number,
-  opts?: { status?: number; sessionError?: string },
-): Promise<void> {
+async function sendTokenAndSession(res, userId, opts) {
   const status = opts?.status ?? 200;
   const sessionError = opts?.sessionError ?? 'Could not load session';
-  const payload: JwtPayload = { userId };
+  const payload = { userId };
   const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
   const session = await loadSessionPayload(userId);
   if (!session) {
@@ -29,11 +26,9 @@ async function sendTokenAndSession(
   else res.json(body);
 }
 
-router.get('/roles', async (_req, res) => {
+export async function getRoles(_req, res) {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT IDNo, ROLE FROM user_role WHERE ACTIVE = 1 ORDER BY IDNo ASC`,
-    );
+    const rows = await listActiveRoles();
     res.json({
       roles: rows.map((r) => ({
         id: Number(r.IDNo),
@@ -44,9 +39,9 @@ router.get('/roles', async (_req, res) => {
     console.error(e);
     res.status(500).json({ error: 'Could not load roles' });
   }
-});
+}
 
-router.post('/register', async (req, res) => {
+export async function register(req, res) {
   try {
     const firstName = String(req.body?.firstName ?? '').trim();
     const lastName = String(req.body?.lastName ?? '').trim();
@@ -75,39 +70,28 @@ router.post('/register', async (req, res) => {
       return;
     }
 
-    const [roleRows] = await pool.query<RowDataPacket[]>(
-      `SELECT IDNo FROM user_role WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
-      [roleId],
-    );
-    if (!roleRows[0]) {
+    const role = await getActiveRoleById(roleId);
+    if (!role) {
       res.status(400).json({ error: 'Invalid role' });
       return;
     }
 
-    const [branchRows] = await pool.query<RowDataPacket[]>(
-      `SELECT id FROM branch WHERE ACTIVE = 1 ORDER BY id ASC LIMIT 1`,
-    );
-    const branchId = branchRows[0] ? Number(branchRows[0].id) : 1;
-
-    const [dup] = await pool.query<RowDataPacket[]>(
-      `SELECT IDNO FROM user_info WHERE USERNAME = ? LIMIT 1`,
-      [username],
-    );
-    if (dup[0]) {
+    const dup = await usernameExists(username);
+    if (dup) {
       res.status(409).json({ error: 'Username already taken' });
       return;
     }
 
+    const branchId = await getFirstActiveBranchId();
     const hash = await bcrypt.hash(password, 10);
-    const [insertResult] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO user_info (
-        FIRSTNAME, LASTNAME, USERNAME, PASSWORD, SALT, PERMISSIONS,
-        LAST_LOGIN, ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT, ACTIVE, BRANCH_ID
-      ) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 1, ?)`,
-      [firstName, lastName, username, hash, roleId, branchId],
-    );
-
-    const userId = Number(insertResult.insertId);
+    const userId = await createUserAccount({
+      firstName,
+      lastName,
+      username,
+      passwordHash: hash,
+      roleId,
+      branchId,
+    });
     if (!Number.isFinite(userId) || userId < 1) {
       res.status(500).json({ error: 'Registration failed' });
       return;
@@ -121,9 +105,9 @@ router.post('/register', async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'Registration failed' });
   }
-});
+}
 
-router.post('/login', async (req, res) => {
+export async function login(req, res) {
   try {
     const username = String(req.body?.username ?? '').trim();
     const password = String(req.body?.password ?? '');
@@ -132,13 +116,7 @@ router.post('/login', async (req, res) => {
       return;
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT IDNO, USERNAME, \`PASSWORD\`, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE
-       FROM user_info WHERE USERNAME = ? LIMIT 1`,
-      [username],
-    );
-
-    const row = rows[0];
+    const row = await findUserByUsername(username);
     if (!row || row.ACTIVE !== 1) {
       res.status(401).json({ error: 'Invalid username or password' });
       return;
@@ -156,9 +134,9 @@ router.post('/login', async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'Login failed' });
   }
-});
+}
 
-router.get('/session', async (req, res) => {
+export async function getSession(req, res) {
   try {
     const auth = req.headers.authorization;
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
@@ -167,9 +145,9 @@ router.get('/session', async (req, res) => {
       return;
     }
 
-    let decoded: JwtPayload;
+    let decoded;
     try {
-      decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
+      decoded = jwt.verify(token, getJwtSecret());
     } catch {
       res.status(401).json({ error: 'Invalid or expired session' });
       return;
@@ -186,10 +164,8 @@ router.get('/session', async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'Session failed' });
   }
-});
+}
 
-router.post('/logout', (_req, res) => {
+export function logout(_req, res) {
   res.json({ ok: true });
-});
-
-export { router as authRouter };
+}
