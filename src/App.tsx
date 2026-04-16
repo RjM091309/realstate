@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { LoginView } from './components/LoginView';
 import { Sidebar, TopNav } from './components/Navigation';
 import { DashboardView } from './components/views/DashboardView/index';
 import { UnitsView } from './components/views/UnitsView/index';
@@ -73,7 +72,12 @@ function MainApp() {
   }
 
   if (!session) {
-    return <LoginView />;
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+        <p className="text-sm">Opening dashboard…</p>
+      </div>
+    );
   }
 
   const displayName = `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username;
