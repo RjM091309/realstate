@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { RegisterInput, SessionPayload } from '@/types/session';
-import { apiFetch, getToken, setToken } from '@/lib/api';
+import { apiFetch, getToken, setDevBypassUserId, setToken } from '@/lib/api';
 
 const BYPASS_LOGIN = true;
 
@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = useCallback(async () => {
     if (BYPASS_LOGIN) {
+      setToken(null);
+      setDevBypassUserId(1);
       setSession(createBypassSession());
       setLoading(false);
       return;
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
     } catch {
       setToken(null);
+      setDevBypassUserId(null);
       setSession(null);
     } finally {
       setLoading(false);
@@ -69,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     if (BYPASS_LOGIN) {
+      setToken(null);
+      setDevBypassUserId(1);
       setSession(createBypassSession());
       return;
     }
@@ -77,11 +82,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ username, password }),
     });
     setToken(data.token);
+    setDevBypassUserId(null);
     setSession(data.session);
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
     if (BYPASS_LOGIN) {
+      setToken(null);
+      setDevBypassUserId(1);
       setSession(createBypassSession());
       return;
     }
@@ -90,15 +98,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(input),
     });
     setToken(data.token);
+    setDevBypassUserId(null);
     setSession(data.session);
   }, []);
 
   const logout = useCallback(() => {
     if (BYPASS_LOGIN) {
+      setToken(null);
+      setDevBypassUserId(null);
       setSession(null);
       return;
     }
     setToken(null);
+    setDevBypassUserId(null);
     setSession(null);
     void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }, []);

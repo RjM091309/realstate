@@ -8,6 +8,7 @@ import {
 } from '../models/contractsModel.js';
 
 function fmtDate(d) {
+  if (d == null) return '';
   if (typeof d === 'string') return d.slice(0, 10);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -15,19 +16,89 @@ function fmtDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+/** DB ENUM contract_type (see lease_contract in realstate_init.sql) */
+const DB_CONTRACT_TYPES = new Set(['monthly_rental', 'selling', 'short_term_rental']);
+/** DB ENUM status */
+const DB_CONTRACT_STATUSES = new Set(['draft', 'active', 'completed', 'terminated', 'cancelled']);
+
+const UI_TYPE_TO_DB = {
+  'Monthly Rental': 'monthly_rental',
+  Sales: 'selling',
+  'Short-term Rental': 'short_term_rental',
+};
+
+const DB_TO_UI_TYPE = {
+  monthly_rental: 'Monthly Rental',
+  selling: 'Sales',
+  short_term_rental: 'Short-term Rental',
+};
+
+const UI_STATUS_TO_DB = {
+  Active: 'active',
+  Expired: 'completed',
+  Terminated: 'terminated',
+};
+
+const DB_TO_UI_STATUS = {
+  draft: 'Active',
+  active: 'Active',
+  completed: 'Expired',
+  terminated: 'Terminated',
+  cancelled: 'Terminated',
+};
+
+function mapUiTypeToDb(type) {
+  const t = String(type ?? '').trim();
+  if (DB_CONTRACT_TYPES.has(t)) return t;
+  return UI_TYPE_TO_DB[t] ?? 'monthly_rental';
+}
+
+function mapDbTypeToUi(type) {
+  const t = String(type ?? '').trim();
+  return DB_TO_UI_TYPE[t] ?? 'Monthly Rental';
+}
+
+function mapUiStatusToDb(status) {
+  const s = String(status ?? '').trim();
+  if (DB_CONTRACT_STATUSES.has(s)) return s;
+  return UI_STATUS_TO_DB[s] ?? 'active';
+}
+
+function mapDbStatusToUi(status) {
+  const s = String(status ?? '').trim().toLowerCase();
+  return DB_TO_UI_STATUS[s] ?? 'Active';
+}
+
+/** Accepts UI ids like "a12" or numeric "12"; returns numeric string for FK to user_info.IDNO */
+function normalizeAgentId(raw) {
+  const s = String(raw ?? '').trim();
+  const prefixed = s.match(/^a(\d+)$/i);
+  if (prefixed) return prefixed[1];
+  if (/^\d+$/.test(s)) return s;
+  const digits = s.replace(/\D/g, '');
+  return digits || '';
+}
+
 function rowToContract(row) {
+  const aid = row.agent_id != null && String(row.agent_id).trim() !== '' ? String(row.agent_id) : '';
+  const start = fmtDate(row.start_date);
+  const ym = /^\d{4}-\d{2}-\d{2}$/.test(start) ? start.slice(0, 7).replace('-', '') : '';
+  const idPad = String(row.id ?? '').replace(/\D/g, '').padStart(4, '0');
+  const normalized =
+    ym && idPad ? `${ym}-${idPad}` : row.contract_no ? String(row.contract_no) : undefined;
   return {
     id: String(row.id),
+    contractNo: normalized,
     unitId: String(row.unit_id),
     tenantId: String(row.tenant_id),
-    agentId: String(row.agent_id),
-    startDate: fmtDate(row.start_date),
+    agentId: aid ? `a${aid}` : '',
+    startDate: start,
     endDate: fmtDate(row.end_date),
     monthlyRent: Number(row.monthly_rent),
     securityDeposit: Number(row.security_deposit),
     advanceRent: Number(row.advance_rent),
-    type: String(row.contract_type),
-    status: String(row.status),
+    type: mapDbTypeToUi(row.contract_type),
+    status: mapDbStatusToUi(row.status),
     remarks: row.remarks ? String(row.remarks) : undefined,
   };
 }
@@ -54,10 +125,13 @@ function validatePayload(body) {
   const remarks =
     remarksRaw === null || remarksRaw === undefined ? null : String(remarksRaw).trim() || null;
 
+  const agentDigits = normalizeAgentId(agentId);
+  if (!agentDigits) return null;
+
   return {
     unitId,
     tenantId,
-    agentId,
+    agentId: agentDigits,
     startDate,
     endDate,
     monthlyRent,
@@ -66,6 +140,15 @@ function validatePayload(body) {
     type,
     status,
     remarks,
+  };
+}
+
+/** Maps validated payload to DB column values (ENUMs + numeric agent id). */
+function payloadForDatabase(parsed) {
+  return {
+    ...parsed,
+    type: mapUiTypeToDb(parsed.type),
+    status: mapUiStatusToDb(parsed.status),
   };
 }
 
@@ -115,8 +198,9 @@ export async function createContract(req, res) {
     res.status(400).json({ error: 'Invalid contract payload' });
     return;
   }
+  const dbPayload = payloadForDatabase(parsed);
   try {
-    const row = await insertContract(ctx.session.branchId, parsed);
+    const row = await insertContract(ctx.session.branchId, dbPayload);
     if (!row) {
       res.status(500).json({ error: 'Failed to load created contract' });
       return;
@@ -124,7 +208,33 @@ export async function createContract(req, res) {
     res.status(201).json({ contract: rowToContract(row) });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Failed to create contract' });
+    // Common MySQL constraint errors → return a clear client message.
+    if (e?.code === 'ER_NO_REFERENCED_ROW_2' || e?.code === 'ER_NO_REFERENCED_ROW') {
+      res.status(400).json({
+        error:
+          'Invalid unit/tenant/agent reference. Make sure you selected an existing unit and tenant, and that your user account exists.',
+      });
+      return;
+    }
+    if (e?.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({ error: 'A contract with the same key already exists.' });
+      return;
+    }
+    const showDetail = process.env.NODE_ENV !== 'production';
+    res.status(500).json({
+      error: 'Failed to create contract',
+      ...(showDetail
+        ? {
+            detail:
+              typeof e?.sqlMessage === 'string'
+                ? e.sqlMessage
+                : e instanceof Error
+                  ? e.message
+                  : String(e),
+            code: typeof e?.code === 'string' ? e.code : undefined,
+          }
+        : null),
+    });
   }
 }
 
@@ -145,8 +255,9 @@ export async function updateContract(req, res) {
     res.status(400).json({ error: 'Invalid contract payload' });
     return;
   }
+  const dbPayload = payloadForDatabase(parsed);
   try {
-    const affectedRows = await updateContractById(id, ctx.session.branchId, parsed);
+    const affectedRows = await updateContractById(id, ctx.session.branchId, dbPayload);
     if (affectedRows === 0) {
       res.status(404).json({ error: 'Contract not found' });
       return;

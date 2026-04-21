@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Users,
@@ -12,6 +12,12 @@ import {
   ExternalLink,
   ShieldAlert,
   ShieldQuestion,
+  CalendarRange,
+  FileText,
+  FileImage,
+  Eye,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,54 +36,32 @@ import {
 import { SkeletonTable } from '@/components/skeleton';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
-import { tenants as seedTenants, brokerAgencies, contracts as seedContracts, units } from '@/lib/mockData';
+import { tenants as seedTenants, contracts as seedContracts, units } from '@/lib/mockData';
 import {
   createTenant,
   deleteTenant,
   fetchTenants,
+  uploadTenantKycDocument,
   updateTenant,
   type TenantWriteBody,
 } from '@/lib/tenantsApi';
+import {
+  createPartnerAgency,
+  deletePartnerAgency,
+  fetchPartnerAgencies,
+  updatePartnerAgency,
+} from '@/lib/partnerAgenciesApi';
+import { fetchBlacklist, type BlacklistRowDto } from '@/lib/blacklistApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { Contract, Tenant, Unit } from '@/types';
+import type { BrokerAgency, Contract, Tenant, Unit } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 
-type BlacklistRow = {
-  id: string;
-  name: string;
-  type: 'Tenant' | 'Landlord';
-  reason: string;
-  date: string;
-};
-
-const blacklistRows: BlacklistRow[] = [
-  {
-    id: 'bl1',
-    name: 'Robert Wilson',
-    type: 'Tenant',
-    reason: 'Unpaid rent for 3 months & property damage',
-    date: '2025-11-12',
-  },
-  {
-    id: 'bl2',
-    name: 'Sarah Jenkins',
-    type: 'Landlord',
-    reason: 'Multiple security deposit refund violations',
-    date: '2026-01-05',
-  },
-  {
-    id: 'bl3',
-    name: 'Kevin Lee',
-    type: 'Tenant',
-    reason: 'Illegal subletting and noise complaints',
-    date: '2025-08-20',
-  },
-];
+type BlacklistRow = BlacklistRowDto;
 
 const ID_TYPES = ['Passport', 'UMID', "Driver's License", 'Other'] as const;
 
@@ -135,6 +119,40 @@ function formToBody(f: TenantForm): TenantWriteBody {
   };
 }
 
+async function toWebpIfNeeded(file: File): Promise<File> {
+  const isImage = file.type.startsWith('image/');
+  if (!isImage) throw new Error('Please upload an image file.');
+  if (file.type === 'image/webp') return file;
+
+  const MAX_DIM = 1600;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to process image.');
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('Failed to convert image to WEBP.'))),
+      'image/webp',
+      0.9,
+    );
+  });
+
+  const safeBase = (file.name || 'id')
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^\w.\-]+/g, '_')
+    .slice(0, 80);
+  return new File([blob], `${safeBase}.webp`, { type: 'image/webp' });
+}
+
 export function CRMView() {
   const { t } = useTranslation();
   const { session } = useAuth();
@@ -143,7 +161,11 @@ export function CRMView() {
   const canDelete = session?.crud?.crm?.delete ?? false;
 
   const [crmLoading, setCrmLoading] = useState(true);
+  const [brokersLoading, setBrokersLoading] = useState(true);
+  const [blacklistLoading, setBlacklistLoading] = useState(true);
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
+  const [brokerList, setBrokerList] = useState<BrokerAgency[]>([]);
+  const [blacklistList, setBlacklistList] = useState<BlacklistRow[]>([]);
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,10 +173,29 @@ export function CRMView() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
+  const idUploadRef = useRef<HTMLInputElement | null>(null);
+  const [idUploading, setIdUploading] = useState(false);
+  const [pendingIdImage, setPendingIdImage] = useState<File | null>(null);
+  const [pendingIdImageName, setPendingIdImageName] = useState<string>('');
+  const [pendingIdPreviewUrl, setPendingIdPreviewUrl] = useState<string>('');
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TenantForm>(emptyForm);
+
+  const [isBrokerFormOpen, setIsBrokerFormOpen] = useState(false);
+  const [brokerFormMode, setBrokerFormMode] = useState<'create' | 'edit'>('create');
+  const [editingBrokerId, setEditingBrokerId] = useState<string | null>(null);
+  const [brokerForm, setBrokerForm] = useState({
+    name: '',
+    contactPerson: '',
+    phone: '',
+    email: '',
+  });
+
+  const [isBlacklistDetailsOpen, setIsBlacklistDetailsOpen] = useState(false);
+  const [selectedBlacklist, setSelectedBlacklist] = useState<BlacklistRow | null>(null);
 
   const reloadTenants = useCallback(async () => {
     try {
@@ -171,6 +212,48 @@ export function CRMView() {
   useEffect(() => {
     void reloadTenants();
   }, [reloadTenants]);
+
+  useEffect(() => {
+    if (!pendingIdImage) {
+      setPendingIdPreviewUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(pendingIdImage);
+    setPendingIdPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingIdImage]);
+
+  const reloadBrokers = useCallback(async () => {
+    try {
+      const list = await fetchPartnerAgencies();
+      setBrokerList(list);
+    } catch {
+      setBrokerList([]);
+      toast.warning(t('views.crm.brokers.loadError'));
+    } finally {
+      setBrokersLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void reloadBrokers();
+  }, [reloadBrokers]);
+
+  const reloadBlacklist = useCallback(async () => {
+    try {
+      const list = await fetchBlacklist();
+      setBlacklistList(list);
+    } catch {
+      setBlacklistList([]);
+      toast.warning(t('views.crm.blacklist.loadError'));
+    } finally {
+      setBlacklistLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void reloadBlacklist();
+  }, [reloadBlacklist]);
 
   useEffect(() => {
     void (async () => {
@@ -207,19 +290,46 @@ export function CRMView() {
 
   const filteredBlacklist = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    if (!q) return blacklistRows;
-    return blacklistRows.filter(
+    if (!q) return blacklistList;
+    return blacklistList.filter(
       (row) =>
         row.name.toLowerCase().includes(q) ||
         row.reason.toLowerCase().includes(q) ||
         row.type.toLowerCase().includes(q)
     );
-  }, [searchTerm]);
+  }, [searchTerm, blacklistList]);
+
+  const filteredBrokers = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return brokerList;
+    return brokerList.filter((a) => {
+      const hay = [a.name, a.contactPerson, a.phone, a.email ?? '']
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [searchTerm, brokerList]);
 
   const idTypeOptions = useMemo(
     () => ID_TYPES.map((x) => ({ value: x, label: x })),
     [],
   );
+
+  const tenantLeaseContext = useMemo(() => {
+    if (!selectedTenant) return { contract: null as Contract | null, unit: null as Unit | null };
+    const matches = contractList.filter((c) => c.tenantId === selectedTenant.id);
+    if (matches.length === 0) return { contract: null, unit: null };
+    const active = matches.find((c) => String(c.status).toLowerCase() === 'active');
+    const contract = active ?? [...matches].sort((a, b) => b.endDate.localeCompare(a.endDate))[0];
+    const unit = unitList.find((u) => u.id === contract.unitId) ?? null;
+    return { contract, unit };
+  }, [contractList, selectedTenant, unitList]);
+
+  const resolveUploadUrl = (path: string) => {
+    if (/^https?:\/\//i.test(path)) return path;
+    const base = window.location.origin;
+    return path.startsWith('/') ? `${base}${path}` : `${base}/${path}`;
+  };
 
   const openViewDetails = useCallback((tenant: Tenant) => {
     setSelectedTenant(tenant);
@@ -247,6 +357,99 @@ export function CRMView() {
     setFormMode('create');
     setEditingId(null);
     setForm(emptyForm());
+    setPendingIdImage(null);
+    setPendingIdImageName('');
+    setPendingIdPreviewUrl('');
+  };
+
+  const openAddBroker = () => {
+    setBrokerForm({ name: '', contactPerson: '', phone: '', email: '' });
+    setBrokerFormMode('create');
+    setEditingBrokerId(null);
+    setIsBrokerFormOpen(true);
+  };
+
+  const openEditBroker = (agency: BrokerAgency) => {
+    setBrokerForm({
+      name: agency.name ?? '',
+      contactPerson: agency.contactPerson ?? '',
+      phone: agency.phone ?? '',
+      email: agency.email ?? '',
+    });
+    setBrokerFormMode('edit');
+    setEditingBrokerId(agency.id);
+    setIsBrokerFormOpen(true);
+  };
+
+  const closeBrokerForm = () => {
+    setIsBrokerFormOpen(false);
+    setBrokerForm({ name: '', contactPerson: '', phone: '', email: '' });
+    setBrokerFormMode('create');
+    setEditingBrokerId(null);
+  };
+
+  const handleSaveBroker = async () => {
+    const name = brokerForm.name.trim();
+    if (!name) {
+      toast.error(t('views.crm.brokers.validationName'));
+      return;
+    }
+    try {
+      const payload = {
+        name,
+        contactPerson: brokerForm.contactPerson.trim(),
+        phone: brokerForm.phone.trim(),
+        email: brokerForm.email.trim() || undefined,
+      };
+      if (brokerFormMode === 'edit' && editingBrokerId) {
+        const updated = await updatePartnerAgency(editingBrokerId, payload);
+        setBrokerList((prev) => prev.map((x) => (x.id === editingBrokerId ? updated : x)));
+        toast.success(t('views.crm.brokers.updated'));
+      } else {
+        const created = await createPartnerAgency(payload);
+        setBrokerList((prev) => [created, ...prev]);
+        toast.success(t('views.crm.brokers.created'));
+      }
+      closeBrokerForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.saveError'));
+    }
+  };
+
+  const handleDeleteBroker = async (agency: BrokerAgency) => {
+    if (!window.confirm(t('views.crm.brokers.deleteConfirm', { name: agency.name }))) return;
+    try {
+      await deletePartnerAgency(agency.id);
+      setBrokerList((prev) => prev.filter((x) => x.id !== agency.id));
+      toast.success(t('views.crm.brokers.deleted'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.deleteError'));
+    }
+  };
+
+  const handleViewBrokerLogs = () => {
+    toast.info(t('views.crm.brokers.logsSoon'));
+  };
+
+  const openBlacklistDetails = (row: BlacklistRow) => {
+    setSelectedBlacklist(row);
+    setIsBlacklistDetailsOpen(true);
+  };
+
+  const closeBlacklistDetails = () => {
+    setIsBlacklistDetailsOpen(false);
+    setSelectedBlacklist(null);
+  };
+
+  const openTenantFromBlacklist = () => {
+    if (!selectedBlacklist?.tenantId) return;
+    const tenant = tenantList.find((x) => x.id === selectedBlacklist.tenantId);
+    if (!tenant) {
+      toast.error(t('views.crm.blacklist.tenantNotFound'));
+      return;
+    }
+    closeBlacklistDetails();
+    openViewDetails(tenant);
   };
 
   const handleSaveTenant = async () => {
@@ -256,19 +459,52 @@ export function CRMView() {
       return;
     }
     try {
+      setIdUploading(Boolean(pendingIdImage));
       if (formMode === 'edit' && editingId) {
-        const updated = await updateTenant(editingId, body);
+        let updated = await updateTenant(editingId, body);
+        if (pendingIdImage) {
+          const webp = await toWebpIfNeeded(pendingIdImage);
+          updated = await uploadTenantKycDocument(editingId, webp);
+        }
         setTenantList((prev) => prev.map((x) => (x.id === editingId ? updated : x)));
         setSelectedTenant((s) => (s?.id === editingId ? updated : s));
         toast.success(t('views.crm.tenantModal.updated'));
       } else {
-        const created = await createTenant(body);
+        let created = await createTenant(body);
+        if (pendingIdImage) {
+          const webp = await toWebpIfNeeded(pendingIdImage);
+          created = await uploadTenantKycDocument(created.id, webp);
+        }
         setTenantList((prev) => [created, ...prev]);
         toast.success(t('views.crm.tenantModal.created'));
       }
+      void reloadBlacklist();
       closeForm();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setIdUploading(false);
+    }
+  };
+
+  const handlePickIdUpload = () => {
+    if (!canUpdate || idUploading) return;
+    idUploadRef.current?.click();
+  };
+
+  const handlePickIdImage: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    try {
+      const webp = await toWebpIfNeeded(picked);
+      setPendingIdImage(webp);
+      setPendingIdImageName(webp.name);
+      toast.success('ID image ready (WEBP).');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Invalid image');
+      setPendingIdImage(null);
+      setPendingIdImageName('');
     }
   };
 
@@ -342,7 +578,9 @@ export function CRMView() {
       {
         header: t('views.crm.table.currentUnit'),
         render: (tenant) => {
-          const activeContract = contractList.find((c) => c.tenantId === tenant.id && c.status === 'Active');
+          const activeContract = contractList.find(
+            (c) => c.tenantId === tenant.id && String(c.status).toLowerCase() === 'active',
+          );
           const unit = activeContract ? unitList.find((u) => u.id === activeContract.unitId) : null;
           return unit ? (
             <div className="flex flex-col">
@@ -374,28 +612,34 @@ export function CRMView() {
         cellClassName: 'text-right',
         render: (tenant) => (
           <div
-            className="inline-flex justify-end"
+            className="inline-flex items-center justify-end gap-0.5"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-indigo-600"
+              title={t('views.crm.table.viewDetails')}
+              aria-label={t('views.crm.table.viewDetails')}
+              onClick={(e) => {
+                e.stopPropagation();
+                openViewDetails(tenant);
+              }}
+            >
+              <Eye className="h-4 w-4" strokeWidth={1.75} />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()} />
                 }
               >
                 <MoreVertical className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openViewDetails(tenant);
-                  }}
-                >
-                  {t('views.crm.table.viewDetails')}
-                </DropdownMenuItem>
                 {canUpdate && (
                   <DropdownMenuItem
                     onClick={(e) => {
@@ -409,7 +653,7 @@ export function CRMView() {
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    const url = `${window.location.origin}${window.location.pathname}?view=portal`;
+                    const url = `${window.location.origin}${window.location.pathname}?view=portal&tenantId=${encodeURIComponent(tenant.id)}`;
                     window.open(url, '_blank');
                   }}
                 >
@@ -469,8 +713,17 @@ export function CRMView() {
         className: 'text-right',
         headerClassName: 'text-right',
         cellClassName: 'text-right',
-        render: () => (
-          <Button variant="outline" size="sm" className="h-8 border-slate-200 text-slate-700 hover:bg-slate-50">
+        render: (item) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 border-slate-200 text-slate-700 hover:bg-slate-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              openBlacklistDetails(item);
+            }}
+          >
             {t('views.crm.blacklist.details')}
           </Button>
         ),
@@ -513,8 +766,8 @@ export function CRMView() {
         }
       >
         {selectedTenant && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col">
+            <div className="flex flex-wrap items-center gap-1.5">
               {selectedTenant.kycVerified !== false ? (
                 <Badge variant="outline" className="border-0 bg-emerald-100 text-emerald-700">
                   {t('views.crm.table.verified')}
@@ -534,40 +787,204 @@ export function CRMView() {
                 </Badge>
               )}
             </div>
-            <div>
-              <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">{t('views.crm.details.contact')}</h4>
-              <div className="grid gap-2 text-sm">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  {selectedTenant.email}
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {t('views.crm.details.contact')}
+                  </h4>
+                  <div className="divide-y divide-slate-100">
+                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {t('views.crm.tenantModal.email')}
+                      </span>
+                      <span className="flex min-w-0 items-start gap-1.5 text-slate-900">
+                        <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="break-all">{selectedTenant.email}</span>
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {t('views.crm.tenantModal.phone')}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-slate-900">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        {selectedTenant.phone}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  {selectedTenant.phone}
+
+                <div className="flex min-w-0 flex-col gap-1.5 border-t border-slate-100 pt-3 md:border-t-0 md:border-l md:border-slate-100 md:pt-0 md:pl-6">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {t('views.crm.details.leaseInfo')}
+                  </h4>
+                  {tenantLeaseContext.contract && tenantLeaseContext.unit ? (
+                    <div className="divide-y divide-slate-100">
+                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {t('views.crm.details.leaseUnit')}
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {tenantLeaseContext.unit.unitNumber} · {tenantLeaseContext.unit.buildingName}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {t('views.crm.details.leasePeriod')}
+                        </span>
+                        <span className="flex min-w-0 items-start gap-1.5 text-slate-900">
+                          <CalendarRange className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <span>
+                            {format(parseISO(tenantLeaseContext.contract.startDate), 'MMM d, yyyy')} —{' '}
+                            {format(parseISO(tenantLeaseContext.contract.endDate), 'MMM d, yyyy')}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {t('views.crm.details.leaseMonthlyRent')}
+                        </span>
+                        <span className="font-semibold text-slate-900">
+                          ₱{tenantLeaseContext.contract.monthlyRent.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {t('views.ledger.table.status')}
+                        </span>
+                        <span>
+                          <Badge
+                            variant="outline"
+                            className="border-slate-200 capitalize text-slate-700"
+                          >
+                            {tenantLeaseContext.contract.status}
+                          </Badge>
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="py-1.5 text-sm leading-snug text-slate-500">
+                      {t('views.crm.details.leaseNoContract')}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-            <div>
-              <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">{t('views.crm.details.identification')}</h4>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700 space-y-1">
-                <p>
-                  <span className="text-slate-500">{t('views.crm.tenantModal.idType')}: </span>
-                  {selectedTenant.idType}
-                </p>
-                <p>
-                  <span className="text-slate-500">{t('views.crm.tenantModal.idNumber')}: </span>
-                  {selectedTenant.idNumber}
-                </p>
-                <p>
-                  <span className="text-slate-500">{t('views.crm.tenantModal.idExpiry')}: </span>
-                  {selectedTenant.idExpiry || '—'}
-                </p>
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="flex flex-col gap-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {t('views.crm.details.identification')}
+                </h4>
+                <div className="divide-y divide-slate-100">
+                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t('views.crm.tenantModal.idType')}
+                    </span>
+                    <span className="text-slate-900">{selectedTenant.idType}</span>
+                  </div>
+                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t('views.crm.tenantModal.idNumber')}
+                    </span>
+                    <span className="text-slate-900">{selectedTenant.idNumber}</span>
+                  </div>
+                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t('views.crm.tenantModal.idExpiry')}
+                    </span>
+                    <span className="text-slate-900">{selectedTenant.idExpiry || '—'}</span>
+                  </div>
+                </div>
               </div>
             </div>
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="flex flex-col gap-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {t('views.crm.details.documents')}
+                </h4>
+                <div className="divide-y divide-slate-100">
+                  <button
+                    type="button"
+                    className={cn(
+                      'grid w-full grid-cols-[minmax(6rem,7.5rem)_1fr] items-center gap-x-3 py-2 text-left text-sm transition-colors',
+                      tenantLeaseContext.contract
+                        ? 'cursor-pointer hover:bg-slate-50/80'
+                        : 'cursor-default opacity-70',
+                    )}
+                    onClick={() => {
+                      if (!tenantLeaseContext.contract) {
+                        toast.info(t('views.crm.details.documentLeaseUnavailable'));
+                        return;
+                      }
+                      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${tenantLeaseContext.contract.id}`;
+                      window.open(url, '_blank');
+                    }}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">PDF</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-slate-900">
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={1.75} />
+                      <span className="truncate font-medium">{t('views.crm.details.documentLeasePdf')}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      'grid w-full grid-cols-[minmax(6rem,7.5rem)_1fr] items-center gap-x-3 py-2 text-left text-sm transition-colors',
+                      selectedTenant.idImageUrl
+                        ? 'cursor-pointer hover:bg-slate-50/80'
+                        : 'cursor-default opacity-70',
+                    )}
+                    onClick={() => {
+                      if (!selectedTenant.idImageUrl) {
+                        toast.info(t('views.crm.details.documentIdUnavailable'));
+                        return;
+                      }
+                      window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank');
+                    }}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">WEBP</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-slate-900">
+                      <FileImage className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={1.75} />
+                      <span className="truncate font-medium">{t('views.crm.details.documentTenantIdJpg')}</span>
+                    </span>
+                  </button>
+                </div>
+
+                {selectedTenant.idImageUrl ? (
+                  <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+                      Preview
+                    </div>
+                    <button
+                      type="button"
+                      className="w-full"
+                      onClick={() => window.open(resolveUploadUrl(selectedTenant.idImageUrl!), '_blank')}
+                      title="Open full image"
+                    >
+                      <img
+                        src={resolveUploadUrl(selectedTenant.idImageUrl)}
+                        alt="Tenant ID"
+                        className="w-full max-h-56 object-contain rounded-lg bg-white"
+                        loading="lazy"
+                      />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
             {selectedTenant.blacklistReason ? (
-              <div>
-                <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">{t('views.crm.details.notes')}</h4>
-                <p className="text-sm text-slate-600">{selectedTenant.blacklistReason}</p>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {t('views.crm.details.notes')}
+                  </h4>
+                  <p className="text-sm leading-snug text-slate-600">{selectedTenant.blacklistReason}</p>
+                </div>
               </div>
             ) : null}
           </div>
@@ -687,7 +1104,223 @@ export function CRMView() {
               />
             </div>
           ) : null}
+
+          {canUpdate ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Tenant ID photo (WEBP)</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">
+                    {pendingIdImageName || 'No file selected'}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Uploading will auto-convert to WEBP.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={idUploadRef}
+                    type="file"
+                    accept="image/webp,image/*"
+                    className="hidden"
+                    onChange={handlePickIdImage}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9"
+                    onClick={handlePickIdUpload}
+                    disabled={idUploading}
+                  >
+                    {idUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                        Processing
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" aria-hidden />
+                        Choose photo
+                      </>
+                    )}
+                  </Button>
+                  {pendingIdImage ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-9"
+                      onClick={() => {
+                        setPendingIdImage(null);
+                        setPendingIdImageName('');
+                        setPendingIdPreviewUrl('');
+                      }}
+                      disabled={idUploading}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              {pendingIdPreviewUrl ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+                    Preview
+                  </div>
+                  <img
+                    src={pendingIdPreviewUrl}
+                    alt="Selected tenant ID"
+                    className="w-full max-h-56 object-contain rounded-lg bg-white"
+                    loading="lazy"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={isBrokerFormOpen}
+        onClose={closeBrokerForm}
+        title={brokerFormMode === 'edit' ? t('views.crm.brokers.editTitle') : t('views.crm.brokers.addTitle')}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeBrokerForm}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void handleSaveBroker()}>
+              {t('views.crm.brokers.save')}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-500 mb-6">
+          {brokerFormMode === 'edit' ? t('views.crm.brokers.editDescription') : t('views.crm.brokers.addDescription')}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="crm-broker-name">{t('views.crm.brokers.agencyName')}</Label>
+            <Input
+              id="crm-broker-name"
+              value={brokerForm.name}
+              onChange={(e) => setBrokerForm((f) => ({ ...f, name: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="crm-broker-contact">{t('views.crm.brokers.contactPersonLabel')}</Label>
+            <Input
+              id="crm-broker-contact"
+              value={brokerForm.contactPerson}
+              onChange={(e) => setBrokerForm((f) => ({ ...f, contactPerson: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="crm-broker-phone">{t('views.crm.brokers.phoneLabel')}</Label>
+            <Input
+              id="crm-broker-phone"
+              value={brokerForm.phone}
+              onChange={(e) => setBrokerForm((f) => ({ ...f, phone: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="crm-broker-email">{t('views.crm.brokers.emailLabel')}</Label>
+            <Input
+              id="crm-broker-email"
+              type="email"
+              value={brokerForm.email}
+              onChange={(e) => setBrokerForm((f) => ({ ...f, email: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isBlacklistDetailsOpen}
+        onClose={closeBlacklistDetails}
+        title={selectedBlacklist ? t('views.crm.blacklist.detailsTitle') : ''}
+        maxWidth="lg"
+        footer={
+          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
+            {selectedBlacklist?.entityType === 'tenant' && selectedBlacklist.tenantId ? (
+              <Button type="button" className="sm:mr-auto bg-indigo-600 hover:bg-indigo-700" onClick={openTenantFromBlacklist}>
+                {t('views.crm.blacklist.viewTenantProfile')}
+              </Button>
+            ) : null}
+            <Button type="button" variant="outline" onClick={closeBlacklistDetails}>
+              {t('views.crm.blacklist.close')}
+            </Button>
+          </div>
+        }
+      >
+        {selectedBlacklist ? (
+          <div className="space-y-4 text-sm text-slate-700">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.name')}</div>
+                  <div className="text-base font-semibold text-slate-900">{selectedBlacklist.name}</div>
+                </div>
+                <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 font-medium">
+                  {selectedBlacklist.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.landlord')}
+                </Badge>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.reason')}</div>
+                <div className="text-sm">{selectedBlacklist.reason}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.dateAdded')}</div>
+                <div className="text-sm">{format(parseISO(selectedBlacklist.date), 'MMM d, yyyy')}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="text-xs text-slate-500">{t('views.crm.blacklist.recordId')}</div>
+                <div className="font-mono text-xs">{selectedBlacklist.id}</div>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="text-xs text-slate-500">{t('views.crm.blacklist.branch')}</div>
+                <div className="font-mono text-xs">{selectedBlacklist.branchId}</div>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="text-xs text-slate-500">{t('views.crm.blacklist.entity')}</div>
+                <div className="font-mono text-xs">{selectedBlacklist.entityType}</div>
+              </div>
+              {selectedBlacklist.tenantId ? (
+                <div className="rounded-xl border border-slate-100 bg-white p-3">
+                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.tenantId')}</div>
+                  <div className="font-mono text-xs">{selectedBlacklist.tenantId}</div>
+                </div>
+              ) : null}
+              {selectedBlacklist.landlordId ? (
+                <div className="rounded-xl border border-slate-100 bg-white p-3">
+                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.landlordId')}</div>
+                  <div className="font-mono text-xs">{selectedBlacklist.landlordId}</div>
+                </div>
+              ) : null}
+              {selectedBlacklist.taggedBy ? (
+                <div className="rounded-xl border border-slate-100 bg-white p-3 sm:col-span-2">
+                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.taggedBy')}</div>
+                  <div className="font-mono text-xs">{selectedBlacklist.taggedBy}</div>
+                </div>
+              ) : null}
+            </div>
+
+            {selectedBlacklist.details ? (
+              <div className="rounded-xl border border-slate-100 bg-white p-4">
+                <div className="text-xs font-bold uppercase text-slate-400 mb-2">{t('views.crm.blacklist.detailsLabel')}</div>
+                <pre className="text-xs whitespace-pre-wrap text-slate-700">{selectedBlacklist.details}</pre>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Modal>
 
       <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
@@ -729,41 +1362,103 @@ export function CRMView() {
         </TabsContent>
 
         <TabsContent value="brokers" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {brokerAgencies.map((agency) => (
-              <Card key={agency.id} className="border-none shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
-                      <Users className="w-6 h-6" />
+          {brokersLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
+                  <div className="h-12 w-12 rounded-lg bg-slate-100 mb-4" />
+                  <div className="h-5 w-2/3 bg-slate-100 rounded mb-2" />
+                  <div className="h-3 w-1/2 bg-slate-100 rounded mb-6" />
+                  <div className="h-4 w-full bg-slate-100 rounded mb-2" />
+                  <div className="h-4 w-5/6 bg-slate-100 rounded mb-4" />
+                  <div className="h-9 w-full bg-slate-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredBrokers.map((agency) => (
+                <Card key={agency.id} className="border-none shadow-md">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                        <Users className="w-6 h-6" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{t('views.crm.brokers.partner')}</Badge>
+                        {(canUpdate || canDelete) ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              }
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => openEditBroker(agency)}>
+                                  {t('views.crm.brokers.edit')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canDelete ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  className="text-rose-600"
+                                  onClick={() => void handleDeleteBroker(agency)}
+                                >
+                                  {t('views.crm.brokers.delete')}
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
                     </div>
-                    <Badge variant="outline">{t('views.crm.brokers.partner')}</Badge>
-                  </div>
-                  <CardTitle className="mt-4">{agency.name}</CardTitle>
-                  <CardDescription>{t('views.crm.brokers.officialPartner')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">{t('views.crm.brokers.contactPerson')}</span>
-                      <span className="font-medium">{agency.contactPerson}</span>
+                    <CardTitle className="mt-4">{agency.name}</CardTitle>
+                    <CardDescription>{t('views.crm.brokers.officialPartner')}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm gap-3">
+                        <span className="text-slate-500 shrink-0">{t('views.crm.brokers.contactPerson')}</span>
+                        <span className="font-medium text-right">{agency.contactPerson || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm gap-3">
+                        <span className="text-slate-500 shrink-0">{t('views.crm.brokers.phone')}</span>
+                        <span className="font-medium text-right">{agency.phone || '—'}</span>
+                      </div>
+                      {agency.email ? (
+                        <div className="flex items-center justify-between text-sm gap-3">
+                          <span className="text-slate-500 shrink-0">{t('views.crm.brokers.emailShort')}</span>
+                          <span className="font-medium text-right break-all">{agency.email}</span>
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">{t('views.crm.brokers.phone')}</span>
-                      <span className="font-medium">{agency.phone}</span>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="w-full">
-                    {t('views.crm.brokers.viewLogs')}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-            <Card className="border-dashed border-2 flex flex-col items-center justify-center p-6 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 transition-all cursor-pointer">
-              <Plus className="w-8 h-8 mb-2" />
-              <p className="font-medium">{t('views.crm.brokers.addAgency')}</p>
-            </Card>
-          </div>
+                    <Button type="button" variant="outline" className="w-full" onClick={handleViewBrokerLogs}>
+                      {t('views.crm.brokers.viewLogs')}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+              {canCreate ? (
+                <button
+                  type="button"
+                  className="border-dashed border-2 flex flex-col items-center justify-center p-6 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 transition-all cursor-pointer rounded-2xl bg-white"
+                  onClick={openAddBroker}
+                >
+                  <Plus className="w-8 h-8 mb-2" />
+                  <p className="font-medium">{t('views.crm.brokers.addAgency')}</p>
+                </button>
+              ) : null}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="blacklist" className="space-y-6">
           <Card className="gap-0 overflow-hidden rounded-xl border border-rose-100/80 py-0 shadow-sm">
@@ -775,7 +1470,7 @@ export function CRMView() {
               <CardDescription className="text-rose-700/70">{t('views.crm.blacklist.description')}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              {crmLoading ? (
+              {crmLoading || blacklistLoading ? (
                 <div className="p-6">
                   <SkeletonTable rows={5} columns={5} showToolbar={false} />
                 </div>

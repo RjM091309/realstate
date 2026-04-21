@@ -326,6 +326,16 @@ export async function ensureSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  const [partnerAgencyCountRows] = await pool.query('SELECT COUNT(*) AS n FROM partner_agency');
+  const pan = Number(partnerAgencyCountRows[0]?.n ?? 0);
+  if (pan === 0) {
+    await pool.query(
+      `INSERT IGNORE INTO partner_agency (branch_id, agency_name, contact_person, contact_number, email, active) VALUES
+        (1, 'Prime Realty', 'Alice Brown', '0917-123-4567', NULL, 1),
+        (1, 'Elite Estates', 'Bob Green', '0918-987-6543', NULL, 1)`,
+    );
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`landlord_profile\` (
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -435,6 +445,23 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_blacklist_tagged_by\` FOREIGN KEY (\`tagged_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  const [blacklistCountRows] = await pool.query('SELECT COUNT(*) AS n FROM blacklist_record');
+  const bn = Number(blacklistCountRows[0]?.n ?? 0);
+  if (bn === 0) {
+    const [tenantRows] = await pool.query(
+      'SELECT id FROM tenant_profile WHERE branch_id = 1 ORDER BY id ASC LIMIT 1',
+    );
+    const tenantId = tenantRows[0]?.id;
+    if (tenantId != null) {
+      await pool.query(
+        `INSERT INTO blacklist_record (
+          branch_id, entity_type, tenant_id, landlord_id, reason, details, is_active, tagged_by
+        ) VALUES (1, 'tenant', ?, NULL, 'Sample blacklist record (seed)', NULL, 1, NULL)`,
+        [tenantId],
+      );
+    }
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`document_template\` (
@@ -572,6 +599,87 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_payment_txn_received_by\` FOREIGN KEY (\`received_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  // Demo lease + payment schedule for empty dev DBs (enables Lease Ledger + Record Payment end-to-end).
+  try {
+    const [lcCountRows] = await pool.query('SELECT COUNT(*) AS n FROM lease_contract');
+    const lcN = Number(lcCountRows[0]?.n ?? 0);
+    if (lcN === 0) {
+      const [[unitRow]] = await pool.query(
+        'SELECT id, monthly_rent FROM unit WHERE active = 1 ORDER BY id ASC LIMIT 1',
+      );
+      const [[tenantRow]] = await pool.query(
+        `SELECT id FROM tenant_profile
+         WHERE active = 1 AND (branch_id = 1 OR branch_id IS NULL)
+         ORDER BY (branch_id = 1) DESC, id ASC
+         LIMIT 1`,
+      );
+      const [[agentRow]] = await pool.query('SELECT IDNO FROM user_info WHERE ACTIVE = 1 ORDER BY IDNO ASC LIMIT 1');
+
+      const unitId = unitRow?.id;
+      const tenantId = tenantRow?.id;
+      const agentId = agentRow?.IDNO ?? null;
+      const rent = Number(unitRow?.monthly_rent ?? 0) > 0 ? Number(unitRow.monthly_rent) : 35000;
+
+      if (unitId != null && tenantId != null) {
+        const [insLc] = await pool.query(
+          `INSERT INTO lease_contract (
+            branch_id,
+            contract_no,
+            unit_id,
+            landlord_id,
+            agent_id,
+            partner_agency_id,
+            contract_type,
+            status,
+            start_date,
+            end_date,
+            monthly_rent,
+            security_deposit,
+            advance_rent,
+            special_remarks,
+            created_by
+          ) VALUES (
+            1,
+            'LC-BOOT-001',
+            ?,
+            NULL,
+            ?,
+            NULL,
+            'monthly_rental',
+            'active',
+            CURDATE() - INTERVAL 30 DAY,
+            CURDATE() + INTERVAL 335 DAY,
+            ?,
+            ?,
+            ?,
+            'Bootstrap contract for local dev (auto-created when DB is empty).',
+            ?
+          )`,
+          [unitId, agentId, rent, rent * 2, rent, agentId],
+        );
+
+        const contractId = insLc.insertId;
+        await pool.query(
+          'INSERT INTO contract_tenant (contract_id, tenant_id, is_primary) VALUES (?, ?, 1)',
+          [contractId, tenantId],
+        );
+
+        const [psCountRows] = await pool.query('SELECT COUNT(*) AS n FROM payment_schedule');
+        const psN = Number(psCountRows[0]?.n ?? 0);
+        if (psN === 0) {
+          await pool.query(
+            `INSERT INTO payment_schedule (
+              branch_id, contract_id, invoice_id, due_date, amount_due, status, notes
+            ) VALUES (?, ?, NULL, DATE_FORMAT(CURDATE(), '%Y-%m-01'), ?, 'pending', 'Bootstrap rent schedule (dev)')`,
+            [1, contractId, rent],
+          );
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[ensureSchema] lease/payment bootstrap skipped:', e);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`contract_collaboration\` (

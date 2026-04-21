@@ -99,8 +99,26 @@ function unitToForm(u: Unit): AddUnitForm {
   };
 }
 
+function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory']): Unit {
+  const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
+  return {
+    id,
+    unitNumber: form.unitNumber.trim(),
+    floor: form.floor.trim() || '—',
+    tower: form.tower.trim() || '—',
+    buildingName: form.buildingName.trim(),
+    commonAddress: form.commonAddress.trim() || form.buildingName.trim(),
+    legalAddress: form.legalAddress.trim() || form.commonAddress.trim() || '—',
+    type: form.type,
+    status: form.status,
+    area: form.area,
+    monthlyRate: Number.isFinite(rate) ? rate : 0,
+    inventory,
+  };
+}
+
 export function UnitsView() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { session } = useAuth();
   const canCreate = session?.crud?.units?.create ?? false;
   const canUpdate = session?.crud?.units?.update ?? false;
@@ -116,13 +134,18 @@ export function UnitsView() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<AddUnitForm>(defaultAddForm);
+  /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
+  const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
 
   const reloadUnits = useCallback(async () => {
+    setUnitsLoading(true);
     try {
       const units = await fetchUnits();
       setUnitList(units);
+      setUnitsBackedByApi(true);
     } catch {
       setUnitList([...seedUnits]);
+      setUnitsBackedByApi(false);
       toast.warning(t('views.units.loadError'));
     } finally {
       setUnitsLoading(false);
@@ -133,10 +156,10 @@ export function UnitsView() {
     void reloadUnits();
   }, [reloadUnits]);
 
-  const handleViewDetails = (unit: Unit) => {
+  const handleViewDetails = useCallback((unit: Unit) => {
     setSelectedUnit(unit);
     setIsDetailsOpen(true);
-  };
+  }, []);
 
   const filteredUnits = unitList.filter(
     (u) =>
@@ -145,38 +168,41 @@ export function UnitsView() {
       u.area.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const statusLabel = (status: string) => {
-    if (status === 'Available') return t('views.units.statuses.available');
-    if (status === 'Occupied') return t('views.units.statuses.occupied');
-    if (status === 'Maintenance') return t('views.units.statuses.maintenance');
-    if (status === 'Reserved') return t('views.units.statuses.reserved');
-    return t('views.units.statuses.maintenance');
-  };
+  const statusLabel = useCallback(
+    (status: string) => {
+      if (status === 'Available') return t('views.units.statuses.available');
+      if (status === 'Occupied') return t('views.units.statuses.occupied');
+      if (status === 'Maintenance') return t('views.units.statuses.maintenance');
+      if (status === 'Reserved') return t('views.units.statuses.reserved');
+      return t('views.units.statuses.maintenance');
+    },
+    [t],
+  );
 
-  const openAddUnitModal = () => {
+  const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);
     setFormMode('create');
     setEditingId(null);
     setAddForm(defaultAddForm());
     setIsAddUnitOpen(true);
-  };
+  }, []);
 
-  const openEditUnitModal = (unit: Unit) => {
+  const openEditUnitModal = useCallback((unit: Unit) => {
     setIsDetailsOpen(false);
     setFormMode('edit');
     setEditingId(unit.id);
     setAddForm(unitToForm(unit));
     setIsAddUnitOpen(true);
-  };
+  }, []);
 
-  const closeAddUnitModal = () => {
+  const closeAddUnitModal = useCallback(() => {
     setIsAddUnitOpen(false);
     setFormMode('create');
     setEditingId(null);
     setAddForm(defaultAddForm());
-  };
+  }, []);
 
-  const handleSaveUnit = async () => {
+  const handleSaveUnit = useCallback(async () => {
     const rate = Number(String(addForm.monthlyRate).replace(/,/g, ''));
     if (!addForm.unitNumber.trim() || !addForm.buildingName.trim()) {
       toast.error(t('views.units.addModal.validationRequired'));
@@ -190,6 +216,28 @@ export function UnitsView() {
       formMode === 'edit' && editingId
         ? (unitList.find((u) => u.id === editingId)?.inventory ?? [])
         : [];
+
+    if (!unitsBackedByApi) {
+      try {
+        if (formMode === 'edit' && editingId) {
+          const updated = formToUnit(editingId, addForm, existingInventory);
+          setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
+          setSelectedUnit((s) => (s?.id === editingId ? updated : s));
+          toast.success(t('views.units.updated'));
+          setIsDetailsOpen(false);
+        } else {
+          const newId = `local-${Date.now()}`;
+          const created = formToUnit(newId, addForm, []);
+          setUnitList((prev) => [created, ...prev]);
+          toast.success(t('views.units.addModal.saved'));
+        }
+        closeAddUnitModal();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Error');
+      }
+      return;
+    }
+
     const body = formToWriteBody(addForm, existingInventory);
     try {
       if (formMode === 'edit' && editingId) {
@@ -207,22 +255,43 @@ export function UnitsView() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error');
     }
-  };
+  }, [
+    addForm,
+    closeAddUnitModal,
+    editingId,
+    formMode,
+    t,
+    unitList,
+    unitsBackedByApi,
+  ]);
 
-  const handleDeleteUnit = async (unit: Unit) => {
-    if (!window.confirm(t('views.units.deleteConfirm', { unitNumber: unit.unitNumber }))) return;
-    try {
-      await deleteUnit(unit.id);
-      setUnitList((prev) => prev.filter((u) => u.id !== unit.id));
-      if (selectedUnit?.id === unit.id) {
-        setSelectedUnit(null);
-        setIsDetailsOpen(false);
+  const handleDeleteUnit = useCallback(
+    async (unit: Unit) => {
+      if (!window.confirm(t('views.units.deleteConfirm', { unitNumber: unit.unitNumber }))) return;
+      const wasViewingDetails = selectedUnit?.id === unit.id;
+      if (!unitsBackedByApi) {
+        setUnitList((prev) => prev.filter((u) => u.id !== unit.id));
+        if (wasViewingDetails) {
+          setSelectedUnit(null);
+          setIsDetailsOpen(false);
+        }
+        toast.success(t('views.units.deleted'));
+        return;
       }
-      toast.success(t('views.units.deleted'));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error');
-    }
-  };
+      try {
+        await deleteUnit(unit.id);
+        setUnitList((prev) => prev.filter((u) => u.id !== unit.id));
+        if (wasViewingDetails) {
+          setSelectedUnit(null);
+          setIsDetailsOpen(false);
+        }
+        toast.success(t('views.units.deleted'));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Error');
+      }
+    },
+    [t, unitsBackedByApi, selectedUnit],
+  );
 
   const addTypeOptions = useMemo(
     () => UNIT_TYPES.map((ut) => ({ value: ut, label: ut })),
@@ -231,7 +300,7 @@ export function UnitsView() {
 
   const addStatusOptions = useMemo(
     () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
-    [t, i18n.language],
+    [statusLabel],
   );
 
   const addAreaOptions = useMemo(
@@ -351,7 +420,7 @@ export function UnitsView() {
         ),
       },
     ],
-    [t, canUpdate, canDelete, statusLabel]
+    [t, canUpdate, canDelete, statusLabel, handleViewDetails, openEditUnitModal, handleDeleteUnit]
   );
 
   return (
@@ -413,7 +482,60 @@ export function UnitsView() {
           {filteredUnits.map((unit) => (
             <Card key={unit.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-all group">
               <div className="h-32 bg-slate-100 relative">
-                <div className="absolute top-3 right-3">
+                <div
+                  className="absolute top-3 right-3 z-10 flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  role="presentation"
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 border border-slate-200 bg-white/95 shadow-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      }
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDetails(unit);
+                        }}
+                      >
+                        {t('views.units.table.viewDetails')}
+                      </DropdownMenuItem>
+                      {canUpdate && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditUnitModal(unit);
+                          }}
+                        >
+                          {t('views.units.table.editUnit')}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem disabled>{t('views.units.table.manageInventory')}</DropdownMenuItem>
+                      {canDelete && (
+                        <DropdownMenuItem
+                          variant="destructive"
+                          className="text-rose-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteUnit(unit);
+                          }}
+                        >
+                          {t('views.units.table.delete')}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Badge
                     className={cn(
                       unit.status === 'Available'
@@ -476,18 +598,33 @@ export function UnitsView() {
         }
         maxWidth="4xl"
         footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
-              {t('views.units.details.close')}
-            </Button>
-            {canUpdate && selectedUnit && (
-              <Button
-                className="bg-indigo-600"
-                onClick={() => openEditUnitModal(selectedUnit)}
-              >
-                {t('views.units.details.editUnitInfo')}
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+            <div className="flex flex-wrap gap-2">
+              {canDelete && selectedUnit ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                  onClick={() => void handleDeleteUnit(selectedUnit)}
+                >
+                  {t('views.units.table.delete')}
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-3 ml-auto">
+              <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>
+                {t('views.units.details.close')}
               </Button>
-            )}
+              {canUpdate && selectedUnit ? (
+                <Button
+                  type="button"
+                  className="bg-indigo-600"
+                  onClick={() => openEditUnitModal(selectedUnit)}
+                >
+                  {t('views.units.details.editUnitInfo')}
+                </Button>
+              ) : null}
+            </div>
           </div>
         }
       >

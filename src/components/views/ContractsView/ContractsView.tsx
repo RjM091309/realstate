@@ -101,12 +101,13 @@ export function ContractsView() {
         const list = await fetchContracts();
         setContractList(list);
       } catch {
-        setContractList(seedContracts);
+        setContractList([]);
+        toast.warning(t('views.contracts.loadError'));
       } finally {
         setContractsLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void (async () => {
@@ -142,6 +143,20 @@ export function ContractsView() {
     [tenantList],
   );
 
+  const applyUnitDefaults = (pickedUnitId: string | null) => {
+    if (!pickedUnitId) return;
+    const unit = unitList.find((u) => u.id === pickedUnitId);
+    if (!unit) return;
+
+    const rent = Number(unit.monthlyRate);
+    if (!Number.isFinite(rent) || rent <= 0) return;
+
+    // Auto-fill defaults (new contract workflow).
+    // Keep user-entered values if they already typed something.
+    setMonthlyRent((prev) => (String(prev ?? '').trim() ? prev : String(rent)));
+    setSecurityDeposit((prev) => (String(prev ?? '').trim() ? prev : String(rent * 2)));
+  };
+
   const handlePreview = (contract: Contract, type: 'contract' | 'invoice') => {
     const url = `${window.location.origin}${window.location.pathname}?view=preview&type=${type}&id=${contract.id}`;
     window.open(url, '_blank');
@@ -163,7 +178,7 @@ export function ContractsView() {
       {
         header: t('views.contracts.table.contractId'),
         render: (contract) => (
-          <span className="font-mono text-xs text-slate-500 uppercase">{contract.id}</span>
+          <span className="font-mono text-xs text-slate-500 uppercase">{contract.contractNo ?? contract.id}</span>
         ),
       },
       {
@@ -174,7 +189,7 @@ export function ContractsView() {
           return (
             <div className="flex flex-col">
               <span className="font-bold text-slate-900">
-                {t('views.units.unitLabel', { unitNumber: unit?.unitNumber })}
+                {unit?.unitNumber ?? contract.unitId}
               </span>
               <span className="text-xs text-slate-500">{tenant?.name}</span>
             </div>
@@ -217,11 +232,11 @@ export function ContractsView() {
       },
       {
         header: t('views.contracts.table.documents'),
-        className: 'text-right',
-        headerClassName: 'text-right',
-        cellClassName: 'text-right',
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
         render: (contract) => (
-          <div className="flex justify-end items-center gap-1">
+          <div className="flex w-full min-w-0 justify-center items-center gap-1 flex-wrap">
             <Button
               variant="ghost"
               size="sm"
@@ -399,7 +414,15 @@ export function ContractsView() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t('views.contracts.selectUnit')}</Label>
-            <Select2 options={unitOptions} value={unitId} onChange={(v) => setUnitId(v as string | null)} />
+            <Select2
+              options={unitOptions}
+              value={unitId}
+              onChange={(v) => {
+                const picked = v as string | null;
+                setUnitId(picked);
+                if (formMode === 'create') applyUnitDefaults(picked);
+              }}
+            />
           </div>
           <div className="space-y-2">
             <Label>{t('views.contracts.selectTenant')}</Label>

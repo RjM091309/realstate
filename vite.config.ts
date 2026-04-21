@@ -12,10 +12,14 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, path.resolve(configDir, '..'), ''),
     ...loadEnv(mode, configDir, ''),
   };
-  const apiPort = env.API_PORT ?? '3001';
+  const apiPort = process.env.API_PORT ?? env.API_PORT ?? '3001';
   /** Same proxy for `vite` and `vite preview` so `/api/*` always reaches Express. */
   const apiProxy = {
     '/api': {
+      target: `http://127.0.0.1:${apiPort}`,
+      changeOrigin: true,
+    },
+    '/uploads': {
       target: `http://127.0.0.1:${apiPort}`,
       changeOrigin: true,
     },

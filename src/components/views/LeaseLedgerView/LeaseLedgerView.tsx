@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileText,
   Download,
@@ -25,12 +25,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SkeletonTable } from '@/components/skeleton';
-import {
-  payments as seedPayments,
-  units as seedUnits,
-  contracts as seedContracts,
-  tenants as seedTenants,
-} from '@/lib/mockData';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
@@ -112,27 +106,40 @@ export function LeaseLedgerView() {
 
   useEffect(() => {
     void (async () => {
+      let hadError = false;
       try {
-        const [paymentsData, unitsData, contractsData, tenantsData] = await Promise.all([
-          fetchPayments(),
-          fetchUnits(),
-          fetchContracts(),
-          fetchTenants(),
-        ]);
-        setPayments(paymentsData);
-        setUnits(unitsData);
-        setContracts(contractsData);
-        setTenants(tenantsData);
-      } catch {
-        setPayments(seedPayments);
-        setUnits(seedUnits);
-        setContracts(seedContracts);
-        setTenants(seedTenants);
+        try {
+          setPayments(await fetchPayments());
+        } catch {
+          hadError = true;
+          setPayments([]);
+        }
+        try {
+          setUnits(await fetchUnits());
+        } catch {
+          hadError = true;
+          setUnits([]);
+        }
+        try {
+          setContracts(await fetchContracts());
+        } catch {
+          hadError = true;
+          setContracts([]);
+        }
+        try {
+          setTenants(await fetchTenants());
+        } catch {
+          hadError = true;
+          setTenants([]);
+        }
+        if (hadError) {
+          toast.warning(t('views.ledger.loadError'));
+        }
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
   const expectedCollection = useMemo(() => {
     const start = startOfMonth(new Date());
@@ -189,40 +196,88 @@ export function LeaseLedgerView() {
     [contracts, units, tenants],
   );
 
-  const handlePreviewInvoice = (contractId: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${contractId}`;
-    window.open(url, '_blank');
-  };
+  const handlePreviewInvoice = useCallback((contractId: string) => {
+    const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${encodeURIComponent(contractId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
 
-  const openCreateModal = () => {
+  const downloadCsv = useCallback((fileName: string, rows: string[][]) => {
+    const csv = rows
+      .map((r) =>
+        r
+          .map((cell) => {
+            const s = String(cell ?? '');
+            const escaped = s.replace(/"/g, '""');
+            return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+          })
+          .join(','),
+      )
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleExportReport = useCallback(() => {
+    const rows: string[][] = [
+      ['Payment ID', 'Contract ID', 'Unit', 'Tenant', 'Due Date', 'Paid Date', 'Status', 'Amount'],
+      ...filteredPayments.map((p) => {
+        const unit = units.find((u) => u.id === p.unitId);
+        const contract = contracts.find((c) => c.id === p.contractId);
+        const tenant = contract ? tenants.find((ten) => ten.id === contract.tenantId) : null;
+        return [
+          p.id,
+          p.contractId,
+          unit?.unitNumber ?? p.unitId,
+          tenant?.name ?? '',
+          p.dueDate,
+          p.paidDate ?? '',
+          p.status,
+          String(p.amount),
+        ];
+      }),
+    ];
+    downloadCsv(`lease_ledger_${format(new Date(), 'yyyyMMdd')}.csv`, rows);
+    toast.success(t('views.ledger.exported'));
+  }, [contracts, downloadCsv, filteredPayments, t, tenants, units]);
+
+  const openCreateModal = useCallback(() => {
     setFormMode('create');
     setEditingPaymentId(null);
     setForm(emptyForm());
     setIsPaymentModalOpen(true);
-  };
+  }, []);
 
-  const openEditModal = (payment: Payment) => {
+  const openEditModal = useCallback((payment: Payment) => {
     setFormMode('edit');
     setEditingPaymentId(payment.id);
     setForm(toForm(payment));
     setIsPaymentModalOpen(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setIsPaymentModalOpen(false);
     setFormMode('create');
     setEditingPaymentId(null);
     setForm(emptyForm());
-  };
+  }, []);
 
-  const savePayment = async () => {
+  const savePayment = useCallback(async () => {
     if (!form.contractId || !form.unitId || !form.dueDate) {
-      toast.error('Please select contract and due date.');
+      toast.error(t('views.ledger.validationRequired'));
       return;
     }
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount.');
+      toast.error(t('views.ledger.validationAmount'));
       return;
     }
     const payload = {
@@ -237,28 +292,87 @@ export function LeaseLedgerView() {
       if (formMode === 'edit' && editingPaymentId) {
         const updated = await updatePayment(editingPaymentId, payload);
         setPayments((prev) => prev.map((p) => (p.id === editingPaymentId ? updated : p)));
-        toast.success('Payment updated.');
+        toast.success(t('views.ledger.updated'));
       } else {
         const created = await createPayment(payload);
         setPayments((prev) => [created, ...prev]);
-        toast.success('Payment recorded.');
+        toast.success(t('views.ledger.recorded'));
       }
       closeModal();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save payment');
+      toast.error(e instanceof Error ? e.message : t('views.ledger.saveError'));
     }
-  };
+  }, [closeModal, editingPaymentId, form, formMode, t]);
 
-  const handleDeletePayment = async (payment: Payment) => {
-    if (!window.confirm(`Delete payment ${payment.id}?`)) return;
+  const handleDeletePayment = useCallback(async (payment: Payment) => {
+    if (!window.confirm(t('views.ledger.deleteConfirm', { id: payment.id }))) return;
     try {
       await deletePayment(payment.id);
       setPayments((prev) => prev.filter((p) => p.id !== payment.id));
-      toast.success('Payment deleted.');
+      toast.success(t('views.ledger.deleted'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to delete payment');
+      toast.error(e instanceof Error ? e.message : t('views.ledger.deleteError'));
     }
-  };
+  }, [t]);
+
+  const handleQuickMarkPaid = useCallback(
+    async (payment: Payment) => {
+      try {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const updated = await updatePayment(payment.id, {
+          contractId: payment.contractId,
+          unitId: payment.unitId,
+          amount: payment.amount,
+          dueDate: payment.dueDate,
+          paidDate: today,
+          status: 'Paid',
+        });
+        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        toast.success(t('views.ledger.markedPaid'));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      }
+    },
+    [t],
+  );
+
+  const handleQuickMarkPending = useCallback(
+    async (payment: Payment) => {
+      try {
+        const updated = await updatePayment(payment.id, {
+          contractId: payment.contractId,
+          unitId: payment.unitId,
+          amount: payment.amount,
+          dueDate: payment.dueDate,
+          status: 'Pending',
+        });
+        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        toast.success(t('views.ledger.markedPending'));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      }
+    },
+    [t],
+  );
+
+  const handleQuickMarkOverdue = useCallback(
+    async (payment: Payment) => {
+      try {
+        const updated = await updatePayment(payment.id, {
+          contractId: payment.contractId,
+          unitId: payment.unitId,
+          amount: payment.amount,
+          dueDate: payment.dueDate,
+          status: 'Overdue',
+        });
+        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        toast.success(t('views.ledger.markedOverdue'));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      }
+    },
+    [t],
+  );
 
   const upcomingColumns: ColumnDef<Payment>[] = useMemo(
     () => [
@@ -375,6 +489,36 @@ export function LeaseLedgerView() {
                   <MoreVertical className="w-4 h-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {canUpdate && payment.status !== 'Paid' && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleQuickMarkPaid(payment);
+                      }}
+                    >
+                      {t('views.ledger.markPaid')}
+                    </DropdownMenuItem>
+                  )}
+                  {canUpdate && payment.status !== 'Overdue' && payment.status !== 'Paid' && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleQuickMarkOverdue(payment);
+                      }}
+                    >
+                      {t('views.ledger.markOverdue')}
+                    </DropdownMenuItem>
+                  )}
+                  {canUpdate && payment.status === 'Paid' && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleQuickMarkPending(payment);
+                      }}
+                    >
+                      {t('views.ledger.markPending')}
+                    </DropdownMenuItem>
+                  )}
                   {canUpdate && (
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -382,18 +526,19 @@ export function LeaseLedgerView() {
                         openEditModal(payment);
                       }}
                     >
-                      Edit payment
+                      {t('views.ledger.editPayment')}
                     </DropdownMenuItem>
                   )}
                   {canDelete && (
                     <DropdownMenuItem
+                      variant="destructive"
                       className="text-rose-600"
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleDeletePayment(payment);
                       }}
                     >
-                      Delete payment
+                      {t('views.ledger.deletePayment')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -403,7 +548,20 @@ export function LeaseLedgerView() {
         ),
       },
     ],
-    [t, units, contracts, tenants, canUpdate, canDelete],
+    [
+      t,
+      units,
+      contracts,
+      tenants,
+      canUpdate,
+      canDelete,
+      handlePreviewInvoice,
+      openEditModal,
+      handleDeletePayment,
+      handleQuickMarkPaid,
+      handleQuickMarkPending,
+      handleQuickMarkOverdue,
+    ],
   );
 
   return (
@@ -414,7 +572,7 @@ export function LeaseLedgerView() {
           <p className="text-slate-500 mt-1">{t('views.ledger.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportReport}>
             <Download className="w-4 h-4 mr-2" />
             {t('views.ledger.exportReport')}
           </Button>
@@ -563,6 +721,7 @@ export function LeaseLedgerView() {
                 keyExtractor={(p) => `up-${p.id}`}
                 embedded
                 highlightFirstColumn={false}
+                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
               />
             </CardContent>
           </Card>
@@ -579,6 +738,7 @@ export function LeaseLedgerView() {
                 keyExtractor={(p) => p.id}
                 embedded
                 highlightFirstColumn={false}
+                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
               />
             </CardContent>
           </Card>

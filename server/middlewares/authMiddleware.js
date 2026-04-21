@@ -4,6 +4,19 @@ import { getJwtSecret } from '../jwt.js';
 
 /** Verifies Bearer JWT and sets `req.userId`. */
 export async function requireAuth(req, res, next) {
+  // Dev-only bypass for local development when the UI is running with BYPASS_LOGIN enabled.
+  // In non-production, this is enabled by default (or can be explicitly enabled via `.env`).
+  // Never enable in production.
+  const allowBypass =
+    process.env.NODE_ENV !== 'production' &&
+    String(process.env.ALLOW_BYPASS_AUTH ?? 'true').toLowerCase() === 'true';
+  const devUserId = req.headers['x-dev-user-id'];
+  if (allowBypass && devUserId != null && String(devUserId).trim() !== '') {
+    req.userId = Number(String(devUserId).trim());
+    next();
+    return;
+  }
+
   const auth = req.headers.authorization;
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) {

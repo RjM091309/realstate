@@ -48,6 +48,7 @@ export interface Tenant {
 
 export interface Contract {
   id: string;
+  contractNo?: string;
   unitId: string;
   tenantId: string;
   agentId: string;
@@ -84,6 +85,7 @@ export interface BrokerAgency {
   name: string;
   contactPerson: string;
   phone: string;
+  email?: string;
 }
 
 export interface DashboardStats {

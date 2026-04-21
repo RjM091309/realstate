@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'realstate_token';
+const DEV_BYPASS_USER_ID_KEY = 'realstate_dev_user_id';
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -9,14 +10,28 @@ export function setToken(token: string | null): void {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export function setDevBypassUserId(userId: number | null): void {
+  if (userId == null) localStorage.removeItem(DEV_BYPASS_USER_ID_KEY);
+  else localStorage.setItem(DEV_BYPASS_USER_ID_KEY, String(userId));
+}
+
+export function getAuthHeaders(initHeaders?: HeadersInit): Headers {
   const token = getToken();
-  const headers = new Headers(init?.headers);
+  const headers = new Headers(initHeaders);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  else {
+    const devUserId = localStorage.getItem(DEV_BYPASS_USER_ID_KEY);
+    if (devUserId) headers.set('x-dev-user-id', devUserId);
+  }
+  return headers;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = getAuthHeaders(init?.headers);
   headers.set('Accept', 'application/json');
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let res: Response;
   try {

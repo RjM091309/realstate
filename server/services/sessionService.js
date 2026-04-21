@@ -45,6 +45,16 @@ export async function loadSessionPayload(userId) {
     };
   }
 
+  // If `user_role_crud_permissions` has no row for a module but the role can open that tab,
+  // grant full CRUD so staff UI (edit/delete, etc.) matches sidebar access.
+  const staffCrudModules = ['units', 'contracts', 'crm', 'ledger', 'calendar'];
+  for (const row of sidebarRows) {
+    const key = String(row.feature_key);
+    if (staffCrudModules.includes(key) && crud[key] === undefined) {
+      crud[key] = { create: true, update: true, delete: true };
+    }
+  }
+
   return {
     user: {
       id: Number(u.IDNO),

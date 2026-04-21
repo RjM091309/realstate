@@ -1,16 +1,15 @@
-import React, { useMemo } from 'react';
-import { 
-  User, 
-  FileText, 
-  CreditCard, 
-  Bell, 
-  Settings, 
-  Download, 
-  Upload, 
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import {
+  User,
+  FileText,
+  Download,
+  Upload,
   CheckCircle2,
   AlertCircle,
   MessageSquare,
-  Package
+  Package,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,23 +19,151 @@ import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { tenants, units, contracts, payments } from '@/lib/mockData';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import type { Payment } from '@/types';
+import type { Contract, Payment, Tenant, Unit } from '@/types';
+import {
+  fetchTenantById,
+  fetchTenantPortalDocuments,
+  uploadTenantKycDocument,
+  type PortalDocumentItem,
+} from '@/lib/tenantsApi';
+import { getAuthHeaders } from '@/lib/api';
+import { fetchContracts } from '@/lib/contractsApi';
+import { fetchUnits } from '@/lib/unitsApi';
+import { fetchPayments } from '@/lib/paymentsApi';
+
+function readTenantIdFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get('tenantId')?.trim() || null;
+}
+
+function toAbsoluteAssetUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return pathOrUrl.startsWith('/') ? `${window.location.origin}${pathOrUrl}` : `${window.location.origin}/${pathOrUrl}`;
+}
+
+async function saveResponseAsFile(res: Response, fileName: string) {
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function TenantPortalView() {
   const { t } = useTranslation();
-  // Mocking the logged in tenant (e.g., John Doe)
-  const tenant = tenants[0];
-  const contract = contracts.find(c => c.tenantId === tenant.id);
-  const unit = units.find(u => u.id === contract?.unitId);
-  const tenantPayments = payments.filter(p => p.contractId === contract?.id);
+  const [tenantIdParam] = useState(readTenantIdFromUrl);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [contractsList, setContractsList] = useState<Contract[]>([]);
+  const [unitsList, setUnitsList] = useState<Unit[]>([]);
+  const [paymentsList, setPaymentsList] = useState<Payment[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [kycDocUrl, setKycDocUrl] = useState<string | undefined>(undefined);
+  const [portalDocuments, setPortalDocuments] = useState<PortalDocumentItem[] | null>(null);
+  const [portalDocumentsLoading, setPortalDocumentsLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (tenantIdParam) {
+        try {
+          const [tdata, cdata, udata, pdata] = await Promise.all([
+            fetchTenantById(tenantIdParam),
+            fetchContracts(),
+            fetchUnits(),
+            fetchPayments(),
+          ]);
+          if (cancelled) return;
+          setTenant(tdata);
+          setContractsList(cdata);
+          setUnitsList(udata);
+          setPaymentsList(pdata);
+          setBootError(null);
+        } catch (e) {
+          if (cancelled) return;
+          setBootError(e instanceof Error ? e.message : t('views.portal.loadError'));
+          setTenant(null);
+        }
+      } else {
+        const t0 = tenants[0];
+        if (cancelled) return;
+        setTenant(t0 ?? null);
+        setContractsList(contracts);
+        setUnitsList(units);
+        setPaymentsList(payments);
+        setBootError(t0 ? null : t('views.portal.loadError'));
+      }
+      if (!cancelled) setPageLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantIdParam, t]);
+
+  useEffect(() => {
+    setKycDocUrl(tenant?.idImageUrl);
+  }, [tenant?.idImageUrl]);
+
+  useEffect(() => {
+    if (!tenant?.id) return;
+    let cancelled = false;
+    setPortalDocumentsLoading(true);
+    void (async () => {
+      try {
+        const docs = await fetchTenantPortalDocuments(tenant.id);
+        if (!cancelled) {
+          setPortalDocuments(docs);
+        }
+      } catch {
+        if (!cancelled) {
+          setPortalDocuments(null);
+          toast.error(t('views.portal.documentsLoadError'));
+        }
+      } finally {
+        if (!cancelled) setPortalDocumentsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant?.id, t]);
+
+  const contract = useMemo(() => {
+    if (!tenant) return undefined;
+    const forTenant = contractsList.filter((c) => c.tenantId === tenant.id);
+    return (
+      forTenant.find((c) => String(c.status).toLowerCase() === 'active') ?? forTenant[0]
+    );
+  }, [contractsList, tenant]);
+
+  const unit = useMemo(
+    () => (contract ? unitsList.find((u) => u.id === contract.unitId) : undefined),
+    [unitsList, contract],
+  );
+
+  const tenantPayments = useMemo(
+    () => (contract ? paymentsList.filter((p) => p.contractId === contract.id) : []),
+    [paymentsList, contract],
+  );
 
   const paymentColumns: ColumnDef<Payment>[] = useMemo(
     () => [
       {
         header: t('views.portal.table.date'),
-        render: (p) => <span>{format(new Date(p.paidDate || p.dueDate), 'MMM dd, yyyy')}</span>,
+        render: (p) => {
+          const raw = p.paidDate || p.dueDate;
+          const d = raw ? parseISO(raw) : new Date('');
+          return <span>{isValid(d) ? format(d, 'MMM dd, yyyy') : '—'}</span>;
+        },
       },
       {
         header: t('views.portal.table.reference'),
@@ -72,9 +199,86 @@ export function TenantPortalView() {
   const handlePreviewContract = () => {
     if (contract) {
       const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${contract.id}`;
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
+
+  const handlePortalDocumentActivate = async (doc: PortalDocumentItem) => {
+    if (!tenant || downloadingId) return;
+    if (doc.kind === 'preview') {
+      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${doc.contractId}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setDownloadingId(doc.id);
+    try {
+      if (doc.kind === 'artifact') {
+        const res = await fetch(
+          `/api/tenants/${encodeURIComponent(tenant.id)}/portal-artifacts/${encodeURIComponent(doc.slug)}`,
+          { headers: getAuthHeaders() },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = typeof err?.error === 'string' ? err.error : res.statusText;
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        await saveResponseAsFile(res, doc.fileName);
+        toast.success(t('views.portal.documentDownloaded'));
+        return;
+      }
+      const href = toAbsoluteAssetUrl(doc.downloadPath);
+      const res = await fetch(href);
+      if (!res.ok) throw new Error(res.statusText || `HTTP ${res.status}`);
+      await saveResponseAsFile(res, doc.fileName);
+      toast.success(t('views.portal.documentDownloaded'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.portal.documentDownloadError'));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handlePickDocument = () => {
+    if (uploading) return;
+    fileRef.current?.click();
+  };
+
+  const handleUploadDocument: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !tenant) return;
+
+    setUploading(true);
+    try {
+      const updated = await uploadTenantKycDocument(tenant.id, file);
+      setKycDocUrl(updated.idImageUrl);
+      toast.success(t('views.portal.uploadSuccess'));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('views.portal.uploadError'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+        <p className="text-sm">{t('views.portal.loading')}</p>
+      </div>
+    );
+  }
+
+  if (bootError || !tenant) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <AlertCircle className="h-10 w-10 text-rose-500" aria-hidden />
+        <p className="text-slate-700 max-w-md">{bootError ?? t('views.portal.loadError')}</p>
+      </div>
+    );
+  }
+
+  const leaseEnd = contract?.endDate ? parseISO(contract.endDate) : null;
 
   return (
     <div className="min-h-screen bg-slate-50 animate-in fade-in duration-500">
@@ -124,7 +328,7 @@ export function TenantPortalView() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-indigo-900">
-                  {format(new Date(contract?.endDate || ''), 'MMM yyyy')}
+                  {leaseEnd && isValid(leaseEnd) ? format(leaseEnd, 'MMM yyyy') : '—'}
                 </div>
                 <p className="text-xs text-indigo-600 mt-1">{t('views.portal.leaseExpires')}</p>
               </CardContent>
@@ -193,7 +397,31 @@ export function TenantPortalView() {
                 </div>
                 <h4 className="text-sm font-bold">{t('views.portal.passportCard')}</h4>
                 <p className="text-xs text-slate-500 mt-1 mb-4">{t('views.portal.passportHint')}</p>
-                <Button size="sm" className="bg-indigo-600 w-full">{t('views.portal.updateDocument')}</Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/webp,image/*,application/pdf"
+                  className="hidden"
+                  onChange={handleUploadDocument}
+                />
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 w-full"
+                  onClick={handlePickDocument}
+                  disabled={uploading}
+                >
+                  {uploading ? t('views.portal.uploading') : t('views.portal.updateDocument')}
+                </Button>
+                {kycDocUrl ? (
+                  <a
+                    href={toAbsoluteAssetUrl(kycDocUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block mt-3 text-xs text-indigo-600 hover:underline"
+                  >
+                    {t('views.portal.viewUploaded')}
+                  </a>
+                ) : null}
               </div>
               
               <div className="space-y-3">
@@ -213,34 +441,68 @@ export function TenantPortalView() {
               <CardDescription>{t('views.portal.myDocumentsDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div 
-                className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors group cursor-pointer"
-                onClick={handlePreviewContract}
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">Lease_Contract_2025.pdf</span>
-                    <span className="text-[10px] text-slate-400">2.4 MB</span>
-                  </div>
+              {portalDocumentsLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-sm">
+                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" aria-hidden />
+                  {t('views.portal.documentsLoading')}
                 </div>
-                <Download className="w-4 h-4 text-slate-300 group-hover:text-indigo-600" />
-              </div>
-              {[
-                { name: 'House_Rules_Handbook.pdf', size: '1.1 MB' },
-                { name: 'Move_In_Clearance.pdf', size: '0.5 MB' },
-              ].map((doc, i) => (
-                <div key={i} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors group cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{doc.name}</span>
-                      <span className="text-[10px] text-slate-400">{doc.size}</span>
+              ) : portalDocuments && portalDocuments.length > 0 ? (
+                portalDocuments.map((doc) => {
+                  const sizeLabel =
+                    doc.sizeLabel ??
+                    (doc.kind === 'preview' ? t('views.portal.documentOpenPreview') : '—');
+                  const busy = downloadingId === doc.id;
+                  return (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between gap-2 p-3 hover:bg-slate-50 rounded-lg transition-colors group"
+                    >
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left rounded-md focus-visible:outline focus-visible:ring-2 focus-visible:ring-indigo-500"
+                        onClick={() => void handlePortalDocumentActivate(doc)}
+                        disabled={Boolean(downloadingId)}
+                      >
+                        <FileText
+                          className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-indigo-600"
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex flex-col">
+                          <span className="text-sm font-medium truncate">{doc.title}</span>
+                          <span className="text-[10px] text-slate-400 truncate">
+                            {doc.fileName}
+                            {sizeLabel && sizeLabel !== '—' ? ` · ${sizeLabel}` : ''}
+                          </span>
+                        </div>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-slate-400 hover:text-indigo-600"
+                        disabled={Boolean(downloadingId)}
+                        aria-label={t('views.portal.downloadDocument')}
+                        onClick={() => void handlePortalDocumentActivate(doc)}
+                      >
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="h-4 w-4" aria-hidden />
+                        )}
+                      </Button>
                     </div>
-                  </div>
-                  <Download className="w-4 h-4 text-slate-300 group-hover:text-indigo-600" />
+                  );
+                })
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-500 py-2">{t('views.portal.documentsEmpty')}</p>
+                  {contract ? (
+                    <Button type="button" variant="outline" size="sm" className="w-full" onClick={handlePreviewContract}>
+                      {t('views.portal.openLeasePreview')}
+                    </Button>
+                  ) : null}
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 

@@ -1,11 +1,90 @@
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadSessionPayload } from '../services/sessionService.js';
 import {
   deleteTenantById,
   getTenantById,
+  insertTenantDocument,
   insertTenant,
   listTenantsByBranch,
+  listRepositoryDocumentsForPortal,
+  listTenantAttachmentDocumentsForPortal,
+  getPrimaryContractIdForTenant,
   updateTenantById,
+  updateTenantKycDocumentById,
 } from '../models/tenantsModel.js';
+import { deactivateBlacklistForTenant, upsertActiveTenantBlacklist } from '../models/blacklistModel.js';
+import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
+import { isValidPortalArtifactSlug, streamPortalArtifactPdf } from '../services/portalArtifactPdfService.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_ROOT = path.normalize(path.join(__dirname, '..', 'uploads'));
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileNameFromPath(filePathRaw, titleFallback) {
+  const s = String(filePathRaw ?? '');
+  try {
+    if (s.startsWith('http://') || s.startsWith('https://')) {
+      const u = new URL(s);
+      const base = path.basename(u.pathname);
+      if (base && base !== '/' && base !== '.') return base;
+    }
+  } catch {
+    // ignore
+  }
+  const base = path.basename(s.split('?')[0]);
+  if (base && base !== '/' && base !== '.') return base;
+  const t = String(titleFallback ?? 'document').replace(/[^\w.\-]+/g, '_');
+  return t.includes('.') ? t : `${t}.pdf`;
+}
+
+function normalizeClientDownloadPath(filePathRaw) {
+  const s = String(filePathRaw ?? '').trim();
+  if (!s) return null;
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  return s.startsWith('/') ? s : `/${s}`;
+}
+
+function resolveUploadDiskPath(filePathRaw) {
+  let s = String(filePathRaw ?? '').trim();
+  if (!s) return null;
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    try {
+      s = new URL(s).pathname;
+    } catch {
+      return null;
+    }
+  }
+  if (!s.startsWith('/')) s = `/${s}`;
+  if (!s.startsWith('/uploads/')) return null;
+  const rel = s.replace(/^\/uploads\//, '');
+  const full = path.normalize(path.join(UPLOADS_ROOT, rel));
+  if (!full.startsWith(UPLOADS_ROOT)) return null;
+  return full;
+}
+
+async function statUploadFileSize(filePathRaw) {
+  const diskPath = resolveUploadDiskPath(filePathRaw);
+  if (!diskPath) return null;
+  try {
+    const st = await fs.stat(diskPath);
+    if (!st.isFile()) return null;
+    return st.size;
+  } catch {
+    return null;
+  }
+}
+
+function attachmentTitle(docType) {
+  if (docType === 'contract_attachment') return 'Contract attachment';
+  return 'Supporting document';
+}
 
 function fmtDate(d) {
   if (d == null) return '';
@@ -110,6 +189,145 @@ export async function listTenants(req, res) {
   }
 }
 
+export async function getTenant(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const row = await getTenantById(id, ctx.session.branchId);
+    if (!row) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+    res.json({ tenant: rowToTenant(row) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load tenant' });
+  }
+}
+
+export async function listTenantPortalDocuments(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const tenantRow = await getTenantById(id, ctx.session.branchId);
+    if (!tenantRow) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+    const branchId = ctx.session.branchId;
+    const [repoRows, attachRows, contractId] = await Promise.all([
+      listRepositoryDocumentsForPortal(id, branchId),
+      listTenantAttachmentDocumentsForPortal(id, branchId),
+      getPrimaryContractIdForTenant(id, branchId),
+    ]);
+
+    const items = [];
+    const seenPaths = new Set();
+
+    const hasRepoLease = repoRows.some((r) => r.doc_type === 'lease_contract');
+    if (!hasRepoLease && contractId) {
+      items.push({
+        id: `preview-contract-${contractId}`,
+        kind: 'preview',
+        previewType: 'contract',
+        contractId: String(contractId),
+        title: 'Lease contract',
+        fileName: 'Lease_Contract.pdf',
+        sizeLabel: null,
+      });
+    }
+
+    items.push({
+      id: 'artifact-house-rules',
+      kind: 'artifact',
+      slug: 'house-rules',
+      title: 'House rules handbook',
+      fileName: 'House_Rules_Handbook.pdf',
+      sizeLabel: null,
+    });
+    items.push({
+      id: 'artifact-move-in-clearance',
+      kind: 'artifact',
+      slug: 'move-in-clearance',
+      title: 'Move-in clearance',
+      fileName: 'Move_In_Clearance.pdf',
+      sizeLabel: null,
+    });
+
+    for (const r of repoRows) {
+      const fp = String(r.file_path ?? '').trim();
+      if (!fp) continue;
+      const downloadPath = normalizeClientDownloadPath(fp);
+      if (!downloadPath) continue;
+      const sz = await statUploadFileSize(fp);
+      items.push({
+        id: `repo-${r.id}`,
+        kind: 'file',
+        title: String(r.title ?? 'Document'),
+        fileName: fileNameFromPath(fp, r.title),
+        sizeLabel: sz != null ? formatBytes(sz) : null,
+        downloadPath,
+      });
+      seenPaths.add(fp);
+    }
+
+    for (const r of attachRows) {
+      const fp = String(r.file_path ?? '').trim();
+      if (!fp || seenPaths.has(fp)) continue;
+      const downloadPath = normalizeClientDownloadPath(fp);
+      if (!downloadPath) continue;
+      const sz = await statUploadFileSize(fp);
+      items.push({
+        id: `attach-${r.id}`,
+        kind: 'file',
+        title: attachmentTitle(r.document_type),
+        fileName: fileNameFromPath(fp, attachmentTitle(r.document_type)),
+        sizeLabel: sz != null ? formatBytes(sz) : null,
+        downloadPath,
+      });
+      seenPaths.add(fp);
+    }
+
+    res.json({ documents: items });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load documents' });
+  }
+}
+
+export async function streamTenantPortalArtifact(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  const slug = String(req.params.slug ?? '').trim();
+  if (!id || !isValidPortalArtifactSlug(slug)) {
+    res.status(400).json({ error: 'Invalid request' });
+    return;
+  }
+  try {
+    const tenantRow = await getTenantById(id, ctx.session.branchId);
+    if (!tenantRow) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+    const fileName = slug === 'house-rules' ? 'House_Rules_Handbook.pdf' : 'Move_In_Clearance.pdf';
+    streamPortalArtifactPdf(res, slug, fileName);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to generate document' });
+  }
+}
+
 export async function createTenant(req, res) {
   const ctx = await getAuthContext(req, res);
   if (!ctx) return;
@@ -127,6 +345,14 @@ export async function createTenant(req, res) {
     if (!row) {
       res.status(500).json({ error: 'Failed to load created tenant' });
       return;
+    }
+    if (parsed.isBlacklisted) {
+      await upsertActiveTenantBlacklist(
+        ctx.session.branchId,
+        row.id,
+        parsed.blacklistReason || 'Blacklisted',
+        ctx.session.user.id,
+      );
     }
     res.status(201).json({ tenant: rowToTenant(row) });
   } catch (e) {
@@ -153,10 +379,35 @@ export async function updateTenant(req, res) {
     return;
   }
   try {
-    const affectedRows = await updateTenantById(id, ctx.session.branchId, parsed);
+    const existing = await getTenantById(id, ctx.session.branchId);
+    if (!existing) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+
+    const raw = req.body ?? {};
+    const toSave = { ...parsed };
+    if (!Object.prototype.hasOwnProperty.call(raw, 'idImageUrl')) {
+      toSave.idImageUrl =
+        existing.id_image_url != null && String(existing.id_image_url).trim() !== ''
+          ? String(existing.id_image_url).trim()
+          : null;
+    }
+
+    const affectedRows = await updateTenantById(id, ctx.session.branchId, toSave);
     if (affectedRows === 0) {
       res.status(404).json({ error: 'Tenant not found' });
       return;
+    }
+    if (toSave.isBlacklisted) {
+      await upsertActiveTenantBlacklist(
+        ctx.session.branchId,
+        id,
+        toSave.blacklistReason || 'Blacklisted',
+        ctx.session.user.id,
+      );
+    } else {
+      await deactivateBlacklistForTenant(ctx.session.branchId, id);
     }
     const row = await getTenantById(id, ctx.session.branchId);
     if (!row) {
@@ -191,6 +442,74 @@ export async function deleteTenant(req, res) {
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
+    if (e?.errno === 1451 || e?.code === 'ER_ROW_IS_REFERENCED_2') {
+      res.status(409).json({
+        error:
+          'This tenant is still linked to a lease or other records. Remove or reassign those first, then try again.',
+      });
+      return;
+    }
     res.status(500).json({ error: 'Failed to delete tenant' });
+  }
+}
+
+export async function uploadTenantKycDocument(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to update tenants' });
+    return;
+  }
+
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  let publicUrl;
+  try {
+    ({ publicUrl } = await finalizeKycUploadToWebpOrPdf(file));
+  } catch (e) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e instanceof Error ? e.message : 'Failed to process upload';
+    if (code >= 400 && code < 500) {
+      res.status(code).json({ error: msg });
+      return;
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to upload document' });
+    return;
+  }
+
+  try {
+    const affected = await updateTenantKycDocumentById(id, ctx.session.branchId, publicUrl);
+    if (affected === 0) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+
+    // Also record the document in `tenant_document` for audit/history.
+    // We use `passport` for now (matches the portal UI label).
+    await insertTenantDocument(ctx.session.branchId, id, {
+      documentType: 'passport',
+      filePath: publicUrl,
+    });
+
+    const row = await getTenantById(id, ctx.session.branchId);
+    if (!row) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+    res.json({ tenant: rowToTenant(row) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to upload document' });
   }
 }
