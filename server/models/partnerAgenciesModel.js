@@ -10,9 +10,12 @@ export async function listPartnerAgenciesByBranch(branchId) {
       contact_person,
       contact_number,
       email,
+      kyc_verified,
+      is_blacklisted,
+      blacklist_reason,
       active
     FROM partner_agency
-    WHERE branch_id = ? AND active = 1
+    WHERE branch_id = ?
     ORDER BY agency_name ASC
     `,
     [branchId],
@@ -29,8 +32,11 @@ export async function insertPartnerAgency(branchId, payload) {
       contact_person,
       contact_number,
       email,
+      kyc_verified,
+      is_blacklisted,
+      blacklist_reason,
       active
-    ) VALUES (?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     `,
     [
       branchId,
@@ -38,6 +44,9 @@ export async function insertPartnerAgency(branchId, payload) {
       payload.contactPerson,
       payload.contactNumber,
       payload.email,
+      payload.kycVerified ? 1 : 0,
+      payload.isBlacklisted ? 1 : 0,
+      payload.blacklistReason,
     ],
   );
   return getPartnerAgencyById(result.insertId, branchId);
@@ -53,6 +62,9 @@ export async function getPartnerAgencyById(id, branchId) {
       contact_person,
       contact_number,
       email,
+      kyc_verified,
+      is_blacklisted,
+      blacklist_reason,
       active
     FROM partner_agency
     WHERE id = ? AND branch_id = ?
@@ -70,10 +82,25 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       agency_name = ?,
       contact_person = ?,
       contact_number = ?,
-      email = ?
-    WHERE id = ? AND branch_id = ? AND active = 1
+      email = ?,
+      kyc_verified = ?,
+      is_blacklisted = ?,
+      blacklist_reason = ?,
+      active = ?
+    WHERE id = ? AND branch_id = ?
     `,
-    [payload.agencyName, payload.contactPerson, payload.contactNumber, payload.email, id, branchId],
+    [
+      payload.agencyName,
+      payload.contactPerson,
+      payload.contactNumber,
+      payload.email,
+      payload.kycVerified ? 1 : 0,
+      payload.isBlacklisted ? 1 : 0,
+      payload.blacklistReason,
+      payload.active ? 1 : 0,
+      id,
+      branchId,
+    ],
   );
   return result.affectedRows;
 }

@@ -51,7 +51,13 @@ import {
   fetchPartnerAgencies,
   updatePartnerAgency,
 } from '@/lib/partnerAgenciesApi';
-import { fetchBlacklist, type BlacklistRowDto } from '@/lib/blacklistApi';
+import {
+  createBlacklistRecord,
+  fetchBlacklist,
+  removeBrokerFromBlacklist,
+  removeTenantFromBlacklist,
+  type BlacklistRowDto,
+} from '@/lib/blacklistApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
@@ -69,6 +75,8 @@ type TenantForm = {
   name: string;
   email: string;
   phone: string;
+  nationality: string;
+  birthDate: string;
   idType: string;
   idNumber: string;
   idExpiry: string;
@@ -82,6 +90,8 @@ function emptyForm(): TenantForm {
     name: '',
     email: '',
     phone: '',
+    nationality: '',
+    birthDate: '',
     idType: 'Passport',
     idNumber: '',
     idExpiry: '',
@@ -96,6 +106,8 @@ function tenantToForm(t: Tenant): TenantForm {
     name: t.name,
     email: t.email,
     phone: t.phone,
+    nationality: t.nationality ?? '',
+    birthDate: t.birthDate ?? '',
     idType: t.idType,
     idNumber: t.idNumber,
     idExpiry: t.idExpiry || '',
@@ -110,6 +122,8 @@ function formToBody(f: TenantForm): TenantWriteBody {
     name: f.name.trim(),
     email: f.email.trim(),
     phone: f.phone.trim(),
+    nationality: f.nationality.trim() || undefined,
+    birthDate: f.birthDate.trim() || undefined,
     idType: f.idType,
     idNumber: f.idNumber.trim(),
     idExpiry: f.idExpiry.trim(),
@@ -166,6 +180,7 @@ export function CRMView() {
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
   const [brokerList, setBrokerList] = useState<BrokerAgency[]>([]);
   const [blacklistList, setBlacklistList] = useState<BlacklistRow[]>([]);
+  const [blacklistTypeFilter, setBlacklistTypeFilter] = useState<'all' | 'tenant' | 'broker'>('all');
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -193,6 +208,15 @@ export function CRMView() {
     phone: '',
     email: '',
   });
+  const [isBrokerDeleteOpen, setIsBrokerDeleteOpen] = useState(false);
+  const [pendingDeleteBroker, setPendingDeleteBroker] = useState<BrokerAgency | null>(null);
+  const [isBrokerBlacklistOpen, setIsBrokerBlacklistOpen] = useState(false);
+  const [pendingBlacklistBroker, setPendingBlacklistBroker] = useState<BrokerAgency | null>(null);
+  const [brokerBlacklistReason, setBrokerBlacklistReason] = useState('');
+  const [isBrokerActivateOpen, setIsBrokerActivateOpen] = useState(false);
+  const [pendingActivateBroker, setPendingActivateBroker] = useState<BrokerAgency | null>(null);
+  const [isTenantActivateOpen, setIsTenantActivateOpen] = useState(false);
+  const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
 
   const [isBlacklistDetailsOpen, setIsBlacklistDetailsOpen] = useState(false);
   const [selectedBlacklist, setSelectedBlacklist] = useState<BlacklistRow | null>(null);
@@ -290,14 +314,21 @@ export function CRMView() {
 
   const filteredBlacklist = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    if (!q) return blacklistList;
-    return blacklistList.filter(
+    const typeFiltered =
+      blacklistTypeFilter === 'all'
+        ? blacklistList
+        : blacklistList.filter((r) =>
+            blacklistTypeFilter === 'tenant' ? r.entityType === 'tenant' : r.entityType === 'broker',
+          );
+
+    if (!q) return typeFiltered;
+    return typeFiltered.filter(
       (row) =>
         row.name.toLowerCase().includes(q) ||
         row.reason.toLowerCase().includes(q) ||
-        row.type.toLowerCase().includes(q)
+        row.type.toLowerCase().includes(q),
     );
-  }, [searchTerm, blacklistList]);
+  }, [searchTerm, blacklistList, blacklistTypeFilter]);
 
   const filteredBrokers = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
@@ -417,11 +448,23 @@ export function CRMView() {
   };
 
   const handleDeleteBroker = async (agency: BrokerAgency) => {
-    if (!window.confirm(t('views.crm.brokers.deleteConfirm', { name: agency.name }))) return;
+    setPendingDeleteBroker(agency);
+    setIsBrokerDeleteOpen(true);
+  };
+
+  const closeDeleteBroker = () => {
+    setIsBrokerDeleteOpen(false);
+    setPendingDeleteBroker(null);
+  };
+
+  const confirmDeleteBroker = async () => {
+    const agency = pendingDeleteBroker;
+    if (!agency) return;
     try {
       await deletePartnerAgency(agency.id);
       setBrokerList((prev) => prev.filter((x) => x.id !== agency.id));
       toast.success(t('views.crm.brokers.deleted'));
+      closeDeleteBroker();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.crm.brokers.deleteError'));
     }
@@ -429,6 +472,100 @@ export function CRMView() {
 
   const handleViewBrokerLogs = () => {
     toast.info(t('views.crm.brokers.logsSoon'));
+  };
+
+  const openBlacklistBroker = (agency: BrokerAgency) => {
+    setPendingBlacklistBroker(agency);
+    setBrokerBlacklistReason('');
+    setIsBrokerBlacklistOpen(true);
+  };
+
+  const closeBlacklistBroker = () => {
+    setIsBrokerBlacklistOpen(false);
+    setPendingBlacklistBroker(null);
+    setBrokerBlacklistReason('');
+  };
+
+  const openActivateBroker = (agency: BrokerAgency) => {
+    setPendingActivateBroker(agency);
+    setIsBrokerActivateOpen(true);
+  };
+
+  const closeActivateBroker = () => {
+    setIsBrokerActivateOpen(false);
+    setPendingActivateBroker(null);
+  };
+
+  const openActivateTenant = (tenant: Tenant) => {
+    setPendingActivateTenant(tenant);
+    setIsTenantActivateOpen(true);
+  };
+
+  const closeActivateTenant = () => {
+    setIsTenantActivateOpen(false);
+    setPendingActivateTenant(null);
+  };
+
+  const confirmActivateTenant = async () => {
+    const tenant = pendingActivateTenant;
+    if (!tenant) return;
+    if (tenant.kycVerified === false) {
+      toast.error(t('views.crm.table.tenantActivationRequiresVerified'));
+      return;
+    }
+    try {
+      await removeTenantFromBlacklist(tenant.id);
+      await reloadBlacklist();
+      await reloadTenants();
+      setSelectedTenant((prev) =>
+        prev && prev.id === tenant.id ? { ...prev, isBlacklisted: false, blacklistReason: undefined } : prev,
+      );
+      toast.success(t('views.crm.table.tenantActivated'));
+      closeActivateTenant();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.table.activateTenantError'));
+    }
+  };
+
+  const confirmActivateBroker = async () => {
+    const agency = pendingActivateBroker;
+    if (!agency) return;
+    if (!agency.kycVerified) {
+      toast.error(t('views.crm.brokers.activationRequiresVerified'));
+      return;
+    }
+    try {
+      await removeBrokerFromBlacklist(agency.id);
+      await reloadBlacklist();
+      await reloadBrokers();
+      toast.success(t('views.crm.brokers.activated'));
+      closeActivateBroker();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.activateError'));
+    }
+  };
+
+  const confirmBlacklistBroker = async () => {
+    const agency = pendingBlacklistBroker;
+    if (!agency) return;
+    const reason = brokerBlacklistReason.trim();
+    if (!reason) {
+      toast.error(t('views.crm.blacklist.reason'));
+      return;
+    }
+    try {
+      const record = await createBlacklistRecord({
+        entityType: 'broker',
+        partnerAgencyId: agency.id,
+        reason,
+      });
+      setBlacklistList((prev) => [record, ...prev]);
+      await reloadBrokers();
+      toast.success(t('views.crm.table.blacklisted'));
+      closeBlacklistBroker();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.blacklist.loadError'));
+    }
   };
 
   const openBlacklistDetails = (row: BlacklistRow) => {
@@ -439,6 +576,30 @@ export function CRMView() {
   const closeBlacklistDetails = () => {
     setIsBlacklistDetailsOpen(false);
     setSelectedBlacklist(null);
+  };
+
+  const toggleBrokerActive = async (agency: BrokerAgency) => {
+    try {
+      const nextActive = agency.active === false ? true : false;
+      const updated = await updatePartnerAgency(agency.id, { active: nextActive });
+      setBrokerList((prev) => prev.map((x) => (x.id === agency.id ? updated : x)));
+      toast.success(nextActive ? t('views.crm.brokers.markedActive') : t('views.crm.brokers.markedInactive'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.statusUpdateError'));
+    }
+  };
+
+  const toggleBrokerVerified = async (agency: BrokerAgency) => {
+    try {
+      const nextVerified = agency.kycVerified ? false : true;
+      const updated = await updatePartnerAgency(agency.id, { kycVerified: nextVerified });
+      setBrokerList((prev) => prev.map((x) => (x.id === agency.id ? updated : x)));
+      toast.success(
+        nextVerified ? t('views.crm.brokers.markedVerified') : t('views.crm.brokers.markedUnverified'),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.statusUpdateError'));
+    }
   };
 
   const openTenantFromBlacklist = () => {
@@ -650,6 +811,16 @@ export function CRMView() {
                     {t('views.crm.table.editTenant')}
                   </DropdownMenuItem>
                 )}
+                {canUpdate && tenant.isBlacklisted ? (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openActivateTenant(tenant);
+                    }}
+                  >
+                    {t('views.crm.table.activateTenant')}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
@@ -681,7 +852,7 @@ export function CRMView() {
         ),
       },
     ],
-    [t, canUpdate, canDelete, openViewDetails, openEdit, handleDeleteTenant, contractList, unitList],
+    [t, canUpdate, canDelete, openViewDetails, openEdit, openActivateTenant, handleDeleteTenant, contractList, unitList],
   );
 
   const blacklistColumns: ColumnDef<BlacklistRow>[] = useMemo(
@@ -694,7 +865,7 @@ export function CRMView() {
         header: t('views.crm.blacklist.type'),
         render: (item) => (
           <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 font-medium">
-            {item.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.landlord')}
+            {item.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker')}
           </Badge>
         ),
       },
@@ -762,6 +933,15 @@ export function CRMView() {
                 {t('views.crm.details.editTenant')}
               </Button>
             )}
+            {canUpdate && selectedTenant?.isBlacklisted ? (
+              <Button
+                type="button"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => openActivateTenant(selectedTenant)}
+              >
+                {t('views.crm.table.activateTenant')}
+              </Button>
+            ) : null}
           </div>
         }
       >
@@ -992,6 +1172,126 @@ export function CRMView() {
       </Modal>
 
       <Modal
+        isOpen={isBrokerDeleteOpen}
+        onClose={closeDeleteBroker}
+        title={t('views.crm.brokers.delete')}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeDeleteBroker}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-rose-600 hover:bg-rose-700"
+              onClick={() => void confirmDeleteBroker()}
+            >
+              {t('views.crm.brokers.delete')}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-600">
+          {pendingDeleteBroker
+            ? t('views.crm.brokers.deleteConfirm', { name: pendingDeleteBroker.name })
+            : ''}
+        </p>
+      </Modal>
+
+      <Modal
+        isOpen={isBrokerBlacklistOpen}
+        onClose={closeBlacklistBroker}
+        title={t('views.crm.table.blacklisted')}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeBlacklistBroker}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-rose-600 hover:bg-rose-700"
+              onClick={() => void confirmBlacklistBroker()}
+            >
+              {t('views.crm.table.blacklisted')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">{pendingBlacklistBroker ? pendingBlacklistBroker.name : ''}</p>
+          <div className="space-y-2">
+            <Label htmlFor="crm-broker-blacklist-reason">{t('views.crm.blacklist.reason')}</Label>
+            <Input
+              id="crm-broker-blacklist-reason"
+              value={brokerBlacklistReason}
+              onChange={(e) => setBrokerBlacklistReason(e.target.value)}
+              className="rounded-xl border-slate-200"
+              placeholder={t('views.crm.blacklist.reason')}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isBrokerActivateOpen}
+        onClose={closeActivateBroker}
+        title={t('views.crm.brokers.activateTitle')}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeActivateBroker}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => void confirmActivateBroker()}
+            >
+              {t('views.crm.brokers.activate')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          <p className="text-sm text-slate-600">{pendingActivateBroker ? pendingActivateBroker.name : ''}</p>
+          <p className="text-sm text-slate-600">{t('views.crm.brokers.activateDescription')}</p>
+          {pendingActivateBroker && !pendingActivateBroker.kycVerified ? (
+            <p className="text-sm text-rose-700">{t('views.crm.brokers.activationRequiresVerified')}</p>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isTenantActivateOpen}
+        onClose={closeActivateTenant}
+        title={t('views.crm.table.activateTenantTitle')}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeActivateTenant}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => void confirmActivateTenant()}
+            >
+              {t('views.crm.table.activateTenant')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          <p className="text-sm text-slate-600">{pendingActivateTenant ? pendingActivateTenant.name : ''}</p>
+          <p className="text-sm text-slate-600">{t('views.crm.table.activateTenantDescription')}</p>
+          {pendingActivateTenant && pendingActivateTenant.kycVerified === false ? (
+            <p className="text-sm text-rose-700">{t('views.crm.table.tenantActivationRequiresVerified')}</p>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={isFormOpen}
         onClose={closeForm}
         title={formMode === 'edit' ? t('views.crm.tenantModal.editTitle') : t('views.crm.tenantModal.createTitle')}
@@ -1035,6 +1335,30 @@ export function CRMView() {
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="crm-nationality">{t('views.crm.tenantModal.nationality')}</Label>
+            <Input
+              id="crm-nationality"
+              value={form.nationality}
+              onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="crm-birth-date">{t('views.crm.tenantModal.birthDate')}</Label>
+            <AppDatePicker
+              mode="single"
+              placeholder="MM/DD/YYYY"
+              fullWidth
+              value={form.birthDate ? parseISO(form.birthDate) : null}
+              onChange={(picked) =>
+                setForm((f) => ({
+                  ...f,
+                  birthDate: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
+                }))
+              }
             />
           </div>
           <div className="space-y-2">
@@ -1267,7 +1591,7 @@ export function CRMView() {
                   <div className="text-base font-semibold text-slate-900">{selectedBlacklist.name}</div>
                 </div>
                 <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 font-medium">
-                  {selectedBlacklist.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.landlord')}
+                  {selectedBlacklist.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker')}
                 </Badge>
               </div>
               <div>
@@ -1299,10 +1623,10 @@ export function CRMView() {
                   <div className="font-mono text-xs">{selectedBlacklist.tenantId}</div>
                 </div>
               ) : null}
-              {selectedBlacklist.landlordId ? (
+              {selectedBlacklist.partnerAgencyId ? (
                 <div className="rounded-xl border border-slate-100 bg-white p-3">
-                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.landlordId')}</div>
-                  <div className="font-mono text-xs">{selectedBlacklist.landlordId}</div>
+                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.brokerId')}</div>
+                  <div className="font-mono text-xs">{selectedBlacklist.partnerAgencyId}</div>
                 </div>
               ) : null}
               {selectedBlacklist.taggedBy ? (
@@ -1377,7 +1701,11 @@ export function CRMView() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredBrokers.map((agency) => (
+              {filteredBrokers.map((agency) => {
+                const isBrokerBl =
+                  Boolean(agency.isBlacklisted) ||
+                  blacklistList.some((r) => r.entityType === 'broker' && r.partnerAgencyId === agency.id);
+                return (
                 <Card key={agency.id} className="border-none shadow-md">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
@@ -1386,6 +1714,36 @@ export function CRMView() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{t('views.crm.brokers.partner')}</Badge>
+                        {isBrokerBl ? (
+                          <Badge variant="outline" className="border-0 bg-rose-100 text-rose-700">
+                            {t('views.crm.table.blacklisted')}
+                          </Badge>
+                        ) : (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'border-0',
+                                agency.kycVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800',
+                              )}
+                            >
+                              {agency.kycVerified
+                                ? t('views.crm.table.verified')
+                                : t('views.crm.table.verificationPending')}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'border-0',
+                                agency.active !== false
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'bg-slate-100 text-slate-700',
+                              )}
+                            >
+                              {agency.active !== false ? t('views.crm.table.active') : t('views.crm.table.inactive')}
+                            </Badge>
+                          </>
+                        )}
                         {(canUpdate || canDelete) ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger
@@ -1405,6 +1763,33 @@ export function CRMView() {
                               {canUpdate ? (
                                 <DropdownMenuItem onClick={() => openEditBroker(agency)}>
                                   {t('views.crm.brokers.edit')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (isBrokerBl) {
+                                      openActivateBroker(agency);
+                                      return;
+                                    }
+                                    openBlacklistBroker(agency);
+                                  }}
+                                >
+                                  {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
+                                  {agency.kycVerified
+                                    ? t('views.crm.brokers.unverify')
+                                    : t('views.crm.brokers.verify')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
+                                  {agency.active !== false
+                                    ? t('views.crm.brokers.deactivate')
+                                    : t('views.crm.brokers.activateActive')}
                                 </DropdownMenuItem>
                               ) : null}
                               {canDelete ? (
@@ -1446,7 +1831,8 @@ export function CRMView() {
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
               {canCreate ? (
                 <button
                   type="button"
@@ -1470,6 +1856,50 @@ export function CRMView() {
               <CardDescription className="text-rose-700/70">{t('views.crm.blacklist.description')}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="flex flex-wrap items-center gap-2 px-6 py-4 border-b border-rose-100 bg-white">
+                <Button
+                  type="button"
+                  variant={blacklistTypeFilter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'h-8',
+                    blacklistTypeFilter === 'all'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
+                  )}
+                  onClick={() => setBlacklistTypeFilter('all')}
+                >
+                  All
+                </Button>
+                <Button
+                  type="button"
+                  variant={blacklistTypeFilter === 'tenant' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'h-8',
+                    blacklistTypeFilter === 'tenant'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
+                  )}
+                  onClick={() => setBlacklistTypeFilter('tenant')}
+                >
+                  {t('views.crm.blacklist.tenant')}
+                </Button>
+                <Button
+                  type="button"
+                  variant={blacklistTypeFilter === 'broker' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'h-8',
+                    blacklistTypeFilter === 'broker'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
+                  )}
+                  onClick={() => setBlacklistTypeFilter('broker')}
+                >
+                  {t('views.crm.blacklist.broker')}
+                </Button>
+              </div>
               {crmLoading || blacklistLoading ? (
                 <div className="p-6">
                   <SkeletonTable rows={5} columns={5} showToolbar={false} />

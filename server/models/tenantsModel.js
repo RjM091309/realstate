@@ -1,6 +1,20 @@
 import { pool } from '../config/db.js';
 
+const KYC_DOC_TYPES = ['passport', 'national_id', 'visa'];
+
+export function clientIdTypeToDocEnum(idType) {
+  const s = String(idType ?? '').trim().toLowerCase();
+  if (s.includes('passport')) return 'passport';
+  if (s.includes('visa')) return 'visa';
+  return 'national_id';
+}
+
+function kycTypesSqlList() {
+  return KYC_DOC_TYPES.map(() => '?').join(', ');
+}
+
 export async function listTenantsByBranch(branchId) {
+  const types = [...KYC_DOC_TYPES];
   const [rows] = await pool.query(
     `
     SELECT
@@ -9,18 +23,32 @@ export async function listTenantsByBranch(branchId) {
       t.full_name AS name,
       t.email,
       t.mobile_no AS phone,
-      t.id_type,
-      t.id_number,
-      t.id_expiry,
-      t.id_image_url,
+      t.nationality,
+      t.birth_date,
+      CASE d.document_type
+        WHEN 'passport' THEN 'Passport'
+        WHEN 'national_id' THEN 'National ID'
+        WHEN 'visa' THEN 'Visa'
+        ELSE ''
+      END AS id_type,
+      d.document_no AS id_number,
+      d.expiry_date AS id_expiry,
+      NULLIF(TRIM(d.file_path), '') AS id_image_url,
       t.kyc_verified,
       t.is_blacklisted,
       t.blacklist_reason
     FROM tenant_profile t
+    LEFT JOIN tenant_document d ON d.id = (
+      SELECT MAX(d2.id)
+      FROM tenant_document d2
+      WHERE d2.tenant_id = t.id
+        AND d2.branch_id = ?
+        AND d2.document_type IN (${kycTypesSqlList()})
+    )
     WHERE (t.branch_id = ? OR t.branch_id IS NULL)
     ORDER BY t.full_name ASC
     `,
-    [branchId],
+    [branchId, ...types, branchId],
   );
   return rows;
 }
@@ -33,34 +61,31 @@ export async function insertTenant(branchId, payload) {
       full_name,
       email,
       mobile_no,
-      id_type,
-      id_number,
-      id_expiry,
-      id_image_url,
+      nationality,
+      birth_date,
       kyc_verified,
       is_blacklisted,
-      blacklist_reason,
-      passport_no,
-      primary_id_no
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      blacklist_reason
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       branchId,
       payload.name,
       payload.email,
       payload.phone,
-      payload.idType,
-      payload.idNumber,
-      payload.idExpiry,
-      payload.idImageUrl,
+      payload.nationality,
+      payload.birthDate,
       payload.kycVerified ? 1 : 0,
       payload.isBlacklisted ? 1 : 0,
       payload.blacklistReason,
-      payload.idType === 'Passport' ? payload.idNumber : null,
-      payload.idType !== 'Passport' ? payload.idNumber : null,
     ],
   );
 
-  return getTenantById(res.insertId, branchId);
+  const tenantId = res.insertId;
+  const hasKycMeta = String(payload.idType ?? '').trim() !== '' && String(payload.idNumber ?? '').trim() !== '';
+  if (hasKycMeta) {
+    await upsertPrimaryKycDocument(branchId, tenantId, payload);
+  }
+  return getTenantById(tenantId, branchId);
 }
 
 export async function updateTenantById(id, branchId, payload) {
@@ -71,15 +96,11 @@ export async function updateTenantById(id, branchId, payload) {
       full_name = ?,
       email = ?,
       mobile_no = ?,
-      id_type = ?,
-      id_number = ?,
-      id_expiry = ?,
-      id_image_url = ?,
+      nationality = ?,
+      birth_date = ?,
       kyc_verified = ?,
       is_blacklisted = ?,
-      blacklist_reason = ?,
-      passport_no = ?,
-      primary_id_no = ?
+      blacklist_reason = ?
     WHERE id = ? AND (branch_id <=> ? OR branch_id IS NULL)
     `,
     [
@@ -87,23 +108,25 @@ export async function updateTenantById(id, branchId, payload) {
       payload.name,
       payload.email,
       payload.phone,
-      payload.idType,
-      payload.idNumber,
-      payload.idExpiry,
-      payload.idImageUrl,
+      payload.nationality,
+      payload.birthDate,
       payload.kycVerified ? 1 : 0,
       payload.isBlacklisted ? 1 : 0,
       payload.blacklistReason,
-      payload.idType === 'Passport' ? payload.idNumber : null,
-      payload.idType !== 'Passport' ? payload.idNumber : null,
       id,
       branchId,
     ],
   );
+  if (result.affectedRows === 0) return 0;
+  const hasKycMeta = String(payload.idType ?? '').trim() !== '' && String(payload.idNumber ?? '').trim() !== '';
+  if (hasKycMeta) {
+    await upsertPrimaryKycDocument(branchId, id, payload);
+  }
   return result.affectedRows;
 }
 
 export async function getTenantById(id, branchId) {
+  const types = [...KYC_DOC_TYPES];
   const [rows] = await pool.query(
     `
     SELECT
@@ -112,18 +135,32 @@ export async function getTenantById(id, branchId) {
       t.full_name AS name,
       t.email,
       t.mobile_no AS phone,
-      t.id_type,
-      t.id_number,
-      t.id_expiry,
-      t.id_image_url,
+      t.nationality,
+      t.birth_date,
+      CASE d.document_type
+        WHEN 'passport' THEN 'Passport'
+        WHEN 'national_id' THEN 'National ID'
+        WHEN 'visa' THEN 'Visa'
+        ELSE ''
+      END AS id_type,
+      d.document_no AS id_number,
+      d.expiry_date AS id_expiry,
+      NULLIF(TRIM(d.file_path), '') AS id_image_url,
       t.kyc_verified,
       t.is_blacklisted,
       t.blacklist_reason
     FROM tenant_profile t
+    LEFT JOIN tenant_document d ON d.id = (
+      SELECT MAX(d2.id)
+      FROM tenant_document d2
+      WHERE d2.tenant_id = t.id
+        AND d2.branch_id = ?
+        AND d2.document_type IN (${kycTypesSqlList()})
+    )
     WHERE t.id = ? AND (t.branch_id <=> ? OR t.branch_id IS NULL)
     LIMIT 1
     `,
-    [id, branchId],
+    [branchId, ...types, id, branchId],
   );
   return rows[0] ?? null;
 }
@@ -136,12 +173,84 @@ export async function deleteTenantById(id, branchId) {
   return result.affectedRows;
 }
 
-export async function updateTenantKycDocumentById(id, branchId, idImageUrl) {
-  const [result] = await pool.query(
-    'UPDATE tenant_profile SET id_image_url = ? WHERE id = ? AND branch_id = ?',
-    [idImageUrl, id, branchId],
+async function latestKycDocumentRow(tenantId, branchId) {
+  const types = [...KYC_DOC_TYPES];
+  const [rows] = await pool.query(
+    `
+    SELECT id, document_type, document_no, expiry_date, file_path
+    FROM tenant_document
+    WHERE tenant_id = ? AND branch_id = ? AND document_type IN (${kycTypesSqlList()})
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [tenantId, branchId, ...types],
   );
-  return result.affectedRows;
+  return rows[0] ?? null;
+}
+
+async function upsertPrimaryKycDocument(branchId, tenantId, payload) {
+  const docType = clientIdTypeToDocEnum(payload.idType);
+  const docNo = String(payload.idNumber ?? '').trim() || null;
+  const exp = payload.idExpiry || null;
+  const fpRaw = payload.idImageUrl != null ? String(payload.idImageUrl).trim() : '';
+  const filePath = fpRaw || '';
+
+  const latest = await latestKycDocumentRow(tenantId, branchId);
+  if (latest) {
+    const keepPath =
+      filePath ||
+      (latest.file_path != null && String(latest.file_path).trim() !== ''
+        ? String(latest.file_path).trim()
+        : '');
+    await pool.query(
+      `
+      UPDATE tenant_document SET
+        document_type = ?,
+        document_no = ?,
+        expiry_date = ?,
+        file_path = ?
+      WHERE id = ?
+      `,
+      [docType, docNo, exp, keepPath || '', latest.id],
+    );
+    return;
+  }
+
+  await pool.query(
+    `
+    INSERT INTO tenant_document (
+      branch_id,
+      tenant_id,
+      document_type,
+      document_no,
+      expiry_date,
+      file_path
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    [branchId, tenantId, docType, docNo, exp, filePath || ''],
+  );
+}
+
+/**
+ * Attach file to KYC. If the latest passport/national_id/visa row has no file yet (e.g. CRM saved
+ * metadata first then uploads), UPDATE that row so we do not duplicate the same registration.
+ * If a file already exists, INSERT a new row (revision / audit trail).
+ */
+export async function insertKycUploadRevision(branchId, tenantId, publicUrl) {
+  const latest = await latestKycDocumentRow(tenantId, branchId);
+  const latestFp = latest?.file_path != null ? String(latest.file_path).trim() : '';
+
+  if (latest && latestFp === '') {
+    await pool.query(`UPDATE tenant_document SET file_path = ? WHERE id = ?`, [publicUrl, latest.id]);
+    return latest.id;
+  }
+
+  return insertTenantDocument(branchId, tenantId, {
+    documentType: latest?.document_type ?? 'passport',
+    documentNo: latest?.document_no ?? null,
+    expiryDate: latest?.expiry_date ?? null,
+    filePath: publicUrl,
+  });
 }
 
 export async function insertTenantDocument(branchId, tenantId, doc) {

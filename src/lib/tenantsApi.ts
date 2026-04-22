@@ -32,6 +32,8 @@ export type TenantWriteBody = {
   name: string;
   email: string;
   phone: string;
+  nationality?: string;
+  birthDate?: string;
   idType: string;
   idNumber: string;
   idExpiry: string;

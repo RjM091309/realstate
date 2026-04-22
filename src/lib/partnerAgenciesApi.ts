@@ -1,11 +1,14 @@
 import { apiFetch } from '@/lib/api';
 import type { BrokerAgency } from '@/types';
 
-export type PartnerAgencyWriteBody = {
+export type PartnerAgencyCreateBody = {
   name: string;
   contactPerson: string;
   phone: string;
   email?: string;
+  kycVerified?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
 };
 
 export async function fetchPartnerAgencies(): Promise<BrokerAgency[]> {
@@ -13,7 +16,7 @@ export async function fetchPartnerAgencies(): Promise<BrokerAgency[]> {
   return agencies;
 }
 
-export async function createPartnerAgency(body: PartnerAgencyWriteBody): Promise<BrokerAgency> {
+export async function createPartnerAgency(body: PartnerAgencyCreateBody): Promise<BrokerAgency> {
   const { agency } = await apiFetch<{ agency: BrokerAgency }>('/api/partner-agencies', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -21,7 +24,11 @@ export async function createPartnerAgency(body: PartnerAgencyWriteBody): Promise
   return agency;
 }
 
-export async function updatePartnerAgency(id: string, body: PartnerAgencyWriteBody): Promise<BrokerAgency> {
+export type PartnerAgencyPatchBody = Partial<PartnerAgencyCreateBody> & {
+  active?: boolean;
+};
+
+export async function updatePartnerAgency(id: string, body: PartnerAgencyPatchBody): Promise<BrokerAgency> {
   const { agency } = await apiFetch<{ agency: BrokerAgency }>(`/api/partner-agencies/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(body),

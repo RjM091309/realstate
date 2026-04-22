@@ -5,14 +5,13 @@ import { loadSessionPayload } from '../services/sessionService.js';
 import {
   deleteTenantById,
   getTenantById,
-  insertTenantDocument,
+  insertKycUploadRevision,
   insertTenant,
   listTenantsByBranch,
   listRepositoryDocumentsForPortal,
   listTenantAttachmentDocumentsForPortal,
   getPrimaryContractIdForTenant,
   updateTenantById,
-  updateTenantKycDocumentById,
 } from '../models/tenantsModel.js';
 import { deactivateBlacklistForTenant, upsertActiveTenantBlacklist } from '../models/blacklistModel.js';
 import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
@@ -96,13 +95,18 @@ function fmtDate(d) {
 }
 
 function rowToTenant(row) {
+  const idType = row.id_type != null && String(row.id_type).trim() !== '' ? String(row.id_type) : '';
+  const idNumber =
+    row.id_number != null && String(row.id_number).trim() !== '' ? String(row.id_number) : '';
   return {
     id: String(row.id),
     name: String(row.name),
     email: String(row.email),
     phone: String(row.phone),
-    idType: String(row.id_type),
-    idNumber: String(row.id_number),
+    nationality: row.nationality != null && String(row.nationality).trim() !== '' ? String(row.nationality) : undefined,
+    birthDate: row.birth_date ? fmtDate(row.birth_date) : '',
+    idType,
+    idNumber,
     idExpiry: row.id_expiry ? fmtDate(row.id_expiry) : '',
     idImageUrl: row.id_image_url ? String(row.id_image_url) : undefined,
     kycVerified: Boolean(Number(row.kyc_verified)),
@@ -117,7 +121,19 @@ function validatePayload(body) {
   const phone = String(body.phone ?? '').trim();
   const idType = String(body.idType ?? '').trim();
   const idNumber = String(body.idNumber ?? '').trim();
-  if (!name || !email || !phone || !idType || !idNumber) return null;
+  if (!name || !email || !phone) return null;
+
+  const nationalityRaw = body.nationality;
+  const nationality =
+    nationalityRaw === null || nationalityRaw === undefined ? null : String(nationalityRaw).trim() || null;
+
+  const birthDateRaw = body.birthDate;
+  let birthDate = null;
+  if (birthDateRaw !== null && birthDateRaw !== undefined && String(birthDateRaw).trim() !== '') {
+    const value = String(birthDateRaw).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    birthDate = value;
+  }
 
   const idExpiryRaw = body.idExpiry;
   let idExpiry = null;
@@ -145,6 +161,8 @@ function validatePayload(body) {
     name,
     email,
     phone,
+    nationality,
+    birthDate,
     idType,
     idNumber,
     idExpiry,
@@ -489,18 +507,13 @@ export async function uploadTenantKycDocument(req, res) {
   }
 
   try {
-    const affected = await updateTenantKycDocumentById(id, ctx.session.branchId, publicUrl);
-    if (affected === 0) {
+    const existing = await getTenantById(id, ctx.session.branchId);
+    if (!existing) {
       res.status(404).json({ error: 'Tenant not found' });
       return;
     }
 
-    // Also record the document in `tenant_document` for audit/history.
-    // We use `passport` for now (matches the portal UI label).
-    await insertTenantDocument(ctx.session.branchId, id, {
-      documentType: 'passport',
-      filePath: publicUrl,
-    });
+    await insertKycUploadRevision(ctx.session.branchId, id, publicUrl);
 
     const row = await getTenantById(id, ctx.session.branchId);
     if (!row) {

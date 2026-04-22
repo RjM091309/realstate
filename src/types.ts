@@ -36,6 +36,8 @@ export interface Tenant {
   name: string;
   email: string;
   phone: string;
+  nationality?: string;
+  birthDate?: string;
   idType: string;
   idNumber: string;
   idExpiry: string;
@@ -86,6 +88,10 @@ export interface BrokerAgency {
   contactPerson: string;
   phone: string;
   email?: string;
+  kycVerified: boolean;
+  isBlacklisted: boolean;
+  blacklistReason?: string;
+  active: boolean;
 }
 
 export interface DashboardStats {

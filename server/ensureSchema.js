@@ -7,6 +7,95 @@ import { SIDEBAR_FEATURE_KEYS } from './accessConfig.js';
 
 export async function ensureSchema() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`user_role\` (
+      \`IDNo\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`ROLE\` VARCHAR(128) NOT NULL,
+      \`ENCODED_BY\` INT UNSIGNED NULL,
+      \`ENCODED_DT\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`EDITED_BY\` INT UNSIGNED NULL,
+      \`EDITED_DT\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      \`ACTIVE\` TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (\`IDNo\`),
+      KEY \`idx_user_role_active\` (\`ACTIVE\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`user_info\` (
+      \`IDNO\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`FIRSTNAME\` VARCHAR(128) NOT NULL,
+      \`LASTNAME\` VARCHAR(128) NOT NULL,
+      \`USERNAME\` VARCHAR(64) NOT NULL,
+      \`PASSWORD\` VARCHAR(255) NOT NULL,
+      \`SALT\` VARCHAR(255) NULL DEFAULT NULL,
+      \`PERMISSIONS\` INT UNSIGNED NOT NULL,
+      \`LAST_LOGIN\` DATETIME NULL DEFAULT NULL,
+      \`ENCODED_BY\` INT UNSIGNED NULL,
+      \`ENCODED_DT\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`EDITED_BY\` INT UNSIGNED NULL,
+      \`EDITED_DT\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      \`ACTIVE\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`BRANCH_ID\` INT UNSIGNED NULL DEFAULT NULL,
+      PRIMARY KEY (\`IDNO\`),
+      UNIQUE KEY \`uk_user_info_username\` (\`USERNAME\`),
+      KEY \`idx_user_info_branch\` (\`BRANCH_ID\`),
+      KEY \`idx_user_info_permissions\` (\`PERMISSIONS\`),
+      KEY \`idx_user_info_active\` (\`ACTIVE\`),
+      CONSTRAINT \`fk_user_info_user_role\` FOREIGN KEY (\`PERMISSIONS\`) REFERENCES \`user_role\` (\`IDNo\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO \`user_role\` (\`IDNo\`, \`ROLE\`, \`ENCODED_BY\`, \`ENCODED_DT\`, \`EDITED_BY\`, \`EDITED_DT\`, \`ACTIVE\`) VALUES
+      (1, 'Administrator', NULL, NOW(), NULL, NULL, 1),
+      (2, 'Property Manager', NULL, NOW(), NULL, NULL, 1),
+      (3, 'Leasing Agent', NULL, NOW(), NULL, NULL, 1),
+      (4, 'Finance Officer', NULL, NOW(), NULL, NULL, 1),
+      (5, 'Read Only', NULL, NOW(), NULL, NULL, 1)
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO \`user_info\` (
+      \`IDNO\`, \`FIRSTNAME\`, \`LASTNAME\`, \`USERNAME\`, \`PASSWORD\`, \`SALT\`,
+      \`PERMISSIONS\`, \`LAST_LOGIN\`, \`ENCODED_BY\`, \`ENCODED_DT\`, \`EDITED_BY\`, \`EDITED_DT\`, \`ACTIVE\`, \`BRANCH_ID\`
+    ) VALUES
+      (
+        1,
+        'Admin',
+        'System',
+        'admin',
+        '$2b$10$talkLtFUrgOrZ52YqMGyEutyF.jOcHNI64s1HlV0ONl6Nh.x7eIH.',
+        NULL,
+        1,
+        NULL,
+        NULL,
+        NOW(),
+        NULL,
+        NULL,
+        1,
+        1
+      ),
+      (
+        2,
+        'Maria',
+        'Santos',
+        'manager1',
+        '$2b$10$talkLtFUrgOrZ52YqMGyEutyF.jOcHNI64s1HlV0ONl6Nh.x7eIH.',
+        NULL,
+        2,
+        NULL,
+        1,
+        NOW(),
+        NULL,
+        NULL,
+        1,
+        1
+      )
+  `);
+
+  await pool.query(`UPDATE \`user_role\` SET \`ENCODED_BY\` = 1 WHERE \`IDNo\` IN (1, 2, 3, 4, 5)`);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS \`branch\` (
       \`id\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`name\` VARCHAR(160) NOT NULL,
@@ -15,7 +104,7 @@ export async function ensureSchema() {
       \`CREATED_DT\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       UNIQUE KEY \`uk_branch_code\` (\`code\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -25,13 +114,90 @@ export async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`branch_sidebar_permissions\` (
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`feature_key\` VARCHAR(64) NOT NULL,
+      PRIMARY KEY (\`branch_id\`, \`feature_key\`),
+      KEY \`idx_bsp_branch\` (\`branch_id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  const branchSidebarValues = [];
+  for (const branchId of [1, 2]) {
+    for (const fk of SIDEBAR_FEATURE_KEYS) {
+      branchSidebarValues.push(`(${branchId}, '${fk}')`);
+    }
+  }
+  await pool.query(
+    `INSERT IGNORE INTO \`branch_sidebar_permissions\` (\`branch_id\`, \`feature_key\`) VALUES ${branchSidebarValues.join(',')}`,
+  );
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`user_role_crud_permissions\` (
+      \`role_id\` INT UNSIGNED NOT NULL,
+      \`module_key\` VARCHAR(64) NOT NULL,
+      \`can_create\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`can_update\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`can_delete\` TINYINT(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (\`role_id\`, \`module_key\`),
+      KEY \`idx_urcp_role\` (\`role_id\`),
+      CONSTRAINT \`fk_urcp_user_role\` FOREIGN KEY (\`role_id\`) REFERENCES \`user_role\` (\`IDNo\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO \`user_role_crud_permissions\`
+      (\`role_id\`, \`module_key\`, \`can_create\`, \`can_update\`, \`can_delete\`) VALUES
+      (1, 'dashboard',       0, 0, 0),
+      (1, 'units',           1, 1, 1),
+      (1, 'contracts',       1, 1, 1),
+      (1, 'crm',             1, 1, 1),
+      (1, 'ledger',          1, 1, 0),
+      (1, 'calendar',        1, 1, 1),
+      (1, 'tenant_portal',   0, 0, 0),
+      (1, 'agent_portal',    0, 0, 0),
+      (2, 'dashboard',       0, 0, 0),
+      (2, 'units',           1, 1, 1),
+      (2, 'contracts',       1, 1, 1),
+      (2, 'crm',             1, 1, 1),
+      (2, 'ledger',          1, 1, 0),
+      (2, 'calendar',        1, 1, 1),
+      (2, 'tenant_portal',   0, 0, 0),
+      (2, 'agent_portal',    0, 0, 0),
+      (3, 'dashboard',       0, 0, 0),
+      (3, 'units',           1, 1, 0),
+      (3, 'contracts',       1, 1, 0),
+      (3, 'crm',             1, 1, 0),
+      (3, 'ledger',          1, 1, 0),
+      (3, 'calendar',        1, 1, 1),
+      (3, 'tenant_portal',   0, 0, 0),
+      (3, 'agent_portal',    0, 0, 0),
+      (4, 'dashboard',       0, 0, 0),
+      (4, 'units',           0, 1, 0),
+      (4, 'contracts',       0, 1, 0),
+      (4, 'crm',             0, 1, 0),
+      (4, 'ledger',          1, 1, 0),
+      (4, 'calendar',        0, 1, 0),
+      (4, 'tenant_portal',   0, 0, 0),
+      (4, 'agent_portal',    0, 0, 0),
+      (5, 'dashboard',       0, 0, 0),
+      (5, 'units',           0, 0, 0),
+      (5, 'contracts',       0, 0, 0),
+      (5, 'crm',             0, 0, 0),
+      (5, 'ledger',          0, 0, 0),
+      (5, 'calendar',        0, 0, 0),
+      (5, 'tenant_portal',   0, 0, 0),
+      (5, 'agent_portal',    0, 0, 0)
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS \`role_sidebar_permissions\` (
       \`role_id\` INT UNSIGNED NOT NULL,
       \`feature_key\` VARCHAR(64) NOT NULL,
       PRIMARY KEY (\`role_id\`, \`feature_key\`),
       KEY \`idx_rsp_role\` (\`role_id\`),
       CONSTRAINT \`fk_rsp_user_role\` FOREIGN KEY (\`role_id\`) REFERENCES \`user_role\` (\`IDNo\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   const values = [];
@@ -43,194 +209,6 @@ export async function ensureSchema() {
   await pool.query(
     `INSERT IGNORE INTO \`role_sidebar_permissions\` (\`role_id\`, \`feature_key\`) VALUES ${values.join(',')}`,
   );
-
-  // Shared contract table (used by contracts + payments). Kept outside legacy mode.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS \`lease_contract\` (
-      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      \`branch_id\` INT UNSIGNED NOT NULL,
-      \`unit_id\` BIGINT UNSIGNED NOT NULL,
-      \`tenant_id\` BIGINT UNSIGNED NOT NULL,
-      \`agent_id\` INT UNSIGNED NOT NULL,
-      \`start_date\` DATE NOT NULL,
-      \`end_date\` DATE NOT NULL,
-      \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`security_deposit\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`advance_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`contract_type\` VARCHAR(64) NOT NULL DEFAULT 'Monthly Rental',
-      \`status\` VARCHAR(32) NOT NULL DEFAULT 'Active',
-      \`remarks\` VARCHAR(500) NULL DEFAULT NULL,
-      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_lease_contract_branch\` (\`branch_id\`),
-      KEY \`idx_lease_contract_tenant\` (\`tenant_id\`),
-      KEY \`idx_lease_contract_unit\` (\`unit_id\`),
-      KEY \`idx_lease_contract_agent\` (\`agent_id\`),
-      CONSTRAINT \`fk_lease_contract_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
-      CONSTRAINT \`fk_lease_contract_unit\` FOREIGN KEY (\`unit_id\`) REFERENCES \`unit\` (\`id\`),
-      CONSTRAINT \`fk_lease_contract_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
-      CONSTRAINT \`fk_lease_contract_agent\` FOREIGN KEY (\`agent_id\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  if (process.env.LEGACY_SCHEMA === '1') {
-    await pool.query(`
-    CREATE TABLE IF NOT EXISTS \`property_unit\` (
-      \`id\` VARCHAR(36) NOT NULL,
-      \`branch_id\` INT UNSIGNED NOT NULL,
-      \`unit_number\` VARCHAR(64) NOT NULL,
-      \`floor\` VARCHAR(64) NOT NULL DEFAULT '',
-      \`tower\` VARCHAR(128) NOT NULL DEFAULT '',
-      \`building_name\` VARCHAR(200) NOT NULL,
-      \`common_address\` VARCHAR(500) NOT NULL DEFAULT '',
-      \`legal_address\` VARCHAR(1000) NOT NULL DEFAULT '',
-      \`unit_type\` VARCHAR(32) NOT NULL,
-      \`status\` VARCHAR(32) NOT NULL,
-      \`area\` VARCHAR(64) NOT NULL,
-      \`monthly_rate\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`inventory_json\` LONGTEXT NULL,
-      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_property_unit_branch\` (\`branch_id\`),
-      CONSTRAINT \`fk_property_unit_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  const [countRows] = await pool.query('SELECT COUNT(*) AS n FROM property_unit');
-  const n = Number(countRows[0]?.n ?? 0);
-  if (n === 0) {
-    const invU1 = JSON.stringify([
-      { id: 'i1', name: 'Refrigerator', condition: 'Good', quantity: 1 },
-      { id: 'i2', name: 'Aircon', condition: 'New', quantity: 1 },
-    ]);
-    const seeds = [
-      ['u1', 1, '1201', '12', 'Tower A', 'The Rise', 'The Rise Makati', '7248 Malugay St, Makati, 1203 Metro Manila', '1BR', 'Occupied', 'Makati', 35000, invU1],
-      ['u2', 1, '2505', '25', 'West Tower', 'One Serendra', 'One Serendra BGC', '11th Ave, Taguig, Metro Manila', '2BR', 'Available', 'BGC', 85000, '[]'],
-      ['u3', 1, '808', '8', 'South Wing', 'Park Terraces', 'Park Terraces Makati', 'Arnaiz Ave, Makati, Metro Manila', 'Studio', 'Occupied', 'Makati', 28000, '[]'],
-      ['u4', 1, '1510', '15', 'Tower 1', 'The Sapphire Bloc', 'Sapphire Bloc Pasig', 'Sapphire Road, Ortigas Center, Pasig', 'Loft', 'Occupied', 'Pasig', 45000, '[]'],
-      ['u5', 1, '302', '3', 'North Tower', 'Avida Towers', 'Avida BGC', '9th Ave, Taguig, Metro Manila', '1BR', 'Available', 'BGC', 32000, '[]'],
-    ];
-    for (const s of seeds) {
-      await pool.query(
-        `INSERT INTO property_unit (
-          id, branch_id, unit_number, floor, tower, building_name, common_address, legal_address,
-          unit_type, status, area, monthly_rate, inventory_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        s,
-      );
-    }
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS \`crm_tenant\` (
-      \`id\` VARCHAR(36) NOT NULL,
-      \`branch_id\` INT UNSIGNED NOT NULL,
-      \`name\` VARCHAR(200) NOT NULL,
-      \`email\` VARCHAR(255) NOT NULL DEFAULT '',
-      \`phone\` VARCHAR(64) NOT NULL DEFAULT '',
-      \`id_type\` VARCHAR(64) NOT NULL DEFAULT '',
-      \`id_number\` VARCHAR(128) NOT NULL DEFAULT '',
-      \`id_expiry\` DATE NULL,
-      \`id_image_url\` VARCHAR(500) NULL DEFAULT NULL,
-      \`kyc_verified\` TINYINT(1) NOT NULL DEFAULT 1,
-      \`is_blacklisted\` TINYINT(1) NOT NULL DEFAULT 0,
-      \`blacklist_reason\` VARCHAR(500) NULL DEFAULT NULL,
-      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_crm_tenant_branch\` (\`branch_id\`),
-      CONSTRAINT \`fk_crm_tenant_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  const [tenantCountRows] = await pool.query('SELECT COUNT(*) AS n FROM crm_tenant');
-  const tn = Number(tenantCountRows[0]?.n ?? 0);
-  if (tn === 0) {
-    await pool.query(
-      `INSERT INTO crm_tenant (
-        id, branch_id, name, email, phone, id_type, id_number, id_expiry,
-        kyc_verified, is_blacklisted, blacklist_reason
-      ) VALUES
-        ('t1', 1, 'Michael Chen', 'michael@example.com', '+63 917 555 0101', 'Passport', 'P1234567A', '2028-12-31', 1, 0, NULL),
-        ('t2', 1, 'Sarah Johnson', 'sarah@example.com', '+63 918 555 0202', 'UMID', '1234-5678901-2', '2030-01-01', 1, 0, NULL)`,
-    );
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS \`lease_contract\` (
-      \`id\` VARCHAR(36) NOT NULL,
-      \`branch_id\` INT UNSIGNED NOT NULL,
-      \`unit_id\` VARCHAR(36) NOT NULL,
-      \`tenant_id\` VARCHAR(36) NOT NULL,
-      \`agent_id\` VARCHAR(64) NOT NULL,
-      \`start_date\` DATE NOT NULL,
-      \`end_date\` DATE NOT NULL,
-      \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`security_deposit\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`advance_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`contract_type\` VARCHAR(64) NOT NULL DEFAULT 'Monthly Rental',
-      \`status\` VARCHAR(32) NOT NULL DEFAULT 'Active',
-      \`remarks\` VARCHAR(500) NULL DEFAULT NULL,
-      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_lease_contract_branch\` (\`branch_id\`),
-      KEY \`idx_lease_contract_tenant\` (\`tenant_id\`),
-      KEY \`idx_lease_contract_unit\` (\`unit_id\`),
-      CONSTRAINT \`fk_lease_contract_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  const [contractCountRows] = await pool.query('SELECT COUNT(*) AS n FROM lease_contract');
-  const cn = Number(contractCountRows[0]?.n ?? 0);
-  if (cn === 0) {
-    await pool.query(
-      `INSERT INTO lease_contract (
-        id, branch_id, unit_id, tenant_id, agent_id, start_date, end_date, monthly_rent,
-        security_deposit, advance_rent, contract_type, status, remarks
-      ) VALUES
-        ('c1', 1, 'u1', 't1', 'a1', CURDATE() - INTERVAL 180 DAY, CURDATE() + INTERVAL 25 DAY, 35000, 70000, 35000, 'Monthly Rental', 'Active', 'Foreign tenant, requires monthly receipt.'),
-        ('c2', 1, 'u3', 't2', 'a2', CURDATE() - INTERVAL 300 DAY, CURDATE() + INTERVAL 45 DAY, 28000, 56000, 28000, 'Monthly Rental', 'Active', NULL),
-        ('c3', 1, 'u4', 't1', 'a3', CURDATE() - INTERVAL 15 DAY, CURDATE() + INTERVAL 350 DAY, 45000, 90000, 45000, 'Monthly Rental', 'Active', NULL)`,
-    );
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS \`payment_collection\` (
-      \`id\` VARCHAR(36) NOT NULL,
-      \`branch_id\` INT UNSIGNED NOT NULL,
-      \`contract_id\` VARCHAR(36) NOT NULL,
-      \`unit_id\` VARCHAR(36) NOT NULL,
-      \`amount\` DECIMAL(14,2) NOT NULL DEFAULT 0,
-      \`due_date\` DATE NOT NULL,
-      \`paid_date\` DATE NULL,
-      \`status\` VARCHAR(32) NOT NULL DEFAULT 'Pending',
-      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_payment_collection_branch\` (\`branch_id\`),
-      KEY \`idx_payment_collection_contract\` (\`contract_id\`),
-      KEY \`idx_payment_collection_unit\` (\`unit_id\`),
-      CONSTRAINT \`fk_payment_collection_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  const [paymentCountRows] = await pool.query('SELECT COUNT(*) AS n FROM payment_collection');
-  const pn = Number(paymentCountRows[0]?.n ?? 0);
-  if (pn === 0) {
-    await pool.query(
-      `INSERT INTO payment_collection (
-        id, branch_id, contract_id, unit_id, amount, due_date, paid_date, status
-      ) VALUES
-        ('p1', 1, 'c1', 'u1', 35000, DATE_FORMAT(CURDATE(), '%Y-%m-01'), DATE_FORMAT(CURDATE(), '%Y-%m-01'), 'Paid'),
-        ('p2', 1, 'c2', 'u3', 28000, CURDATE() - INTERVAL 5 DAY, NULL, 'Overdue'),
-        ('p3', 1, 'c3', 'u4', 45000, CURDATE() + INTERVAL 3 DAY, NULL, 'Pending')`,
-    );
-  }
-
-  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`area\` (
@@ -246,7 +224,7 @@ export async function ensureSchema() {
       UNIQUE KEY \`uk_area_branch_name\` (\`branch_id\`, \`name\`),
       KEY \`idx_area_city\` (\`city\`),
       CONSTRAINT \`fk_area_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -269,7 +247,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_property_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_property_area\` FOREIGN KEY (\`area_id\`) REFERENCES \`area\` (\`id\`),
       CONSTRAINT \`fk_property_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -285,6 +263,7 @@ export async function ensureSchema() {
       \`listing_type\` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
       \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
       \`market_value\` DECIMAL(14,2) NULL DEFAULT NULL,
+      \`inventory_json\` LONGTEXT NULL,
       \`status\` ENUM('vacant','occupied','reserved','maintenance','inactive') NOT NULL DEFAULT 'vacant',
       \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_by\` INT UNSIGNED NULL DEFAULT NULL,
@@ -296,18 +275,8 @@ export async function ensureSchema() {
       KEY \`idx_unit_listing_type\` (\`listing_type\`),
       CONSTRAINT \`fk_unit_property\` FOREIGN KEY (\`property_id\`) REFERENCES \`property\` (\`id\`),
       CONSTRAINT \`fk_unit_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
-
-  // Compatibility column used by the current API (unitsController expects inventory_json).
-  try {
-    await pool.query(`ALTER TABLE \`unit\` ADD COLUMN \`inventory_json\` LONGTEXT NULL`);
-  } catch (e) {
-    // Ignore "Duplicate column name" so schema bootstrapping stays idempotent.
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) {
-      throw e;
-    }
-  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`partner_agency\` (
@@ -317,22 +286,25 @@ export async function ensureSchema() {
       \`contact_person\` VARCHAR(140) NULL DEFAULT NULL,
       \`contact_number\` VARCHAR(40) NULL DEFAULT NULL,
       \`email\` VARCHAR(180) NULL DEFAULT NULL,
+      \`kyc_verified\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`is_blacklisted\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`blacklist_reason\` VARCHAR(500) NULL DEFAULT NULL,
       \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       UNIQUE KEY \`uk_partner_agency_branch_name\` (\`branch_id\`, \`agency_name\`),
       KEY \`idx_partner_agency_branch\` (\`branch_id\`),
       CONSTRAINT \`fk_partner_agency_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   const [partnerAgencyCountRows] = await pool.query('SELECT COUNT(*) AS n FROM partner_agency');
   const pan = Number(partnerAgencyCountRows[0]?.n ?? 0);
   if (pan === 0) {
     await pool.query(
-      `INSERT IGNORE INTO partner_agency (branch_id, agency_name, contact_person, contact_number, email, active) VALUES
-        (1, 'Prime Realty', 'Alice Brown', '0917-123-4567', NULL, 1),
-        (1, 'Elite Estates', 'Bob Green', '0918-987-6543', NULL, 1)`,
+      `INSERT IGNORE INTO partner_agency (branch_id, agency_name, contact_person, contact_number, email, kyc_verified, is_blacklisted, active) VALUES
+        (1, 'Prime Realty', 'Alice Brown', '0917-123-4567', NULL, 0, 0, 1),
+        (1, 'Elite Estates', 'Bob Green', '0918-987-6543', NULL, 0, 0, 1)`,
     );
   }
 
@@ -350,7 +322,7 @@ export async function ensureSchema() {
       KEY \`idx_landlord_name\` (\`full_name\`),
       KEY \`idx_landlord_branch\` (\`branch_id\`),
       CONSTRAINT \`fk_landlord_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -361,55 +333,57 @@ export async function ensureSchema() {
       \`email\` VARCHAR(180) NULL DEFAULT NULL,
       \`mobile_no\` VARCHAR(40) NULL DEFAULT NULL,
       \`nationality\` VARCHAR(80) NULL DEFAULT NULL,
-      \`passport_no\` VARCHAR(100) NULL DEFAULT NULL,
-      \`primary_id_no\` VARCHAR(100) NULL DEFAULT NULL,
       \`birth_date\` DATE NULL DEFAULT NULL,
+      \`kyc_verified\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`is_blacklisted\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`blacklist_reason\` VARCHAR(500) NULL DEFAULT NULL,
       \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       KEY \`idx_tenant_name\` (\`full_name\`),
       KEY \`idx_tenant_branch\` (\`branch_id\`),
       CONSTRAINT \`fk_tenant_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
-  // Compatibility columns used by the current API (tenantsController expects KYC + blacklist fields).
-  // If you later want full normalization, we can move these to `tenant_document` + `blacklist_record`.
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`id_type\` VARCHAR(64) NOT NULL DEFAULT ''`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`id_number\` VARCHAR(128) NOT NULL DEFAULT ''`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`id_expiry\` DATE NULL DEFAULT NULL`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`id_image_url\` VARCHAR(500) NULL DEFAULT NULL`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`kyc_verified\` TINYINT(1) NOT NULL DEFAULT 1`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`is_blacklisted\` TINYINT(1) NOT NULL DEFAULT 0`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
-  try {
-    await pool.query(`ALTER TABLE \`tenant_profile\` ADD COLUMN \`blacklist_reason\` VARCHAR(500) NULL DEFAULT NULL`);
-  } catch (e) {
-    if (!String(e?.message ?? '').toLowerCase().includes('duplicate column')) throw e;
-  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`lease_contract\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`contract_no\` VARCHAR(60) NOT NULL,
+      \`unit_id\` BIGINT UNSIGNED NOT NULL,
+      \`landlord_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`agent_id\` INT UNSIGNED NULL DEFAULT NULL COMMENT 'Who closed deal',
+      \`partner_agency_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`contract_type\` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
+      \`status\` ENUM('draft','active','completed','terminated','cancelled') NOT NULL DEFAULT 'draft',
+      \`start_date\` DATE NOT NULL,
+      \`end_date\` DATE NOT NULL,
+      \`move_in_date\` DATE NULL DEFAULT NULL,
+      \`move_out_date\` DATE NULL DEFAULT NULL,
+      \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+      \`security_deposit\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+      \`advance_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+      \`manual_profit_override\` DECIMAL(14,2) NULL DEFAULT NULL,
+      \`profit_override_note\` VARCHAR(255) NULL DEFAULT NULL,
+      \`special_remarks\` TEXT NULL,
+      \`created_by\` INT UNSIGNED NULL DEFAULT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uk_contract_no\` (\`contract_no\`),
+      KEY \`idx_lease_contract_branch\` (\`branch_id\`),
+      KEY \`idx_lease_contract_status_dates\` (\`status\`, \`start_date\`, \`end_date\`),
+      KEY \`idx_lease_contract_agent\` (\`agent_id\`),
+      CONSTRAINT \`fk_contract_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+      CONSTRAINT \`fk_contract_unit\` FOREIGN KEY (\`unit_id\`) REFERENCES \`unit\` (\`id\`),
+      CONSTRAINT \`fk_contract_landlord\` FOREIGN KEY (\`landlord_id\`) REFERENCES \`landlord_profile\` (\`id\`),
+      CONSTRAINT \`fk_contract_agent\` FOREIGN KEY (\`agent_id\`) REFERENCES \`user_info\` (\`IDNO\`),
+      CONSTRAINT \`fk_contract_partner_agency\` FOREIGN KEY (\`partner_agency_id\`) REFERENCES \`partner_agency\` (\`id\`),
+      CONSTRAINT \`fk_contract_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`contract_tenant\` (
@@ -421,16 +395,17 @@ export async function ensureSchema() {
       KEY \`idx_contract_tenant_tenant\` (\`tenant_id\`),
       CONSTRAINT \`fk_ct_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_ct_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`blacklist_record\` (
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`branch_id\` INT UNSIGNED NOT NULL,
-      \`entity_type\` ENUM('tenant','landlord') NOT NULL,
+      \`entity_type\` ENUM('tenant','landlord','broker') NOT NULL,
       \`tenant_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
       \`landlord_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`partner_agency_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
       \`reason\` VARCHAR(255) NOT NULL,
       \`details\` TEXT NULL,
       \`is_active\` TINYINT(1) NOT NULL DEFAULT 1,
@@ -439,29 +414,14 @@ export async function ensureSchema() {
       PRIMARY KEY (\`id\`),
       KEY \`idx_blacklist_branch\` (\`branch_id\`),
       KEY \`idx_blacklist_entity\` (\`entity_type\`, \`is_active\`),
+      KEY \`idx_blacklist_partner_agency\` (\`partner_agency_id\`),
       CONSTRAINT \`fk_blacklist_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_blacklist_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
       CONSTRAINT \`fk_blacklist_landlord\` FOREIGN KEY (\`landlord_id\`) REFERENCES \`landlord_profile\` (\`id\`),
+      CONSTRAINT \`fk_blacklist_partner_agency\` FOREIGN KEY (\`partner_agency_id\`) REFERENCES \`partner_agency\` (\`id\`),
       CONSTRAINT \`fk_blacklist_tagged_by\` FOREIGN KEY (\`tagged_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
-
-  const [blacklistCountRows] = await pool.query('SELECT COUNT(*) AS n FROM blacklist_record');
-  const bn = Number(blacklistCountRows[0]?.n ?? 0);
-  if (bn === 0) {
-    const [tenantRows] = await pool.query(
-      'SELECT id FROM tenant_profile WHERE branch_id = 1 ORDER BY id ASC LIMIT 1',
-    );
-    const tenantId = tenantRows[0]?.id;
-    if (tenantId != null) {
-      await pool.query(
-        `INSERT INTO blacklist_record (
-          branch_id, entity_type, tenant_id, landlord_id, reason, details, is_active, tagged_by
-        ) VALUES (1, 'tenant', ?, NULL, 'Sample blacklist record (seed)', NULL, 1, NULL)`,
-        [tenantId],
-      );
-    }
-  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`document_template\` (
@@ -479,7 +439,7 @@ export async function ensureSchema() {
       KEY \`idx_doc_template_branch\` (\`branch_id\`),
       CONSTRAINT \`fk_doc_template_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_doc_template_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -503,7 +463,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_doc_repo_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_doc_repo_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
       CONSTRAINT \`fk_doc_repo_uploaded_by\` FOREIGN KEY (\`uploaded_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -524,7 +484,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_tenant_document_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_tenant_document_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
       CONSTRAINT \`fk_tenant_document_verified_by\` FOREIGN KEY (\`verified_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -552,7 +512,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_invoice_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_invoice_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_invoice_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -573,7 +533,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_payment_schedule_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_payment_schedule_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_payment_schedule_invoice\` FOREIGN KEY (\`invoice_id\`) REFERENCES \`invoice\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -597,7 +557,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_payment_txn_schedule\` FOREIGN KEY (\`payment_schedule_id\`) REFERENCES \`payment_schedule\` (\`id\`),
       CONSTRAINT \`fk_payment_txn_invoice\` FOREIGN KEY (\`invoice_id\`) REFERENCES \`invoice\` (\`id\`),
       CONSTRAINT \`fk_payment_txn_received_by\` FOREIGN KEY (\`received_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   // Demo lease + payment schedule for empty dev DBs (enables Lease Ledger + Record Payment end-to-end).
@@ -698,7 +658,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_collab_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_collab_agency\` FOREIGN KEY (\`partner_agency_id\`) REFERENCES \`partner_agency\` (\`id\`),
       CONSTRAINT \`fk_collab_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -719,7 +679,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_special_request_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_special_request_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_special_request_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -738,7 +698,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_inventory_snapshot_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_inventory_snapshot_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_inventory_snapshot_inspected_by\` FOREIGN KEY (\`inspected_by\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -753,7 +713,7 @@ export async function ensureSchema() {
       PRIMARY KEY (\`id\`),
       KEY \`idx_inventory_item_snapshot\` (\`snapshot_id\`),
       CONSTRAINT \`fk_inventory_item_snapshot\` FOREIGN KEY (\`snapshot_id\`) REFERENCES \`inventory_snapshot\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -774,7 +734,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_calendar_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_calendar_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
       CONSTRAINT \`fk_calendar_payment_schedule\` FOREIGN KEY (\`payment_schedule_id\`) REFERENCES \`payment_schedule\` (\`id\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
   await pool.query(`
@@ -784,7 +744,7 @@ export async function ensureSchema() {
       \`actor_user_id\` INT UNSIGNED NULL DEFAULT NULL,
       \`module_name\` VARCHAR(80) NOT NULL,
       \`record_table\` VARCHAR(80) NOT NULL,
-      \`record_id\` VARCHAR(80) NULL DEFAULT NULL,
+      \`record_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
       \`action\` ENUM('create','update','delete','status_change','override','login') NOT NULL,
       \`change_summary\` TEXT NULL,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -793,6 +753,6 @@ export async function ensureSchema() {
       KEY \`idx_audit_module_date\` (\`module_name\`, \`created_at\`),
       CONSTRAINT \`fk_audit_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_audit_actor_user\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 }

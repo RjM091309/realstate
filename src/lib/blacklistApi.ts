@@ -3,11 +3,12 @@ import { apiFetch } from '@/lib/api';
 export type BlacklistRowDto = {
   id: string;
   branchId: string;
-  entityType: 'tenant' | 'landlord';
+  entityType: 'tenant' | 'landlord' | 'broker';
   tenantId?: string;
   landlordId?: string;
+  partnerAgencyId?: string;
   name: string;
-  type: 'Tenant' | 'Landlord';
+  type: 'Tenant' | 'Broker';
   reason: string;
   details?: string;
   taggedBy?: string;
@@ -15,9 +16,10 @@ export type BlacklistRowDto = {
 };
 
 export type BlacklistCreateBody = {
-  entityType: 'tenant' | 'landlord';
+  entityType: 'tenant' | 'landlord' | 'broker';
   tenantId?: string;
   landlordId?: string;
+  partnerAgencyId?: string;
   reason: string;
   details?: string;
 };
@@ -33,4 +35,16 @@ export async function createBlacklistRecord(body: BlacklistCreateBody): Promise<
     body: JSON.stringify(body),
   });
   return record;
+}
+
+export async function removeTenantFromBlacklist(tenantId: string): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/api/blacklist/tenant/${encodeURIComponent(tenantId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function removeBrokerFromBlacklist(partnerAgencyId: string): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/api/blacklist/broker/${encodeURIComponent(partnerAgencyId)}`, {
+    method: 'DELETE',
+  });
 }

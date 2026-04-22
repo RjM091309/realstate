@@ -10,7 +10,7 @@
 --   (bcrypt; replace in production with Argon2id or your app’s verifier)
 -- =============================================================================
 
-CREATE DATABASE IF NOT EXISTS `realstate` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `realstate` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE `realstate`;
 
 SET NAMES utf8mb4;
@@ -58,7 +58,7 @@ CREATE TABLE `user_role` (
   `ACTIVE` TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`IDNo`),
   KEY `idx_user_role_active` (`ACTIVE`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Staff roles; IDNo referenced by user_info.PERMISSIONS and user_role_crud_permissions.role_id';
 
 -- ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ CREATE TABLE `user_info` (
   KEY `idx_user_info_permissions` (`PERMISSIONS`),
   KEY `idx_user_info_active` (`ACTIVE`),
   CONSTRAINT `fk_user_info_user_role` FOREIGN KEY (`PERMISSIONS`) REFERENCES `user_role` (`IDNo`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Staff accounts';
 
 -- ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ CREATE TABLE `branch` (
   `CREATED_DT` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_branch_code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Branches / sites for sidebar and staff assignment';
 
 -- ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ CREATE TABLE `branch_sidebar_permissions` (
   `feature_key` VARCHAR(64) NOT NULL,
   PRIMARY KEY (`branch_id`, `feature_key`),
   KEY `idx_bsp_branch` (`branch_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Control Panel sidebar features enabled per branch';
 
 -- ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ CREATE TABLE `user_role_crud_permissions` (
   PRIMARY KEY (`role_id`, `module_key`),
   KEY `idx_urcp_role` (`role_id`),
   CONSTRAINT `fk_urcp_user_role` FOREIGN KEY (`role_id`) REFERENCES `user_role` (`IDNo`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Staff CRUD rights per module (Control Panel)';
 
 -- ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ CREATE TABLE `role_sidebar_permissions` (
   PRIMARY KEY (`role_id`, `feature_key`),
   KEY `idx_rsp_role` (`role_id`),
   CONSTRAINT `fk_rsp_user_role` FOREIGN KEY (`role_id`) REFERENCES `user_role` (`IDNo`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Sidebar feature allowlist per role; effective menu = branch ∩ role';
 
 -- ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ CREATE TABLE `area` (
   UNIQUE KEY `uk_area_branch_name` (`branch_id`, `name`),
   KEY `idx_area_city` (`city`),
   CONSTRAINT `fk_area_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Area categorization (Makati, BGC, Pasig, etc.)';
 
 -- ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ CREATE TABLE `property` (
   CONSTRAINT `fk_property_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_property_area` FOREIGN KEY (`area_id`) REFERENCES `area` (`id`),
   CONSTRAINT `fk_property_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Building or project master data';
 
 -- ---------------------------------------------------------------------------
@@ -199,6 +199,7 @@ CREATE TABLE `unit` (
   `listing_type` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
   `monthly_rent` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `market_value` DECIMAL(14,2) NULL DEFAULT NULL,
+  `inventory_json` LONGTEXT NULL COMMENT 'Compatibility for current API (unitsController); may be removed after migration',
   `status` ENUM('vacant','occupied','reserved','maintenance','inactive') NOT NULL DEFAULT 'vacant',
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_by` INT UNSIGNED NULL DEFAULT NULL,
@@ -210,7 +211,7 @@ CREATE TABLE `unit` (
   KEY `idx_unit_listing_type` (`listing_type`),
   CONSTRAINT `fk_unit_property` FOREIGN KEY (`property_id`) REFERENCES `property` (`id`),
   CONSTRAINT `fk_unit_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Unit inventory with vacancy and pricing';
 
 -- ---------------------------------------------------------------------------
@@ -223,13 +224,16 @@ CREATE TABLE `partner_agency` (
   `contact_person` VARCHAR(140) NULL DEFAULT NULL,
   `contact_number` VARCHAR(40) NULL DEFAULT NULL,
   `email` VARCHAR(180) NULL DEFAULT NULL,
+  `kyc_verified` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_blacklisted` TINYINT(1) NOT NULL DEFAULT 0,
+  `blacklist_reason` VARCHAR(500) NULL DEFAULT NULL,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_partner_agency_branch_name` (`branch_id`, `agency_name`),
   KEY `idx_partner_agency_branch` (`branch_id`),
   CONSTRAINT `fk_partner_agency_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Pre-registered external broker/agency directory';
 
 -- ---------------------------------------------------------------------------
@@ -248,7 +252,7 @@ CREATE TABLE `landlord_profile` (
   KEY `idx_landlord_name` (`full_name`),
   KEY `idx_landlord_branch` (`branch_id`),
   CONSTRAINT `fk_landlord_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Landlord master records';
 
 -- ---------------------------------------------------------------------------
@@ -261,17 +265,18 @@ CREATE TABLE `tenant_profile` (
   `email` VARCHAR(180) NULL DEFAULT NULL,
   `mobile_no` VARCHAR(40) NULL DEFAULT NULL,
   `nationality` VARCHAR(80) NULL DEFAULT NULL,
-  `passport_no` VARCHAR(100) NULL DEFAULT NULL,
-  `primary_id_no` VARCHAR(100) NULL DEFAULT NULL,
   `birth_date` DATE NULL DEFAULT NULL,
+  `kyc_verified` TINYINT(1) NOT NULL DEFAULT 1,
+  `is_blacklisted` TINYINT(1) NOT NULL DEFAULT 0,
+  `blacklist_reason` VARCHAR(500) NULL DEFAULT NULL,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_tenant_name` (`full_name`),
   KEY `idx_tenant_branch` (`branch_id`),
   CONSTRAINT `fk_tenant_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Tenant master records (supports KYC fields)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Tenant master; KYC files/metadata live in tenant_document';
 
 -- ---------------------------------------------------------------------------
 -- lease_contract (new lease workflow backbone)
@@ -310,7 +315,7 @@ CREATE TABLE `lease_contract` (
   CONSTRAINT `fk_contract_agent` FOREIGN KEY (`agent_id`) REFERENCES `user_info` (`IDNO`),
   CONSTRAINT `fk_contract_partner_agency` FOREIGN KEY (`partner_agency_id`) REFERENCES `partner_agency` (`id`),
   CONSTRAINT `fk_contract_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Contract lifecycle with deal attribution and financial defaults';
 
 -- ---------------------------------------------------------------------------
@@ -325,7 +330,7 @@ CREATE TABLE `contract_tenant` (
   KEY `idx_contract_tenant_tenant` (`tenant_id`),
   CONSTRAINT `fk_ct_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_ct_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Many-to-many mapping for tenants per contract';
 
 -- ---------------------------------------------------------------------------
@@ -334,9 +339,10 @@ COMMENT='Many-to-many mapping for tenants per contract';
 CREATE TABLE `blacklist_record` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `branch_id` INT UNSIGNED NOT NULL,
-  `entity_type` ENUM('tenant','landlord') NOT NULL,
+  `entity_type` ENUM('tenant','landlord','broker') NOT NULL,
   `tenant_id` BIGINT UNSIGNED NULL DEFAULT NULL,
   `landlord_id` BIGINT UNSIGNED NULL DEFAULT NULL,
+  `partner_agency_id` BIGINT UNSIGNED NULL DEFAULT NULL,
   `reason` VARCHAR(255) NOT NULL,
   `details` TEXT NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
@@ -345,11 +351,13 @@ CREATE TABLE `blacklist_record` (
   PRIMARY KEY (`id`),
   KEY `idx_blacklist_branch` (`branch_id`),
   KEY `idx_blacklist_entity` (`entity_type`, `is_active`),
+  KEY `idx_blacklist_partner_agency` (`partner_agency_id`),
   CONSTRAINT `fk_blacklist_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_blacklist_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`),
   CONSTRAINT `fk_blacklist_landlord` FOREIGN KEY (`landlord_id`) REFERENCES `landlord_profile` (`id`),
+  CONSTRAINT `fk_blacklist_partner_agency` FOREIGN KEY (`partner_agency_id`) REFERENCES `partner_agency` (`id`),
   CONSTRAINT `fk_blacklist_tagged_by` FOREIGN KEY (`tagged_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Blacklist registry with reason/history';
 
 -- ---------------------------------------------------------------------------
@@ -370,7 +378,7 @@ CREATE TABLE `document_template` (
   KEY `idx_doc_template_branch` (`branch_id`),
   CONSTRAINT `fk_doc_template_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_doc_template_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Template versions used for auto-generated docs';
 
 -- ---------------------------------------------------------------------------
@@ -396,7 +404,7 @@ CREATE TABLE `document_repository` (
   CONSTRAINT `fk_doc_repo_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_doc_repo_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`),
   CONSTRAINT `fk_doc_repo_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Document Management System searchable repository';
 
 -- ---------------------------------------------------------------------------
@@ -419,7 +427,7 @@ CREATE TABLE `tenant_document` (
   CONSTRAINT `fk_tenant_document_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_tenant_document_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`),
   CONSTRAINT `fk_tenant_document_verified_by` FOREIGN KEY (`verified_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='KYC document uploads and verification trail';
 
 -- ---------------------------------------------------------------------------
@@ -449,7 +457,7 @@ CREATE TABLE `invoice` (
   CONSTRAINT `fk_invoice_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_invoice_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_invoice_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Billing statements generated from active contracts';
 
 -- ---------------------------------------------------------------------------
@@ -472,7 +480,7 @@ CREATE TABLE `payment_schedule` (
   CONSTRAINT `fk_payment_schedule_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_payment_schedule_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_payment_schedule_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `invoice` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Expected payment ledger lines per contract period';
 
 -- ---------------------------------------------------------------------------
@@ -498,7 +506,7 @@ CREATE TABLE `payment_transaction` (
   CONSTRAINT `fk_payment_txn_schedule` FOREIGN KEY (`payment_schedule_id`) REFERENCES `payment_schedule` (`id`),
   CONSTRAINT `fk_payment_txn_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `invoice` (`id`),
   CONSTRAINT `fk_payment_txn_received_by` FOREIGN KEY (`received_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Recorded collections; drives paid color coding in calendar/UI';
 
 -- ---------------------------------------------------------------------------
@@ -520,7 +528,7 @@ CREATE TABLE `contract_collaboration` (
   CONSTRAINT `fk_collab_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_collab_agency` FOREIGN KEY (`partner_agency_id`) REFERENCES `partner_agency` (`id`),
   CONSTRAINT `fk_collab_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Broker/agency collaboration logs per contract';
 
 -- ---------------------------------------------------------------------------
@@ -543,7 +551,7 @@ CREATE TABLE `special_request` (
   CONSTRAINT `fk_special_request_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_special_request_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_special_request_created_by` FOREIGN KEY (`created_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Operational special requests and remarks tracker';
 
 -- ---------------------------------------------------------------------------
@@ -564,7 +572,7 @@ CREATE TABLE `inventory_snapshot` (
   CONSTRAINT `fk_inventory_snapshot_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_inventory_snapshot_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_inventory_snapshot_inspected_by` FOREIGN KEY (`inspected_by`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Inventory inspection snapshot per contract lifecycle event';
 
 -- ---------------------------------------------------------------------------
@@ -581,7 +589,7 @@ CREATE TABLE `inventory_snapshot_item` (
   PRIMARY KEY (`id`),
   KEY `idx_inventory_item_snapshot` (`snapshot_id`),
   CONSTRAINT `fk_inventory_item_snapshot` FOREIGN KEY (`snapshot_id`) REFERENCES `inventory_snapshot` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Detailed inventory list items for move-in/out';
 
 -- ---------------------------------------------------------------------------
@@ -604,7 +612,7 @@ CREATE TABLE `calendar_event` (
   CONSTRAINT `fk_calendar_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_calendar_contract` FOREIGN KEY (`contract_id`) REFERENCES `lease_contract` (`id`),
   CONSTRAINT `fk_calendar_payment_schedule` FOREIGN KEY (`payment_schedule_id`) REFERENCES `payment_schedule` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Calendar feed for operations and payment statuses';
 
 -- ---------------------------------------------------------------------------
@@ -625,7 +633,7 @@ CREATE TABLE `audit_log` (
   KEY `idx_audit_module_date` (`module_name`, `created_at`),
   CONSTRAINT `fk_audit_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
   CONSTRAINT `fk_audit_actor_user` FOREIGN KEY (`actor_user_id`) REFERENCES `user_info` (`IDNO`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Generic audit trail for compliance and accountability';
 
 -- ---------------------------------------------------------------------------

@@ -8,8 +8,24 @@ export const agents: Agent[] = [
 ];
 
 export const brokerAgencies: BrokerAgency[] = [
-  { id: 'ba1', name: 'Prime Realty', contactPerson: 'Alice Brown', phone: '0917-123-4567' },
-  { id: 'ba2', name: 'Elite Estates', contactPerson: 'Bob Green', phone: '0918-987-6543' },
+  {
+    id: 'ba1',
+    name: 'Prime Realty',
+    contactPerson: 'Alice Brown',
+    phone: '0917-123-4567',
+    kycVerified: false,
+    isBlacklisted: false,
+    active: true,
+  },
+  {
+    id: 'ba2',
+    name: 'Elite Estates',
+    contactPerson: 'Bob Green',
+    phone: '0918-987-6543',
+    kycVerified: false,
+    isBlacklisted: false,
+    active: true,
+  },
 ];
 
 export const units: Unit[] = [
