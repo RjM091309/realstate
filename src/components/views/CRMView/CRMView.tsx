@@ -72,6 +72,19 @@ type BlacklistRow = BlacklistRowDto;
 
 const ID_TYPES = ['Passport', 'UMID', "Driver's License", 'Other'] as const;
 const GOV_DOC_TYPES = ['Passport', 'National ID', 'Visa', 'Other'] as const;
+const NATIONALITIES_ALPHA3 = [
+  { code: 'PHL', label: 'Philippines' },
+  { code: 'KOR', label: 'Korea' },
+  { code: 'JPN', label: 'Japan' },
+  { code: 'CHN', label: 'China' },
+] as const;
+
+function nationalityLabel(alpha3: string | undefined) {
+  const code = String(alpha3 ?? '').trim().toUpperCase();
+  if (!code) return '—';
+  const hit = NATIONALITIES_ALPHA3.find((x) => x.code === code);
+  return hit ? `${hit.label} (${hit.code})` : code;
+}
 
 type TenantForm = {
   name: string;
@@ -104,11 +117,13 @@ function emptyForm(): TenantForm {
 }
 
 function tenantToForm(t: Tenant): TenantForm {
+  const nat = String(t.nationality ?? '').trim().toUpperCase();
+  const allowedNat = new Set<string>(NATIONALITIES_ALPHA3.map((x) => x.code));
   return {
     name: t.name,
     email: t.email,
     phone: t.phone,
-    nationality: t.nationality ?? '',
+    nationality: allowedNat.has(nat) ? nat : '',
     birthDate: t.birthDate ?? '',
     idType: t.idType,
     idNumber: t.idNumber,
@@ -356,6 +371,10 @@ export function CRMView() {
     () => ID_TYPES.map((x) => ({ value: x, label: x })),
     [],
   );
+  const nationalityOptions = useMemo(
+    () => NATIONALITIES_ALPHA3.map((x) => ({ value: x.code, label: `${x.label} (${x.code})` })),
+    [],
+  );
   const brokerGovDocTypeOptions = useMemo(
     () => GOV_DOC_TYPES.map((x) => ({ value: x, label: x })),
     [],
@@ -370,6 +389,12 @@ export function CRMView() {
     const unit = unitList.find((u) => u.id === contract.unitId) ?? null;
     return { contract, unit };
   }, [contractList, selectedTenant, unitList]);
+
+  const existingTenantIdImageUrl = useMemo(() => {
+    if (!isFormOpen || formMode !== 'edit' || !editingId) return '';
+    if (selectedTenant?.id === editingId) return selectedTenant.idImageUrl ?? '';
+    return tenantList.find((t) => t.id === editingId)?.idImageUrl ?? '';
+  }, [editingId, formMode, isFormOpen, selectedTenant, tenantList]);
 
   const resolveUploadUrl = (path: string) => {
     if (/^https?:\/\//i.test(path)) return path;
@@ -1084,6 +1109,12 @@ export function CRMView() {
                         {selectedTenant.phone}
                       </span>
                     </div>
+                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {t('views.crm.tenantModal.nationality')}
+                      </span>
+                      <span className="text-slate-900">{nationalityLabel(selectedTenant.nationality)}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1430,11 +1461,11 @@ export function CRMView() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="crm-nationality">{t('views.crm.tenantModal.nationality')}</Label>
-            <Input
-              id="crm-nationality"
+            <Select2
+              options={nationalityOptions}
               value={form.nationality}
-              onChange={(e) => setForm((f) => ({ ...f, nationality: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              onChange={(v) => setForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
+              placeholder="Select nationality"
             />
           </div>
           <div className="space-y-2">
@@ -1582,12 +1613,38 @@ export function CRMView() {
                   <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
                     Preview
                   </div>
-                  <img
-                    src={pendingIdPreviewUrl}
-                    alt="Selected tenant ID"
-                    className="w-full max-h-56 object-contain rounded-lg bg-white"
-                    loading="lazy"
-                  />
+                  <button
+                    type="button"
+                    className="w-full"
+                    onClick={() => window.open(pendingIdPreviewUrl, '_blank')}
+                    title="Open full image"
+                  >
+                    <img
+                      src={pendingIdPreviewUrl}
+                      alt="Selected tenant ID"
+                      className="w-full max-h-56 object-contain rounded-lg bg-white"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              ) : existingTenantIdImageUrl ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+                    Uploaded
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full"
+                    onClick={() => window.open(resolveUploadUrl(existingTenantIdImageUrl), '_blank')}
+                    title="Open full image"
+                  >
+                    <img
+                      src={resolveUploadUrl(existingTenantIdImageUrl)}
+                      alt="Tenant ID"
+                      className="w-full max-h-56 object-contain rounded-lg bg-white"
+                      loading="lazy"
+                    />
+                  </button>
                 </div>
               ) : null}
             </div>
