@@ -6,6 +6,43 @@ import { pool } from './config/db.js';
 import { SIDEBAR_FEATURE_KEYS } from './accessConfig.js';
 
 export async function ensureSchema() {
+  async function ensurePartnerAgencyDocColumns() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'partner_agency'
+        AND column_name IN ('document_type', 'document_no', 'expiry_date', 'file_path')
+      `,
+    );
+    const existing = new Set(rows.map((r) => String(r.column_name)));
+
+    // Keep each ALTER separate so one failure doesn't block others.
+    if (!existing.has('document_type')) {
+      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL`);
+    }
+    if (!existing.has('document_no')) {
+      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`document_no\` VARCHAR(120) NULL DEFAULT NULL`);
+    }
+    if (!existing.has('expiry_date')) {
+      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`expiry_date\` DATE NULL DEFAULT NULL`);
+    }
+    if (!existing.has('file_path')) {
+      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`file_path\` VARCHAR(255) NULL DEFAULT NULL`);
+    }
+
+    // Enforce column order (phpMyAdmin shows in physical order).
+    // Desired sequence: ... email, document_type, document_no, expiry_date, file_path, kyc_verified ...
+    await pool.query(
+      `ALTER TABLE \`partner_agency\`
+        MODIFY COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL AFTER \`email\`,
+        MODIFY COLUMN \`document_no\` VARCHAR(120) NULL DEFAULT NULL AFTER \`document_type\`,
+        MODIFY COLUMN \`expiry_date\` DATE NULL DEFAULT NULL AFTER \`document_no\`,
+        MODIFY COLUMN \`file_path\` VARCHAR(255) NULL DEFAULT NULL AFTER \`expiry_date\``,
+    );
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`user_role\` (
       \`IDNo\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -286,6 +323,10 @@ export async function ensureSchema() {
       \`contact_person\` VARCHAR(140) NULL DEFAULT NULL,
       \`contact_number\` VARCHAR(40) NULL DEFAULT NULL,
       \`email\` VARCHAR(180) NULL DEFAULT NULL,
+      \`document_type\` VARCHAR(60) NULL DEFAULT NULL,
+      \`document_no\` VARCHAR(120) NULL DEFAULT NULL,
+      \`expiry_date\` DATE NULL DEFAULT NULL,
+      \`file_path\` VARCHAR(255) NULL DEFAULT NULL,
       \`kyc_verified\` TINYINT(1) NOT NULL DEFAULT 0,
       \`is_blacklisted\` TINYINT(1) NOT NULL DEFAULT 0,
       \`blacklist_reason\` VARCHAR(500) NULL DEFAULT NULL,
@@ -297,6 +338,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_partner_agency_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  await ensurePartnerAgencyDocColumns();
 
   const [partnerAgencyCountRows] = await pool.query('SELECT COUNT(*) AS n FROM partner_agency');
   const pan = Number(partnerAgencyCountRows[0]?.n ?? 0);

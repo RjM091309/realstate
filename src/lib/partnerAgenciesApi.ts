@@ -6,6 +6,10 @@ export type PartnerAgencyCreateBody = {
   contactPerson: string;
   phone: string;
   email?: string;
+  documentType?: string;
+  documentNo?: string;
+  expiryDate?: string;
+  filePath?: string;
   kycVerified?: boolean;
   isBlacklisted?: boolean;
   blacklistReason?: string;
@@ -38,4 +42,18 @@ export async function updatePartnerAgency(id: string, body: PartnerAgencyPatchBo
 
 export async function deletePartnerAgency(id: string): Promise<void> {
   await apiFetch<{ ok: boolean }>(`/api/partner-agencies/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function uploadPartnerAgencyKycDocument(id: string, file: File): Promise<BrokerAgency> {
+  const form = new FormData();
+  form.append('file', file);
+  const { agency } = await apiFetch<{ agency: BrokerAgency }>(
+    `/api/partner-agencies/${encodeURIComponent(id)}/kyc-document`,
+    {
+      method: 'POST',
+      body: form,
+      headers: {}, // Let browser set multipart boundary
+    } as RequestInit,
+  );
+  return agency;
 }

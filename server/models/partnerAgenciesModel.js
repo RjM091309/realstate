@@ -10,6 +10,10 @@ export async function listPartnerAgenciesByBranch(branchId) {
       contact_person,
       contact_number,
       email,
+      document_type,
+      document_no,
+      expiry_date,
+      file_path,
       kyc_verified,
       is_blacklisted,
       blacklist_reason,
@@ -32,11 +36,15 @@ export async function insertPartnerAgency(branchId, payload) {
       contact_person,
       contact_number,
       email,
+      document_type,
+      document_no,
+      expiry_date,
+      file_path,
       kyc_verified,
       is_blacklisted,
       blacklist_reason,
       active
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `,
     [
       branchId,
@@ -44,6 +52,10 @@ export async function insertPartnerAgency(branchId, payload) {
       payload.contactPerson,
       payload.contactNumber,
       payload.email,
+      payload.documentType,
+      payload.documentNo,
+      payload.expiryDate,
+      payload.filePath,
       payload.kycVerified ? 1 : 0,
       payload.isBlacklisted ? 1 : 0,
       payload.blacklistReason,
@@ -62,6 +74,10 @@ export async function getPartnerAgencyById(id, branchId) {
       contact_person,
       contact_number,
       email,
+      document_type,
+      document_no,
+      expiry_date,
+      file_path,
       kyc_verified,
       is_blacklisted,
       blacklist_reason,
@@ -83,6 +99,10 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       contact_person = ?,
       contact_number = ?,
       email = ?,
+      document_type = ?,
+      document_no = ?,
+      expiry_date = ?,
+      file_path = ?,
       kyc_verified = ?,
       is_blacklisted = ?,
       blacklist_reason = ?,
@@ -94,6 +114,10 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       payload.contactPerson,
       payload.contactNumber,
       payload.email,
+      payload.documentType,
+      payload.documentNo,
+      payload.expiryDate,
+      payload.filePath,
       payload.kycVerified ? 1 : 0,
       payload.isBlacklisted ? 1 : 0,
       payload.blacklistReason,
@@ -101,6 +125,17 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       id,
       branchId,
     ],
+  );
+  return result.affectedRows;
+}
+
+export async function updatePartnerAgencyDocumentPathById(id, branchId, filePath) {
+  const [result] = await pool.query(
+    `
+    UPDATE partner_agency SET file_path = ?
+    WHERE id = ? AND branch_id = ?
+    `,
+    [filePath, id, branchId],
   );
   return result.affectedRows;
 }

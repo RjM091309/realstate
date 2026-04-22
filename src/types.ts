@@ -88,6 +88,10 @@ export interface BrokerAgency {
   contactPerson: string;
   phone: string;
   email?: string;
+  documentType?: string;
+  documentNo?: string;
+  expiryDate?: string;
+  filePath?: string;
   kycVerified: boolean;
   isBlacklisted: boolean;
   blacklistReason?: string;

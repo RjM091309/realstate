@@ -49,6 +49,7 @@ import {
   createPartnerAgency,
   deletePartnerAgency,
   fetchPartnerAgencies,
+  uploadPartnerAgencyKycDocument,
   updatePartnerAgency,
 } from '@/lib/partnerAgenciesApi';
 import {
@@ -70,6 +71,7 @@ import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 type BlacklistRow = BlacklistRowDto;
 
 const ID_TYPES = ['Passport', 'UMID', "Driver's License", 'Other'] as const;
+const GOV_DOC_TYPES = ['Passport', 'National ID', 'Visa', 'Other'] as const;
 
 type TenantForm = {
   name: string;
@@ -207,7 +209,16 @@ export function CRMView() {
     contactPerson: '',
     phone: '',
     email: '',
+    documentType: '',
+    documentNo: '',
+    expiryDate: '',
+    filePath: '',
   });
+  const brokerDocUploadRef = useRef<HTMLInputElement | null>(null);
+  const [brokerDocUploading, setBrokerDocUploading] = useState(false);
+  const [pendingBrokerDoc, setPendingBrokerDoc] = useState<File | null>(null);
+  const [pendingBrokerDocName, setPendingBrokerDocName] = useState('');
+  const [pendingBrokerDocPreviewUrl, setPendingBrokerDocPreviewUrl] = useState('');
   const [isBrokerDeleteOpen, setIsBrokerDeleteOpen] = useState(false);
   const [pendingDeleteBroker, setPendingDeleteBroker] = useState<BrokerAgency | null>(null);
   const [isBrokerBlacklistOpen, setIsBrokerBlacklistOpen] = useState(false);
@@ -345,6 +356,10 @@ export function CRMView() {
     () => ID_TYPES.map((x) => ({ value: x, label: x })),
     [],
   );
+  const brokerGovDocTypeOptions = useMemo(
+    () => GOV_DOC_TYPES.map((x) => ({ value: x, label: x })),
+    [],
+  );
 
   const tenantLeaseContext = useMemo(() => {
     if (!selectedTenant) return { contract: null as Contract | null, unit: null as Unit | null };
@@ -394,9 +409,21 @@ export function CRMView() {
   };
 
   const openAddBroker = () => {
-    setBrokerForm({ name: '', contactPerson: '', phone: '', email: '' });
+    setBrokerForm({
+      name: '',
+      contactPerson: '',
+      phone: '',
+      email: '',
+      documentType: '',
+      documentNo: '',
+      expiryDate: '',
+      filePath: '',
+    });
     setBrokerFormMode('create');
     setEditingBrokerId(null);
+    setPendingBrokerDoc(null);
+    setPendingBrokerDocName('');
+    setPendingBrokerDocPreviewUrl('');
     setIsBrokerFormOpen(true);
   };
 
@@ -406,17 +433,68 @@ export function CRMView() {
       contactPerson: agency.contactPerson ?? '',
       phone: agency.phone ?? '',
       email: agency.email ?? '',
+      documentType: agency.documentType ?? '',
+      documentNo: agency.documentNo ?? '',
+      expiryDate: agency.expiryDate ?? '',
+      filePath: agency.filePath ?? '',
     });
     setBrokerFormMode('edit');
     setEditingBrokerId(agency.id);
+    setPendingBrokerDoc(null);
+    setPendingBrokerDocName('');
+    setPendingBrokerDocPreviewUrl('');
     setIsBrokerFormOpen(true);
   };
 
   const closeBrokerForm = () => {
     setIsBrokerFormOpen(false);
-    setBrokerForm({ name: '', contactPerson: '', phone: '', email: '' });
+    setBrokerForm({
+      name: '',
+      contactPerson: '',
+      phone: '',
+      email: '',
+      documentType: '',
+      documentNo: '',
+      expiryDate: '',
+      filePath: '',
+    });
     setBrokerFormMode('create');
     setEditingBrokerId(null);
+    setPendingBrokerDoc(null);
+    setPendingBrokerDocName('');
+    setPendingBrokerDocPreviewUrl('');
+  };
+
+  useEffect(() => {
+    if (!pendingBrokerDoc) {
+      setPendingBrokerDocPreviewUrl('');
+      return;
+    }
+    const isImage = pendingBrokerDoc.type.startsWith('image/');
+    if (!isImage) {
+      setPendingBrokerDocPreviewUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(pendingBrokerDoc);
+    setPendingBrokerDocPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingBrokerDoc]);
+
+  const isLikelyImagePath = (p: string) => /\.(webp|png|jpe?g|gif)$/i.test(p.split('?')[0] || '');
+  const isLikelyPdfPath = (p: string) => /\.pdf$/i.test(p.split('?')[0] || '');
+
+  const handlePickBrokerDocUpload = () => {
+    if (!canUpdate || brokerDocUploading) return;
+    brokerDocUploadRef.current?.click();
+  };
+
+  const handlePickBrokerDoc: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    setPendingBrokerDoc(picked);
+    setPendingBrokerDocName(picked.name);
+    toast.success('Document ready to upload.');
   };
 
   const handleSaveBroker = async () => {
@@ -426,24 +504,37 @@ export function CRMView() {
       return;
     }
     try {
+      setBrokerDocUploading(Boolean(pendingBrokerDoc));
       const payload = {
         name,
         contactPerson: brokerForm.contactPerson.trim(),
         phone: brokerForm.phone.trim(),
         email: brokerForm.email.trim() || undefined,
+        documentType: brokerForm.documentType.trim() || undefined,
+        documentNo: brokerForm.documentNo.trim() || undefined,
+        expiryDate: brokerForm.expiryDate.trim() || undefined,
+        filePath: brokerForm.filePath.trim() || undefined,
       };
       if (brokerFormMode === 'edit' && editingBrokerId) {
-        const updated = await updatePartnerAgency(editingBrokerId, payload);
+        let updated = await updatePartnerAgency(editingBrokerId, payload);
+        if (pendingBrokerDoc) {
+          updated = await uploadPartnerAgencyKycDocument(editingBrokerId, pendingBrokerDoc);
+        }
         setBrokerList((prev) => prev.map((x) => (x.id === editingBrokerId ? updated : x)));
         toast.success(t('views.crm.brokers.updated'));
       } else {
-        const created = await createPartnerAgency(payload);
+        let created = await createPartnerAgency(payload);
+        if (pendingBrokerDoc) {
+          created = await uploadPartnerAgencyKycDocument(created.id, pendingBrokerDoc);
+        }
         setBrokerList((prev) => [created, ...prev]);
         toast.success(t('views.crm.brokers.created'));
       }
       closeBrokerForm();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.crm.brokers.saveError'));
+    } finally {
+      setBrokerDocUploading(false);
     }
   };
 
@@ -1561,6 +1652,147 @@ export function CRMView() {
               className="rounded-xl border-slate-200"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Government document type</Label>
+            <Select2
+              options={brokerGovDocTypeOptions}
+              value={brokerForm.documentType}
+              onChange={(v) => setBrokerForm((f) => ({ ...f, documentType: (v ?? '') as string }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="crm-broker-doc-no">Document no.</Label>
+            <Input
+              id="crm-broker-doc-no"
+              value={brokerForm.documentNo}
+              onChange={(e) => setBrokerForm((f) => ({ ...f, documentNo: e.target.value }))}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="crm-broker-expiry">Expiry date</Label>
+            <AppDatePicker
+              mode="single"
+              placeholder="MM/DD/YYYY"
+              fullWidth
+              value={brokerForm.expiryDate ? parseISO(brokerForm.expiryDate) : null}
+              onChange={(picked) =>
+                setBrokerForm((f) => ({
+                  ...f,
+                  expiryDate: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
+                }))
+              }
+            />
+          </div>
+
+          {canUpdate ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>KYC document (image or PDF)</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">
+                    {pendingBrokerDocName || 'No file selected'}
+                  </div>
+                  <div className="text-xs text-slate-500">Max 5MB. Images will be converted to WEBP.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={brokerDocUploadRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={handlePickBrokerDoc}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9"
+                    onClick={handlePickBrokerDocUpload}
+                    disabled={brokerDocUploading}
+                  >
+                    {brokerDocUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                        Uploading
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" aria-hidden />
+                        Choose file
+                      </>
+                    )}
+                  </Button>
+                  {pendingBrokerDoc ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-9"
+                      onClick={() => {
+                        setPendingBrokerDoc(null);
+                        setPendingBrokerDocName('');
+                        setPendingBrokerDocPreviewUrl('');
+                      }}
+                      disabled={brokerDocUploading}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              {pendingBrokerDocPreviewUrl ? (
+                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Preview</div>
+                  <button
+                    type="button"
+                    className="w-full"
+                    onClick={() => window.open(pendingBrokerDocPreviewUrl, '_blank')}
+                    title="Open full image"
+                  >
+                    <img
+                      src={pendingBrokerDocPreviewUrl}
+                      alt="Selected partner agency document"
+                      className="w-full max-h-56 object-contain rounded-lg bg-white"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              ) : brokerForm.filePath && isLikelyImagePath(brokerForm.filePath) ? (
+                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Uploaded</div>
+                  <button
+                    type="button"
+                    className="w-full"
+                    onClick={() => window.open(resolveUploadUrl(brokerForm.filePath), '_blank')}
+                    title="Open full image"
+                  >
+                    <img
+                      src={resolveUploadUrl(brokerForm.filePath)}
+                      alt="Partner agency document"
+                      className="w-full max-h-56 object-contain rounded-lg bg-white"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              ) : brokerForm.filePath && isLikelyPdfPath(brokerForm.filePath) ? (
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Uploaded</div>
+                    <div className="text-sm font-medium text-slate-900 truncate">PDF document</div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9"
+                    onClick={() => window.open(resolveUploadUrl(brokerForm.filePath), '_blank')}
+                  >
+                    Open PDF
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Modal>
 

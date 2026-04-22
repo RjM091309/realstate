@@ -5,8 +5,10 @@ import {
   insertPartnerAgency,
   listPartnerAgenciesByBranch,
   updatePartnerAgencyById,
+  updatePartnerAgencyDocumentPathById,
 } from '../models/partnerAgenciesModel.js';
 import { deactivateBlacklistForPartnerAgency, upsertActiveBrokerBlacklistRecord } from '../models/blacklistModel.js';
+import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
 
 function rowToAgency(row) {
   return {
@@ -15,6 +17,14 @@ function rowToAgency(row) {
     contactPerson: row.contact_person ? String(row.contact_person) : '',
     phone: row.contact_number ? String(row.contact_number) : '',
     email: row.email ? String(row.email) : undefined,
+    documentType: row.document_type != null && String(row.document_type).trim() !== '' ? String(row.document_type) : undefined,
+    documentNo: row.document_no != null && String(row.document_no).trim() !== '' ? String(row.document_no) : undefined,
+    expiryDate: row.expiry_date
+      ? typeof row.expiry_date === 'string'
+        ? row.expiry_date.slice(0, 10)
+        : `${row.expiry_date.getFullYear()}-${String(row.expiry_date.getMonth() + 1).padStart(2, '0')}-${String(row.expiry_date.getDate()).padStart(2, '0')}`
+      : undefined,
+    filePath: row.file_path != null && String(row.file_path).trim() !== '' ? String(row.file_path) : undefined,
     kycVerified: Boolean(Number(row.kyc_verified)),
     isBlacklisted: Boolean(Number(row.is_blacklisted)),
     blacklistReason:
@@ -44,6 +54,28 @@ function validateCreatePayload(body) {
     emailRaw === null || emailRaw === undefined || String(emailRaw).trim() === ''
       ? null
       : String(emailRaw).trim();
+  const documentTypeRaw = body.documentType;
+  const documentType =
+    documentTypeRaw === null || documentTypeRaw === undefined || String(documentTypeRaw).trim() === ''
+      ? null
+      : String(documentTypeRaw).trim();
+  const documentNoRaw = body.documentNo;
+  const documentNo =
+    documentNoRaw === null || documentNoRaw === undefined || String(documentNoRaw).trim() === ''
+      ? null
+      : String(documentNoRaw).trim();
+  const expiryRaw = body.expiryDate;
+  let expiryDate = null;
+  if (expiryRaw !== null && expiryRaw !== undefined && String(expiryRaw).trim() !== '') {
+    const value = String(expiryRaw).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    expiryDate = value;
+  }
+  const filePathRaw = body.filePath;
+  const filePath =
+    filePathRaw === null || filePathRaw === undefined || String(filePathRaw).trim() === ''
+      ? null
+      : String(filePathRaw).trim();
   const kycVerified = parseOptionalBool(body.kycVerified) ?? false;
   const isBlacklisted = Boolean(body.isBlacklisted);
   const blacklistReasonRaw = body.blacklistReason;
@@ -57,6 +89,10 @@ function validateCreatePayload(body) {
     contactPerson: contactPerson || null,
     contactNumber: phone || null,
     email,
+    documentType,
+    documentNo,
+    expiryDate,
+    filePath,
     kycVerified,
     isBlacklisted,
     blacklistReason,
@@ -79,6 +115,38 @@ function validatePatchPayload(body) {
         ? null
         : String(body.email).trim();
 
+  const documentType =
+    body.documentType === undefined
+      ? undefined
+      : body.documentType === null || String(body.documentType).trim() === ''
+        ? null
+        : String(body.documentType).trim();
+
+  const documentNo =
+    body.documentNo === undefined
+      ? undefined
+      : body.documentNo === null || String(body.documentNo).trim() === ''
+        ? null
+        : String(body.documentNo).trim();
+
+  let expiryDate = undefined;
+  if (body.expiryDate !== undefined) {
+    if (body.expiryDate === null || String(body.expiryDate).trim() === '') {
+      expiryDate = null;
+    } else {
+      const value = String(body.expiryDate).trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+      expiryDate = value;
+    }
+  }
+
+  const filePath =
+    body.filePath === undefined
+      ? undefined
+      : body.filePath === null || String(body.filePath).trim() === ''
+        ? null
+        : String(body.filePath).trim();
+
   const active = body.active === undefined ? undefined : parseOptionalBool(body.active);
   const kycVerified =
     body.kycVerified === undefined ? undefined : parseOptionalBool(body.kycVerified);
@@ -99,6 +167,10 @@ function validatePatchPayload(body) {
     contactPerson === undefined &&
     phone === undefined &&
     email === undefined &&
+    documentType === undefined &&
+    documentNo === undefined &&
+    expiryDate === undefined &&
+    filePath === undefined &&
     active === undefined &&
     kycVerified === undefined &&
     isBlacklisted === undefined &&
@@ -112,6 +184,10 @@ function validatePatchPayload(body) {
     contactPerson,
     contactNumber: phone,
     email,
+    documentType,
+    documentNo,
+    expiryDate,
+    filePath,
     active,
     kycVerified,
     isBlacklisted,
@@ -223,6 +299,32 @@ export async function updatePartnerAgency(req, res) {
       contactPerson: parsed.contactPerson ?? (existing.contact_person ? String(existing.contact_person) : null),
       contactNumber: parsed.contactNumber ?? (existing.contact_number ? String(existing.contact_number) : null),
       email: parsed.email ?? (existing.email ? String(existing.email) : null),
+      documentType:
+        parsed.documentType !== undefined
+          ? parsed.documentType
+          : existing.document_type != null && String(existing.document_type).trim() !== ''
+            ? String(existing.document_type)
+            : null,
+      documentNo:
+        parsed.documentNo !== undefined
+          ? parsed.documentNo
+          : existing.document_no != null && String(existing.document_no).trim() !== ''
+            ? String(existing.document_no)
+            : null,
+      expiryDate:
+        parsed.expiryDate !== undefined
+          ? parsed.expiryDate
+          : existing.expiry_date
+            ? typeof existing.expiry_date === 'string'
+              ? existing.expiry_date.slice(0, 10)
+              : `${existing.expiry_date.getFullYear()}-${String(existing.expiry_date.getMonth() + 1).padStart(2, '0')}-${String(existing.expiry_date.getDate()).padStart(2, '0')}`
+            : null,
+      filePath:
+        parsed.filePath !== undefined
+          ? parsed.filePath
+          : existing.file_path != null && String(existing.file_path).trim() !== ''
+            ? String(existing.file_path)
+            : null,
       active: parsed.active ?? Boolean(Number(existing.active)),
       kycVerified: parsed.kycVerified ?? Boolean(Number(existing.kyc_verified)),
       isBlacklisted: parsed.isBlacklisted ?? Boolean(Number(existing.is_blacklisted)),
@@ -277,6 +379,60 @@ export async function updatePartnerAgency(req, res) {
     }
     console.error(e);
     res.status(500).json({ error: 'Failed to update partner agency' });
+  }
+}
+
+export async function uploadPartnerAgencyKycDocument(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to update partner agencies' });
+    return;
+  }
+
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  let publicUrl;
+  try {
+    ({ publicUrl } = await finalizeKycUploadToWebpOrPdf(file));
+  } catch (e) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e instanceof Error ? e.message : 'Failed to process upload';
+    if (code >= 400 && code < 500) {
+      res.status(code).json({ error: msg });
+      return;
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to upload document' });
+    return;
+  }
+
+  try {
+    const existing = await getPartnerAgencyById(id, ctx.session.branchId);
+    if (!existing) {
+      res.status(404).json({ error: 'Partner agency not found' });
+      return;
+    }
+    await updatePartnerAgencyDocumentPathById(id, ctx.session.branchId, publicUrl);
+    const row = await getPartnerAgencyById(id, ctx.session.branchId);
+    if (!row) {
+      res.status(404).json({ error: 'Partner agency not found' });
+      return;
+    }
+    res.json({ agency: rowToAgency(row) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to upload document' });
   }
 }
 
