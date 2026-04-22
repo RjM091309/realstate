@@ -88,6 +88,7 @@ export interface BrokerAgency {
   contactPerson: string;
   phone: string;
   email?: string;
+  nationality?: string;
   documentType?: string;
   documentNo?: string;
   expiryDate?: string;

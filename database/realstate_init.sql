@@ -224,6 +224,7 @@ CREATE TABLE `partner_agency` (
   `contact_person` VARCHAR(140) NULL DEFAULT NULL,
   `contact_number` VARCHAR(40) NULL DEFAULT NULL,
   `email` VARCHAR(180) NULL DEFAULT NULL,
+  `nationality` CHAR(3) NULL DEFAULT NULL,
   `document_type` VARCHAR(60) NULL DEFAULT NULL,
   `document_no` VARCHAR(120) NULL DEFAULT NULL,
   `expiry_date` DATE NULL DEFAULT NULL,

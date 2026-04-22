@@ -17,6 +17,7 @@ function rowToAgency(row) {
     contactPerson: row.contact_person ? String(row.contact_person) : '',
     phone: row.contact_number ? String(row.contact_number) : '',
     email: row.email ? String(row.email) : undefined,
+    nationality: row.nationality != null && String(row.nationality).trim() !== '' ? String(row.nationality) : undefined,
     documentType: row.document_type != null && String(row.document_type).trim() !== '' ? String(row.document_type) : undefined,
     documentNo: row.document_no != null && String(row.document_no).trim() !== '' ? String(row.document_no) : undefined,
     expiryDate: row.expiry_date
@@ -54,6 +55,11 @@ function validateCreatePayload(body) {
     emailRaw === null || emailRaw === undefined || String(emailRaw).trim() === ''
       ? null
       : String(emailRaw).trim();
+  const nationalityRaw = body.nationality;
+  const nationality =
+    nationalityRaw === null || nationalityRaw === undefined || String(nationalityRaw).trim() === ''
+      ? null
+      : String(nationalityRaw).trim().slice(0, 3).toUpperCase();
   const documentTypeRaw = body.documentType;
   const documentType =
     documentTypeRaw === null || documentTypeRaw === undefined || String(documentTypeRaw).trim() === ''
@@ -89,6 +95,7 @@ function validateCreatePayload(body) {
     contactPerson: contactPerson || null,
     contactNumber: phone || null,
     email,
+    nationality,
     documentType,
     documentNo,
     expiryDate,
@@ -114,6 +121,13 @@ function validatePatchPayload(body) {
       : body.email === null || String(body.email).trim() === ''
         ? null
         : String(body.email).trim();
+
+  const nationality =
+    body.nationality === undefined
+      ? undefined
+      : body.nationality === null || String(body.nationality).trim() === ''
+        ? null
+        : String(body.nationality).trim().slice(0, 3).toUpperCase();
 
   const documentType =
     body.documentType === undefined
@@ -167,6 +181,7 @@ function validatePatchPayload(body) {
     contactPerson === undefined &&
     phone === undefined &&
     email === undefined &&
+    nationality === undefined &&
     documentType === undefined &&
     documentNo === undefined &&
     expiryDate === undefined &&
@@ -184,6 +199,7 @@ function validatePatchPayload(body) {
     contactPerson,
     contactNumber: phone,
     email,
+    nationality,
     documentType,
     documentNo,
     expiryDate,
@@ -299,6 +315,12 @@ export async function updatePartnerAgency(req, res) {
       contactPerson: parsed.contactPerson ?? (existing.contact_person ? String(existing.contact_person) : null),
       contactNumber: parsed.contactNumber ?? (existing.contact_number ? String(existing.contact_number) : null),
       email: parsed.email ?? (existing.email ? String(existing.email) : null),
+      nationality:
+        parsed.nationality !== undefined
+          ? parsed.nationality
+          : existing.nationality != null && String(existing.nationality).trim() !== ''
+            ? String(existing.nationality)
+            : null,
       documentType:
         parsed.documentType !== undefined
           ? parsed.documentType

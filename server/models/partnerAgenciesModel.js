@@ -10,6 +10,7 @@ export async function listPartnerAgenciesByBranch(branchId) {
       contact_person,
       contact_number,
       email,
+      nationality,
       document_type,
       document_no,
       expiry_date,
@@ -36,6 +37,7 @@ export async function insertPartnerAgency(branchId, payload) {
       contact_person,
       contact_number,
       email,
+      nationality,
       document_type,
       document_no,
       expiry_date,
@@ -44,7 +46,7 @@ export async function insertPartnerAgency(branchId, payload) {
       is_blacklisted,
       blacklist_reason,
       active
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `,
     [
       branchId,
@@ -52,6 +54,7 @@ export async function insertPartnerAgency(branchId, payload) {
       payload.contactPerson,
       payload.contactNumber,
       payload.email,
+      payload.nationality,
       payload.documentType,
       payload.documentNo,
       payload.expiryDate,
@@ -74,6 +77,7 @@ export async function getPartnerAgencyById(id, branchId) {
       contact_person,
       contact_number,
       email,
+      nationality,
       document_type,
       document_no,
       expiry_date,
@@ -99,6 +103,7 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       contact_person = ?,
       contact_number = ?,
       email = ?,
+      nationality = ?,
       document_type = ?,
       document_no = ?,
       expiry_date = ?,
@@ -114,6 +119,7 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       payload.contactPerson,
       payload.contactNumber,
       payload.email,
+      payload.nationality,
       payload.documentType,
       payload.documentNo,
       payload.expiryDate,

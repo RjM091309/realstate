@@ -6,6 +6,7 @@ export type PartnerAgencyCreateBody = {
   contactPerson: string;
   phone: string;
   email?: string;
+  nationality?: string;
   documentType?: string;
   documentNo?: string;
   expiryDate?: string;

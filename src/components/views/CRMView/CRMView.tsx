@@ -224,6 +224,7 @@ export function CRMView() {
     contactPerson: '',
     phone: '',
     email: '',
+    nationality: '',
     documentType: '',
     documentNo: '',
     expiryDate: '',
@@ -439,6 +440,7 @@ export function CRMView() {
       contactPerson: '',
       phone: '',
       email: '',
+      nationality: '',
       documentType: '',
       documentNo: '',
       expiryDate: '',
@@ -458,6 +460,7 @@ export function CRMView() {
       contactPerson: agency.contactPerson ?? '',
       phone: agency.phone ?? '',
       email: agency.email ?? '',
+      nationality: agency.nationality ?? '',
       documentType: agency.documentType ?? '',
       documentNo: agency.documentNo ?? '',
       expiryDate: agency.expiryDate ?? '',
@@ -478,6 +481,7 @@ export function CRMView() {
       contactPerson: '',
       phone: '',
       email: '',
+      nationality: '',
       documentType: '',
       documentNo: '',
       expiryDate: '',
@@ -535,6 +539,7 @@ export function CRMView() {
         contactPerson: brokerForm.contactPerson.trim(),
         phone: brokerForm.phone.trim(),
         email: brokerForm.email.trim() || undefined,
+        nationality: brokerForm.nationality.trim() || undefined,
         documentType: brokerForm.documentType.trim() || undefined,
         documentNo: brokerForm.documentNo.trim() || undefined,
         expiryDate: brokerForm.expiryDate.trim() || undefined,
@@ -1707,6 +1712,16 @@ export function CRMView() {
               value={brokerForm.email}
               onChange={(e) => setBrokerForm((f) => ({ ...f, email: e.target.value }))}
               className="rounded-xl border-slate-200"
+            />
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Nationality</Label>
+            <Select2
+              options={nationalityOptions}
+              value={brokerForm.nationality}
+              onChange={(v) => setBrokerForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
+              placeholder="Select nationality"
             />
           </div>
 

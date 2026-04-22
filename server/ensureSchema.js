@@ -13,12 +13,15 @@ export async function ensureSchema() {
       FROM information_schema.columns
       WHERE table_schema = DATABASE()
         AND table_name = 'partner_agency'
-        AND column_name IN ('document_type', 'document_no', 'expiry_date', 'file_path')
+        AND column_name IN ('nationality', 'document_type', 'document_no', 'expiry_date', 'file_path')
       `,
     );
     const existing = new Set(rows.map((r) => String(r.column_name)));
 
     // Keep each ALTER separate so one failure doesn't block others.
+    if (!existing.has('nationality')) {
+      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`nationality\` CHAR(3) NULL DEFAULT NULL`);
+    }
     if (!existing.has('document_type')) {
       await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL`);
     }
@@ -33,10 +36,11 @@ export async function ensureSchema() {
     }
 
     // Enforce column order (phpMyAdmin shows in physical order).
-    // Desired sequence: ... email, document_type, document_no, expiry_date, file_path, kyc_verified ...
+    // Desired sequence: ... email, nationality, document_type, document_no, expiry_date, file_path, kyc_verified ...
     await pool.query(
       `ALTER TABLE \`partner_agency\`
-        MODIFY COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL AFTER \`email\`,
+        MODIFY COLUMN \`nationality\` CHAR(3) NULL DEFAULT NULL AFTER \`email\`,
+        MODIFY COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL AFTER \`nationality\`,
         MODIFY COLUMN \`document_no\` VARCHAR(120) NULL DEFAULT NULL AFTER \`document_type\`,
         MODIFY COLUMN \`expiry_date\` DATE NULL DEFAULT NULL AFTER \`document_no\`,
         MODIFY COLUMN \`file_path\` VARCHAR(255) NULL DEFAULT NULL AFTER \`expiry_date\``,
@@ -323,6 +327,7 @@ export async function ensureSchema() {
       \`contact_person\` VARCHAR(140) NULL DEFAULT NULL,
       \`contact_number\` VARCHAR(40) NULL DEFAULT NULL,
       \`email\` VARCHAR(180) NULL DEFAULT NULL,
+      \`nationality\` CHAR(3) NULL DEFAULT NULL,
       \`document_type\` VARCHAR(60) NULL DEFAULT NULL,
       \`document_no\` VARCHAR(120) NULL DEFAULT NULL,
       \`expiry_date\` DATE NULL DEFAULT NULL,
