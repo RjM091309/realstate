@@ -276,7 +276,9 @@
         "documents": "Documents",
         "to": "to",
         "contract": "Contract",
-        "invoice": "Invoice"
+        "invoice": "Invoice",
+        "viewContract": "View Contract",
+        "viewInvoice": "View Invoice"
       },
       "statuses": {
         "active": "Active"

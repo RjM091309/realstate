@@ -14,6 +14,7 @@ import { CRMView } from './components/views/CRMView/index';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
 import { UserAccessView } from './components/views/UserAccessView/index';
+import { SettingsView } from './components/views/SettingsView/index';
 import { TenantPortalView } from './components/views/TenantPortalView/index';
 import { AgentPortalView } from './components/views/AgentPortalView/index';
 import { DocumentPreview } from './components/DocumentPreview';
@@ -57,6 +58,7 @@ function MainApp() {
   useEffect(() => {
     if (!session?.sidebarTabIds?.length) return;
     if (activeTab === 'access' && isAdmin) return;
+    if (activeTab === 'settings') return;
     if (!session.sidebarTabIds.includes(activeTab)) {
       setActiveTab(session.sidebarTabIds[0]!);
     }
@@ -98,6 +100,8 @@ function MainApp() {
         return <CalendarView />;
       case 'access':
         return <UserAccessView />;
+      case 'settings':
+        return <SettingsView />;
       default:
         return <DashboardView />;
     }

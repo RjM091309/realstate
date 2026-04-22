@@ -13,6 +13,8 @@ import {
   UserCircle,
   Briefcase,
   SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,8 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLogout }: SidebarProps) {
   const { t } = useTranslation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const operationalItems = [
     { id: 'dashboard', label: t('nav.menu.dashboard'), icon: LayoutDashboard },
     { id: 'units', label: t('nav.menu.units'), icon: Building2 },
@@ -63,16 +67,30 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   const navItems = [...visibleOperational, ...accessItem];
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-300 w-64 border-r border-slate-800">
-      <div className="p-6">
-        <div className="flex items-center gap-2.5 mb-8">
+    <div 
+      className={cn(
+        "relative flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 ease-in-out shrink-0",
+        isCollapsed ? "w-20" : "w-64"
+      )}
+    >
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-4 top-8 flex h-8 w-8 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-400 hover:text-white transition-colors z-50 shadow-md"
+      >
+        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+
+      <div className={cn("transition-all duration-300", isCollapsed ? "p-4" : "p-6")}>
+        <div className={cn("flex items-center mb-8", isCollapsed ? "justify-center" : "gap-2.5")}>
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-950/40 ring-1 ring-white/10"
             aria-hidden
           >
             <Building2 className="h-[18px] w-[18px]" strokeWidth={2} />
           </div>
-          <span className="text-xl font-bold text-white tracking-tight">{t('nav.appName')}</span>
+          {!isCollapsed && (
+            <span className="text-xl font-bold text-white tracking-tight truncate">{t('nav.appName')}</span>
+          )}
         </div>
 
         <nav className="space-y-0.5" aria-label="Main">
@@ -80,6 +98,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
             <button
               key={item.id}
               type="button"
+              title={isCollapsed ? item.label : undefined}
               onClick={() => {
                 if (item.id === 'portal') {
                   const url = `${window.location.origin}${window.location.pathname}?view=portal`;
@@ -94,31 +113,46 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                 setActiveTab(item.id);
               }}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "w-full flex items-center rounded-md text-sm font-medium transition-colors",
+                isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
                 activeTab === item.id 
                   ? "bg-indigo-600 text-white" 
                   : "hover:bg-slate-800 hover:text-white"
               )}
             >
-              <item.icon className="w-4 h-4 shrink-0 opacity-90" />
-              <span className="truncate">{item.label}</span>
+              <item.icon className={cn("shrink-0 opacity-90", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
+              {!isCollapsed && <span className="truncate">{item.label}</span>}
             </button>
           ))}
         </nav>
       </div>
 
-      <div className="mt-auto p-6 border-t border-slate-800">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors">
-          <Settings className="w-4 h-4" />
-          {t('nav.settings')}
+      <div className={cn("mt-auto border-t border-slate-800", isCollapsed ? "p-4" : "p-6")}>
+        <button 
+          title={isCollapsed ? t('nav.settings') : undefined}
+          onClick={() => setActiveTab('settings')}
+          className={cn(
+            "w-full flex items-center rounded-md text-sm font-medium transition-colors",
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
+            activeTab === 'settings' 
+              ? "bg-indigo-600 text-white" 
+              : "hover:bg-slate-800 hover:text-white"
+          )}
+        >
+          <Settings className={cn("shrink-0", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
+          {!isCollapsed && t('nav.settings')}
         </button>
         <button
           type="button"
+          title={isCollapsed ? t('nav.logout') : undefined}
           onClick={() => onLogout?.()}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-rose-400 hover:bg-rose-900/20 transition-colors mt-1"
+          className={cn(
+            "w-full flex items-center rounded-md text-sm font-medium text-rose-400 hover:bg-rose-900/20 transition-colors mt-1",
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2"
+          )}
         >
-          <LogOut className="w-4 h-4" />
-          {t('nav.logout')}
+          <LogOut className={cn("shrink-0", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
+          {!isCollapsed && t('nav.logout')}
         </button>
       </div>
     </div>

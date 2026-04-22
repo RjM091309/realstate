@@ -276,7 +276,9 @@
         "documents": "문서",
         "to": "부터",
         "contract": "계약서",
-        "invoice": "청구서"
+        "invoice": "청구서",
+        "viewContract": "계약서 보기",
+        "viewInvoice": "청구서 보기"
       },
       "statuses": {
         "active": "활성"
