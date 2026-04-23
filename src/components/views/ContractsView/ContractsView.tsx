@@ -366,8 +366,9 @@ export function ContractsView() {
       {
         header: t('views.contracts.table.agent'),
         render: (contract) => {
-          const agent = agents.find((a) => a.id === contract.agentId);
-          return <span className="text-sm font-medium">{agent?.name}</span>;
+          const fallback = agents.find((a) => a.id === contract.agentId)?.name;
+          const label = (contract.agentName && contract.agentName.trim()) || fallback || '—';
+          return <span className="text-sm font-medium">{label}</span>;
         },
       },
       {
@@ -523,8 +524,9 @@ export function ContractsView() {
     return contractList.filter((c) => {
       const unit = unitList.find((u) => u.id === c.unitId);
       const tenant = tenantList.find((ten) => ten.id === c.tenantId);
-      const agent = agents.find((a) => a.id === c.agentId);
-      const hay = [c.id, unit?.unitNumber, unit?.buildingName, tenant?.name, agent?.name]
+      const agentFallback = agents.find((a) => a.id === c.agentId)?.name;
+      const agentLabel = (c.agentName && c.agentName.trim()) || agentFallback || '';
+      const hay = [c.id, unit?.unitNumber, unit?.buildingName, tenant?.name, agentLabel]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();

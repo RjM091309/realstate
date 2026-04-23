@@ -1,4 +1,6 @@
 import { loadSessionPayload } from '../services/sessionService.js';
+import { getContractById } from '../models/contractsModel.js';
+import { getPaymentById } from '../models/paymentsModel.js';
 import {
   deleteCalendarEventById,
   getCalendarEventById,
@@ -16,11 +18,28 @@ function fmtDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+function fmtDateTime(d) {
+  if (d == null) return '';
+  if (typeof d === 'string') return d.slice(0, 19).replace('T', ' ');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+}
+
 function rowToCalendarEvent(row) {
   let metadata;
   if (row.metadata_json != null && row.metadata_json !== '') {
     try {
-      metadata = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : row.metadata_json;
+      const raw = row.metadata_json;
+      if (typeof raw === 'string') {
+        metadata = JSON.parse(raw);
+      } else if (typeof raw === 'object') {
+        metadata = raw;
+      }
     } catch {
       metadata = undefined;
     }
@@ -34,7 +53,7 @@ function rowToCalendarEvent(row) {
     title: String(row.title),
     colorCode: row.color_code != null ? String(row.color_code) : null,
     metadata,
-    createdAt: fmtDate(row.created_at),
+    createdAt: row.created_at ? fmtDateTime(row.created_at) : '',
   };
 }
 
@@ -85,6 +104,21 @@ function validatePayload(body) {
   return { contractId, paymentScheduleId, eventType, eventDate, title, colorCode, metadataJson };
 }
 
+async function validateCalendarForeignKeys(branchId, parsed) {
+  if (parsed.contractId) {
+    const c = await getContractById(parsed.contractId, branchId);
+    if (!c) return { ok: false, error: 'Invalid contract' };
+  }
+  if (parsed.paymentScheduleId) {
+    const ps = await getPaymentById(parsed.paymentScheduleId, branchId);
+    if (!ps) return { ok: false, error: 'Invalid payment schedule' };
+    if (parsed.contractId && String(ps.contract_id) !== String(parsed.contractId)) {
+      return { ok: false, error: 'Payment schedule does not match contract' };
+    }
+  }
+  return { ok: true };
+}
+
 function canCrud(session, op) {
   const permissions = session.crud?.calendar;
   if (!permissions) return false;
@@ -131,6 +165,11 @@ export async function createCalendarEvent(req, res) {
     res.status(400).json({ error: 'Invalid event payload' });
     return;
   }
+  const fk = await validateCalendarForeignKeys(ctx.session.branchId, parsed);
+  if (!fk.ok) {
+    res.status(400).json({ error: fk.error });
+    return;
+  }
   try {
     const row = await insertCalendarEvent(ctx.session.branchId, parsed);
     if (!row) {
@@ -159,6 +198,11 @@ export async function updateCalendarEvent(req, res) {
   const parsed = validatePayload(req.body ?? {});
   if (!parsed) {
     res.status(400).json({ error: 'Invalid event payload' });
+    return;
+  }
+  const fk = await validateCalendarForeignKeys(ctx.session.branchId, parsed);
+  if (!fk.ok) {
+    res.status(400).json({ error: fk.error });
     return;
   }
   try {

@@ -57,12 +57,49 @@ type UiEvent = {
   typeLabel: string;
   unitId: string;
   color: string;
+  /** When set, use inline background (hex) instead of `color` Tailwind class. */
+  colorHex?: string | null;
   icon: React.ReactNode;
   source: 'derived' | 'custom';
   raw?: CalendarEvent;
   contractId?: string | null;
   paymentId?: string | null;
 };
+
+function pickContractForCalendarEvent(
+  list: Contract[],
+  unitId: string,
+  eventType: CalendarEventType,
+  eventDate: string,
+): Contract | undefined {
+  const forUnit = list.filter((c) => c.unitId === unitId);
+  if (forUnit.length === 0) return undefined;
+  if (eventType === 'move_in') {
+    const byStart = forUnit.find((c) => c.startDate === eventDate);
+    if (byStart) return byStart;
+  }
+  if (eventType === 'move_out') {
+    const byEnd = forUnit.find((c) => c.endDate === eventDate);
+    if (byEnd) return byEnd;
+  }
+  const active = forUnit.find((c) => c.status === 'Active');
+  if (active) return active;
+  return [...forUnit].sort((a, b) => b.endDate.localeCompare(a.endDate))[0];
+}
+
+function findPaymentScheduleForEvent(
+  list: Payment[],
+  unitId: string,
+  eventDate: string,
+  eventType: CalendarEventType,
+  contractId?: string | null,
+): string | null {
+  if (eventType !== 'payment_due' && eventType !== 'payment_received') return null;
+  const row = list.find(
+    (p) => p.unitId === unitId && p.dueDate === eventDate && (!contractId || p.contractId === contractId),
+  );
+  return row?.id ?? null;
+}
 
 type EventForm = {
   eventType: CalendarEventType;
@@ -172,7 +209,7 @@ export function CalendarView() {
         date: startOfDay(parseISO(p.dueDate)),
         typeLabel: t('views.calendar.eventTypes.paymentDue'),
         unitId: p.unitId,
-        color: p.status === 'Paid' ? 'bg-emerald-500' : 'bg-amber-500',
+        color: p.status === 'Paid' ? 'bg-blue-500' : 'bg-amber-500',
         icon: <DollarSign className="w-3 h-3" />,
         source: 'derived' as const,
         contractId: p.contractId,
@@ -191,6 +228,7 @@ export function CalendarView() {
           ? String(e.metadata.unitId ?? '').trim()
           : '';
       const unitId = unitIdFromContract ?? unitIdFromPayment ?? unitIdFromMeta ?? '';
+      const hex = e.colorCode && e.colorCode.trim() !== '' ? e.colorCode.trim() : null;
 
       const label =
         e.eventType === 'move_in'
@@ -206,12 +244,12 @@ export function CalendarView() {
                   : t('views.calendar.eventTypes.other');
 
       const color =
-        e.colorCode && e.colorCode.trim() !== ''
-          ? 'bg-indigo-500'
+        hex
+          ? 'bg-slate-500'
           : e.eventType === 'inspection'
             ? 'bg-indigo-500'
             : e.eventType === 'payment_received'
-              ? 'bg-emerald-500'
+              ? 'bg-blue-500'
               : 'bg-slate-500';
 
       const icon =
@@ -231,6 +269,7 @@ export function CalendarView() {
         typeLabel: e.title || label,
         unitId,
         color,
+        colorHex: hex,
         icon,
         source: 'custom',
         raw: e,
@@ -284,7 +323,11 @@ export function CalendarView() {
         ev.raw.contractId != null ? contracts.find((c) => c.id === ev.raw.contractId)?.unitId : undefined;
       const unitIdFromPayment =
         ev.raw.paymentScheduleId != null ? payments.find((p) => p.id === ev.raw.paymentScheduleId)?.unitId : undefined;
-      const unitId = unitIdFromContract ?? unitIdFromPayment ?? units[0]?.id ?? '';
+      const unitIdFromMeta =
+        ev.raw.metadata && typeof ev.raw.metadata === 'object' && ev.raw.metadata !== null && 'unitId' in ev.raw.metadata
+          ? String((ev.raw.metadata as { unitId?: string }).unitId ?? '').trim()
+          : '';
+      const unitId = unitIdFromContract ?? unitIdFromPayment ?? unitIdFromMeta ?? units[0]?.id ?? '';
       setEventFormMode('edit');
       setEditingEventId(ev.raw.id);
       setEventForm({
@@ -312,12 +355,29 @@ export function CalendarView() {
     }
     const unit = units.find((u) => u.id === eventForm.unitId);
     const buildingHint = unit ? `${unit.unitNumber} - ${unit.buildingName}` : '';
+    const contract = pickContractForCalendarEvent(
+      contracts,
+      eventForm.unitId,
+      eventForm.eventType,
+      eventForm.eventDate,
+    );
+    const contractId = contract?.id ?? null;
+    const paymentScheduleId =
+      findPaymentScheduleForEvent(
+        payments,
+        eventForm.unitId,
+        eventForm.eventDate,
+        eventForm.eventType,
+        contractId,
+      ) ?? null;
     const body = {
       eventType: eventForm.eventType,
       eventDate: eventForm.eventDate,
       title: eventForm.title.trim(),
       colorCode: eventForm.colorCode.trim() || null,
-      metadata: { unitId: eventForm.unitId, buildingHint },
+      contractId,
+      paymentScheduleId,
+      metadata: { unitId: eventForm.unitId, buildingHint, contractId, paymentScheduleId },
     };
     try {
       if (eventFormMode === 'edit' && editingEventId) {
@@ -333,7 +393,7 @@ export function CalendarView() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.calendar.saveError'));
     }
-  }, [closeEventModal, editingEventId, eventForm, eventFormMode, t, units]);
+  }, [closeEventModal, contracts, editingEventId, eventForm, eventFormMode, payments, t, units]);
 
   const removeEvent = useCallback(
     async (ev: UiEvent) => {
@@ -450,8 +510,9 @@ export function CalendarView() {
                               key={event.id}
                               className={cn(
                                 "w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm",
-                                event.color || ''
+                                !event.colorHex && (event.color || '')
                               )}
+                              style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
                               title={event.typeLabel}
                             />
                           ))}
@@ -493,10 +554,13 @@ export function CalendarView() {
                       className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all"
                     >
                       <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm",
-                          event.color || 'bg-indigo-600'
-                        )}>
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm",
+                            !event.colorHex && (event.color || 'bg-indigo-600'),
+                          )}
+                          style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
+                        >
                           {event.icon}
                         </div>
                         <div>
@@ -577,7 +641,7 @@ export function CalendarView() {
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                   <span className="text-xs font-medium text-slate-700">{t('views.calendar.paymentPaid')}</span>
                 </div>
                 <DollarSign className="w-3 h-3 text-slate-300" />
@@ -698,6 +762,22 @@ export function CalendarView() {
                 </div>
               ) : null;
             })()}
+
+            {detailsEvent.source === 'custom' && detailsEvent.raw ? (
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-600 space-y-1">
+                {detailsEvent.raw.contractId ? (
+                  <p>
+                    <span className="font-semibold text-slate-800">contract_id:</span> {detailsEvent.raw.contractId}
+                  </p>
+                ) : null}
+                {detailsEvent.raw.paymentScheduleId ? (
+                  <p>
+                    <span className="font-semibold text-slate-800">payment_schedule_id:</span>{' '}
+                    {detailsEvent.raw.paymentScheduleId}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               {detailsEvent.contractId ? (

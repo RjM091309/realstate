@@ -92,12 +92,14 @@ function rowToContract(row) {
   const idPad = String(row.id ?? '').replace(/\D/g, '').padStart(4, '0');
   const normalized =
     ym && idPad ? `${ym}-${idPad}` : row.contract_no ? String(row.contract_no) : undefined;
+  const rawAgentName = row.agent_name != null ? String(row.agent_name).trim() : '';
   return {
     id: String(row.id),
     contractNo: normalized,
     unitId: String(row.unit_id),
     tenantId: String(row.tenant_id),
     agentId: aid ? `a${aid}` : '',
+    agentName: rawAgentName || undefined,
     startDate: start,
     endDate: fmtDate(row.end_date),
     monthlyRent: Number(row.monthly_rent),

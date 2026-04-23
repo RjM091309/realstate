@@ -1,5 +1,14 @@
 import { pool } from '../config/db.js';
 
+/** Display name: "First Last", or USERNAME if names empty. */
+const AGENT_NAME_SQL = `(
+  CASE
+    WHEN u.IDNO IS NULL THEN NULL
+    WHEN TRIM(CONCAT(COALESCE(u.FIRSTNAME, ''), ' ', COALESCE(u.LASTNAME, ''))) = '' THEN u.USERNAME
+    ELSE TRIM(CONCAT(COALESCE(u.FIRSTNAME, ''), ' ', COALESCE(u.LASTNAME, '')))
+  END
+) AS agent_name`;
+
 function contractNoPrefixFromStartDate(startDateRaw) {
   const s = String(startDateRaw ?? '').trim().slice(0, 10);
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -44,6 +53,7 @@ export async function listContractsByBranch(branchId) {
         c.unit_id,
         ct.tenant_id,
         c.agent_id,
+        ${AGENT_NAME_SQL},
         c.start_date,
         c.end_date,
         c.monthly_rent,
@@ -55,6 +65,7 @@ export async function listContractsByBranch(branchId) {
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1
+     LEFT JOIN user_info u ON u.IDNO = c.agent_id
      WHERE c.branch_id = ?
      ORDER BY c.created_at DESC`,
     [branchId],
@@ -190,6 +201,7 @@ export async function getContractById(id, branchId) {
         c.unit_id,
         ct.tenant_id,
         c.agent_id,
+        ${AGENT_NAME_SQL},
         c.start_date,
         c.end_date,
         c.monthly_rent,
@@ -201,6 +213,7 @@ export async function getContractById(id, branchId) {
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1
+     LEFT JOIN user_info u ON u.IDNO = c.agent_id
      WHERE c.id = ? AND c.branch_id = ?
      LIMIT 1`,
     [id, branchId],

@@ -16,7 +16,7 @@ export async function listCalendarEventsByBranch(branchId) {
       created_at
     FROM calendar_event
     WHERE branch_id = ?
-    ORDER BY event_date DESC, created_at DESC
+    ORDER BY event_date ASC, id ASC
     `,
     [branchId],
   );

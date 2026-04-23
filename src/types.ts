@@ -64,6 +64,8 @@ export interface Contract {
   unitId: string;
   tenantId: string;
   agentId: string;
+  /** Staff name from `user_info` (API); optional for older clients. */
+  agentName?: string;
   startDate: string;
   endDate: string;
   monthlyRent: number;
