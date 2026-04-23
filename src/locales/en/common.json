@@ -238,7 +238,7 @@
         "description": "Enter the unit details. Inventory can be managed after the unit is created.",
         "unitNumber": "Unit number",
         "floor": "Floor",
-        "tower": "Tower / wing",
+        "tower": "Tower / wing (optional)",
         "buildingName": "Building name",
         "commonAddress": "Common address",
         "legalAddress": "Legal address",

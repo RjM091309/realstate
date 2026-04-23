@@ -18,7 +18,7 @@ export interface Unit {
   legalAddress: string;
   type: UnitType;
   status: UnitStatus;
-  area: 'Makati' | 'BGC' | 'Pasig' | 'Quezon City';
+  area: string;
   monthlyRate: number;
   marketValue?: number;
   inventory: InventoryItem[];

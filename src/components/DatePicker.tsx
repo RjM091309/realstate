@@ -143,6 +143,7 @@ export function DatePicker({
   mode = 'range',
   placeholder = 'Enter Date',
   fullWidth = false,
+  inputClassName = '',
 }: {
   value: any;
   onChange: (next: any) => void;
@@ -151,6 +152,7 @@ export function DatePicker({
   mode?: 'single' | 'range';
   placeholder?: string;
   fullWidth?: boolean;
+  inputClassName?: string;
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
@@ -207,7 +209,7 @@ export function DatePicker({
             placeholder={placeholder}
             aria-label="Date range"
             onClick={(e) => setAnchorEl(e.currentTarget)}
-            className="h-9 rounded-full pl-9 pr-3 text-xs w-full border border-[var(--border)] hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 text-[var(--text)] placeholder:text-[var(--text-muted)] transition-all cursor-pointer"
+            className={`h-9 rounded-full pl-9 pr-3 text-xs w-full border border-[var(--border)] hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 text-[var(--text)] placeholder:text-[var(--text-muted)] transition-all cursor-pointer ${inputClassName}`}
             style={{
               backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
               borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',

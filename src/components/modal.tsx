@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   maxWidth = 'md',
@@ -70,8 +72,11 @@ export const Modal: React.FC<ModalProps> = ({
               )}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
-                <h3 className="text-xl font-bold text-brand-text">{title}</h3>
+              <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100 shrink-0 gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-bold text-brand-text">{title}</h3>
+                  {subtitle ? <p className="mt-1 text-sm text-brand-muted">{subtitle}</p> : null}
+                </div>
                 <button
                   type="button"
                   onClick={onClose}

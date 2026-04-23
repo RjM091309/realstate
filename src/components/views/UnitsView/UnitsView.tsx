@@ -44,18 +44,88 @@ import { useTranslation } from 'react-i18next';
 
 const UNIT_TYPES: UnitType[] = ['Studio', '1BR', '2BR', '3BR', 'Loft', 'Penthouse'];
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
-const AREAS: Unit['area'][] = ['Makati', 'BGC', 'Pasig', 'Quezon City'];
+const AREA_CITIES_LUZON: string[] = [
+  'Manila',
+  'Caloocan City',
+  'Las Pinas City',
+  'Makati City',
+  'Malabon City',
+  'Mandaluyong City',
+  'Marikina City',
+  'Muntinlupa City',
+  'Navotas City',
+  'Paranaque City',
+  'Pasay City',
+  'Pasig City',
+  'Quezon City',
+  'San Juan City',
+  'Taguig City',
+  'Valenzuela City',
+  'Pateros',
+  'Baguio City',
+  'Tabuk City',
+  'Alaminos City',
+  'Candon City',
+  'Dagupan City',
+  'Laoag City',
+  'San Carlos City (Pangasinan)',
+  'Urdaneta City',
+  'Vigan City',
+  'Tuguegarao City',
+  'Cauayan City',
+  'Ilagan City',
+  'Santiago City',
+  'Angeles City',
+  'Balanga City',
+  'Cabanatuan City',
+  'Gapan City',
+  'Malolos City',
+  'Meycauayan City',
+  'Munoz City',
+  'Olongapo City',
+  'Palayan City',
+  'San Fernando City (Pampanga)',
+  'San Jose del Monte City',
+  'Tarlac City',
+  'Antipolo City',
+  'Bacoor City',
+  'Batangas City',
+  'Binan City',
+  'Cabuyao City',
+  'Calamba City',
+  'Cavite City',
+  'Dasmarinas City',
+  'General Trias City',
+  'Imus City',
+  'Lipa City',
+  'Lucena City',
+  'San Pablo City',
+  'San Pedro City',
+  'Santa Rosa City',
+  'Santo Tomas City',
+  'Tagaytay City',
+  'Tanauan City',
+  'Trece Martires City',
+  'Calapan City',
+  'Puerto Princesa City',
+  'Iriga City',
+  'Legazpi City',
+  'Ligao City',
+  'Masbate City',
+  'Naga City',
+  'Sorsogon City',
+  'Tabaco City',
+];
 
 type AddUnitForm = {
   unitNumber: string;
   floor: string;
   tower: string;
   buildingName: string;
-  commonAddress: string;
   legalAddress: string;
   type: UnitType;
   status: UnitStatus;
-  area: Unit['area'];
+  area: string;
   monthlyRate: string;
 };
 
@@ -65,27 +135,69 @@ function defaultAddForm(): AddUnitForm {
     floor: '',
     tower: '',
     buildingName: '',
-    commonAddress: '',
     legalAddress: '',
     type: '1BR',
     status: 'Available',
-    area: 'Makati',
+    area: '',
     monthlyRate: '',
   };
 }
 
+function suggestNextUnitNumber(units: Unit[]): string {
+  const numericUnitNumbers = units
+    .map((u) => String(u.unitNumber ?? '').trim())
+    .filter((v) => /^\d+$/.test(v))
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v));
+  if (numericUnitNumbers.length === 0) return '101';
+  return String(Math.max(...numericUnitNumbers) + 1);
+}
+
+function ordinalFloor(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
+  if (n % 10 === 1) return `${n}st`;
+  if (n % 10 === 2) return `${n}nd`;
+  if (n % 10 === 3) return `${n}rd`;
+  return `${n}th`;
+}
+
+function normalizeFloorForForm(rawFloor: string): string {
+  const floor = String(rawFloor ?? '').trim();
+  if (!floor || floor === '—') return '';
+  if (/^\d+$/.test(floor)) {
+    const n = Number(floor);
+    if (Number.isFinite(n) && n >= 1 && n <= 12) return `${ordinalFloor(n)} floor`;
+  }
+  return floor;
+}
+
+function normalizeAreaForForm(rawArea: string): string {
+  const area = String(rawArea ?? '').trim();
+  if (!area) return '';
+  if (area === 'Makati') return 'Makati City';
+  if (area === 'Pasig') return 'Pasig City';
+  if (area === 'BGC') return 'Taguig City';
+  return area;
+}
+
+function areaDisplayLabel(rawArea: string): string {
+  return normalizeAreaForForm(rawArea) || '—';
+}
+
 function formToWriteBody(form: AddUnitForm, inventory: Unit['inventory']): UnitWriteBody {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
+  const legalAddress = form.legalAddress.trim();
+  const commonAddress = legalAddress || form.buildingName.trim();
   return {
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
     buildingName: form.buildingName.trim(),
-    commonAddress: form.commonAddress.trim() || form.buildingName.trim(),
-    legalAddress: form.legalAddress.trim() || form.commonAddress.trim() || '—',
+    commonAddress: commonAddress || '—',
+    legalAddress: legalAddress || commonAddress || '—',
     type: form.type,
     status: form.status,
-    area: form.area,
+    area: form.area.trim(),
     monthlyRate: rate,
     inventory,
   };
@@ -94,14 +206,13 @@ function formToWriteBody(form: AddUnitForm, inventory: Unit['inventory']): UnitW
 function unitToForm(u: Unit): AddUnitForm {
   return {
     unitNumber: u.unitNumber,
-    floor: u.floor === '—' ? '' : u.floor,
+    floor: normalizeFloorForForm(u.floor),
     tower: u.tower === '—' ? '' : u.tower,
     buildingName: u.buildingName,
-    commonAddress: u.commonAddress,
     legalAddress: u.legalAddress,
     type: u.type,
     status: u.status,
-    area: u.area,
+    area: normalizeAreaForForm(u.area),
     monthlyRate: String(u.monthlyRate),
   };
 }
@@ -138,17 +249,19 @@ function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
 
 function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory']): Unit {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
+  const legalAddress = form.legalAddress.trim();
+  const commonAddress = legalAddress || form.buildingName.trim();
   return {
     id,
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
     buildingName: form.buildingName.trim(),
-    commonAddress: form.commonAddress.trim() || form.buildingName.trim(),
-    legalAddress: form.legalAddress.trim() || form.commonAddress.trim() || '—',
+    commonAddress: commonAddress || '—',
+    legalAddress: legalAddress || commonAddress || '—',
     type: form.type,
     status: form.status,
-    area: form.area,
+    area: form.area.trim(),
     monthlyRate: Number.isFinite(rate) ? rate : 0,
     inventory,
   };
@@ -184,6 +297,7 @@ export function UnitsView() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isManageInventoryOpen, setIsManageInventoryOpen] = useState(false);
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -195,6 +309,7 @@ export function UnitsView() {
   const [detailInventoryDraft, setDetailInventoryDraft] = useState<InventoryItem[]>([]);
   const [inventorySaving, setInventorySaving] = useState(false);
   const [inventoryAddOpen, setInventoryAddOpen] = useState(false);
+  const [inventoryEditOpen, setInventoryEditOpen] = useState(false);
   const [inventoryEditId, setInventoryEditId] = useState<string | null>(null);
   const [inventoryAddName, setInventoryAddName] = useState('');
   const [inventoryAddQty, setInventoryAddQty] = useState(1);
@@ -264,19 +379,20 @@ export function UnitsView() {
   }, [selectedUnit, branchContracts]);
 
   useEffect(() => {
-    if (!isDetailsOpen || !selectedUnit) return;
+    if ((!isDetailsOpen && !isManageInventoryOpen) || !selectedUnit) return;
     setDetailInventoryDraft(normalizeInventoryDraft(selectedUnit.inventory));
-  }, [isDetailsOpen, selectedUnit]);
+  }, [isDetailsOpen, isManageInventoryOpen, selectedUnit]);
 
   useEffect(() => {
-    if (!isDetailsOpen) {
+    if (!isDetailsOpen && !isManageInventoryOpen) {
       setInventoryAddOpen(false);
+      setInventoryEditOpen(false);
       setInventoryEditId(null);
       setInventoryAddName('');
       setInventoryAddQty(1);
       setInventoryAddCondition('Good');
     }
-  }, [isDetailsOpen]);
+  }, [isDetailsOpen, isManageInventoryOpen]);
 
   const inventoryConditionOptions = useMemo(
     () =>
@@ -336,6 +452,7 @@ export function UnitsView() {
   );
 
   const openInventoryAddModal = useCallback(() => {
+    setInventoryEditOpen(false);
     setInventoryEditId(null);
     setInventoryAddName('');
     setInventoryAddQty(1);
@@ -351,14 +468,23 @@ export function UnitsView() {
     setInventoryAddCondition('Good');
   }, []);
 
+  const closeInventoryEditModal = useCallback(() => {
+    setInventoryEditOpen(false);
+    setInventoryEditId(null);
+    setInventoryAddName('');
+    setInventoryAddQty(1);
+    setInventoryAddCondition('Good');
+  }, []);
+
   const openInventoryEditModal = useCallback((inv: InventoryItem) => {
+    setInventoryAddOpen(false);
     setInventoryEditId(inv.id);
     setInventoryAddName(String(inv.name ?? ''));
     setInventoryAddQty(Math.max(1, Math.floor(Number(inv.quantity)) || 1));
     setInventoryAddCondition(
       (['New', 'Good', 'Fair', 'Poor'].includes(inv.condition) ? inv.condition : 'Good') as InventoryItem['condition'],
     );
-    setInventoryAddOpen(true);
+    setInventoryEditOpen(true);
   }, []);
 
   const handleAddInventoryItemSubmit = useCallback(async () => {
@@ -369,22 +495,50 @@ export function UnitsView() {
     }
     if (!selectedUnit) return;
 
-    const upsert: InventoryItem = {
-      id: inventoryEditId ?? newInventoryItemId(),
-      name,
-      quantity: Math.max(1, Math.floor(Number(inventoryAddQty)) || 1),
-      condition: (['New', 'Good', 'Fair', 'Poor'].includes(inventoryAddCondition) ? inventoryAddCondition : 'Good') as InventoryItem['condition'],
-    };
-
-    const next =
-      inventoryEditId && detailInventoryDraft.some((x) => x.id === inventoryEditId)
-        ? detailInventoryDraft.map((x) => (x.id === inventoryEditId ? upsert : x))
-        : [...detailInventoryDraft, upsert];
+    const next = [
+      ...detailInventoryDraft,
+      {
+        id: newInventoryItemId(),
+        name,
+        quantity: Math.max(1, Math.floor(Number(inventoryAddQty)) || 1),
+        condition: (['New', 'Good', 'Fair', 'Poor'].includes(inventoryAddCondition) ? inventoryAddCondition : 'Good') as InventoryItem['condition'],
+      },
+    ];
 
     const ok = await handleSaveDetailInventory(next);
     if (ok) closeInventoryAddModal();
   }, [
     closeInventoryAddModal,
+    detailInventoryDraft,
+    handleSaveDetailInventory,
+    inventoryAddCondition,
+    inventoryAddName,
+    inventoryAddQty,
+    selectedUnit,
+    t,
+  ]);
+
+  const handleEditInventoryItemSubmit = useCallback(async () => {
+    const name = inventoryAddName.trim();
+    if (!name) {
+      toast.error(t('views.units.details.inventoryItemNameRequired'));
+      return;
+    }
+    if (!selectedUnit || !inventoryEditId) return;
+
+    const edited: InventoryItem = {
+      id: inventoryEditId,
+      name,
+      quantity: Math.max(1, Math.floor(Number(inventoryAddQty)) || 1),
+      condition: (['New', 'Good', 'Fair', 'Poor'].includes(inventoryAddCondition) ? inventoryAddCondition : 'Good') as InventoryItem['condition'],
+    };
+
+    const next = detailInventoryDraft.map((x) => (x.id === inventoryEditId ? edited : x));
+
+    const ok = await handleSaveDetailInventory(next);
+    if (ok) closeInventoryEditModal();
+  }, [
+    closeInventoryEditModal,
     detailInventoryDraft,
     handleSaveDetailInventory,
     inventoryAddCondition,
@@ -397,7 +551,14 @@ export function UnitsView() {
 
   const handleViewDetails = useCallback((unit: Unit) => {
     setSelectedUnit(unit);
+    setIsManageInventoryOpen(false);
     setIsDetailsOpen(true);
+  }, []);
+
+  const handleManageInventory = useCallback((unit: Unit) => {
+    setSelectedUnit(unit);
+    setIsDetailsOpen(false);
+    setIsManageInventoryOpen(true);
   }, []);
 
   const filteredUnits = unitList.filter(
@@ -420,14 +581,19 @@ export function UnitsView() {
 
   const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);
+    setIsManageInventoryOpen(false);
     setFormMode('create');
     setEditingId(null);
-    setAddForm(defaultAddForm());
+    setAddForm({
+      ...defaultAddForm(),
+      unitNumber: suggestNextUnitNumber(unitList),
+    });
     setIsAddUnitOpen(true);
-  }, []);
+  }, [unitList]);
 
   const openEditUnitModal = useCallback((unit: Unit) => {
     setIsDetailsOpen(false);
+    setIsManageInventoryOpen(false);
     setFormMode('edit');
     setEditingId(unit.id);
     setAddForm(unitToForm(unit));
@@ -447,6 +613,10 @@ export function UnitsView() {
       toast.error(t('views.units.addModal.validationRequired'));
       return;
     }
+    if (!addForm.area.trim()) {
+      toast.error('Select an area city.');
+      return;
+    }
     if (!Number.isFinite(rate) || rate < 0) {
       toast.error(t('views.units.addModal.validationRate'));
       return;
@@ -464,6 +634,7 @@ export function UnitsView() {
           setSelectedUnit((s) => (s?.id === editingId ? updated : s));
           toast.success(t('views.units.updated'));
           setIsDetailsOpen(false);
+          setIsManageInventoryOpen(false);
         } else {
           const newId = `local-${Date.now()}`;
           const created = formToUnit(newId, addForm, []);
@@ -485,6 +656,7 @@ export function UnitsView() {
         setSelectedUnit((s) => (s?.id === editingId ? updated : s));
         toast.success(t('views.units.updated'));
         setIsDetailsOpen(false);
+        setIsManageInventoryOpen(false);
       } else {
         const created = await createUnit(body);
         setUnitList((prev) => [created, ...prev]);
@@ -513,6 +685,7 @@ export function UnitsView() {
         if (wasViewingDetails) {
           setSelectedUnit(null);
           setIsDetailsOpen(false);
+          setIsManageInventoryOpen(false);
         }
         toast.success(t('views.units.deleted'));
         return;
@@ -523,6 +696,7 @@ export function UnitsView() {
         if (wasViewingDetails) {
           setSelectedUnit(null);
           setIsDetailsOpen(false);
+          setIsManageInventoryOpen(false);
         }
         toast.success(t('views.units.deleted'));
       } catch (e) {
@@ -543,7 +717,16 @@ export function UnitsView() {
   );
 
   const addAreaOptions = useMemo(
-    () => AREAS.map((a) => ({ value: a, label: a })),
+    () => AREA_CITIES_LUZON.map((city) => ({ value: city, label: city })),
+    [],
+  );
+
+  const addFloorOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const floor = `${ordinalFloor(i + 1)} floor`;
+        return { value: floor, label: floor };
+      }),
     [],
   );
 
@@ -559,7 +742,10 @@ export function UnitsView() {
           <div className="flex flex-col">
             <span className="font-medium text-slate-700">{unit.buildingName}</span>
             <span className="text-xs text-slate-500">
-              {unit.tower}, {t('views.units.table.floor')} {unit.floor}
+              {unit.tower},{' '}
+              {/\bfloor\b/i.test(String(unit.floor ?? ''))
+                ? unit.floor
+                : `${t('views.units.table.floor')} ${unit.floor}`}
             </span>
           </div>
         ),
@@ -569,7 +755,7 @@ export function UnitsView() {
         render: (unit) => (
           <div className="flex items-center gap-1 text-slate-600">
             <MapPin className="w-3 h-3" />
-            {unit.area}
+            {areaDisplayLabel(unit.area)}
           </div>
         ),
       },
@@ -641,7 +827,14 @@ export function UnitsView() {
                     {t('views.units.table.editUnit')}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem disabled>{t('views.units.table.manageInventory')}</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleManageInventory(unit);
+                  }}
+                >
+                  {t('views.units.table.manageInventory')}
+                </DropdownMenuItem>
                 {canDelete && (
                   <DropdownMenuItem
                     className="text-rose-600"
@@ -659,7 +852,7 @@ export function UnitsView() {
         ),
       },
     ],
-    [t, canUpdate, canDelete, statusLabel, handleViewDetails, openEditUnitModal, handleDeleteUnit]
+    [t, canUpdate, canDelete, statusLabel, handleViewDetails, openEditUnitModal, handleManageInventory, handleDeleteUnit]
   );
 
   return (
@@ -760,7 +953,14 @@ export function UnitsView() {
                           {t('views.units.table.editUnit')}
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem disabled>{t('views.units.table.manageInventory')}</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleManageInventory(unit);
+                        }}
+                      >
+                        {t('views.units.table.manageInventory')}
+                      </DropdownMenuItem>
                       {canDelete && (
                         <DropdownMenuItem
                           variant="destructive"
@@ -807,7 +1007,7 @@ export function UnitsView() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     <MapPin className="w-3 h-3" />
-                    {unit.area}
+                    {areaDisplayLabel(unit.area)}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     <LayoutGrid className="w-3 h-3" />
@@ -835,6 +1035,7 @@ export function UnitsView() {
         title={
           selectedUnit ? t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber }) : ''
         }
+        subtitle={selectedUnit ? `${selectedUnit.buildingName} • ${selectedUnit?.legalAddress || '—'}` : ''}
         maxWidth="4xl"
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3 w-full">
@@ -851,13 +1052,18 @@ export function UnitsView() {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-3 ml-auto">
-              <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 min-w-[120px] rounded-xl"
+                onClick={() => setIsDetailsOpen(false)}
+              >
                 {t('views.units.details.close')}
               </Button>
               {canUpdate && selectedUnit ? (
                 <Button
                   type="button"
-                  className="bg-indigo-600"
+                  className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
                   onClick={() => openEditUnitModal(selectedUnit)}
                 >
                   {t('views.units.details.editUnitInfo')}
@@ -867,12 +1073,7 @@ export function UnitsView() {
           </div>
         }
       >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-sm text-brand-muted">
-              {selectedUnit?.buildingName} • {selectedUnit?.tower}
-            </p>
-          </div>
+        <div className="flex justify-end items-start mb-2 pr-2">
           <Badge
             className={cn(
               selectedUnit?.status === 'Available'
@@ -891,7 +1092,7 @@ export function UnitsView() {
         </div>
 
         <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div className="grid grid-cols-3 gap-4">
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
                 <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.monthlyRate')}</p>
@@ -903,161 +1104,62 @@ export function UnitsView() {
               </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
                 <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.table.area')}</p>
-                <p className="text-lg font-bold text-slate-900">{selectedUnit?.area}</p>
+                <p className="text-lg font-bold text-slate-900">{areaDisplayLabel(selectedUnit?.area ?? '')}</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h4 className="text-sm font-bold flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4 text-indigo-600" />
-                  {t('views.units.details.inventoryAssets')}
-                </h4>
-                {canUpdate ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-lg border-slate-300 bg-white px-4 font-medium text-slate-800 shadow-none hover:bg-slate-50"
-                      onClick={openInventoryAddModal}
-                    >
-                      <Plus className="w-4 h-4 mr-1.5" aria-hidden />
-                      {t('views.units.details.addInventoryItem')}
-                    </Button>
-                  </div>
-                ) : null}
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <LayoutGrid className="w-4 h-4 text-indigo-600" />
+                {t('views.units.details.inventoryAssets')}
+              </h4>
+              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                {!selectedUnit?.inventory?.length ? (
+                  <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
+                        <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          {t('views.units.details.inventoryItemName')}
+                        </TableHead>
+                        <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          {t('views.units.details.inventoryQty')}
+                        </TableHead>
+                        <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          {t('views.units.details.inventoryCondition')}
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedUnit.inventory.map((inv) => (
+                        <TableRow
+                          key={inv.id}
+                          className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                        >
+                          <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
+                            {inv.name}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
+                            {inv.quantity}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5">
+                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
+                              {inv.condition === 'New'
+                                ? t('views.units.details.conditionNew')
+                                : inv.condition === 'Good'
+                                  ? t('views.units.details.conditionGood')
+                                  : inv.condition === 'Fair'
+                                    ? t('views.units.details.conditionFair')
+                                    : t('views.units.details.conditionPoor')}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
-
-              {canUpdate ? (
-                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                  {detailInventoryDraft.length === 0 ? (
-                    <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
-                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryItemName')}
-                          </TableHead>
-                          <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryQty')}
-                          </TableHead>
-                          <TableHead className="min-w-[10rem] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryCondition')}
-                          </TableHead>
-                          <TableHead className="w-28 border-l border-slate-200 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.table.actions')}
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {detailInventoryDraft.map((inv) => (
-                          <TableRow
-                            key={inv.id}
-                            className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
-                          >
-                            <TableCell className="px-4 py-3 text-sm font-medium uppercase tracking-wide text-slate-900">
-                              {inv.name}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-center text-sm font-medium text-slate-800">
-                              {inv.quantity}
-                            </TableCell>
-                            <TableCell className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1 text-sm text-slate-800">
-                                {inv.condition === 'New'
-                                  ? t('views.units.details.conditionNew')
-                                  : inv.condition === 'Good'
-                                    ? t('views.units.details.conditionGood')
-                                    : inv.condition === 'Fair'
-                                      ? t('views.units.details.conditionFair')
-                                      : t('views.units.details.conditionPoor')}
-                              </span>
-                            </TableCell>
-                            <TableCell className="border-l border-slate-200 px-3 py-3 text-right align-middle">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-9 w-9 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                                  title={t('common.edit')}
-                                  disabled={inventorySaving}
-                                  onClick={() => openInventoryEditModal(inv)}
-                                >
-                                  <Pencil className="w-4 h-4" aria-hidden />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-9 w-9 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                                  title={t('common.delete')}
-                                  disabled={inventorySaving}
-                                  onClick={() => {
-                                    const next = detailInventoryDraft.filter((x) => x.id !== inv.id);
-                                    void handleSaveDetailInventory(next);
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4" aria-hidden />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                  {!selectedUnit?.inventory?.length ? (
-                    <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
-                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryItemName')}
-                          </TableHead>
-                          <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryQty')}
-                          </TableHead>
-                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {t('views.units.details.inventoryCondition')}
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedUnit.inventory.map((inv) => (
-                          <TableRow
-                            key={inv.id}
-                            className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
-                          >
-                            <TableCell className="px-4 py-3 text-sm font-medium uppercase tracking-wide text-slate-900">
-                              {inv.name}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-center text-sm font-medium text-slate-800">
-                              {inv.quantity}
-                            </TableCell>
-                            <TableCell className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1 text-sm text-slate-800">
-                                {inv.condition === 'New'
-                                  ? t('views.units.details.conditionNew')
-                                  : inv.condition === 'Good'
-                                    ? t('views.units.details.conditionGood')
-                                    : inv.condition === 'Fair'
-                                      ? t('views.units.details.conditionFair')
-                                      : t('views.units.details.conditionPoor')}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="space-y-3">
@@ -1066,11 +1168,13 @@ export function UnitsView() {
                 {t('views.units.details.legalAddress')}
               </h4>
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
-                {t('views.units.details.addressTemplate', {
-                  unitNumber: selectedUnit?.unitNumber,
-                  tower: selectedUnit?.tower,
-                  buildingName: selectedUnit?.buildingName,
-                })}
+                {selectedUnit?.legalAddress?.trim() ||
+                  selectedUnit?.commonAddress?.trim() ||
+                  t('views.units.details.addressTemplate', {
+                    unitNumber: selectedUnit?.unitNumber,
+                    tower: selectedUnit?.tower,
+                    buildingName: selectedUnit?.buildingName,
+                  })}
               </div>
             </div>
 
@@ -1122,9 +1226,177 @@ export function UnitsView() {
       </Modal>
 
       <Modal
-        isOpen={Boolean(inventoryAddOpen && isDetailsOpen && selectedUnit && canUpdate)}
+        isOpen={Boolean(isManageInventoryOpen && !isAddUnitOpen && selectedUnit)}
+        onClose={() => setIsManageInventoryOpen(false)}
+        title={
+          selectedUnit
+            ? `${t('views.units.table.manageInventory')} • ${t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}`
+            : t('views.units.table.manageInventory')
+        }
+        maxWidth="3xl"
+        footer={
+          <div className="flex justify-end w-full">
+            <Button type="button" variant="outline" onClick={() => setIsManageInventoryOpen(false)}>
+              {t('views.units.details.close')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-slate-500">
+              {selectedUnit?.buildingName} • {selectedUnit?.tower}
+            </div>
+            {canUpdate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-lg border-slate-300 bg-white px-4 font-medium text-slate-800 shadow-none hover:bg-slate-50"
+                onClick={openInventoryAddModal}
+              >
+                <Plus className="w-4 h-4 mr-1.5" aria-hidden />
+                {t('views.units.details.addInventoryItem')}
+              </Button>
+            ) : null}
+          </div>
+
+          {canUpdate ? (
+            <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+              {detailInventoryDraft.length === 0 ? (
+                <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
+                      <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryItemName')}
+                      </TableHead>
+                      <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryQty')}
+                      </TableHead>
+                      <TableHead className="min-w-[10rem] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryCondition')}
+                      </TableHead>
+                      <TableHead className="w-28 border-l border-slate-200 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.table.actions')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detailInventoryDraft.map((inv) => (
+                      <TableRow
+                        key={inv.id}
+                        className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                      >
+                        <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
+                          {inv.name}
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
+                          {inv.quantity}
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5">
+                          <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
+                            {inv.condition === 'New'
+                              ? t('views.units.details.conditionNew')
+                              : inv.condition === 'Good'
+                                ? t('views.units.details.conditionGood')
+                                : inv.condition === 'Fair'
+                                  ? t('views.units.details.conditionFair')
+                                  : t('views.units.details.conditionPoor')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="border-l border-slate-200 px-3 py-2.5 text-right align-middle">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              title={t('common.edit')}
+                              disabled={inventorySaving}
+                              onClick={() => openInventoryEditModal(inv)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                              title={t('common.delete')}
+                              disabled={inventorySaving}
+                              onClick={() => {
+                                const next = detailInventoryDraft.filter((x) => x.id !== inv.id);
+                                void handleSaveDetailInventory(next);
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+              {!selectedUnit?.inventory?.length ? (
+                <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
+                      <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryItemName')}
+                      </TableHead>
+                      <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryQty')}
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {t('views.units.details.inventoryCondition')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(selectedUnit?.inventory ?? []).map((inv) => (
+                      <TableRow
+                        key={inv.id}
+                        className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                      >
+                        <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
+                          {inv.name}
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
+                          {inv.quantity}
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5">
+                          <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
+                            {inv.condition === 'New'
+                              ? t('views.units.details.conditionNew')
+                              : inv.condition === 'Good'
+                                ? t('views.units.details.conditionGood')
+                                : inv.condition === 'Fair'
+                                  ? t('views.units.details.conditionFair')
+                                  : t('views.units.details.conditionPoor')}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(inventoryAddOpen && isManageInventoryOpen && selectedUnit && canUpdate)}
         onClose={closeInventoryAddModal}
-        title={inventoryEditId ? t('common.edit') : t('views.units.details.addInventoryModalTitle')}
+        title={t('views.units.details.addInventoryModalTitle')}
         maxWidth="md"
         footer={
           <div className="flex justify-end gap-3 w-full">
@@ -1180,18 +1452,81 @@ export function UnitsView() {
       </Modal>
 
       <Modal
+        isOpen={Boolean(inventoryEditOpen && isManageInventoryOpen && selectedUnit && canUpdate && inventoryEditId)}
+        onClose={closeInventoryEditModal}
+        title={t('common.edit')}
+        maxWidth="md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeInventoryEditModal} disabled={inventorySaving}>
+              {t('views.units.addModal.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={inventorySaving || !selectedUnit}
+              onClick={() => void handleEditInventoryItemSubmit()}
+            >
+              {inventorySaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden /> : null}
+              {t('views.units.details.saveInventory')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="inventory-edit-name">{t('views.units.details.inventoryItemName')}</Label>
+            <Input
+              id="inventory-edit-name"
+              value={inventoryAddName}
+              onChange={(e) => setInventoryAddName(e.target.value)}
+              placeholder={t('views.units.details.inventoryItemName')}
+              disabled={inventorySaving}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inventory-edit-qty">{t('views.units.details.inventoryQty')}</Label>
+            <Input
+              id="inventory-edit-qty"
+              type="number"
+              min={1}
+              value={inventoryAddQty}
+              onChange={(e) => setInventoryAddQty(Math.max(1, Number(e.target.value) || 1))}
+              disabled={inventorySaving}
+              className="rounded-xl border-slate-200 max-w-[8rem]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('views.units.details.inventoryCondition')}</Label>
+            <Select2
+              options={inventoryConditionOptions}
+              value={inventoryAddCondition}
+              onChange={(v) => setInventoryAddCondition((v ?? 'Good') as InventoryItem['condition'])}
+              disabled={inventorySaving}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={isAddUnitOpen}
         onClose={closeAddUnitModal}
         title={formMode === 'edit' ? t('views.units.editModal.title') : t('views.units.addModal.title')}
         maxWidth="2xl"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeAddUnitModal}>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 min-w-[120px] rounded-xl"
+              onClick={closeAddUnitModal}
+            >
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
               onClick={() => void handleSaveUnit()}
             >
               {formMode === 'edit' ? t('views.units.editModal.save') : t('views.units.addModal.save')}
@@ -1199,9 +1534,6 @@ export function UnitsView() {
           </div>
         }
       >
-        {formMode === 'create' && (
-          <p className="text-sm text-slate-500 mb-6">{t('views.units.addModal.description')}</p>
-        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="add-unit-number">{t('views.units.addModal.unitNumber')}</Label>
@@ -1210,16 +1542,16 @@ export function UnitsView() {
               value={addForm.unitNumber}
               onChange={(e) => setAddForm((f) => ({ ...f, unitNumber: e.target.value }))}
               placeholder="e.g. 1201"
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="add-floor">{t('views.units.addModal.floor')}</Label>
-            <Input
-              id="add-floor"
-              value={addForm.floor}
-              onChange={(e) => setAddForm((f) => ({ ...f, floor: e.target.value }))}
-              className="rounded-xl border-slate-200"
+            <Label>{t('views.units.addModal.floor')}</Label>
+            <Select2
+              options={addFloorOptions}
+              value={addForm.floor || null}
+              onChange={(v) => setAddForm((f) => ({ ...f, floor: String(v ?? '') }))}
+              placeholder="Select floor"
             />
           </div>
           <div className="space-y-2">
@@ -1228,7 +1560,7 @@ export function UnitsView() {
               id="add-tower"
               value={addForm.tower}
               onChange={(e) => setAddForm((f) => ({ ...f, tower: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -1237,16 +1569,7 @@ export function UnitsView() {
               id="add-building"
               value={addForm.buildingName}
               onChange={(e) => setAddForm((f) => ({ ...f, buildingName: e.target.value }))}
-              className="rounded-xl border-slate-200"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-common">{t('views.units.addModal.commonAddress')}</Label>
-            <Input
-              id="add-common"
-              value={addForm.commonAddress}
-              onChange={(e) => setAddForm((f) => ({ ...f, commonAddress: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -1255,7 +1578,7 @@ export function UnitsView() {
               id="add-legal"
               value={addForm.legalAddress}
               onChange={(e) => setAddForm((f) => ({ ...f, legalAddress: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2">
@@ -1282,10 +1605,11 @@ export function UnitsView() {
             <Label>{t('views.units.addModal.area')}</Label>
             <Select2
               options={addAreaOptions}
-              value={addForm.area}
+              value={addForm.area || null}
               onChange={(v) =>
-                setAddForm((f) => ({ ...f, area: (v ?? 'Makati') as Unit['area'] }))
+                setAddForm((f) => ({ ...f, area: String(v ?? '') }))
               }
+              placeholder="Type city to search..."
             />
           </div>
           <div className="space-y-2">
@@ -1297,7 +1621,7 @@ export function UnitsView() {
               value={addForm.monthlyRate}
               onChange={(e) => setAddForm((f) => ({ ...f, monthlyRate: e.target.value }))}
               placeholder="35000"
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
         </div>

@@ -9,7 +9,6 @@ import {
 
 const UNIT_TYPES = new Set(['Studio', '1BR', '2BR', '3BR', 'Loft', 'Penthouse']);
 const UNIT_STATUSES = new Set(['Available', 'Occupied', 'Maintenance', 'Reserved']);
-const AREAS = new Set(['Makati', 'BGC', 'Pasig', 'Quezon City']);
 
 function rowToUnit(row) {
   let inventory = [];
@@ -61,8 +60,8 @@ function validatePayload(body) {
 
   const unitType = String(body.type ?? '');
   const status = String(body.status ?? '');
-  const area = String(body.area ?? '');
-  if (!UNIT_TYPES.has(unitType) || !UNIT_STATUSES.has(status) || !AREAS.has(area)) return null;
+  const area = String(body.area ?? '').trim();
+  if (!UNIT_TYPES.has(unitType) || !UNIT_STATUSES.has(status) || !area) return null;
 
   const monthlyRate = Number(body.monthlyRate);
   if (!Number.isFinite(monthlyRate) || monthlyRate < 0) return null;

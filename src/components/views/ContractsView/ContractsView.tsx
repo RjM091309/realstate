@@ -522,10 +522,17 @@ export function ContractsView() {
         maxWidth="2xl"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" onClick={closeContractModal}>
+            <Button
+              variant="outline"
+              className="h-11 min-w-[120px] rounded-xl"
+              onClick={closeContractModal}
+            >
               {t('views.contracts.cancel')}
             </Button>
-            <Button className="bg-indigo-600" onClick={handleGenerate}>
+            <Button
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              onClick={handleGenerate}
+            >
               {formMode === 'edit' ? 'Save Changes' : t('views.contracts.generateActivate')}
             </Button>
           </div>
@@ -557,6 +564,7 @@ export function ContractsView() {
               onChange={(d) => setStartDate((d as Date | null) ?? null)}
               placeholder="Start date"
               fullWidth
+              inputClassName="h-12 rounded-xl text-sm"
             />
           </div>
           <div className="space-y-2">
@@ -567,6 +575,7 @@ export function ContractsView() {
               onChange={(d) => setEndDate((d as Date | null) ?? null)}
               placeholder="End date"
               fullWidth
+              inputClassName="h-12 rounded-xl text-sm"
             />
           </div>
           <div className="space-y-2">
@@ -574,7 +583,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="35000"
-              className="rounded-xl"
+              className="h-12 rounded-xl border-slate-200"
               value={monthlyRent}
               onChange={(e) => setMonthlyRent(e.target.value)}
             />
@@ -584,7 +593,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="70000"
-              className="rounded-xl"
+              className="h-12 rounded-xl border-slate-200"
               value={securityDeposit}
               onChange={(e) => setSecurityDeposit(e.target.value)}
             />

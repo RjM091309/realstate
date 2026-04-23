@@ -2083,10 +2083,19 @@ export function CRMView() {
         maxWidth="lg"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeBrokerForm}>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 min-w-[100px] rounded-xl"
+              onClick={closeBrokerForm}
+            >
               {t('views.crm.brokers.cancel')}
             </Button>
-            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void handleSaveBroker()}>
+            <Button
+              type="button"
+              className="h-11 min-w-[100px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => void handleSaveBroker()}
+            >
               {t('views.crm.brokers.save')}
             </Button>
           </div>
@@ -2095,14 +2104,14 @@ export function CRMView() {
         <p className="text-sm text-slate-500 mb-6">
           {brokerFormMode === 'edit' ? t('views.crm.brokers.editDescription') : t('views.crm.brokers.addDescription')}
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="crm-broker-name">{t('views.crm.brokers.agencyName')}</Label>
             <Input
               id="crm-broker-name"
               value={brokerForm.name}
               onChange={(e) => setBrokerForm((f) => ({ ...f, name: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2">
@@ -2111,7 +2120,7 @@ export function CRMView() {
               id="crm-broker-contact"
               value={brokerForm.contactPerson}
               onChange={(e) => setBrokerForm((f) => ({ ...f, contactPerson: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2">
@@ -2120,7 +2129,7 @@ export function CRMView() {
               id="crm-broker-phone"
               value={brokerForm.phone}
               onChange={(e) => setBrokerForm((f) => ({ ...f, phone: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -2130,7 +2139,7 @@ export function CRMView() {
               type="email"
               value={brokerForm.email}
               onChange={(e) => setBrokerForm((f) => ({ ...f, email: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
 
@@ -2158,7 +2167,7 @@ export function CRMView() {
               id="crm-broker-doc-no"
               value={brokerForm.documentNo}
               onChange={(e) => setBrokerForm((f) => ({ ...f, documentNo: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className="h-12 rounded-xl border-slate-200"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -2167,6 +2176,7 @@ export function CRMView() {
               mode="single"
               placeholder="MM/DD/YYYY"
               fullWidth
+              inputClassName="h-12 rounded-xl text-sm"
               value={brokerForm.expiryDate ? parseISO(brokerForm.expiryDate) : null}
               onChange={(picked) =>
                 setBrokerForm((f) => ({
@@ -2198,7 +2208,7 @@ export function CRMView() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9"
+                    className="h-10 rounded-xl"
                     onClick={handlePickBrokerDocUpload}
                     disabled={brokerDocUploading}
                   >
@@ -2218,7 +2228,7 @@ export function CRMView() {
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-9"
+                      className="h-10 rounded-xl"
                       onClick={() => {
                         setPendingBrokerDoc(null);
                         setPendingBrokerDocName('');
