@@ -208,6 +208,19 @@
         "monthlyRate": "Monthly Rate",
         "unitType": "Unit Type",
         "inventoryAssets": "Inventory & Assets",
+        "inventoryItemName": "Item name",
+        "inventoryQty": "Qty",
+        "inventoryCondition": "Condition",
+        "addInventoryItem": "Add Item",
+        "addInventoryModalTitle": "Add inventory item",
+        "inventoryItemNameRequired": "Enter an item name.",
+        "saveInventory": "Save inventory",
+        "inventorySaved": "Inventory saved.",
+        "removeInventoryItem": "Remove",
+        "conditionNew": "New",
+        "conditionGood": "Good",
+        "conditionFair": "Fair",
+        "conditionPoor": "Poor",
         "legalAddress": "Legal Address & Details",
         "historicalTenants": "Historical Tenants (Past Contracts)",
         "specialRequests": "Special Requests / Remarks",
@@ -216,6 +229,8 @@
         "good": "Good",
         "completed": "Completed",
         "addressTemplate": "{{unitNumber}}, {{tower}}, {{buildingName}}, Ayala Avenue, Makati City, Metro Manila, Philippines.",
+        "noHistorical": "No past contracts for this unit yet.",
+        "noRemarks": "No special requests or remarks on file for this unit.",
         "remarksText": "\"Landlord requests strictly no pets. Tenant requested for additional curtains before move-in.\""
       },
       "addModal": {
@@ -281,7 +296,9 @@
         "viewInvoice": "View Invoice"
       },
       "statuses": {
-        "active": "Active"
+        "active": "Active",
+        "expired": "Completed",
+        "terminated": "Terminated"
       }
     },
     "crm": {

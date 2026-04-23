@@ -208,6 +208,19 @@
         "monthlyRate": "월 임대료",
         "unitType": "유닛 유형",
         "inventoryAssets": "비품 및 자산",
+        "inventoryItemName": "품목명",
+        "inventoryQty": "수량",
+        "inventoryCondition": "상태",
+        "addInventoryItem": "항목 추가",
+        "addInventoryModalTitle": "비품 추가",
+        "inventoryItemNameRequired": "품목명을 입력하세요.",
+        "saveInventory": "비품 저장",
+        "inventorySaved": "비품이 저장되었습니다.",
+        "removeInventoryItem": "삭제",
+        "conditionNew": "신품",
+        "conditionGood": "양호",
+        "conditionFair": "보통",
+        "conditionPoor": "불량",
         "legalAddress": "법적 주소 및 세부 정보",
         "historicalTenants": "이전 임차인(과거 계약)",
         "specialRequests": "특별 요청 / 비고",
@@ -216,6 +229,8 @@
         "good": "양호",
         "completed": "완료",
         "addressTemplate": "{{unitNumber}}, {{tower}}, {{buildingName}}, Ayala Avenue, Makati City, Metro Manila, Philippines.",
+        "noHistorical": "이 유닛에 대한 과거 계약이 없습니다.",
+        "noRemarks": "이 유닛에 등록된 특별 요청이나 비고가 없습니다.",
         "remarksText": "\"집주인은 반려동물 금지를 요청했습니다. 임차인은 입주 전 커튼 추가를 요청했습니다.\""
       },
       "addModal": {
@@ -281,7 +296,9 @@
         "viewInvoice": "청구서 보기"
       },
       "statuses": {
-        "active": "활성"
+        "active": "활성",
+        "expired": "완료",
+        "terminated": "해지"
       }
     },
     "crm": {

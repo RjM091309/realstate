@@ -11,12 +11,16 @@ import {
   List as ListIcon,
   ChevronRight,
   History,
+  Loader2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,10 +32,13 @@ import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
+import { format, parseISO } from 'date-fns';
 import { units as seedUnits } from '@/lib/mockData';
+import { fetchContracts } from '@/lib/contractsApi';
+import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
-import type { Unit, UnitStatus, UnitType } from '@/types';
+import type { Contract, InventoryItem, Tenant, Unit, UnitStatus, UnitType } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -99,6 +106,36 @@ function unitToForm(u: Unit): AddUnitForm {
   };
 }
 
+function newInventoryItemId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function normalizeInventoryDraft(items: InventoryItem[] | undefined | null): InventoryItem[] {
+  return (items ?? []).map((it) => ({
+    id: String(it.id ?? '').trim() || newInventoryItemId(),
+    name: String(it.name ?? ''),
+    quantity: Number.isFinite(Number(it.quantity)) && Number(it.quantity) >= 1 ? Math.floor(Number(it.quantity)) : 1,
+    condition: (['New', 'Good', 'Fair', 'Poor'].includes(it.condition) ? it.condition : 'Good') as InventoryItem['condition'],
+  }));
+}
+
+function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
+  return {
+    unitNumber: u.unitNumber,
+    floor: u.floor,
+    tower: u.tower,
+    buildingName: u.buildingName,
+    commonAddress: u.commonAddress,
+    legalAddress: u.legalAddress,
+    type: u.type,
+    status: u.status,
+    area: u.area,
+    monthlyRate: u.monthlyRate,
+    inventory,
+  };
+}
+
 function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory']): Unit {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   return {
@@ -115,6 +152,23 @@ function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory'])
     monthlyRate: Number.isFinite(rate) ? rate : 0,
     inventory,
   };
+}
+
+function formatContractPeriod(c: Contract): string {
+  try {
+    const a = parseISO(c.startDate);
+    const b = parseISO(c.endDate);
+    return `${format(a, 'MMM yyyy')} - ${format(b, 'MMM yyyy')}`;
+  } catch {
+    return `${c.startDate} – ${c.endDate}`;
+  }
+}
+
+function contractStatusLabel(c: Contract, t: (k: string) => string): string {
+  if (c.status === 'Active') return t('views.contracts.statuses.active');
+  if (c.status === 'Expired') return t('views.contracts.statuses.expired');
+  if (c.status === 'Terminated') return t('views.contracts.statuses.terminated');
+  return c.status;
 }
 
 export function UnitsView() {
@@ -136,6 +190,15 @@ export function UnitsView() {
   const [addForm, setAddForm] = useState<AddUnitForm>(defaultAddForm);
   /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
+  const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
+  const [tenantsList, setTenantsList] = useState<Tenant[]>([]);
+  const [detailInventoryDraft, setDetailInventoryDraft] = useState<InventoryItem[]>([]);
+  const [inventorySaving, setInventorySaving] = useState(false);
+  const [inventoryAddOpen, setInventoryAddOpen] = useState(false);
+  const [inventoryEditId, setInventoryEditId] = useState<string | null>(null);
+  const [inventoryAddName, setInventoryAddName] = useState('');
+  const [inventoryAddQty, setInventoryAddQty] = useState(1);
+  const [inventoryAddCondition, setInventoryAddCondition] = useState<InventoryItem['condition']>('Good');
 
   const reloadUnits = useCallback(async () => {
     setUnitsLoading(true);
@@ -155,6 +218,182 @@ export function UnitsView() {
   useEffect(() => {
     void reloadUnits();
   }, [reloadUnits]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [contracts, tenants] = await Promise.all([fetchContracts(), fetchTenants()]);
+        if (!cancelled) {
+          setBranchContracts(contracts);
+          setTenantsList(tenants);
+        }
+      } catch {
+        if (!cancelled) {
+          setBranchContracts([]);
+          setTenantsList([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const historicalContractsForSelectedUnit = useMemo(() => {
+    if (!selectedUnit) return [];
+    const rows = branchContracts.filter(
+      (c) => c.unitId === selectedUnit.id && (c.status === 'Expired' || c.status === 'Terminated'),
+    );
+    return [...rows].sort((a, b) => {
+      try {
+        return parseISO(b.endDate).getTime() - parseISO(a.endDate).getTime();
+      } catch {
+        return 0;
+      }
+    });
+  }, [selectedUnit, branchContracts]);
+
+  const unitRemarksAggregated = useMemo(() => {
+    if (!selectedUnit) return null;
+    const forUnit = branchContracts.filter((c) => c.unitId === selectedUnit.id);
+    const parts = forUnit
+      .map((c) => c.remarks?.trim())
+      .filter((r): r is string => Boolean(r));
+    return [...new Set(parts)].join('\n\n') || null;
+  }, [selectedUnit, branchContracts]);
+
+  useEffect(() => {
+    if (!isDetailsOpen || !selectedUnit) return;
+    setDetailInventoryDraft(normalizeInventoryDraft(selectedUnit.inventory));
+  }, [isDetailsOpen, selectedUnit]);
+
+  useEffect(() => {
+    if (!isDetailsOpen) {
+      setInventoryAddOpen(false);
+      setInventoryEditId(null);
+      setInventoryAddName('');
+      setInventoryAddQty(1);
+      setInventoryAddCondition('Good');
+    }
+  }, [isDetailsOpen]);
+
+  const inventoryConditionOptions = useMemo(
+    () =>
+      (['New', 'Good', 'Fair', 'Poor'] as const).map((v) => ({
+        value: v,
+        label:
+          v === 'New'
+            ? t('views.units.details.conditionNew')
+            : v === 'Good'
+              ? t('views.units.details.conditionGood')
+              : v === 'Fair'
+                ? t('views.units.details.conditionFair')
+                : t('views.units.details.conditionPoor'),
+      })),
+    [t],
+  );
+
+  const handleSaveDetailInventory = useCallback(
+    async (draftSource?: InventoryItem[]): Promise<boolean> => {
+      if (!selectedUnit) return false;
+      const source = draftSource ?? detailInventoryDraft;
+      const cleaned = source
+        .map((it) => ({
+          id: String(it.id || '').trim() || newInventoryItemId(),
+          name: String(it.name ?? '').trim(),
+          quantity: Math.max(1, Math.floor(Number(it.quantity)) || 1),
+          condition: (['New', 'Good', 'Fair', 'Poor'].includes(it.condition) ? it.condition : 'Good') as InventoryItem['condition'],
+        }))
+        .filter((r) => r.name.length > 0);
+
+      if (!unitsBackedByApi) {
+        const nextUnit = { ...selectedUnit, inventory: cleaned };
+        setUnitList((prev) => prev.map((u) => (u.id === selectedUnit.id ? nextUnit : u)));
+        setSelectedUnit(nextUnit);
+        setDetailInventoryDraft(normalizeInventoryDraft(cleaned));
+        toast.success(t('views.units.details.inventorySaved'));
+        return true;
+      }
+
+      setInventorySaving(true);
+      try {
+        const body = unitToWriteBody(selectedUnit, cleaned);
+        const updated = await updateUnit(selectedUnit.id, body);
+        setUnitList((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        setSelectedUnit(updated);
+        setDetailInventoryDraft(normalizeInventoryDraft(updated.inventory));
+        toast.success(t('views.units.details.inventorySaved'));
+        return true;
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Error');
+        return false;
+      } finally {
+        setInventorySaving(false);
+      }
+    },
+    [detailInventoryDraft, selectedUnit, t, unitsBackedByApi],
+  );
+
+  const openInventoryAddModal = useCallback(() => {
+    setInventoryEditId(null);
+    setInventoryAddName('');
+    setInventoryAddQty(1);
+    setInventoryAddCondition('Good');
+    setInventoryAddOpen(true);
+  }, []);
+
+  const closeInventoryAddModal = useCallback(() => {
+    setInventoryAddOpen(false);
+    setInventoryEditId(null);
+    setInventoryAddName('');
+    setInventoryAddQty(1);
+    setInventoryAddCondition('Good');
+  }, []);
+
+  const openInventoryEditModal = useCallback((inv: InventoryItem) => {
+    setInventoryEditId(inv.id);
+    setInventoryAddName(String(inv.name ?? ''));
+    setInventoryAddQty(Math.max(1, Math.floor(Number(inv.quantity)) || 1));
+    setInventoryAddCondition(
+      (['New', 'Good', 'Fair', 'Poor'].includes(inv.condition) ? inv.condition : 'Good') as InventoryItem['condition'],
+    );
+    setInventoryAddOpen(true);
+  }, []);
+
+  const handleAddInventoryItemSubmit = useCallback(async () => {
+    const name = inventoryAddName.trim();
+    if (!name) {
+      toast.error(t('views.units.details.inventoryItemNameRequired'));
+      return;
+    }
+    if (!selectedUnit) return;
+
+    const upsert: InventoryItem = {
+      id: inventoryEditId ?? newInventoryItemId(),
+      name,
+      quantity: Math.max(1, Math.floor(Number(inventoryAddQty)) || 1),
+      condition: (['New', 'Good', 'Fair', 'Poor'].includes(inventoryAddCondition) ? inventoryAddCondition : 'Good') as InventoryItem['condition'],
+    };
+
+    const next =
+      inventoryEditId && detailInventoryDraft.some((x) => x.id === inventoryEditId)
+        ? detailInventoryDraft.map((x) => (x.id === inventoryEditId ? upsert : x))
+        : [...detailInventoryDraft, upsert];
+
+    const ok = await handleSaveDetailInventory(next);
+    if (ok) closeInventoryAddModal();
+  }, [
+    closeInventoryAddModal,
+    detailInventoryDraft,
+    handleSaveDetailInventory,
+    inventoryAddCondition,
+    inventoryAddName,
+    inventoryAddQty,
+    inventoryEditId,
+    selectedUnit,
+    t,
+  ]);
 
   const handleViewDetails = useCallback((unit: Unit) => {
     setSelectedUnit(unit);
@@ -669,26 +908,156 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4 text-indigo-600" />
-                {t('views.units.details.inventoryAssets')}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {selectedUnit?.inventory?.length ? (
-                  selectedUnit.inventory.map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between p-2 text-sm border-b border-slate-100">
-                      <span className="text-slate-700">
-                        {inv.name} (×{inv.quantity})
-                      </span>
-                      <Badge variant="outline" className="text-[10px] h-5">
-                        {inv.condition}
-                      </Badge>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500 col-span-full">{t('views.units.inventoryEmpty')}</p>
-                )}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h4 className="text-sm font-bold flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-indigo-600" />
+                  {t('views.units.details.inventoryAssets')}
+                </h4>
+                {canUpdate ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-lg border-slate-300 bg-white px-4 font-medium text-slate-800 shadow-none hover:bg-slate-50"
+                      onClick={openInventoryAddModal}
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" aria-hidden />
+                      {t('views.units.details.addInventoryItem')}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
+
+              {canUpdate ? (
+                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  {detailInventoryDraft.length === 0 ? (
+                    <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
+                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryItemName')}
+                          </TableHead>
+                          <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryQty')}
+                          </TableHead>
+                          <TableHead className="min-w-[10rem] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryCondition')}
+                          </TableHead>
+                          <TableHead className="w-28 border-l border-slate-200 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.table.actions')}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detailInventoryDraft.map((inv) => (
+                          <TableRow
+                            key={inv.id}
+                            className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                          >
+                            <TableCell className="px-4 py-3 text-sm font-medium uppercase tracking-wide text-slate-900">
+                              {inv.name}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-center text-sm font-medium text-slate-800">
+                              {inv.quantity}
+                            </TableCell>
+                            <TableCell className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 text-sm text-slate-800">
+                                {inv.condition === 'New'
+                                  ? t('views.units.details.conditionNew')
+                                  : inv.condition === 'Good'
+                                    ? t('views.units.details.conditionGood')
+                                    : inv.condition === 'Fair'
+                                      ? t('views.units.details.conditionFair')
+                                      : t('views.units.details.conditionPoor')}
+                              </span>
+                            </TableCell>
+                            <TableCell className="border-l border-slate-200 px-3 py-3 text-right align-middle">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                  title={t('common.edit')}
+                                  disabled={inventorySaving}
+                                  onClick={() => openInventoryEditModal(inv)}
+                                >
+                                  <Pencil className="w-4 h-4" aria-hidden />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                  title={t('common.delete')}
+                                  disabled={inventorySaving}
+                                  onClick={() => {
+                                    const next = detailInventoryDraft.filter((x) => x.id !== inv.id);
+                                    void handleSaveDetailInventory(next);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" aria-hidden />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  {!selectedUnit?.inventory?.length ? (
+                    <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
+                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryItemName')}
+                          </TableHead>
+                          <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryQty')}
+                          </TableHead>
+                          <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            {t('views.units.details.inventoryCondition')}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedUnit.inventory.map((inv) => (
+                          <TableRow
+                            key={inv.id}
+                            className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                          >
+                            <TableCell className="px-4 py-3 text-sm font-medium uppercase tracking-wide text-slate-900">
+                              {inv.name}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-center text-sm font-medium text-slate-800">
+                              {inv.quantity}
+                            </TableCell>
+                            <TableCell className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 text-sm text-slate-800">
+                                {inv.condition === 'New'
+                                  ? t('views.units.details.conditionNew')
+                                  : inv.condition === 'Good'
+                                    ? t('views.units.details.conditionGood')
+                                    : inv.condition === 'Fair'
+                                      ? t('views.units.details.conditionFair')
+                                      : t('views.units.details.conditionPoor')}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -711,20 +1080,27 @@ export function UnitsView() {
                 {t('views.units.details.historicalTenants')}
               </h4>
               <div className="space-y-2">
-                {[
-                  { name: 'Alice Guo', period: 'Jan 2024 - Jan 2025', status: 'Completed' },
-                  { name: 'David Sy', period: 'Jan 2023 - Jan 2024', status: 'Completed' },
-                ].map((hist, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg border border-slate-100 text-xs">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-700">{hist.name}</span>
-                      <span className="text-slate-400">{hist.period}</span>
-                    </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      {t('views.units.details.completed')}
-                    </Badge>
-                  </div>
-                ))}
+                {historicalContractsForSelectedUnit.length > 0 ? (
+                  historicalContractsForSelectedUnit.map((c) => {
+                    const tenantName = tenantsList.find((x) => x.id === c.tenantId)?.name ?? '—';
+                    return (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg border border-slate-100 text-xs"
+                      >
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className="font-bold text-slate-700 truncate">{tenantName}</span>
+                          <span className="text-slate-400">{formatContractPeriod(c)}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {contractStatusLabel(c, t)}
+                        </Badge>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-slate-500">{t('views.units.details.noHistorical')}</p>
+                )}
               </div>
             </div>
 
@@ -733,10 +1109,74 @@ export function UnitsView() {
                 <Plus className="w-4 h-4" />
                 {t('views.units.details.specialRequests')}
               </h4>
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-sm text-amber-900 italic">{t('views.units.details.remarksText')}</div>
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-sm text-amber-900">
+                {unitRemarksAggregated ? (
+                  <p className="whitespace-pre-wrap leading-relaxed">{unitRemarksAggregated}</p>
+                ) : (
+                  <p className="italic text-amber-900/80">{t('views.units.details.noRemarks')}</p>
+                )}
+              </div>
             </div>
           </div>
         </ScrollArea>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(inventoryAddOpen && isDetailsOpen && selectedUnit && canUpdate)}
+        onClose={closeInventoryAddModal}
+        title={inventoryEditId ? t('common.edit') : t('views.units.details.addInventoryModalTitle')}
+        maxWidth="md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeInventoryAddModal} disabled={inventorySaving}>
+              {t('views.units.addModal.cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={inventorySaving || !selectedUnit}
+              onClick={() => void handleAddInventoryItemSubmit()}
+            >
+              {inventorySaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden /> : null}
+              {t('views.units.details.saveInventory')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="inventory-add-name">{t('views.units.details.inventoryItemName')}</Label>
+            <Input
+              id="inventory-add-name"
+              value={inventoryAddName}
+              onChange={(e) => setInventoryAddName(e.target.value)}
+              placeholder={t('views.units.details.inventoryItemName')}
+              disabled={inventorySaving}
+              className="rounded-xl border-slate-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inventory-add-qty">{t('views.units.details.inventoryQty')}</Label>
+            <Input
+              id="inventory-add-qty"
+              type="number"
+              min={1}
+              value={inventoryAddQty}
+              onChange={(e) => setInventoryAddQty(Math.max(1, Number(e.target.value) || 1))}
+              disabled={inventorySaving}
+              className="rounded-xl border-slate-200 max-w-[8rem]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('views.units.details.inventoryCondition')}</Label>
+            <Select2
+              options={inventoryConditionOptions}
+              value={inventoryAddCondition}
+              onChange={(v) => setInventoryAddCondition((v ?? 'Good') as InventoryItem['condition'])}
+              disabled={inventorySaving}
+            />
+          </div>
+        </div>
       </Modal>
 
       <Modal
