@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -22,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { contracts as seedContracts, units as seedUnits, tenants as seedTenants, agents } from '@/lib/mockData';
+import { units as seedUnits, tenants as seedTenants, agents } from '@/lib/mockData';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import {
@@ -39,7 +39,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { Contract, ContractCollaborationRow, ContractTenantRow, Tenant, Unit } from '@/types';
+import type { Contract, ContractCollaborationRow, ContractTenantRow, Tenant, Unit, DocumentTemplateRow, RepositoryDocumentRow, InventorySnapshotItemRow, InventorySnapshotRow } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import {
   ContractDetailsCollaborationModal,
@@ -52,7 +52,6 @@ import {
   uploadContractRepositoryDocument,
   uploadDocumentTemplate,
 } from '@/lib/documentsApi';
-import type { DocumentTemplateRow, RepositoryDocumentRow } from '@/types';
 import {
   createInventorySnapshot,
   createInventorySnapshotItem,
@@ -63,7 +62,6 @@ import {
   patchInventorySnapshot,
   patchInventorySnapshotItem,
 } from '@/lib/inventoryApi';
-import type { InventorySnapshotItemRow, InventorySnapshotRow } from '@/types';
 
 export function ContractsView() {
   const { t } = useTranslation();
@@ -91,8 +89,7 @@ export function ContractsView() {
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [contractTenantsLoading, setContractTenantsLoading] = useState(false);
-  const [contractCollabLoading, setContractCollabLoading] = useState(false);
+
   const [contractTenants, setContractTenants] = useState<ContractTenantRow[]>([]);
   const [contractCollaborations, setContractCollaborations] = useState<ContractCollaborationRow[]>([]);
   const [repoDocs, setRepoDocs] = useState<RepositoryDocumentRow[]>([]);
@@ -226,8 +223,7 @@ export function ContractsView() {
     setTemplates([]);
     setInventorySnapshots([]);
     setInventoryItemsBySnapshot({});
-    setContractTenantsLoading(true);
-    setContractCollabLoading(true);
+
     void (async () => {
       try {
         const [tenantsRows, collabRows, docsRows, templateRows, snapRows] = await Promise.all([
@@ -251,9 +247,6 @@ export function ContractsView() {
         setInventoryItemsBySnapshot(map);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to load contract details');
-      } finally {
-        setContractTenantsLoading(false);
-        setContractCollabLoading(false);
       }
     })();
   };
@@ -298,36 +291,6 @@ export function ContractsView() {
     return [...fromTenants, ...fromCollab];
   };
 
-  const contractTenantColumns: ColumnDef<ContractTenantRow>[] = useMemo(
-    () => [
-      {
-        header: 'Tenant',
-        render: (r) => (
-          <div className="flex flex-col">
-            <span className="font-medium text-slate-900">{r.name}</span>
-            <span className="text-xs text-slate-500">{r.isPrimary ? 'Primary' : 'Co-tenant'}</span>
-          </div>
-        ),
-      },
-      { header: 'Email', render: (r) => <span className="text-sm text-slate-700 break-all">{r.email || '—'}</span> },
-      { header: 'Phone', render: (r) => <span className="text-sm text-slate-700">{r.phone || '—'}</span> },
-      { header: 'Added', render: (r) => <span className="text-xs text-slate-500">{r.createdAt || '—'}</span> },
-    ],
-    [],
-  );
-
-  const contractCollabColumns: ColumnDef<ContractCollaborationRow>[] = useMemo(
-    () => [
-      { header: 'Agency', render: (r) => <span className="font-medium text-slate-900">{r.partnerAgencyName}</span> },
-      {
-        header: 'Commission terms',
-        render: (r) => <span className="text-sm text-slate-700">{r.commissionTerms || '—'}</span>,
-      },
-      { header: 'Remarks', render: (r) => <span className="text-sm text-slate-600">{r.remarks || '—'}</span> },
-      { header: 'Created', render: (r) => <span className="text-xs text-slate-500">{r.createdAt || '—'}</span> },
-    ],
-    [],
-  );
 
   const columns: ColumnDef<Contract>[] = useMemo(
     () => [

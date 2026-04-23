@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, FileText, ExternalLink, ChevronRight } from 'lucide-react';
 import { Modal } from '@/components/modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { DataTable, type ColumnDef } from '@/components/data-table';
 
 export type CollaboratorRole = 'Owner' | 'Editor' | 'Viewer';
 
@@ -132,88 +133,20 @@ export function TabsNavigation({
   tab: TabKey;
   onChange: (t: TabKey) => void;
 }) {
-  const items: Array<{ key: TabKey; label: string }> = [
-    { key: 'collaboration', label: 'Collaboration' },
-    { key: 'activity', label: 'Activity' },
-    { key: 'documents', label: 'Documents' },
-    { key: 'inventory', label: 'Inventory' },
-    { key: 'notes', label: 'Notes' },
+  const items: Array<{ value: TabKey; label: string }> = [
+    { value: 'collaboration', label: 'Collaboration' },
+    { value: 'activity', label: 'Activity' },
+    { value: 'documents', label: 'Documents' },
+    { value: 'inventory', label: 'Inventory' },
+    { value: 'notes', label: 'Notes' },
   ];
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-2">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        {items.map((it) => (
-          <button
-            key={it.key}
-            type="button"
-            onClick={() => onChange(it.key)}
-            className={cn(
-              'h-9 rounded-xl text-sm font-semibold transition-colors',
-              tab === it.key ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100',
-            )}
-          >
-            {it.label}
-          </button>
-        ))}
-      </div>
+    <div className="rounded-2xl border border-slate-100 bg-white p-2 max-w-xs">
+      <Select2 options={items} value={tab} onChange={(v) => onChange(v as TabKey)} />
     </div>
   );
-}
+} 
 
-export function CollaboratorItem({
-  item,
-  onRoleChange,
-  onRemove,
-}: {
-  item: Collaborator;
-  onRoleChange: (id: string, next: CollaboratorRole) => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate">{item.name || '—'}</div>
-          <div className="text-xs text-slate-500 break-all">{item.email || '—'}</div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={cn('border-0', roleBadgeClass(item.role))}>
-              {item.role}
-            </Badge>
-            <span className="text-[11px] text-slate-400">Added {item.dateAdded || '—'}</span>
-          </div>
-        </div>
-
-        <div className="shrink-0 flex items-center gap-2">
-          <select
-            value={item.role}
-            onChange={(e) => onRoleChange(item.id, e.target.value as CollaboratorRole)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-          >
-            <option value="Owner">Owner</option>
-            <option value="Editor">Editor</option>
-            <option value="Viewer">Viewer</option>
-          </select>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button type="button" variant="ghost" size="icon" className="h-9 w-9" />}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-rose-600"
-                onClick={() => onRemove(item.id)}
-              >
-                Remove
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function CollaboratorList({
   collaborators,
@@ -224,18 +157,66 @@ export function CollaboratorList({
   onRoleChange: (id: string, next: CollaboratorRole) => void;
   onRemove: (id: string) => void;
 }) {
-  return (
-    <div className="space-y-3">
-      {collaborators.length === 0 ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
-          No collaborators yet. Invite someone to start collaborating
+  const columns: ColumnDef<Collaborator>[] = useMemo(() => [
+    {
+      header: 'Collaborator',
+      render: (c) => (
+        <div>
+          <div className="font-semibold text-slate-900 truncate">{c.name || '—'}</div>
+          <div className="text-xs text-slate-500 break-all">{c.email || '—'}</div>
         </div>
-      ) : (
-        collaborators.map((c) => (
-          <CollaboratorItem key={c.id} item={c} onRoleChange={onRoleChange} onRemove={onRemove} />
-        ))
-      )}
-    </div>
+      ),
+    },
+    {
+      header: 'Role',
+      render: (c) => (
+        <Badge variant="outline" className={cn('border-0', roleBadgeClass(c.role))}>
+          {c.role}
+        </Badge>
+      ),
+    },
+    {
+      header: 'Added',
+      render: (c) => <span className="text-xs text-slate-400">{c.dateAdded || '—'}</span>,
+    },
+    {
+      header: 'Actions',
+      render: (c) => (
+        <div className="flex items-center gap-2">
+          <select
+            value={c.role}
+            onChange={(e) => onRoleChange(c.id, e.target.value as CollaboratorRole)}
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          >
+            <option value="Owner">Owner</option>
+            <option value="Editor">Editor</option>
+            <option value="Viewer">Viewer</option>
+          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button type="button" variant="ghost" size="icon" className="h-8 w-8" />}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="text-rose-600" onClick={() => onRemove(c.id)}>
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ], [onRoleChange, onRemove]);
+
+  return (
+    <DataTable
+      data={collaborators}
+      columns={columns}
+      keyExtractor={(c) => c.id}
+      highlightFirstColumn={false}
+      embedded
+    />
   );
 }
 
@@ -244,13 +225,13 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
     <div className="space-y-2">
       {items.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
-          No activity yet.
+          No activity recorded.
         </div>
       ) : (
         items.map((it) => (
           <div key={it.id} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <div className="text-[11px] text-slate-400">{it.at}</div>
-            <div className="mt-1 text-sm text-slate-700">{it.text}</div>
+            <div className="text-[11px] text-slate-400 mb-1">{it.at}</div>
+            <div className="text-sm text-slate-700">{it.text}</div>
           </div>
         ))
       )}
@@ -696,22 +677,65 @@ export function ContractDetailsCollaborationModal({
           <ContractSummaryCard title="Primary tenant" value={summary.primaryTenantLabel} />
           <ContractSummaryCard title="Period" value={summary.periodLabel} />
           <ContractSummaryCard title="Status" value={summary.statusLabel} />
-        </div>
+        </div>        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-2">
+          {/* ── Sidebar Nav ── */}
+          <div className="col-span-1 space-y-1">
+            <button
+              type="button"
+              onClick={() => setTab('collaboration')}
+              className={cn(
+                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
+                tab === 'collaboration' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              Collaborators
+              <ChevronRight className={cn("h-4 w-4", tab === 'collaboration' ? "text-indigo-700" : "text-transparent")} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('activity')}
+              className={cn(
+                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
+                tab === 'activity' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              Activity & Notes
+              <ChevronRight className={cn("h-4 w-4", tab === 'activity' ? "text-indigo-700" : "text-transparent")} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('documents')}
+              className={cn(
+                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
+                tab === 'documents' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              Documents
+              <ChevronRight className={cn("h-4 w-4", tab === 'documents' ? "text-indigo-700" : "text-transparent")} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('inventory')}
+              className={cn(
+                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
+                tab === 'inventory' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              Inventory
+              <ChevronRight className={cn("h-4 w-4", tab === 'inventory' ? "text-indigo-700" : "text-transparent")} />
+            </button>
+          </div>
 
-        <TabsNavigation tab={tab} onChange={setTab} />
-
-        {tab === 'collaboration' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-4">
+          {/* ── Main Content Area ── */}
+          <div className="col-span-1 md:col-span-3 min-w-0">
+            {tab === 'collaboration' ? (
+              <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-slate-900">Collaborators</div>
                   <div className="text-xs text-slate-500">Manage access for this contract.</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" className="h-9" onClick={() => setInviteOpen(true)}>
-                    Invite collaborator
-                  </Button>
                   <Button type="button" className="h-9 bg-indigo-600 hover:bg-indigo-700" onClick={() => setInviteOpen(true)}>
                     Add collaborator
                   </Button>
@@ -792,7 +816,7 @@ export function ContractDetailsCollaborationModal({
                       onClick={submitInvite}
                       disabled={inviteSaving}
                     >
-                      Send invite
+                      Add
                     </Button>
                   </div>
                 </div>
@@ -813,25 +837,10 @@ export function ContractDetailsCollaborationModal({
                   ))}
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="text-sm font-bold text-slate-900">Activity</div>
-                <div className="text-xs text-slate-500">Recent actions on this contract.</div>
               </div>
-              <ActivityFeed items={activity} />
-
-              <div>
-                <div className="text-sm font-bold text-slate-900">Comments & Notes</div>
-                <div className="text-xs text-slate-500">Add internal notes for your team.</div>
-              </div>
-              <CommentSection comments={comments} onAdd={addComment} onEdit={editComment} onDelete={deleteComment} />
-            </div>
-          </div>
-        ) : tab === 'activity' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
+            ) : tab === 'activity' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
               <div className="text-sm font-bold text-slate-900 mb-2">Activity</div>
               <ActivityFeed items={activity} />
             </div>
@@ -839,10 +848,10 @@ export function ContractDetailsCollaborationModal({
               <div className="text-sm font-bold text-slate-900 mb-2">Comments & Notes</div>
               <CommentSection comments={comments} onAdd={addComment} onEdit={editComment} onDelete={deleteComment} />
             </div>
-          </div>
-        ) : tab === 'documents' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              </div>
+            ) : tab === 'documents' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-slate-900">Repository documents</div>
@@ -920,35 +929,47 @@ export function ContractDetailsCollaborationModal({
               ) : null}
               <div className="space-y-2">
                 {documents.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
-                    No documents yet.
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                    No documents uploaded.
                   </div>
                 ) : (
                   documents.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      className="w-full text-left rounded-2xl border border-slate-100 bg-white p-4 hover:bg-slate-50/80 transition-colors"
-                      onClick={() => {
-                        if (d.docType === 'lease_contract' && d.contractId) {
-                          const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${encodeURIComponent(
-                            d.contractId,
-                          )}`;
-                          window.open(url, '_blank', 'noopener,noreferrer');
-                          return;
-                        }
-                        window.open(d.filePath.startsWith('/') ? d.filePath : `/${d.filePath}`, '_blank');
-                      }}
-                      title="Open document"
-                    >
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                          <FileText className="h-5 w-5 text-indigo-600" />
+                        </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900 truncate">{d.title || 'Document'}</div>
-                          <div className="text-xs text-slate-500">{d.docType}</div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span className="capitalize">{d.docType.replace(/_/g, ' ')}</span>
+                            <span>•</span>
+                            <span>{d.createdAt || '—'}</span>
+                          </div>
                         </div>
-                        <div className="shrink-0 text-[11px] text-slate-400">{d.createdAt || '—'}</div>
                       </div>
-                    </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {d.portalVisible ? (
+                          <Badge variant="outline" className="border-0 bg-emerald-100 text-emerald-700 hidden sm:inline-flex">Portal</Badge>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                          onClick={() => {
+                            if (d.docType === 'lease_contract' && d.contractId) {
+                              const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${encodeURIComponent(d.contractId)}`;
+                              window.open(url, '_blank', 'noopener,noreferrer');
+                              return;
+                            }
+                            window.open(d.filePath.startsWith('/') ? d.filePath : `/${d.filePath}`, '_blank');
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -1050,36 +1071,47 @@ export function ContractDetailsCollaborationModal({
               ) : null}
               <div className="space-y-2">
                 {templates.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
-                    No templates found.
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                    No templates available.
                   </div>
                 ) : (
                   templates.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="w-full text-left rounded-2xl border border-slate-100 bg-white p-4 hover:bg-slate-50/80 transition-colors"
-                      onClick={() => window.open(t.filePath.startsWith('/') ? t.filePath : `/${t.filePath}`, '_blank')}
-                      title="Open template file"
-                    >
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                          <FileText className="h-5 w-5 text-indigo-600" />
+                        </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900 truncate">{t.title || 'Template'}</div>
-                          <div className="text-xs text-slate-500">
-                            {t.templateKey} · v{t.versionNo}
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span>{t.templateKey}</span>
+                            <span>•</span>
+                            <span>v{t.versionNo}</span>
+                            <span>•</span>
+                            <span>{t.createdAt || '—'}</span>
                           </div>
                         </div>
-                        <div className="shrink-0 text-[11px] text-slate-400">{t.createdAt || '—'}</div>
                       </div>
-                    </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                          onClick={() => window.open(t.filePath.startsWith('/') ? t.filePath : `/${t.filePath}`, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
             </div>
-          </div>
-        ) : tab === 'inventory' ? (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              </div>
+            ) : tab === 'inventory' ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-slate-900">Inventory snapshots</div>
@@ -1414,31 +1446,34 @@ export function ContractDetailsCollaborationModal({
                       </div>
                     ) : null}
 
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {s.items.length === 0 ? (
-                        <div className="rounded-xl border border-slate-100 bg-white p-3 text-sm text-slate-500">
-                          No items recorded.
-                        </div>
-                      ) : (
-                        s.items.map((it) => (
-                          <div key={it.id} className="rounded-xl border border-slate-100 bg-white p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
+                    <div className="mt-3">
+                      <div className="space-y-2">
+                        {s.items.length === 0 ? (
+                          <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                            No items in this snapshot.
+                          </div>
+                        ) : (
+                          s.items.map((it) => (
+                            <div key={it.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
+                              <div className="flex-1 min-w-0">
                                 <div className="font-semibold text-slate-900 truncate">{it.itemName}</div>
-                                <div className="text-xs text-slate-500">
-                                  {it.category ? `${inventoryCategoryLabel(it.category)} · ` : ''}Qty: {it.quantity}
+                                {it.notes ? <div className="text-xs text-slate-500 truncate mb-1">{it.notes}</div> : null}
+                                <div className="flex items-center gap-2 text-xs text-slate-600">
+                                  <span>{inventoryCategoryLabel(it.category) || 'Uncategorized'}</span>
+                                  <span>•</span>
+                                  <span>Qty: {it.quantity}</span>
+                                  <span>•</span>
+                                  <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 capitalize">
+                                    {it.conditionState}
+                                  </Badge>
                                 </div>
-                                {it.notes ? <div className="mt-1 text-xs text-slate-600">{it.notes}</div> : null}
                               </div>
-                              <div className="shrink-0 flex items-center gap-1">
-                                <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700">
-                                  {it.conditionState}
-                                </Badge>
+                              <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-9 w-9 text-slate-500 hover:text-indigo-600"
+                                  className="h-8 w-8 text-slate-500 hover:text-indigo-600"
                                   title="Edit item"
                                   onClick={() => {
                                     setEditItemId(it.id);
@@ -1455,7 +1490,7 @@ export function ContractDetailsCollaborationModal({
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-9 w-9 text-slate-500 hover:text-rose-600"
+                                  className="h-8 w-8 text-slate-500 hover:text-rose-600"
                                   title="Delete item"
                                   onClick={async () => {
                                     if (!confirm('Delete this item?')) return;
@@ -1466,98 +1501,99 @@ export function ContractDetailsCollaborationModal({
                                 </Button>
                               </div>
                             </div>
+                          ))
+                        )}
+                      </div>
 
-                            {editItemId === it.id ? (
-                              <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  <div className="space-y-2">
-                                    <Label>Item name</Label>
-                                    <Input className="rounded-xl" value={editItemName} onChange={(e) => setEditItemName(e.target.value)} />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Category</Label>
-                                    <select
-                                      value={editItemCategory}
-                                      onChange={(e) => setEditItemCategory(e.target.value)}
-                                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                    >
-                                      <option value="">Select category (optional)</option>
-                                      {INVENTORY_CATEGORIES.map((c) => (
-                                        <option key={c.value} value={c.value}>
-                                          {c.label} — {c.detail}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Quantity</Label>
-                                    <Input type="number" min={1} className="rounded-xl" value={editItemQty} onChange={(e) => setEditItemQty(e.target.value)} />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Condition</Label>
-                                    <select
-                                      value={editItemCondition}
-                                      onChange={(e) => setEditItemCondition(e.target.value as any)}
-                                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                    >
-                                      <option value="excellent">excellent</option>
-                                      <option value="good">good</option>
-                                      <option value="fair">fair</option>
-                                      <option value="damaged">damaged</option>
-                                      <option value="missing">missing</option>
-                                    </select>
-                                  </div>
-                                  <div className="space-y-2 md:col-span-2">
-                                    <Label>Notes</Label>
-                                    <Input className="rounded-xl" value={editItemNotes} onChange={(e) => setEditItemNotes(e.target.value)} />
-                                  </div>
-                                </div>
-                                <div className="mt-3 flex justify-end gap-2">
-                                  <Button type="button" variant="outline" disabled={editItemSaving} onClick={() => setEditItemId(null)}>
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    className="bg-indigo-600 hover:bg-indigo-700"
-                                    disabled={editItemSaving}
-                                    onClick={async () => {
-                                      const qty = Number(editItemQty);
-                                      if (!editItemName.trim() || !Number.isFinite(qty) || qty <= 0) return;
-                                      try {
-                                        setEditItemSaving(true);
-                                        await onEditItem(it.id, {
-                                          itemName: editItemName.trim(),
-                                          category: editItemCategory.trim() || undefined,
-                                          quantity: qty,
-                                          conditionState: editItemCondition,
-                                          notes: editItemNotes.trim() || undefined,
-                                        });
-                                        setEditItemId(null);
-                                      } finally {
-                                        setEditItemSaving(false);
-                                      }
-                                    }}
-                                  >
-                                    {editItemSaving ? 'Saving…' : 'Save changes'}
-                                  </Button>
-                                </div>
+                      {/* Inline edit form for selected item */}
+                      {editItemId && s.items.find((it) => it.id === editItemId) ? (() => {
+                        const it = s.items.find((i) => i.id === editItemId)!;
+                        return (
+                          <div key={it.id} className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label>Item name</Label>
+                                <Input className="rounded-xl" value={editItemName} onChange={(e) => setEditItemName(e.target.value)} />
                               </div>
-                            ) : null}
+                              <div className="space-y-2">
+                                <Label>Category</Label>
+                                <select
+                                  value={editItemCategory}
+                                  onChange={(e) => setEditItemCategory(e.target.value)}
+                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                >
+                                  <option value="">Select category (optional)</option>
+                                  {INVENTORY_CATEGORIES.map((c) => (
+                                    <option key={c.value} value={c.value}>
+                                      {c.label} — {c.detail}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Quantity</Label>
+                                <Input type="number" min={1} className="rounded-xl" value={editItemQty} onChange={(e) => setEditItemQty(e.target.value)} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Condition</Label>
+                                <select
+                                  value={editItemCondition}
+                                  onChange={(e) => setEditItemCondition(e.target.value as any)}
+                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                >
+                                  <option value="excellent">excellent</option>
+                                  <option value="good">good</option>
+                                  <option value="fair">fair</option>
+                                  <option value="damaged">damaged</option>
+                                  <option value="missing">missing</option>
+                                </select>
+                              </div>
+                              <div className="space-y-2 md:col-span-2">
+                                <Label>Notes</Label>
+                                <Input className="rounded-xl" value={editItemNotes} onChange={(e) => setEditItemNotes(e.target.value)} />
+                              </div>
+                            </div>
+                            <div className="mt-3 flex justify-end gap-2">
+                              <Button type="button" variant="outline" disabled={editItemSaving} onClick={() => setEditItemId(null)}>
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                disabled={editItemSaving}
+                                onClick={async () => {
+                                  const qty = Number(editItemQty);
+                                  if (!editItemName.trim() || !Number.isFinite(qty) || qty <= 0) return;
+                                  try {
+                                    setEditItemSaving(true);
+                                    await onEditItem(it.id, {
+                                      itemName: editItemName.trim(),
+                                      category: editItemCategory.trim() || undefined,
+                                      quantity: qty,
+                                      conditionState: editItemCondition,
+                                      notes: editItemNotes.trim() || undefined,
+                                    });
+                                    setEditItemId(null);
+                                  } finally {
+                                    setEditItemSaving(false);
+                                  }
+                                }}
+                              >
+                                {editItemSaving ? 'Saving…' : 'Save changes'}
+                              </Button>
+                            </div>
                           </div>
-                        ))
-                      )}
+                        );
+                      })() : null}
                     </div>
                   </div>
                 ))
               )}
             </div>
+              </div>
+            ) : null}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-100 bg-white p-6">
-            <div className="text-sm font-bold text-slate-900 mb-2">Notes</div>
-            <CommentSection comments={comments} onAdd={addComment} onEdit={editComment} onDelete={deleteComment} />
-          </div>
-        )}
+        </div>
       </div>
     </Modal>
   );
