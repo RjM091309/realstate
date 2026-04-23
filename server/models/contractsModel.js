@@ -208,10 +208,189 @@ export async function getContractById(id, branchId) {
   return rows[0] ?? null;
 }
 
+export async function getContractDocumentDetails(contractId, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      c.id AS contract_id,
+      c.branch_id,
+      c.contract_no,
+      c.unit_id,
+      c.landlord_id,
+      c.agent_id,
+      c.contract_type,
+      c.status,
+      c.start_date,
+      c.end_date,
+      c.monthly_rent,
+      c.security_deposit,
+      c.advance_rent,
+      c.special_remarks AS contract_remarks,
+      c.created_at AS contract_created_at,
+
+      u.unit_no AS unit_number,
+      u.floor_no AS unit_floor,
+      u.tower AS unit_tower,
+      pr.name AS building_name,
+      pr.common_address,
+      pr.legal_address,
+
+      t.id AS tenant_id,
+      t.full_name AS tenant_name,
+      t.email AS tenant_email,
+      t.mobile_no AS tenant_phone,
+
+      ll.id AS landlord_id2,
+      ll.full_name AS landlord_name,
+      ll.mobile_no AS landlord_phone,
+      ll.email AS landlord_email,
+      ll.gov_id_no AS landlord_gov_id_no
+    FROM lease_contract c
+    INNER JOIN unit u ON u.id = c.unit_id
+    INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = c.branch_id
+    LEFT JOIN contract_tenant ct ON ct.contract_id = c.id AND ct.is_primary = 1
+    LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    LEFT JOIN landlord_profile ll ON ll.id = c.landlord_id
+    WHERE c.id = ? AND c.branch_id = ?
+    LIMIT 1
+    `,
+    [contractId, branchId],
+  );
+  return rows[0] ?? null;
+}
+
 export async function deleteContractById(id, branchId) {
   const [result] = await pool.query('DELETE FROM lease_contract WHERE id = ? AND branch_id = ?', [
     id,
     branchId,
   ]);
   return result.affectedRows;
+}
+
+export async function listContractTenants(contractId, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      ct.contract_id,
+      ct.tenant_id,
+      ct.is_primary,
+      ct.created_at,
+      t.full_name AS tenant_name,
+      t.email AS tenant_email,
+      t.mobile_no AS tenant_phone
+    FROM contract_tenant ct
+    INNER JOIN lease_contract lc ON lc.id = ct.contract_id AND lc.branch_id = ?
+    INNER JOIN tenant_profile t ON t.id = ct.tenant_id
+    WHERE ct.contract_id = ?
+    ORDER BY ct.is_primary DESC, ct.created_at DESC
+    `,
+    [branchId, contractId],
+  );
+  return rows;
+}
+
+export async function listContractCollaborations(contractId, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      cc.id,
+      cc.branch_id,
+      cc.contract_id,
+      cc.partner_agency_id,
+      pa.agency_name AS partner_agency_name,
+      pa.contact_person AS partner_contact_person,
+      pa.contact_number AS partner_contact_number,
+      pa.email AS partner_email,
+      cc.commission_terms,
+      cc.remarks,
+      cc.created_by,
+      cc.created_at
+    FROM contract_collaboration cc
+    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ?
+    LEFT JOIN partner_agency pa ON pa.id = cc.partner_agency_id
+    WHERE cc.contract_id = ? AND cc.branch_id = ?
+    ORDER BY cc.created_at DESC, cc.id DESC
+    `,
+    [branchId, contractId, branchId],
+  );
+  return rows;
+}
+
+async function findPartnerAgencyByEmail(branchId, email) {
+  const e = String(email ?? '').trim();
+  if (!e) return null;
+  const [rows] = await pool.query(
+    `
+    SELECT id
+    FROM partner_agency
+    WHERE branch_id = ? AND LOWER(email) = LOWER(?)
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [branchId, e],
+  );
+  return rows[0]?.id ?? null;
+}
+
+export async function findOrCreatePartnerAgencyForInvite(branchId, name, email) {
+  const emailNorm = String(email ?? '').trim();
+  const nameNorm = String(name ?? '').trim();
+  if (emailNorm) {
+    const byEmail = await findPartnerAgencyByEmail(branchId, emailNorm);
+    if (byEmail) return String(byEmail);
+  }
+
+  const agencyName = nameNorm || emailNorm || 'Partner Agency';
+  try {
+    const [res] = await pool.query(
+      `
+      INSERT INTO partner_agency (
+        branch_id,
+        agency_name,
+        contact_person,
+        contact_number,
+        email,
+        kyc_verified,
+        is_blacklisted,
+        active
+      ) VALUES (?, ?, ?, NULL, ?, 0, 0, 1)
+      `,
+      [branchId, agencyName, nameNorm || null, emailNorm || null],
+    );
+    return String(res.insertId);
+  } catch (e) {
+    // If duplicate agency name exists, just fetch that.
+    if (e?.code === 'ER_DUP_ENTRY') {
+      const [rows] = await pool.query(
+        `SELECT id FROM partner_agency WHERE branch_id = ? AND agency_name = ? LIMIT 1`,
+        [branchId, agencyName],
+      );
+      if (rows[0]?.id) return String(rows[0].id);
+    }
+    throw e;
+  }
+}
+
+export async function insertContractCollaboration(branchId, contractId, payload) {
+  const [result] = await pool.query(
+    `
+    INSERT INTO contract_collaboration (
+      branch_id,
+      contract_id,
+      partner_agency_id,
+      commission_terms,
+      remarks,
+      created_by
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    [
+      branchId,
+      contractId,
+      payload.partnerAgencyId,
+      payload.commissionTerms ?? null,
+      payload.remarks ?? null,
+      payload.createdBy ?? null,
+    ],
+  );
+  return result.insertId;
 }

@@ -3,11 +3,11 @@ import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { contracts as seedContracts, units as seedUnits, tenants as seedTenants } from '@/lib/mockData';
-import { fetchContracts } from '@/lib/contractsApi';
-import { fetchUnits } from '@/lib/unitsApi';
-import { fetchTenants } from '@/lib/tenantsApi';
+import { fetchContractDocumentDetails } from '@/lib/contractsApi';
+import { fetchContractRepositoryDocuments } from '@/lib/documentsApi';
+import { fetchContractInvoices, fetchInvoice } from '@/lib/invoicesApi';
 import { format } from 'date-fns';
-import type { Contract, Tenant, Unit } from '@/types';
+import type { Contract, InvoiceRow, Tenant, Unit } from '@/types';
 
 interface DocumentPreviewProps {
   type: 'contract' | 'invoice';
@@ -21,26 +21,114 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [invoice, setInvoice] = useState<InvoiceRow | null>(null);
+  const [resolvedContractId, setResolvedContractId] = useState<string>(contractId);
+  const [leaseAttachmentPath, setLeaseAttachmentPath] = useState<string>('');
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     void (async () => {
       try {
-        const [contractsData, unitsData, tenantsData] = await Promise.all([
-          fetchContracts(),
-          fetchUnits(),
-          fetchTenants(),
-        ]);
+        let contractIdForDetails = contractId;
+        let resolvedInvoice: InvoiceRow | null = null;
+        if (type === 'invoice') {
+          // In standalone preview URLs, `id` may be an invoice id (not a contract id).
+          try {
+            const invRow = await fetchInvoice(contractId);
+            if (!active) return;
+            resolvedInvoice = invRow;
+            contractIdForDetails = invRow.contractId;
+          } catch {
+            // Backward compatibility: some places still pass contractId for invoice preview.
+            contractIdForDetails = contractId;
+          }
+        }
+
+        setResolvedContractId(contractIdForDetails);
+        const details = await fetchContractDocumentDetails(contractIdForDetails);
         if (!active) return;
-        setContracts(contractsData);
-        setUnits(unitsData);
-        setTenants(tenantsData);
+        setContracts([details.contract]);
+        setUnits([
+          {
+            id: details.unit.id,
+            unitNumber: details.unit.unitNumber,
+            floor: details.unit.floor,
+            tower: details.unit.tower,
+            buildingName: details.unit.buildingName,
+            commonAddress: details.unit.commonAddress,
+            legalAddress: details.unit.legalAddress,
+            type: 'Studio',
+            status: 'Available',
+            area: 'Makati',
+            monthlyRate: Number(details.contract.monthlyRent ?? 0),
+            inventory: [],
+          },
+        ]);
+        setTenants(
+          details.tenant
+            ? [
+                {
+                  id: details.tenant.id,
+                  name: details.tenant.name,
+                  email: details.tenant.email,
+                  phone: details.tenant.phone,
+                  idType: '',
+                  idNumber: '',
+                  idExpiry: '',
+                  isBlacklisted: false,
+                },
+              ]
+            : [],
+        );
+
+        if (type === 'invoice') {
+          setInvoice(resolvedInvoice);
+          // If invoice wasn't resolved by id above, fall back to picking from contract invoices.
+          if (!resolvedInvoice) {
+            try {
+              const inv = await fetchContractInvoices(contractIdForDetails);
+              if (!active) return;
+              const pick =
+                inv.find((x) => x.status === 'issued') ??
+                inv.find((x) => x.status === 'draft') ??
+                inv[0] ??
+                null;
+              resolvedInvoice = pick;
+              setInvoice(pick);
+            } catch {
+              if (!active) return;
+              setInvoice(null);
+            }
+          }
+        }
+
+        // If there's an uploaded lease contract in the repository, prefer showing it
+        // for the Lease Agreement preview.
+        if (type === 'contract') {
+          try {
+            const docs = await fetchContractRepositoryDocuments(contractIdForDetails);
+            if (!active) return;
+            const lease =
+              docs.find((d) => d.docType === 'lease_contract') ??
+              docs.find((d) => d.docType === 'other' && /lease/i.test(d.title ?? '')) ??
+              null;
+            setLeaseAttachmentPath(lease?.filePath ? String(lease.filePath) : '');
+          } catch {
+            if (!active) return;
+            setLeaseAttachmentPath('');
+          }
+        } else {
+          setLeaseAttachmentPath('');
+        }
       } catch {
         // Fallback keeps document preview usable when API is unavailable.
         if (!active) return;
         setContracts(seedContracts);
         setUnits(seedUnits);
         setTenants(seedTenants);
+        setInvoice(null);
+        setLeaseAttachmentPath('');
       } finally {
         if (active) setLoading(false);
       }
@@ -48,11 +136,11 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
     return () => {
       active = false;
     };
-  }, []);
+  }, [contractId, type]);
 
   const contract = useMemo(
-    () => contracts.find((c) => c.id === contractId),
-    [contracts, contractId],
+    () => contracts.find((c) => c.id === resolvedContractId),
+    [contracts, resolvedContractId],
   );
   const unit = useMemo(
     () => units.find((u) => u.id === contract?.unitId),
@@ -66,6 +154,42 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
   if (loading) return <div className="p-8 text-center">Loading document...</div>;
   if (!contract) return <div className="p-8 text-center">Contract not found.</div>;
 
+  const invoiceNoLabel = invoice?.invoiceNo ? invoice.invoiceNo : `INV-${new Date().getFullYear()}-001`;
+  const issuedLabel = invoice?.issuedAt ? invoice.issuedAt : format(new Date(), 'MMMM dd, yyyy');
+  const base = invoice?.baseAmount ?? contract.securityDeposit + contract.advanceRent;
+  const other = invoice?.otherCharges ?? 0;
+  const discount = invoice?.discountAmount ?? 0;
+  const total = invoice?.totalAmount ?? base + other - discount;
+
+  const resolveUploadUrl = (p: string) => {
+    const s = String(p ?? '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return s;
+  };
+
+  const isLikelyPdfPath = (p: string) => /\.pdf(\?|#|$)/i.test(String(p ?? ''));
+
+  const handlePdf = () => {
+    // If we have an attached lease contract file, open it directly (user can download from viewer).
+    if (type === 'contract' && leaseAttachmentPath) {
+      const url = resolveUploadUrl(leaseAttachmentPath);
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const title =
+      type === 'invoice'
+        ? `Invoice_${invoiceNoLabel}`
+        : `Contract_${contract.contractNo ?? contract.id}`;
+    const prev = document.title;
+    document.title = title;
+    try {
+      window.print();
+    } finally {
+      document.title = prev;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-200 flex flex-col">
       {/* Toolbar */}
@@ -77,11 +201,11 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
           </Button>
           <div className="flex flex-col">
             <h1 className="text-lg font-bold">{type === 'contract' ? 'Lease Agreement' : 'Billing Statement'}</h1>
-            <p className="text-xs text-slate-500">Document ID: {contract.id}</p>
+            <p className="text-xs text-slate-500">Document ID: {type === 'invoice' ? (invoice?.id ?? '') : contract.id}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-8">
+          <Button variant="outline" size="sm" className="h-8" onClick={handlePdf}>
             <Download className="w-4 h-4 mr-2" />
             PDF
           </Button>
@@ -96,7 +220,23 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
       <div className="flex-1 flex justify-center p-8 sm:p-12 overflow-y-auto">
         {/* A4 Container */}
         <div className="bg-white shadow-2xl w-[210mm] min-h-[297mm] p-[20mm] sm:p-[25mm] font-serif text-slate-800 relative overflow-hidden print:shadow-none print:p-0 print:w-full">
-          {type === 'contract' ? (
+          {type === 'contract' && leaseAttachmentPath ? (
+            <div className="w-full h-[calc(297mm-40mm)] print:h-auto">
+              {isLikelyPdfPath(leaseAttachmentPath) ? (
+                <iframe
+                  title="Lease agreement"
+                  src={resolveUploadUrl(leaseAttachmentPath)}
+                  className="w-full h-full border-0"
+                />
+              ) : (
+                <img
+                  src={resolveUploadUrl(leaseAttachmentPath)}
+                  alt="Lease agreement"
+                  className="w-full h-full object-contain bg-white"
+                />
+              )}
+            </div>
+          ) : type === 'contract' ? (
             <div className="space-y-8">
               <div className="text-center space-y-4">
                 <div className="flex justify-center mb-4">
@@ -161,10 +301,10 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                 <div className="text-right space-y-1">
                   <div className="bg-slate-900 text-white px-4 py-2 rounded-md mb-4 inline-block">
                     <p className="text-xs font-bold uppercase tracking-widest opacity-70">Invoice Number</p>
-                    <p className="font-mono text-lg font-bold">#INV-2026-001</p>
+                    <p className="font-mono text-lg font-bold">#{invoiceNoLabel}</p>
                   </div>
                   <p className="text-sm font-bold text-slate-900">Date Issued</p>
-                  <p className="text-sm text-slate-500">{format(new Date(), 'MMMM dd, yyyy')}</p>
+                  <p className="text-sm text-slate-500">{issuedLabel}</p>
                 </div>
               </div>
 
@@ -200,18 +340,31 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                   <TableBody>
                     <TableRow className="hover:bg-transparent border-slate-100">
                       <TableCell className="py-6">
-                        <p className="font-bold text-slate-900">Security Deposit</p>
-                        <p className="text-xs text-slate-500">Equivalent to two (2) months of rent</p>
+                        <p className="font-bold text-slate-900">Base amount</p>
+                        <p className="text-xs text-slate-500">
+                          {invoice?.billingPeriodStart && invoice?.billingPeriodEnd
+                            ? `Billing period: ${invoice.billingPeriodStart} to ${invoice.billingPeriodEnd}`
+                            : 'Billing summary'}
+                        </p>
                       </TableCell>
-                      <TableCell className="text-right font-bold text-slate-900">₱{contract.securityDeposit.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-bold text-slate-900">₱{Number(base).toLocaleString()}</TableCell>
                     </TableRow>
-                    <TableRow className="hover:bg-transparent border-slate-100">
-                      <TableCell className="py-6">
-                        <p className="font-bold text-slate-900">Advance Rent</p>
-                        <p className="text-xs text-slate-500">First month of lease</p>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-slate-900">₱{contract.advanceRent.toLocaleString()}</TableCell>
-                    </TableRow>
+                    {other ? (
+                      <TableRow className="hover:bg-transparent border-slate-100">
+                        <TableCell className="py-6">
+                          <p className="font-bold text-slate-900">Other charges</p>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">₱{Number(other).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ) : null}
+                    {discount ? (
+                      <TableRow className="hover:bg-transparent border-slate-100">
+                        <TableCell className="py-6">
+                          <p className="font-bold text-slate-900">Discount</p>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">-₱{Number(discount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ) : null}
                   </TableBody>
                 </Table>
 
@@ -219,16 +372,24 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                   <div className="w-full max-w-xs space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500">Subtotal</span>
-                      <span className="font-bold text-slate-900">₱{(contract.securityDeposit + contract.advanceRent).toLocaleString()}</span>
+                      <span className="font-bold text-slate-900">₱{Number(base + other).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Tax (0%)</span>
-                      <span className="font-bold text-slate-900">₱0.00</span>
-                    </div>
+                    {discount ? (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Discount</span>
+                        <span className="font-bold text-slate-900">-₱{Number(discount).toLocaleString()}</span>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between items-center pt-3 border-t-2 border-slate-900">
                       <span className="text-lg font-black uppercase text-slate-900">Total Due</span>
-                      <span className="text-2xl font-black text-indigo-600">₱{(contract.securityDeposit + contract.advanceRent).toLocaleString()}</span>
+                      <span className="text-2xl font-black text-indigo-600">₱{Number(total).toLocaleString()}</span>
                     </div>
+                    {invoice?.dueDate ? (
+                      <div className="flex justify-between text-xs text-slate-500 pt-1">
+                        <span>Due date</span>
+                        <span className="font-medium">{invoice.dueDate}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

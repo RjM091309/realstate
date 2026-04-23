@@ -1,8 +1,14 @@
 import { loadSessionPayload } from '../services/sessionService.js';
+import { logAudit } from '../services/auditLogService.js';
 import {
   deleteContractById,
+  findOrCreatePartnerAgencyForInvite,
+  getContractDocumentDetails,
   getContractById,
   insertContract,
+  insertContractCollaboration,
+  listContractCollaborations,
+  listContractTenants,
   listContractsByBranch,
   updateContractById,
 } from '../models/contractsModel.js';
@@ -296,5 +302,192 @@ export async function deleteContract(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to delete contract' });
+  }
+}
+
+export async function listContractTenantsView(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const rows = await listContractTenants(id, ctx.session.branchId);
+    const tenants = rows.map((r) => ({
+      contractId: String(r.contract_id),
+      tenantId: String(r.tenant_id),
+      isPrimary: Boolean(Number(r.is_primary)),
+      createdAt: r.created_at ? fmtDate(r.created_at) : '',
+      name: r.tenant_name ? String(r.tenant_name) : '—',
+      email: r.tenant_email ? String(r.tenant_email) : '',
+      phone: r.tenant_phone ? String(r.tenant_phone) : '',
+    }));
+    res.json({ tenants });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load contract tenants' });
+  }
+}
+
+export async function listContractCollaborationsView(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const rows = await listContractCollaborations(id, ctx.session.branchId);
+    const collaborations = rows.map((r) => ({
+      id: String(r.id),
+      contractId: String(r.contract_id),
+      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
+      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
+      remarks: r.remarks ? String(r.remarks) : '',
+      createdBy: r.created_by != null ? String(r.created_by) : '',
+      createdAt: r.created_at ? fmtDate(r.created_at) : '',
+    }));
+    res.json({ collaborations });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load contract collaborations' });
+  }
+}
+
+function validateCreateCollaborationInvite(body) {
+  const name = String(body?.name ?? '').trim();
+  const email = String(body?.email ?? '').trim();
+  const commissionTerms = body?.commissionTerms == null ? null : String(body.commissionTerms).trim() || null;
+  const remarks = body?.remarks == null ? null : String(body.remarks).trim() || null;
+  if (!name && !email) return null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return { name, email, commissionTerms, remarks };
+}
+
+export async function createContractCollaborationInvite(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'create')) {
+    res.status(403).json({ error: 'No permission to add collaborators' });
+    return;
+  }
+
+  const contractId = String(req.params.id ?? '').trim();
+  if (!contractId) {
+    res.status(400).json({ error: 'Invalid contract id' });
+    return;
+  }
+
+  const parsed = validateCreateCollaborationInvite(req.body ?? {});
+  if (!parsed) {
+    res.status(400).json({ error: 'Invalid invite payload' });
+    return;
+  }
+
+  try {
+    const partnerAgencyId = await findOrCreatePartnerAgencyForInvite(ctx.session.branchId, parsed.name, parsed.email);
+    await insertContractCollaboration(ctx.session.branchId, contractId, {
+      partnerAgencyId,
+      commissionTerms: parsed.commissionTerms,
+      remarks: parsed.remarks,
+      createdBy: ctx.session.user.id,
+    });
+
+    void logAudit({
+      branchId: ctx.session.branchId,
+      actorUserId: ctx.session.user.id,
+      moduleName: 'contracts',
+      recordTable: 'contract_collaboration',
+      recordId: null,
+      action: 'create',
+      changeSummary: `Invited collaborator: ${parsed.email || parsed.name || '—'} (contract ${contractId})`,
+    });
+
+    const rows = await listContractCollaborations(contractId, ctx.session.branchId);
+    const collaborations = rows.map((r) => ({
+      id: String(r.id),
+      contractId: String(r.contract_id),
+      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
+      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
+      remarks: r.remarks ? String(r.remarks) : '',
+      createdBy: r.created_by != null ? String(r.created_by) : '',
+      createdAt: r.created_at ? fmtDate(r.created_at) : '',
+    }));
+    res.status(201).json({ collaborations });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to invite collaborator' });
+  }
+}
+
+function rowToContractDocumentDto(r) {
+  return {
+    contract: {
+      id: String(r.contract_id),
+      contractNo: r.contract_no ? String(r.contract_no) : undefined,
+      unitId: String(r.unit_id),
+      tenantId: r.tenant_id != null ? String(r.tenant_id) : '',
+      agentId: r.agent_id != null ? `a${String(r.agent_id)}` : '',
+      startDate: fmtDate(r.start_date),
+      endDate: fmtDate(r.end_date),
+      monthlyRent: Number(r.monthly_rent ?? 0),
+      securityDeposit: Number(r.security_deposit ?? 0),
+      advanceRent: Number(r.advance_rent ?? 0),
+      type: mapDbTypeToUi(r.contract_type),
+      status: mapDbStatusToUi(r.status),
+      remarks: r.contract_remarks ? String(r.contract_remarks) : undefined,
+    },
+    unit: {
+      id: String(r.unit_id),
+      unitNumber: r.unit_number ? String(r.unit_number) : '',
+      floor: r.unit_floor ? String(r.unit_floor) : '',
+      tower: r.unit_tower ? String(r.unit_tower) : '',
+      buildingName: r.building_name ? String(r.building_name) : '',
+      commonAddress: r.common_address ? String(r.common_address) : '',
+      legalAddress: r.legal_address ? String(r.legal_address) : '',
+    },
+    tenant: r.tenant_id
+      ? {
+          id: String(r.tenant_id),
+          name: r.tenant_name ? String(r.tenant_name) : '',
+          email: r.tenant_email ? String(r.tenant_email) : '',
+          phone: r.tenant_phone ? String(r.tenant_phone) : '',
+        }
+      : null,
+    landlord: r.landlord_id2
+      ? {
+          id: String(r.landlord_id2),
+          fullName: r.landlord_name ? String(r.landlord_name) : '',
+          mobileNo: r.landlord_phone ? String(r.landlord_phone) : '',
+          email: r.landlord_email ? String(r.landlord_email) : '',
+          govIdNo: r.landlord_gov_id_no ? String(r.landlord_gov_id_no) : '',
+        }
+      : null,
+  };
+}
+
+export async function getContractDocumentDetailsView(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const row = await getContractDocumentDetails(id, ctx.session.branchId);
+    if (!row) {
+      res.status(404).json({ error: 'Contract not found' });
+      return;
+    }
+    res.json(rowToContractDocumentDto(row));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load contract document details' });
   }
 }

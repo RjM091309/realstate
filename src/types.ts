@@ -48,6 +48,16 @@ export interface Tenant {
   blacklistReason?: string;
 }
 
+export interface Landlord {
+  id: string;
+  fullName: string;
+  mobileNo: string;
+  email: string;
+  govIdNo: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Contract {
   id: string;
   contractNo?: string;
@@ -65,6 +75,67 @@ export interface Contract {
   remarks?: string;
 }
 
+export interface ContractTenantRow {
+  contractId: string;
+  tenantId: string;
+  isPrimary: boolean;
+  createdAt: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface ContractCollaborationRow {
+  id: string;
+  contractId: string;
+  partnerAgencyId?: string;
+  partnerAgencyName: string;
+  commissionTerms: string;
+  remarks: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface DocumentTemplateRow {
+  id: string;
+  templateKey: string;
+  title: string;
+  filePath: string;
+  versionNo: number;
+  createdAt: string;
+}
+
+export interface RepositoryDocumentRow {
+  id: string;
+  contractId?: string;
+  tenantId?: string;
+  docType: string;
+  title: string;
+  filePath: string;
+  portalVisible: boolean;
+  createdAt: string;
+}
+
+export interface InventorySnapshotRow {
+  id: string;
+  contractId: string;
+  snapshotType: 'move_in' | 'move_out' | 'routine';
+  inspectionDate: string;
+  inspectedBy?: string;
+  remarks: string;
+  createdAt: string;
+}
+
+export interface InventorySnapshotItemRow {
+  id: string;
+  snapshotId: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  conditionState: 'excellent' | 'good' | 'fair' | 'damaged' | 'missing';
+  notes: string;
+}
+
 export interface Payment {
   id: string;
   contractId: string;
@@ -73,6 +144,24 @@ export interface Payment {
   dueDate: string;
   paidDate?: string;
   status: PaymentStatus;
+}
+
+export interface InvoiceRow {
+  id: string;
+  branchId: string;
+  invoiceNo: string;
+  contractId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  dueDate: string;
+  baseAmount: number;
+  otherCharges: number;
+  discountAmount: number;
+  totalAmount: number;
+  status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void';
+  issuedAt?: string;
+  createdBy?: string;
+  createdAt: string;
 }
 
 export interface Agent {

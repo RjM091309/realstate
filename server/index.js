@@ -14,6 +14,12 @@ import { paymentsRouter } from './routes/paymentsRoutes.js';
 import { partnerAgenciesRouter } from './routes/partnerAgenciesRoutes.js';
 import { blacklistRouter } from './routes/blacklistRoutes.js';
 import { calendarEventsRouter } from './routes/calendarEventsRoutes.js';
+import { documentsRouter } from './routes/documentsRoutes.js';
+import { inventorySnapshotsRouter } from './routes/inventorySnapshotsRoutes.js';
+import { specialRequestsRouter } from './routes/specialRequestsRoutes.js';
+import { landlordsRouter } from './routes/landlordsRoutes.js';
+import { invoicesRouter } from './routes/invoicesRoutes.js';
+import { auditLogsRouter } from './routes/auditLogsRoutes.js';
 
 const app = express();
 const apiPort = Number(process.env.API_PORT ?? 3001);
@@ -60,6 +66,12 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/calendar-events', calendarEventsRouter);
 app.use('/api/partner-agencies', partnerAgenciesRouter);
 app.use('/api/blacklist', blacklistRouter);
+app.use('/api/documents', documentsRouter);
+app.use('/api/inventory', inventorySnapshotsRouter);
+app.use('/api/special-requests', specialRequestsRouter);
+app.use('/api/landlords', landlordsRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/audit-logs', auditLogsRouter);
 
 void (async () => {
   try {
@@ -75,7 +87,7 @@ void (async () => {
   const server = app.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist',
+      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
     );
   });
 

@@ -99,3 +99,34 @@ export async function uploadTenantKycDocument(tenantId: string, file: File): Pro
   const { tenant } = (await res.json()) as { tenant: Tenant };
   return tenant;
 }
+
+export async function uploadTenantLeaseContract(
+  tenantId: string,
+  file: File,
+  opts?: { title?: string; portalVisible?: boolean },
+): Promise<{ filePath: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  if (opts?.title) form.append('title', opts.title);
+  form.append('portalVisible', opts?.portalVisible === false ? '0' : '1');
+
+  const res = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}/lease-contract`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = typeof err?.error === 'string' ? err.error : res.statusText;
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as { ok: boolean; filePath: string };
+  return { filePath: data.filePath };
+}
+
+export async function fetchTenantLeaseContract(tenantId: string): Promise<{ filePath: string; title?: string }> {
+  const res = await apiFetch<{ filePath: string; title?: string }>(`/api/tenants/${encodeURIComponent(tenantId)}/lease-contract`);
+  return res;
+}

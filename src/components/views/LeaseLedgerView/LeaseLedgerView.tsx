@@ -103,6 +103,7 @@ export function LeaseLedgerView() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [form, setForm] = useState<PaymentForm>(emptyForm);
+  const [refLoading, setRefLoading] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -140,6 +141,44 @@ export function LeaseLedgerView() {
       }
     })();
   }, [t]);
+
+  const ensureReferenceDataLoaded = useCallback(async () => {
+    // This view loads reference data on mount, but we also re-check when opening the modal
+    // to avoid an empty Contract dropdown if the initial request failed or the API restarted.
+    if (refLoading) return;
+    if (units.length && contracts.length && tenants.length) return;
+    setRefLoading(true);
+    let hadError = false;
+    try {
+      if (!units.length) {
+        try {
+          setUnits(await fetchUnits());
+        } catch {
+          hadError = true;
+          setUnits([]);
+        }
+      }
+      if (!contracts.length) {
+        try {
+          setContracts(await fetchContracts());
+        } catch {
+          hadError = true;
+          setContracts([]);
+        }
+      }
+      if (!tenants.length) {
+        try {
+          setTenants(await fetchTenants());
+        } catch {
+          hadError = true;
+          setTenants([]);
+        }
+      }
+    } finally {
+      setRefLoading(false);
+      if (hadError) toast.warning(t('views.ledger.loadError'));
+    }
+  }, [contracts.length, refLoading, t, tenants.length, units.length]);
 
   const expectedCollection = useMemo(() => {
     const start = startOfMonth(new Date());
@@ -254,14 +293,16 @@ export function LeaseLedgerView() {
     setEditingPaymentId(null);
     setForm(emptyForm());
     setIsPaymentModalOpen(true);
-  }, []);
+    void ensureReferenceDataLoaded();
+  }, [ensureReferenceDataLoaded]);
 
   const openEditModal = useCallback((payment: Payment) => {
     setFormMode('edit');
     setEditingPaymentId(payment.id);
     setForm(toForm(payment));
     setIsPaymentModalOpen(true);
-  }, []);
+    void ensureReferenceDataLoaded();
+  }, [ensureReferenceDataLoaded]);
 
   const closeModal = useCallback(() => {
     setIsPaymentModalOpen(false);

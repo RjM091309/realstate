@@ -32,6 +32,10 @@ import { getAuthHeaders } from '@/lib/api';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchPayments } from '@/lib/paymentsApi';
+import { fetchContractInventorySnapshots, fetchSnapshotItems } from '@/lib/inventoryApi';
+import { createContractSpecialRequest, fetchContractSpecialRequests } from '@/lib/specialRequestsApi';
+import { Textarea } from '@/components/ui/textarea';
+import type { InventorySnapshotItemRow } from '@/types';
 
 function readTenantIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('tenantId')?.trim() || null;
@@ -70,6 +74,14 @@ export function TenantPortalView() {
   const [portalDocuments, setPortalDocuments] = useState<PortalDocumentItem[] | null>(null);
   const [portalDocumentsLoading, setPortalDocumentsLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<InventorySnapshotItemRow[]>([]);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [maintenanceTitle, setMaintenanceTitle] = useState('');
+  const [maintenanceDetails, setMaintenanceDetails] = useState('');
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requests, setRequests] = useState<Array<{ id: string; title: string; details: string; status: string; createdAt: string }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +166,84 @@ export function TenantPortalView() {
     () => (contract ? paymentsList.filter((p) => p.contractId === contract.id) : []),
     [paymentsList, contract],
   );
+
+  useEffect(() => {
+    if (!contract?.id) {
+      setInventoryItems([]);
+      return;
+    }
+    let cancelled = false;
+    setInventoryLoading(true);
+    void (async () => {
+      try {
+        const snaps = await fetchContractInventorySnapshots(contract.id);
+        if (cancelled) return;
+        const moveIn = snaps
+          .filter((s) => s.snapshotType === 'move_in')
+          .sort((a, b) => String(b.inspectionDate).localeCompare(String(a.inspectionDate)))[0];
+        const pick = moveIn ?? snaps.sort((a, b) => String(b.inspectionDate).localeCompare(String(a.inspectionDate)))[0];
+        if (!pick) {
+          setInventoryItems([]);
+          return;
+        }
+        const items = await fetchSnapshotItems(pick.id);
+        if (!cancelled) setInventoryItems(items);
+      } catch {
+        if (!cancelled) setInventoryItems([]);
+      } finally {
+        if (!cancelled) setInventoryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract?.id]);
+
+  useEffect(() => {
+    if (!contract?.id) {
+      setRequests([]);
+      return;
+    }
+    let cancelled = false;
+    setRequestsLoading(true);
+    void (async () => {
+      try {
+        const rows = await fetchContractSpecialRequests(contract.id);
+        if (!cancelled) setRequests(rows);
+      } catch {
+        if (!cancelled) setRequests([]);
+      } finally {
+        if (!cancelled) setRequestsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract?.id]);
+
+  const submitMaintenance = async () => {
+    if (!contract?.id) return;
+    const title = maintenanceTitle.trim();
+    const details = maintenanceDetails.trim();
+    if (!title || !details) {
+      toast.error('Please enter a title and details.');
+      return;
+    }
+    if (maintenanceSaving) return;
+    setMaintenanceSaving(true);
+    try {
+      const next = await createContractSpecialRequest(contract.id, { title, details });
+      setRequests(next);
+      setMaintenanceTitle('');
+      setMaintenanceDetails('');
+      setMaintenanceOpen(false);
+      toast.success('Maintenance request submitted.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to submit request');
+    } finally {
+      setMaintenanceSaving(false);
+    }
+  };
 
   const paymentColumns: ColumnDef<Payment>[] = useMemo(
     () => [
@@ -358,23 +448,28 @@ export function TenantPortalView() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { item: 'Air Conditioning Unit', status: 'Good' },
-                  { item: 'Refrigerator (Samsung)', status: 'Good' },
-                  { item: 'Microwave Oven', status: 'Good' },
-                  { item: 'Queen Size Bed Frame', status: 'Good' },
-                  { item: 'Water Heater', status: 'Maintenance Needed' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <Package className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium">{item.item}</span>
-                    </div>
-                    <Badge variant={item.status === 'Good' ? 'outline' : 'destructive'} className="text-[10px]">
-                      {item.status === 'Good' ? t('views.portal.inventoryStatus.good') : t('views.portal.inventoryStatus.maintenanceNeeded')}
-                    </Badge>
-                  </div>
-                ))}
+                {inventoryLoading ? (
+                  <div className="col-span-full text-sm text-slate-500">Loading inventory…</div>
+                ) : inventoryItems.length === 0 ? (
+                  <div className="col-span-full text-sm text-slate-500">No inventory snapshot found for this contract.</div>
+                ) : (
+                  inventoryItems.map((it) => {
+                    const ok = it.conditionState === 'excellent' || it.conditionState === 'good';
+                    return (
+                      <div key={it.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Package className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="text-sm font-medium truncate">
+                            {it.itemName}{it.quantity > 1 ? ` ×${it.quantity}` : ''}
+                          </span>
+                        </div>
+                        <Badge variant={ok ? 'outline' : 'destructive'} className="text-[10px] shrink-0">
+                          {ok ? t('views.portal.inventoryStatus.good') : t('views.portal.inventoryStatus.maintenanceNeeded')}
+                        </Badge>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -515,9 +610,81 @@ export function TenantPortalView() {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-amber-700 mb-4">{t('views.portal.maintenanceHint')}</p>
-              <Button size="sm" variant="outline" className="w-full border-amber-200 text-amber-900 hover:bg-amber-100">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full border-amber-200 text-amber-900 hover:bg-amber-100"
+                onClick={() => setMaintenanceOpen((v) => !v)}
+              >
                 {t('views.portal.submitRequest')}
               </Button>
+
+              {maintenanceOpen ? (
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-amber-900">Title</Label>
+                    <Input
+                      value={maintenanceTitle}
+                      onChange={(e) => setMaintenanceTitle(e.target.value)}
+                      placeholder="e.g., Water heater not working"
+                      className="bg-white/70"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-amber-900">Details</Label>
+                    <Textarea
+                      value={maintenanceDetails}
+                      onChange={(e) => setMaintenanceDetails(e.target.value)}
+                      placeholder="Describe the issue (where/when/how)."
+                      className="bg-white/70"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-amber-900 hover:bg-amber-100"
+                      onClick={() => setMaintenanceOpen(false)}
+                      disabled={maintenanceSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-amber-900 text-amber-50 hover:bg-amber-900/90"
+                      onClick={() => void submitMaintenance()}
+                      disabled={maintenanceSaving}
+                    >
+                      {maintenanceSaving ? 'Submitting…' : 'Submit'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-4">
+                {requestsLoading ? (
+                  <div className="text-xs text-amber-800/80">Loading requests…</div>
+                ) : requests.length === 0 ? (
+                  <div className="text-xs text-amber-800/80">No requests yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {requests.slice(0, 3).map((r) => (
+                      <div key={r.id} className="rounded-lg border border-amber-200 bg-white/70 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-amber-900 truncate">{r.title}</div>
+                            <div className="text-[11px] text-amber-900/80 line-clamp-2">{r.details}</div>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-900">
+                            {r.status}
+                          </Badge>
+                        </div>
+                        {r.createdAt ? <div className="mt-1 text-[10px] text-amber-900/60">{r.createdAt}</div> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

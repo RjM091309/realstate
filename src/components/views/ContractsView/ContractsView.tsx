@@ -25,13 +25,45 @@ import {
 import { contracts as seedContracts, units as seedUnits, tenants as seedTenants, agents } from '@/lib/mockData';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { fetchUnits } from '@/lib/unitsApi';
-import { createContract, deleteContract, fetchContracts, updateContract } from '@/lib/contractsApi';
+import {
+  createContract,
+  deleteContract,
+  fetchContractCollaborations,
+  fetchContractTenants,
+  fetchContracts,
+  inviteContractCollaborator,
+  updateContract,
+} from '@/lib/contractsApi';
+import { createContractInvoice } from '@/lib/invoicesApi';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { Contract, Tenant, Unit } from '@/types';
+import type { Contract, ContractCollaborationRow, ContractTenantRow, Tenant, Unit } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
+import {
+  ContractDetailsCollaborationModal,
+  type ActivityItem,
+  type Collaborator,
+} from '@/components/contracts/ContractDetailsCollaborationModal';
+import {
+  fetchContractRepositoryDocuments,
+  fetchDocumentTemplates,
+  uploadContractRepositoryDocument,
+  uploadDocumentTemplate,
+} from '@/lib/documentsApi';
+import type { DocumentTemplateRow, RepositoryDocumentRow } from '@/types';
+import {
+  createInventorySnapshot,
+  createInventorySnapshotItem,
+  deleteInventorySnapshot,
+  deleteInventorySnapshotItem,
+  fetchContractInventorySnapshots,
+  fetchSnapshotItems,
+  patchInventorySnapshot,
+  patchInventorySnapshotItem,
+} from '@/lib/inventoryApi';
+import type { InventorySnapshotItemRow, InventorySnapshotRow } from '@/types';
 
 export function ContractsView() {
   const { t } = useTranslation();
@@ -57,6 +89,18 @@ export function ContractsView() {
   });
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [contractTenantsLoading, setContractTenantsLoading] = useState(false);
+  const [contractCollabLoading, setContractCollabLoading] = useState(false);
+  const [contractTenants, setContractTenants] = useState<ContractTenantRow[]>([]);
+  const [contractCollaborations, setContractCollaborations] = useState<ContractCollaborationRow[]>([]);
+  const [repoDocs, setRepoDocs] = useState<RepositoryDocumentRow[]>([]);
+  const [templates, setTemplates] = useState<DocumentTemplateRow[]>([]);
+  const [inventorySnapshots, setInventorySnapshots] = useState<InventorySnapshotRow[]>([]);
+  const [inventoryItemsBySnapshot, setInventoryItemsBySnapshot] = useState<
+    Record<string, InventorySnapshotItemRow[]>
+  >({});
 
   const resetNewContractForm = () => {
     setUnitId(null);
@@ -172,6 +216,118 @@ export function ContractsView() {
       toast.error(e instanceof Error ? e.message : 'Failed to delete contract');
     }
   };
+
+  const openContractDetails = (contract: Contract) => {
+    setSelectedContract(contract);
+    setIsDetailsOpen(true);
+    setContractTenants([]);
+    setContractCollaborations([]);
+    setRepoDocs([]);
+    setTemplates([]);
+    setInventorySnapshots([]);
+    setInventoryItemsBySnapshot({});
+    setContractTenantsLoading(true);
+    setContractCollabLoading(true);
+    void (async () => {
+      try {
+        const [tenantsRows, collabRows, docsRows, templateRows, snapRows] = await Promise.all([
+          fetchContractTenants(contract.id),
+          fetchContractCollaborations(contract.id),
+          fetchContractRepositoryDocuments(contract.id),
+          fetchDocumentTemplates(),
+          fetchContractInventorySnapshots(contract.id),
+        ]);
+        setContractTenants(tenantsRows);
+        setContractCollaborations(collabRows);
+        setRepoDocs(docsRows);
+        setTemplates(templateRows);
+        setInventorySnapshots(snapRows);
+
+        const itemPairs = await Promise.all(
+          snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
+        );
+        const map: Record<string, InventorySnapshotItemRow[]> = {};
+        for (const [sid, items] of itemPairs) map[sid] = items;
+        setInventoryItemsBySnapshot(map);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to load contract details');
+      } finally {
+        setContractTenantsLoading(false);
+        setContractCollabLoading(false);
+      }
+    })();
+  };
+
+  const reloadInventory = async (contractId: string) => {
+    const snapRows = await fetchContractInventorySnapshots(contractId);
+    setInventorySnapshots(snapRows);
+    const itemPairs = await Promise.all(
+      snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
+    );
+    const map: Record<string, InventorySnapshotItemRow[]> = {};
+    for (const [sid, items] of itemPairs) map[sid] = items;
+    setInventoryItemsBySnapshot(map);
+  };
+
+  const closeContractDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedContract(null);
+    setContractTenants([]);
+    setContractCollaborations([]);
+    setRepoDocs([]);
+    setTemplates([]);
+    setInventorySnapshots([]);
+    setInventoryItemsBySnapshot({});
+  };
+
+  const buildCollaborators = (tenantsRows: ContractTenantRow[], collabRows: ContractCollaborationRow[]): Collaborator[] => {
+    const fromTenants = (tenantsRows ?? []).map<Collaborator>((r) => ({
+      id: `tenant-${r.tenantId}`,
+      name: r.name || '—',
+      email: r.email || '',
+      role: r.isPrimary ? 'Owner' : 'Viewer',
+      dateAdded: r.createdAt || '',
+    }));
+    const fromCollab = (collabRows ?? []).map<Collaborator>((c) => ({
+      id: `agency-${c.id}`,
+      name: c.partnerAgencyName || 'Agency',
+      email: '',
+      role: 'Viewer',
+      dateAdded: c.createdAt || '',
+    }));
+    return [...fromTenants, ...fromCollab];
+  };
+
+  const contractTenantColumns: ColumnDef<ContractTenantRow>[] = useMemo(
+    () => [
+      {
+        header: 'Tenant',
+        render: (r) => (
+          <div className="flex flex-col">
+            <span className="font-medium text-slate-900">{r.name}</span>
+            <span className="text-xs text-slate-500">{r.isPrimary ? 'Primary' : 'Co-tenant'}</span>
+          </div>
+        ),
+      },
+      { header: 'Email', render: (r) => <span className="text-sm text-slate-700 break-all">{r.email || '—'}</span> },
+      { header: 'Phone', render: (r) => <span className="text-sm text-slate-700">{r.phone || '—'}</span> },
+      { header: 'Added', render: (r) => <span className="text-xs text-slate-500">{r.createdAt || '—'}</span> },
+    ],
+    [],
+  );
+
+  const contractCollabColumns: ColumnDef<ContractCollaborationRow>[] = useMemo(
+    () => [
+      { header: 'Agency', render: (r) => <span className="font-medium text-slate-900">{r.partnerAgencyName}</span> },
+      {
+        header: 'Commission terms',
+        render: (r) => <span className="text-sm text-slate-700">{r.commissionTerms || '—'}</span>,
+      },
+      { header: 'Remarks', render: (r) => <span className="text-sm text-slate-600">{r.remarks || '—'}</span> },
+      { header: 'Created', render: (r) => <span className="text-xs text-slate-500">{r.createdAt || '—'}</span> },
+    ],
+    [],
+  );
 
   const columns: ColumnDef<Contract>[] = useMemo(
     () => [
@@ -471,6 +627,240 @@ export function ContractsView() {
         </div>
       </Modal>
 
+      <ContractDetailsCollaborationModal
+        isOpen={isDetailsOpen}
+        onClose={closeContractDetails}
+        summary={{
+          title: selectedContract ? `Contract ${selectedContract.contractNo ?? selectedContract.id}` : 'Contract',
+          unitLabel: selectedContract
+            ? (() => {
+                const u = unitList.find((x) => x.id === selectedContract.unitId);
+                return u ? `${u.unitNumber} · ${u.buildingName}` : selectedContract.unitId;
+              })()
+            : '—',
+          primaryTenantLabel: selectedContract
+            ? tenantList.find((x) => x.id === selectedContract.tenantId)?.name ?? selectedContract.tenantId
+            : '—',
+          periodLabel: selectedContract
+            ? `${format(new Date(selectedContract.startDate), 'MMM d, yyyy')} — ${format(
+                new Date(selectedContract.endDate),
+                'MMM d, yyyy',
+              )}`
+            : '—',
+          statusLabel: selectedContract ? selectedContract.status : '—',
+        }}
+        initialCollaborators={buildCollaborators(contractTenants, contractCollaborations)}
+        initialActivity={(() => {
+          const items: ActivityItem[] = [];
+          for (const r of contractTenants ?? []) {
+            if (!r.createdAt) continue;
+            items.push({
+              id: `tenant-${r.tenantId}-${r.isPrimary ? 'p' : 'c'}`,
+              at: r.createdAt,
+              text: `${r.isPrimary ? 'Primary tenant' : 'Co-tenant'} linked: ${r.name || r.tenantId}`,
+            });
+          }
+          for (const c of contractCollaborations ?? []) {
+            if (!c.createdAt) continue;
+            items.push({
+              id: `collab-${c.id}`,
+              at: c.createdAt,
+              text: `Collaboration added: ${c.partnerAgencyName || 'Agency'}${
+                c.commissionTerms ? ` (${c.commissionTerms})` : ''
+              }`,
+            });
+          }
+          return items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+        })()}
+        onSendInvite={async ({ name, email, commissionTerms, remarks }) => {
+          if (!selectedContract) return;
+          try {
+            const next = await inviteContractCollaborator(selectedContract.id, {
+              name,
+              email,
+              commissionTerms,
+              remarks,
+            });
+            setContractCollaborations(next);
+            toast.success('Invite sent.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to send invite');
+            throw e;
+          }
+        }}
+        documents={repoDocs.map((d) => ({
+          id: d.id,
+          docType: d.docType,
+          title: d.title,
+          filePath: d.filePath,
+          createdAt: d.createdAt,
+          portalVisible: d.portalVisible,
+          contractId: d.contractId,
+        }))}
+        templates={templates.map((t1) => ({
+          id: t1.id,
+          templateKey: t1.templateKey,
+          title: t1.title,
+          filePath: t1.filePath,
+          versionNo: t1.versionNo,
+          createdAt: t1.createdAt,
+        }))}
+        onUploadRepositoryDocument={async (payload) => {
+          if (!selectedContract) return;
+          try {
+            const next = await uploadContractRepositoryDocument(selectedContract.id, {
+              file: payload.file,
+              docType: payload.docType,
+              title: payload.title,
+              portalVisible: payload.portalVisible,
+            });
+            setRepoDocs(next);
+            toast.success('Document uploaded.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to upload document');
+            throw e;
+          }
+        }}
+        onUploadTemplate={async (payload) => {
+          try {
+            const next = await uploadDocumentTemplate({
+              file: payload.file,
+              templateKey: payload.templateKey,
+              title: payload.title,
+              isActive: payload.isActive,
+            });
+            setTemplates(next);
+            toast.success('Template uploaded.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to upload template');
+            throw e;
+          }
+        }}
+        onGenerateInvoice={async () => {
+          if (!selectedContract) return;
+          try {
+            // Default: current month billing, due at month end; base = monthly rent.
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const toYmd = (d: Date) =>
+              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+            const created = await createContractInvoice(selectedContract.id, {
+              billingPeriodStart: toYmd(start),
+              billingPeriodEnd: toYmd(end),
+              dueDate: toYmd(end),
+              baseAmount: Number(selectedContract.monthlyRent ?? 0),
+              otherCharges: 0,
+              discountAmount: 0,
+              status: 'issued',
+            });
+            toast.success('Invoice generated.');
+            const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${encodeURIComponent(created.id)}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to generate invoice');
+            throw e;
+          }
+        }}
+        inventory={inventorySnapshots.map((s) => ({
+          id: s.id,
+          snapshotType: s.snapshotType,
+          inspectionDate: s.inspectionDate,
+          remarks: s.remarks,
+          items: (inventoryItemsBySnapshot[s.id] ?? []).map((it) => ({
+            id: it.id,
+            itemName: it.itemName,
+            category: it.category,
+            quantity: it.quantity,
+            conditionState: it.conditionState,
+            notes: it.notes,
+          })),
+        }))}
+        onAddSnapshot={async (payload) => {
+          if (!selectedContract) return;
+          try {
+            await createInventorySnapshot({
+              contractId: selectedContract.id,
+              snapshotType: payload.snapshotType,
+              inspectionDate: payload.inspectionDate,
+              remarks: payload.remarks,
+            });
+            await reloadInventory(selectedContract.id);
+            toast.success('Snapshot added.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to add snapshot');
+          }
+        }}
+        onAddItem={async (payload) => {
+          if (!selectedContract) return;
+          try {
+            await createInventorySnapshotItem({
+              snapshotId: payload.snapshotId,
+              itemName: payload.itemName,
+              category: payload.category,
+              quantity: payload.quantity,
+              conditionState: payload.conditionState,
+              notes: payload.notes,
+            });
+            await reloadInventory(selectedContract.id);
+            toast.success('Item added.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to add item');
+          }
+        }}
+        onEditSnapshot={async (snapshotId, payload) => {
+          if (!selectedContract) return;
+          try {
+            await patchInventorySnapshot(snapshotId, {
+              snapshotType: payload.snapshotType,
+              inspectionDate: payload.inspectionDate,
+              remarks: payload.remarks,
+            });
+            await reloadInventory(selectedContract.id);
+            toast.success('Snapshot updated.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to update snapshot');
+          }
+        }}
+        onDeleteSnapshot={async (snapshotId) => {
+          if (!selectedContract) return;
+          try {
+            await deleteInventorySnapshot(snapshotId);
+            await reloadInventory(selectedContract.id);
+            toast.success('Snapshot deleted.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to delete snapshot');
+          }
+        }}
+        onEditItem={async (itemId, payload) => {
+          if (!selectedContract) return;
+          try {
+            await patchInventorySnapshotItem(itemId, {
+              itemName: payload.itemName,
+              category: payload.category,
+              quantity: payload.quantity,
+              conditionState: payload.conditionState,
+              notes: payload.notes,
+            });
+            await reloadInventory(selectedContract.id);
+            toast.success('Item updated.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to update item');
+          }
+        }}
+        onDeleteItem={async (itemId) => {
+          if (!selectedContract) return;
+          try {
+            await deleteInventorySnapshotItem(itemId);
+            await reloadInventory(selectedContract.id);
+            toast.success('Item deleted.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to delete item');
+          }
+        }}
+      />
+
       <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -502,7 +892,12 @@ export function ContractsView() {
           <SkeletonTable rows={8} columns={6} />
         </div>
       ) : (
-        <DataTable data={filteredContracts} columns={columns} keyExtractor={(c) => c.id} />
+        <DataTable
+          data={filteredContracts}
+          columns={columns}
+          keyExtractor={(c) => c.id}
+          onRowClick={(c) => openContractDetails(c)}
+        />
       )}
     </div>
   );

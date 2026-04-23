@@ -11,11 +11,15 @@ import {
   listRepositoryDocumentsForPortal,
   listTenantAttachmentDocumentsForPortal,
   getPrimaryContractIdForTenant,
+  getLatestLeaseContractRepositoryDocForTenant,
   updateTenantById,
 } from '../models/tenantsModel.js';
 import { deactivateBlacklistForTenant, upsertActiveTenantBlacklist } from '../models/blacklistModel.js';
 import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
 import { isValidPortalArtifactSlug, streamPortalArtifactPdf } from '../services/portalArtifactPdfService.js';
+import { finalizeRepositoryUploadToWebpOrPdf } from '../services/repositoryUploadService.js';
+import { insertRepositoryDocument } from '../models/documentsModel.js';
+import { logAudit } from '../services/auditLogService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_ROOT = path.normalize(path.join(__dirname, '..', 'uploads'));
@@ -524,5 +528,113 @@ export async function uploadTenantKycDocument(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to upload document' });
+  }
+}
+
+export async function uploadTenantLeaseContract(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  // Allow upload for both create and update flows (register tenant + edits).
+  if (!canCrud(ctx.session, 'create') && !canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to upload documents' });
+    return;
+  }
+
+  const tenantId = String(req.params.id ?? '').trim();
+  if (!tenantId) {
+    res.status(400).json({ error: 'Invalid tenant id' });
+    return;
+  }
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  try {
+    const existing = await getTenantById(tenantId, ctx.session.branchId);
+    if (!existing) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to validate tenant' });
+    return;
+  }
+
+  let filePath;
+  try {
+    ({ publicUrl: filePath } = await finalizeRepositoryUploadToWebpOrPdf(file));
+  } catch (e) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e instanceof Error ? e.message : 'Failed to process upload';
+    if (code >= 400 && code < 500) {
+      res.status(code).json({ error: msg });
+      return;
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to upload document' });
+    return;
+  }
+
+  const titleRaw = String(req.body?.title ?? '').trim();
+  const title = titleRaw || 'Lease contract';
+  const portalVisibleRaw = String(req.body?.portalVisible ?? req.body?.is_portal_visible ?? '1').trim();
+  const portalVisible = portalVisibleRaw === '0' || portalVisibleRaw.toLowerCase() === 'false' ? 0 : 1;
+
+  try {
+    const contractId = await getPrimaryContractIdForTenant(tenantId, ctx.session.branchId);
+    const repoId = await insertRepositoryDocument(ctx.session.branchId, {
+      contractId: contractId ? String(contractId) : null,
+      tenantId,
+      uploadedBy: ctx.session.user.id,
+      docType: 'lease_contract',
+      title,
+      filePath,
+      portalVisible: Boolean(portalVisible),
+    });
+
+    void logAudit({
+      branchId: ctx.session.branchId,
+      actorUserId: ctx.session.user.id,
+      moduleName: 'crm',
+      recordTable: 'document_repository',
+      recordId: repoId,
+      action: 'create',
+      changeSummary: `Uploaded lease contract for tenant ${tenantId}: ${title}`,
+    });
+
+    res.status(201).json({ ok: true, filePath });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to save lease contract' });
+  }
+}
+
+export async function getTenantLeaseContract(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const tenantId = String(req.params.id ?? '').trim();
+  if (!tenantId) {
+    res.status(400).json({ error: 'Invalid tenant id' });
+    return;
+  }
+  try {
+    const existing = await getTenantById(tenantId, ctx.session.branchId);
+    if (!existing) {
+      res.status(404).json({ error: 'Tenant not found' });
+      return;
+    }
+    const row = await getLatestLeaseContractRepositoryDocForTenant(tenantId, ctx.session.branchId);
+    if (!row || !String(row.file_path ?? '').trim()) {
+      res.json({ filePath: '' });
+      return;
+    }
+    res.json({ filePath: String(row.file_path).trim(), title: String(row.title ?? '') });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load lease contract' });
   }
 }

@@ -41,7 +41,9 @@ import {
   createTenant,
   deleteTenant,
   fetchTenants,
+  fetchTenantLeaseContract,
   uploadTenantKycDocument,
+  uploadTenantLeaseContract,
   updateTenant,
   type TenantWriteBody,
 } from '@/lib/tenantsApi';
@@ -52,6 +54,13 @@ import {
   uploadPartnerAgencyKycDocument,
   updatePartnerAgency,
 } from '@/lib/partnerAgenciesApi';
+import {
+  createLandlord,
+  deleteLandlord,
+  fetchLandlords,
+  updateLandlord,
+  type LandlordWriteBody,
+} from '@/lib/landlordsApi';
 import {
   createBlacklistRecord,
   fetchBlacklist,
@@ -64,7 +73,7 @@ import { fetchUnits } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { BrokerAgency, Contract, Tenant, Unit } from '@/types';
+import type { BrokerAgency, Contract, Landlord, Tenant, Unit } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 
@@ -194,8 +203,10 @@ export function CRMView() {
   const [crmLoading, setCrmLoading] = useState(true);
   const [brokersLoading, setBrokersLoading] = useState(true);
   const [blacklistLoading, setBlacklistLoading] = useState(true);
+  const [landlordsLoading, setLandlordsLoading] = useState(true);
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
   const [brokerList, setBrokerList] = useState<BrokerAgency[]>([]);
+  const [landlordList, setLandlordList] = useState<Landlord[]>([]);
   const [blacklistList, setBlacklistList] = useState<BlacklistRow[]>([]);
   const [blacklistTypeFilter, setBlacklistTypeFilter] = useState<'all' | 'tenant' | 'broker'>('all');
   const [contractList, setContractList] = useState<Contract[]>([]);
@@ -210,6 +221,13 @@ export function CRMView() {
   const [pendingIdImage, setPendingIdImage] = useState<File | null>(null);
   const [pendingIdImageName, setPendingIdImageName] = useState<string>('');
   const [pendingIdPreviewUrl, setPendingIdPreviewUrl] = useState<string>('');
+
+  const leaseUploadRef = useRef<HTMLInputElement | null>(null);
+  const [leaseUploading, setLeaseUploading] = useState(false);
+  const [pendingLeaseFile, setPendingLeaseFile] = useState<File | null>(null);
+  const [pendingLeaseName, setPendingLeaseName] = useState('');
+  const [pendingLeasePreviewUrl, setPendingLeasePreviewUrl] = useState('');
+  const [existingLeaseContractUrl, setExistingLeaseContractUrl] = useState('');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -245,6 +263,16 @@ export function CRMView() {
   const [isTenantActivateOpen, setIsTenantActivateOpen] = useState(false);
   const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
 
+  const [isLandlordFormOpen, setIsLandlordFormOpen] = useState(false);
+  const [landlordFormMode, setLandlordFormMode] = useState<'create' | 'edit'>('create');
+  const [editingLandlordId, setEditingLandlordId] = useState<string | null>(null);
+  const [landlordForm, setLandlordForm] = useState({
+    fullName: '',
+    mobileNo: '',
+    email: '',
+    govIdNo: '',
+  });
+
   const [isBlacklistDetailsOpen, setIsBlacklistDetailsOpen] = useState(false);
   const [selectedBlacklist, setSelectedBlacklist] = useState<BlacklistRow | null>(null);
 
@@ -273,6 +301,39 @@ export function CRMView() {
     setPendingIdPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [pendingIdImage]);
+
+  useEffect(() => {
+    if (!pendingLeaseFile) {
+      setPendingLeasePreviewUrl('');
+      return;
+    }
+    if (!pendingLeaseFile.type.startsWith('image/')) {
+      setPendingLeasePreviewUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(pendingLeaseFile);
+    setPendingLeasePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingLeaseFile]);
+
+  useEffect(() => {
+    if (!isFormOpen || formMode !== 'edit' || !editingId) {
+      setExistingLeaseContractUrl('');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchTenantLeaseContract(editingId);
+        if (!cancelled) setExistingLeaseContractUrl(res.filePath || '');
+      } catch {
+        if (!cancelled) setExistingLeaseContractUrl('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId, formMode, isFormOpen]);
 
   const reloadBrokers = useCallback(async () => {
     try {
@@ -306,6 +367,22 @@ export function CRMView() {
     void reloadBlacklist();
   }, [reloadBlacklist]);
 
+  const reloadLandlords = useCallback(async () => {
+    try {
+      const list = await fetchLandlords();
+      setLandlordList(list);
+    } catch {
+      setLandlordList([]);
+      toast.warning('Failed to load landlords');
+    } finally {
+      setLandlordsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadLandlords();
+  }, [reloadLandlords]);
+
   useEffect(() => {
     void (async () => {
       try {
@@ -338,6 +415,78 @@ export function CRMView() {
         tenant.phone.includes(q)
     );
   }, [searchTerm, tenantList]);
+
+  const filteredLandlords = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return landlordList;
+    return landlordList.filter(
+      (l) =>
+        l.fullName.toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q) ||
+        (l.mobileNo || '').includes(q) ||
+        (l.govIdNo || '').includes(q),
+    );
+  }, [landlordList, searchTerm]);
+
+  const openAddLandlord = () => {
+    setLandlordForm({ fullName: '', mobileNo: '', email: '', govIdNo: '' });
+    setLandlordFormMode('create');
+    setEditingLandlordId(null);
+    setIsLandlordFormOpen(true);
+  };
+
+  const openEditLandlord = (l: Landlord) => {
+    setLandlordForm({
+      fullName: l.fullName ?? '',
+      mobileNo: l.mobileNo ?? '',
+      email: l.email ?? '',
+      govIdNo: l.govIdNo ?? '',
+    });
+    setLandlordFormMode('edit');
+    setEditingLandlordId(l.id);
+    setIsLandlordFormOpen(true);
+  };
+
+  const closeLandlordForm = () => {
+    setIsLandlordFormOpen(false);
+    setLandlordFormMode('create');
+    setEditingLandlordId(null);
+    setLandlordForm({ fullName: '', mobileNo: '', email: '', govIdNo: '' });
+  };
+
+  const handleSaveLandlord = async () => {
+    const payload: LandlordWriteBody = {
+      fullName: landlordForm.fullName,
+      mobileNo: landlordForm.mobileNo,
+      email: landlordForm.email,
+      govIdNo: landlordForm.govIdNo,
+    };
+    try {
+      if (landlordFormMode === 'edit' && editingLandlordId) {
+        const updated = await updateLandlord(editingLandlordId, payload);
+        setLandlordList((prev) => prev.map((x) => (x.id === editingLandlordId ? updated : x)));
+        toast.success('Landlord updated.');
+      } else {
+        const created = await createLandlord(payload);
+        setLandlordList((prev) => [created, ...prev]);
+        toast.success('Landlord created.');
+      }
+      closeLandlordForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save landlord');
+    }
+  };
+
+  const handleDeleteLandlord = async (l: Landlord) => {
+    if (!window.confirm(`Deactivate landlord ${l.fullName}?`)) return;
+    try {
+      await deleteLandlord(l.id);
+      setLandlordList((prev) => prev.filter((x) => x.id !== l.id));
+      toast.success('Landlord deactivated.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to deactivate landlord');
+    }
+  };
 
   const filteredBlacklist = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
@@ -432,6 +581,10 @@ export function CRMView() {
     setPendingIdImage(null);
     setPendingIdImageName('');
     setPendingIdPreviewUrl('');
+    setPendingLeaseFile(null);
+    setPendingLeaseName('');
+    setPendingLeasePreviewUrl('');
+    setExistingLeaseContractUrl('');
   };
 
   const openAddBroker = () => {
@@ -748,6 +901,13 @@ export function CRMView() {
           const webp = await toWebpIfNeeded(pendingIdImage);
           updated = await uploadTenantKycDocument(editingId, webp);
         }
+        if (pendingLeaseFile) {
+          setLeaseUploading(true);
+          await uploadTenantLeaseContract(editingId, pendingLeaseFile, {
+            title: `Lease contract - ${updated.name}`,
+            portalVisible: true,
+          });
+        }
         setTenantList((prev) => prev.map((x) => (x.id === editingId ? updated : x)));
         setSelectedTenant((s) => (s?.id === editingId ? updated : s));
         toast.success(t('views.crm.tenantModal.updated'));
@@ -756,6 +916,13 @@ export function CRMView() {
         if (pendingIdImage) {
           const webp = await toWebpIfNeeded(pendingIdImage);
           created = await uploadTenantKycDocument(created.id, webp);
+        }
+        if (pendingLeaseFile) {
+          setLeaseUploading(true);
+          await uploadTenantLeaseContract(created.id, pendingLeaseFile, {
+            title: `Lease contract - ${created.name}`,
+            portalVisible: true,
+          });
         }
         setTenantList((prev) => [created, ...prev]);
         toast.success(t('views.crm.tenantModal.created'));
@@ -766,7 +933,22 @@ export function CRMView() {
       toast.error(e instanceof Error ? e.message : 'Error');
     } finally {
       setIdUploading(false);
+      setLeaseUploading(false);
     }
+  };
+
+  const handlePickLeaseUpload = () => {
+    if (!canUpdate || leaseUploading) return;
+    leaseUploadRef.current?.click();
+  };
+
+  const handlePickLeaseFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    setPendingLeaseFile(picked);
+    setPendingLeaseName(picked.name);
+    toast.success('Lease contract ready to upload.');
   };
 
   const handlePickIdUpload = () => {
@@ -974,6 +1156,85 @@ export function CRMView() {
       },
     ],
     [t, canUpdate, canDelete, openViewDetails, openEdit, openActivateTenant, handleDeleteTenant, contractList, unitList],
+  );
+
+  const landlordColumns: ColumnDef<Landlord>[] = useMemo(
+    () => [
+      {
+        header: 'Landlord',
+        render: (l) => (
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-900">{l.fullName}</span>
+            <span className="text-xs text-slate-500">{l.govIdNo || '—'}</span>
+          </div>
+        ),
+      },
+      {
+        header: 'Contact',
+        render: (l) => (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Phone className="w-3 h-3" />
+              {l.mobileNo || '—'}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Mail className="w-3 h-3" />
+              <span className="break-all">{l.email || '—'}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: 'Created',
+        render: (l) => <span className="text-xs text-slate-500">{l.createdAt || '—'}</span>,
+      },
+      {
+        header: 'Actions',
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: (l) => (
+          <div
+            className="inline-flex items-center justify-end"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()} />}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canUpdate ? (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditLandlord(l);
+                    }}
+                  >
+                    Edit
+                  </DropdownMenuItem>
+                ) : null}
+                {canDelete ? (
+                  <DropdownMenuItem
+                    className="text-rose-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDeleteLandlord(l);
+                    }}
+                  >
+                    Deactivate
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ),
+      },
+    ],
+    [canDelete, canUpdate],
   );
 
   const blacklistColumns: ColumnDef<BlacklistRow>[] = useMemo(
@@ -1654,6 +1915,164 @@ export function CRMView() {
               ) : null}
             </div>
           ) : null}
+
+          {canUpdate ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Lease contract (PDF/Image)</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">{pendingLeaseName || 'No file selected'}</div>
+                  <div className="text-xs text-slate-500">Uploads to document repository as `lease_contract`.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={leaseUploadRef}
+                    type="file"
+                    accept="application/pdf,image/*"
+                    className="hidden"
+                    onChange={handlePickLeaseFile}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9"
+                    onClick={handlePickLeaseUpload}
+                    disabled={leaseUploading}
+                  >
+                    {leaseUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                        Uploading
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" aria-hidden />
+                        Choose file
+                      </>
+                    )}
+                  </Button>
+                  {pendingLeaseFile ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-9"
+                      onClick={() => {
+                        setPendingLeaseFile(null);
+                        setPendingLeaseName('');
+                        setPendingLeasePreviewUrl('');
+                      }}
+                      disabled={leaseUploading}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              {pendingLeasePreviewUrl ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Preview</div>
+                  <button
+                    type="button"
+                    className="w-full"
+                    onClick={() => window.open(pendingLeasePreviewUrl, '_blank')}
+                    title="Open full image"
+                  >
+                    <img
+                      src={pendingLeasePreviewUrl}
+                      alt="Selected lease contract"
+                      className="w-full max-h-56 object-contain rounded-lg bg-white"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              ) : existingLeaseContractUrl ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Uploaded</div>
+                  {isLikelyPdfPath(existingLeaseContractUrl) ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm text-slate-700 truncate">Lease contract</div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9"
+                        onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')}
+                      >
+                        Open PDF
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full"
+                      onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')}
+                      title="Open full image"
+                    >
+                      <img
+                        src={resolveUploadUrl(existingLeaseContractUrl)}
+                        alt="Lease contract"
+                        className="w-full max-h-56 object-contain rounded-lg bg-white"
+                        loading="lazy"
+                      />
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isLandlordFormOpen}
+        onClose={closeLandlordForm}
+        title={landlordFormMode === 'edit' ? 'Edit landlord' : 'Add landlord'}
+        maxWidth="lg"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={closeLandlordForm}>
+              Cancel
+            </Button>
+            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
+              Save
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Full name</Label>
+            <Input
+              className="rounded-xl border-slate-200"
+              value={landlordForm.fullName}
+              onChange={(e) => setLandlordForm((f) => ({ ...f, fullName: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Mobile no</Label>
+            <Input
+              className="rounded-xl border-slate-200"
+              value={landlordForm.mobileNo}
+              onChange={(e) => setLandlordForm((f) => ({ ...f, mobileNo: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              className="rounded-xl border-slate-200"
+              value={landlordForm.email}
+              onChange={(e) => setLandlordForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Government ID no</Label>
+            <Input
+              className="rounded-xl border-slate-200"
+              value={landlordForm.govIdNo}
+              onChange={(e) => setLandlordForm((f) => ({ ...f, govIdNo: e.target.value }))}
+            />
+          </div>
         </div>
       </Modal>
 
@@ -1968,8 +2387,9 @@ export function CRMView() {
       </div>
 
       <Tabs defaultValue="tenants" className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
           <TabsTrigger value="tenants">{t('views.crm.tabs.tenants')}</TabsTrigger>
+          <TabsTrigger value="landlords">Landlords</TabsTrigger>
           <TabsTrigger value="brokers">{t('views.crm.tabs.brokers')}</TabsTrigger>
           <TabsTrigger value="blacklist">{t('views.crm.tabs.blacklist')}</TabsTrigger>
         </TabsList>
@@ -1986,6 +2406,24 @@ export function CRMView() {
               keyExtractor={(tenant) => tenant.id}
               onRowClick={(tenant) => openViewDetails(tenant)}
             />
+          )}
+        </TabsContent>
+
+        <TabsContent value="landlords" className="space-y-6">
+          <div className="flex items-center justify-end">
+            {canCreate ? (
+              <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddLandlord}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add landlord
+              </Button>
+            ) : null}
+          </div>
+          {landlordsLoading ? (
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+              <SkeletonTable rows={6} columns={4} />
+            </div>
+          ) : (
+            <DataTable data={filteredLandlords} columns={landlordColumns} keyExtractor={(l) => l.id} />
           )}
         </TabsContent>
 

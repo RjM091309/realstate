@@ -297,6 +297,22 @@ export async function listRepositoryDocumentsForPortal(tenantId, branchId) {
   return rows;
 }
 
+export async function getLatestLeaseContractRepositoryDocForTenant(tenantId, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT dr.id, dr.title, dr.file_path, dr.created_at
+    FROM document_repository dr
+    WHERE dr.branch_id = ?
+      AND dr.tenant_id = ?
+      AND dr.doc_type = 'lease_contract'
+    ORDER BY dr.created_at DESC, dr.id DESC
+    LIMIT 1
+    `,
+    [branchId, tenantId],
+  );
+  return rows[0] ?? null;
+}
+
 export async function listTenantAttachmentDocumentsForPortal(tenantId, branchId) {
   const [rows] = await pool.query(
     `
