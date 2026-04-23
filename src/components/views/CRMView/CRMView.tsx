@@ -1488,7 +1488,7 @@ export function CRMView() {
                         toast.info(t('views.crm.details.documentLeaseUnavailable'));
                         return;
                       }
-                      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${tenantLeaseContext.contract.id}`;
+                      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${tenantLeaseContext.contract.id}`;
                       window.open(url, '_blank');
                     }}
                   >

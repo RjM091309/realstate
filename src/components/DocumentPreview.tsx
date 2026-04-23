@@ -103,24 +103,8 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
           }
         }
 
-        // If there's an uploaded lease contract in the repository, prefer showing it
-        // for the Lease Agreement preview.
-        if (type === 'contract') {
-          try {
-            const docs = await fetchContractRepositoryDocuments(contractIdForDetails);
-            if (!active) return;
-            const lease =
-              docs.find((d) => d.docType === 'lease_contract') ??
-              docs.find((d) => d.docType === 'other' && /lease/i.test(d.title ?? '')) ??
-              null;
-            setLeaseAttachmentPath(lease?.filePath ? String(lease.filePath) : '');
-          } catch {
-            if (!active) return;
-            setLeaseAttachmentPath('');
-          }
-        } else {
-          setLeaseAttachmentPath('');
-        }
+        // Always use the generated HTML view for 'contract' preview
+        setLeaseAttachmentPath('');
       } catch {
         // Fallback keeps document preview usable when API is unavailable.
         if (!active) return;

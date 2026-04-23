@@ -356,29 +356,29 @@ export function ContractsView() {
         headerClassName: 'text-center',
         cellClassName: 'text-center',
         render: (contract) => (
-          <div className="flex w-full min-w-0 justify-center items-center gap-1 flex-wrap">
+          <div className="flex w-full justify-center items-center gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="h-8 px-2 text-indigo-600"
+              className="h-8 px-3 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'contract');
               }}
             >
-              <FileText className="w-4 h-4 mr-1" />
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
               {t('views.contracts.table.contract')}
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="h-8 px-2 text-slate-600"
+              className="h-8 px-3 text-slate-600 bg-slate-100 hover:bg-slate-200 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'invoice');
               }}
             >
-              <FileText className="w-4 h-4 mr-1" />
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
               {t('views.contracts.table.invoice')}
             </Button>
           </div>
