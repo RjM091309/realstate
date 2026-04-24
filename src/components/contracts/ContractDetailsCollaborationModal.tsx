@@ -679,7 +679,7 @@ export function ContractDetailsCollaborationModal({
           <ContractSummaryCard title="Status" value={summary.statusLabel} />
         </div>        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-2">
           {/* ── Sidebar Nav ── */}
-          <div className="col-span-1 space-y-1">
+          <div className="col-span-1 space-y-1 border-r border-slate-200 pr-4">
             <button
               type="button"
               onClick={() => setTab('collaboration')}
@@ -727,7 +727,7 @@ export function ContractDetailsCollaborationModal({
           </div>
 
           {/* ── Main Content Area ── */}
-          <div className="col-span-1 md:col-span-3 min-w-0">
+          <div className="col-span-1 md:col-span-3 min-w-0 pl-2">
             {tab === 'collaboration' ? (
               <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

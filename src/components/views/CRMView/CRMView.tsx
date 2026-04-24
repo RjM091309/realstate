@@ -210,6 +210,7 @@ export function CRMView() {
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<string | number | null>('tenants');
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -1290,10 +1291,22 @@ export function CRMView() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.crm.title')}</h1>
           <p className="text-slate-500 mt-1">{t('views.crm.subtitle')}</p>
         </div>
-        {canCreate && (
+        {canCreate && activeTab === 'tenants' && (
           <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openRegister}>
             <Plus className="w-4 h-4 mr-2" />
             {t('views.crm.registerTenant')}
+          </Button>
+        )}
+        {canCreate && activeTab === 'brokers' && (
+          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddBroker}>
+            <Plus className="w-4 h-4 mr-2" />
+            {t('views.crm.brokers.addAgency')}
+          </Button>
+        )}
+        {canCreate && activeTab === 'landlords' && (
+          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddLandlord}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Landlord
           </Button>
         )}
       </div>
@@ -1348,7 +1361,7 @@ export function CRMView() {
               )}
             </div>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-slate-200 pt-3">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6">
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -1382,7 +1395,7 @@ export function CRMView() {
                   </div>
                 </div>
 
-                <div className="flex min-w-0 flex-col gap-1.5 border-t border-slate-100 pt-3 md:border-t-0 md:border-l md:border-slate-100 md:pt-0 md:pl-6">
+                <div className="flex min-w-0 flex-col gap-1.5 border-t border-slate-200 pt-3 md:border-t-0 md:border-l md:border-slate-200 md:pt-0 md:pl-6">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
                     {t('views.crm.details.leaseInfo')}
                   </h4>
@@ -1439,7 +1452,7 @@ export function CRMView() {
               </div>
             </div>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-slate-200 pt-3">
               <div className="flex flex-col gap-1.5">
                 <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   {t('views.crm.details.identification')}
@@ -1467,7 +1480,7 @@ export function CRMView() {
               </div>
             </div>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-slate-200 pt-3">
               <div className="flex flex-col gap-1.5">
                 <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   {t('views.crm.details.documents')}
@@ -1544,7 +1557,7 @@ export function CRMView() {
             </div>
 
             {selectedTenant.blacklistReason ? (
-              <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mt-3 border-t border-slate-200 pt-3">
                 <div className="flex flex-col gap-1.5">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
                     {t('views.crm.details.notes')}
@@ -2378,23 +2391,19 @@ export function CRMView() {
         ) : null}
       </Modal>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             placeholder={t('views.crm.searchPlaceholder')}
-            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
-            style={{
-              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
-              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
-            }}
+            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <Tabs defaultValue="tenants" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
           <TabsTrigger value="tenants">{t('views.crm.tabs.tenants')}</TabsTrigger>
           <TabsTrigger value="landlords">Landlords</TabsTrigger>
@@ -2418,14 +2427,6 @@ export function CRMView() {
         </TabsContent>
 
         <TabsContent value="landlords" className="space-y-6">
-          <div className="flex items-center justify-end">
-            {canCreate ? (
-              <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddLandlord}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add landlord
-              </Button>
-            ) : null}
-          </div>
           {landlordsLoading ? (
             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
               <SkeletonTable rows={6} columns={4} />
@@ -2450,149 +2451,160 @@ export function CRMView() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredBrokers.map((agency) => {
                 const isBrokerBl =
                   Boolean(agency.isBlacklisted) ||
                   blacklistList.some((r) => r.entityType === 'broker' && r.partnerAgencyId === agency.id);
                 return (
-                <Card key={agency.id} className="border-none shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
-                        <Users className="w-6 h-6" />
+                <div
+                  key={agency.id}
+                  className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="px-5 pt-5 pb-4">
+                    <div className="flex items-start gap-3.5">
+                      <div className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-600 font-semibold text-base">
+                        {(agency.name || '?').charAt(0).toUpperCase()}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{t('views.crm.brokers.partner')}</Badge>
-                        {isBrokerBl ? (
-                          <Badge variant="outline" className="border-0 bg-rose-100 text-rose-700">
-                            {t('views.crm.table.blacklisted')}
-                          </Badge>
-                        ) : (
-                          <>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'border-0',
-                                agency.kycVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800',
-                              )}
-                            >
-                              {agency.kycVerified
-                                ? t('views.crm.table.verified')
-                                : t('views.crm.table.verificationPending')}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'border-0',
-                                agency.active !== false
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : 'bg-slate-100 text-slate-700',
-                              )}
-                            >
-                              {agency.active !== false ? t('views.crm.table.active') : t('views.crm.table.inactive')}
-                            </Badge>
-                          </>
-                        )}
-                        {(canUpdate || canDelete) ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              }
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => openEditBroker(agency)}>
-                                  {t('views.crm.brokers.edit')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    if (isBrokerBl) {
-                                      openActivateBroker(agency);
-                                      return;
-                                    }
-                                    openBlacklistBroker(agency);
-                                  }}
-                                >
-                                  {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
-                                  {agency.kycVerified
-                                    ? t('views.crm.brokers.unverify')
-                                    : t('views.crm.brokers.verify')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
-                                  {agency.active !== false
-                                    ? t('views.crm.brokers.deactivate')
-                                    : t('views.crm.brokers.activateActive')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canDelete ? (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  className="text-rose-600"
-                                  onClick={() => void handleDeleteBroker(agency)}
-                                >
-                                  {t('views.crm.brokers.delete')}
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : null}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">{agency.name}</h3>
+                          {(canUpdate || canDelete) ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                }
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {canUpdate ? (
+                                  <DropdownMenuItem onClick={() => openEditBroker(agency)}>
+                                    {t('views.crm.brokers.edit')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canUpdate ? (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      if (isBrokerBl) {
+                                        openActivateBroker(agency);
+                                        return;
+                                      }
+                                      openBlacklistBroker(agency);
+                                    }}
+                                  >
+                                    {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canUpdate ? (
+                                  <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
+                                    {agency.kycVerified
+                                      ? t('views.crm.brokers.unverify')
+                                      : t('views.crm.brokers.verify')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canUpdate ? (
+                                  <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
+                                    {agency.active !== false
+                                      ? t('views.crm.brokers.deactivate')
+                                      : t('views.crm.brokers.activateActive')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canDelete ? (
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    className="text-rose-600"
+                                    onClick={() => void handleDeleteBroker(agency)}
+                                  >
+                                    {t('views.crm.brokers.delete')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{agency.contactPerson || '—'}</p>
+                        {/* Status indicators */}
+                        <div className="flex items-center gap-3 mt-2">
+                          {isBrokerBl ? (
+                            <span className="flex items-center gap-1.5 text-[11px] text-rose-600 font-medium">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              {t('views.crm.table.blacklisted')}
+                            </span>
+                          ) : (
+                            <>
+                              <span className={cn(
+                                'flex items-center gap-1.5 text-[11px] font-medium',
+                                agency.kycVerified ? 'text-emerald-600' : 'text-amber-600',
+                              )}>
+                                <span className={cn('h-1.5 w-1.5 rounded-full', agency.kycVerified ? 'bg-emerald-500' : 'bg-amber-500')} />
+                                {agency.kycVerified ? t('views.crm.table.verified') : t('views.crm.table.verificationPending')}
+                              </span>
+                              <span className={cn(
+                                'flex items-center gap-1.5 text-[11px] font-medium',
+                                agency.active !== false ? 'text-slate-600' : 'text-slate-400',
+                              )}>
+                                <span className={cn('h-1.5 w-1.5 rounded-full', agency.active !== false ? 'bg-slate-500' : 'bg-slate-300')} />
+                                {agency.active !== false ? t('views.crm.table.active') : t('views.crm.table.inactive')}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <CardTitle className="mt-4">{agency.name}</CardTitle>
-                    <CardDescription>{t('views.crm.brokers.officialPartner')}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm gap-3">
-                        <span className="text-slate-500 shrink-0">{t('views.crm.brokers.contactPerson')}</span>
-                        <span className="font-medium text-right">{agency.contactPerson || '—'}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm gap-3">
-                        <span className="text-slate-500 shrink-0">{t('views.crm.brokers.phone')}</span>
-                        <span className="font-medium text-right">{agency.phone || '—'}</span>
+                  </div>
+
+                  {/* Details */}
+                  <div className="px-5 pb-4 space-y-2">
+                    <div className="border-t border-slate-100 pt-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium">{t('views.crm.brokers.phone')}</span>
+                        <span className="text-slate-700 font-medium tabular-nums">{agency.phone || '—'}</span>
                       </div>
                       {agency.email ? (
-                        <div className="flex items-center justify-between text-sm gap-3">
-                          <span className="text-slate-500 shrink-0">{t('views.crm.brokers.emailShort')}</span>
-                          <span className="font-medium text-right break-all">{agency.email}</span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">{t('views.crm.brokers.emailShort')}</span>
+                          <span className="text-slate-700 font-medium break-all text-right">{agency.email}</span>
+                        </div>
+                      ) : null}
+                      {agency.nationality ? (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">Nationality</span>
+                          <span className="text-slate-700 font-medium">{agency.nationality}</span>
+                        </div>
+                      ) : null}
+                      {agency.documentType ? (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">Document</span>
+                          <span className="text-slate-700 font-medium">{agency.documentType}{agency.documentNo ? ` • ${agency.documentNo}` : ''}</span>
+                        </div>
+                      ) : null}
+                      {agency.expiryDate ? (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">Expiry</span>
+                          <span className="text-slate-700 font-medium tabular-nums">{agency.expiryDate}</span>
                         </div>
                       ) : null}
                     </div>
-                    <Button type="button" variant="outline" className="w-full" onClick={handleViewBrokerLogs}>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100">
+                    <Button type="button" variant="ghost" size="sm" className="w-full h-7 text-xs font-medium text-slate-500 hover:text-slate-900" onClick={handleViewBrokerLogs}>
                       {t('views.crm.brokers.viewLogs')}
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
                 );
               })}
-              {canCreate ? (
-                <button
-                  type="button"
-                  className="border-dashed border-2 flex flex-col items-center justify-center p-6 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 transition-all cursor-pointer rounded-2xl bg-white"
-                  onClick={openAddBroker}
-                >
-                  <Plus className="w-8 h-8 mb-2" />
-                  <p className="font-medium">{t('views.crm.brokers.addAgency')}</p>
-                </button>
-              ) : null}
             </div>
           )}
         </TabsContent>

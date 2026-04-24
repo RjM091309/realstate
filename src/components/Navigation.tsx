@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { 
-  LayoutDashboard, 
-  Building2, 
-  Users, 
-  FileText, 
-  Calendar, 
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  FilePen,
+  BookOpen,
+  Calendar,
   Settings,
   LogOut,
   Search,
@@ -47,9 +48,9 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   const operationalItems = [
     { id: 'dashboard', label: t('nav.menu.dashboard'), icon: LayoutDashboard },
     { id: 'units', label: t('nav.menu.units'), icon: Building2 },
-    { id: 'contracts', label: t('nav.menu.contracts'), icon: FileText },
+    { id: 'contracts', label: t('nav.menu.contracts'), icon: FilePen },
     { id: 'crm', label: t('nav.menu.crm'), icon: Users },
-    { id: 'ledger', label: t('nav.menu.ledger'), icon: FileText },
+    { id: 'ledger', label: t('nav.menu.ledger'), icon: BookOpen },
     { id: 'calendar', label: t('nav.menu.calendar'), icon: Calendar },
     { id: 'agentPortal', label: t('nav.menu.agentPortal'), icon: Briefcase },
     { id: 'portal', label: t('nav.menu.portal'), icon: UserCircle },
@@ -66,94 +67,167 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
 
   const navItems = [...visibleOperational, ...accessItem];
 
+  const { session } = useAuth();
+  const userName = session
+    ? `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username
+    : '';
+  const userRole = session?.role.name ?? '';
+  const userInitials = (() => {
+    const parts = userName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]![0]!}${parts[1]![0]!}`.toUpperCase();
+    return userName.slice(0, 2).toUpperCase() || 'U';
+  })();
+
   return (
-    <div 
+    <div
       className={cn(
-        "relative flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 ease-in-out shrink-0",
-        isCollapsed ? "w-20" : "w-64"
+        'relative flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800/60 transition-all duration-300 ease-in-out shrink-0',
+        isCollapsed ? 'w-[72px]' : 'w-64'
       )}
     >
+      {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-4 top-8 flex h-8 w-8 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-400 hover:text-white transition-colors z-50 shadow-md"
+        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-all z-50 shadow-lg"
       >
-        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
 
-      <div className={cn("transition-all duration-300", isCollapsed ? "p-4" : "p-6")}>
-        <div className={cn("flex items-center mb-8", isCollapsed ? "justify-center" : "gap-2.5")}>
+      {/* Logo */}
+      <div className={cn('transition-all duration-300', isCollapsed ? 'px-4 pt-5 pb-4' : 'px-5 pt-6 pb-4')}>
+        <div className={cn('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-950/40 ring-1 ring-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-950/50 ring-1 ring-white/10"
             aria-hidden
           >
             <Building2 className="h-[18px] w-[18px]" strokeWidth={2} />
           </div>
-          {!isCollapsed && (
-            <span className="text-xl font-bold text-white tracking-tight truncate">{t('nav.appName')}</span>
-          )}
+          <span
+            className={cn(
+              'text-lg font-bold text-white tracking-tight overflow-hidden transition-all duration-300',
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+            )}
+          >
+            {t('nav.appName')}
+          </span>
         </div>
+      </div>
 
+      {/* Divider */}
+      <div className="mx-4 border-t border-slate-800/80" />
+
+      {/* Nav items */}
+      <div className={cn('flex-1 overflow-y-auto transition-all duration-300 py-3', isCollapsed ? 'px-3' : 'px-3')}>
         <nav className="space-y-0.5" aria-label="Main">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              title={isCollapsed ? item.label : undefined}
-              onClick={() => {
-                if (item.id === 'portal') {
-                  const url = `${window.location.origin}${window.location.pathname}?view=portal`;
-                  window.open(url, '_blank');
-                  return;
-                }
-                if (item.id === 'agentPortal') {
-                  const url = `${window.location.origin}${window.location.pathname}?view=agent-portal`;
-                  window.open(url, '_blank');
-                  return;
-                }
-                setActiveTab(item.id);
-              }}
-              className={cn(
-                "w-full flex items-center rounded-md text-sm font-medium transition-colors",
-                isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
-                activeTab === item.id 
-                  ? "bg-indigo-600 text-white" 
-                  : "hover:bg-slate-800 hover:text-white"
-              )}
-            >
-              <item.icon className={cn("shrink-0 opacity-90", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={isCollapsed ? item.label : undefined}
+                onClick={() => {
+                  if (item.id === 'portal') {
+                    window.open(`${window.location.origin}${window.location.pathname}?view=portal`, '_blank');
+                    return;
+                  }
+                  if (item.id === 'agentPortal') {
+                    window.open(`${window.location.origin}${window.location.pathname}?view=agent-portal`, '_blank');
+                    return;
+                  }
+                  setActiveTab(item.id);
+                }}
+                className={cn(
+                  'relative w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150',
+                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
+                  isActive
+                    ? 'bg-indigo-500/15 text-indigo-300'
+                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
+                )}
+              >
+                {/* Left accent bar for active */}
+                {isActive && !isCollapsed && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-full" />
+                )}
+                <item.icon
+                  className={cn(
+                    'shrink-0 transition-colors',
+                    isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
+                    isActive ? 'text-indigo-400' : ''
+                  )}
+                />
+                <span
+                  className={cn(
+                    'truncate transition-all duration-300 overflow-hidden',
+                    isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                  )}
+                >
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
         </nav>
       </div>
 
-      <div className={cn("mt-auto border-t border-slate-800", isCollapsed ? "p-4" : "p-6")}>
-        <button 
-          title={isCollapsed ? t('nav.settings') : undefined}
-          onClick={() => setActiveTab('settings')}
-          className={cn(
-            "w-full flex items-center rounded-md text-sm font-medium transition-colors",
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
-            activeTab === 'settings' 
-              ? "bg-indigo-600 text-white" 
-              : "hover:bg-slate-800 hover:text-white"
-          )}
-        >
-          <Settings className={cn("shrink-0", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
-          {!isCollapsed && t('nav.settings')}
-        </button>
-        <button
-          type="button"
-          title={isCollapsed ? t('nav.logout') : undefined}
-          onClick={() => onLogout?.()}
-          className={cn(
-            "w-full flex items-center rounded-md text-sm font-medium text-rose-400 hover:bg-rose-900/20 transition-colors mt-1",
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2"
-          )}
-        >
-          <LogOut className={cn("shrink-0", isCollapsed ? "w-5 h-5" : "w-4 h-4")} />
-          {!isCollapsed && t('nav.logout')}
-        </button>
+      {/* Bottom section */}
+      <div className="border-t border-slate-800/80">
+        {/* User profile card */}
+        <div className={cn(
+          'flex items-center gap-3 transition-all duration-300',
+          isCollapsed ? 'justify-center p-3' : 'px-4 py-3.5'
+        )}>
+          <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold">
+            {userInitials}
+          </div>
+          <div className={cn(
+            'min-w-0 overflow-hidden transition-all duration-300',
+            isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
+          )}>
+            <p className="text-xs font-semibold text-slate-200 truncate">{userName}</p>
+            <p className="text-[10px] text-slate-500 truncate">{userRole}</p>
+          </div>
+        </div>
+
+        {/* Settings & Logout */}
+        <div className={cn('border-t border-slate-800/60 space-y-0.5', isCollapsed ? 'p-3' : 'px-3 py-3')}>
+          <button
+            title={isCollapsed ? t('nav.settings') : undefined}
+            onClick={() => setActiveTab('settings')}
+            className={cn(
+              'w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150',
+              isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
+              activeTab === 'settings'
+                ? 'bg-indigo-500/15 text-indigo-300'
+                : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
+            )}
+          >
+            <Settings className={cn('shrink-0', isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]')} />
+            <span className={cn(
+              'truncate transition-all duration-300 overflow-hidden',
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+            )}>
+              {t('nav.settings')}
+            </span>
+          </button>
+          <button
+            type="button"
+            title={isCollapsed ? t('nav.logout') : undefined}
+            onClick={() => onLogout?.()}
+            className={cn(
+              'w-full flex items-center rounded-lg text-sm font-medium text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-300 transition-all duration-150',
+              isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
+            )}
+          >
+            <LogOut className={cn('shrink-0', isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]')} />
+            <span className={cn(
+              'truncate transition-all duration-300 overflow-hidden',
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+            )}>
+              {t('nav.logout')}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

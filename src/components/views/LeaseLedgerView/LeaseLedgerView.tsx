@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileText,
   Download,
@@ -724,21 +724,17 @@ export function LeaseLedgerView() {
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             placeholder={t('views.ledger.searchPlaceholder')}
-            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
-            style={{
-              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
-              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
-            }}
+            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="w-full sm:w-auto shrink-0">
+        <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
           <Filter className="w-4 h-4 mr-2" />
           {t('views.ledger.filter')}
         </Button>

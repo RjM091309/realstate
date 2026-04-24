@@ -257,6 +257,21 @@ function normalizeInventoryDraft(items: InventoryItem[] | undefined | null): Inv
   }));
 }
 
+function statusBadgeClass(status: string): string {
+  if (status === 'Available') return 'bg-emerald-500';
+  if (status === 'Occupied') return 'bg-indigo-500';
+  if (status === 'Maintenance') return 'bg-rose-500';
+  if (status === 'Reserved') return 'bg-amber-500';
+  return 'bg-slate-500';
+}
+
+function conditionLabel(condition: string, t: (k: string) => string): string {
+  if (condition === 'New') return t('views.units.details.conditionNew');
+  if (condition === 'Good') return t('views.units.details.conditionGood');
+  if (condition === 'Fair') return t('views.units.details.conditionFair');
+  return t('views.units.details.conditionPoor');
+}
+
 function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
   return {
     unitNumber: u.unitNumber,
@@ -497,15 +512,8 @@ export function UnitsView() {
     setInventoryAddOpen(true);
   }, []);
 
-  const closeInventoryAddModal = useCallback(() => {
+  const resetInventoryForm = useCallback(() => {
     setInventoryAddOpen(false);
-    setInventoryEditId(null);
-    setInventoryAddName('');
-    setInventoryAddQty(1);
-    setInventoryAddCondition('Good');
-  }, []);
-
-  const closeInventoryEditModal = useCallback(() => {
     setInventoryEditOpen(false);
     setInventoryEditId(null);
     setInventoryAddName('');
@@ -543,9 +551,9 @@ export function UnitsView() {
     ];
 
     const ok = await handleSaveDetailInventory(next);
-    if (ok) closeInventoryAddModal();
+    if (ok) resetInventoryForm();
   }, [
-    closeInventoryAddModal,
+    resetInventoryForm,
     detailInventoryDraft,
     handleSaveDetailInventory,
     inventoryAddCondition,
@@ -573,9 +581,9 @@ export function UnitsView() {
     const next = detailInventoryDraft.map((x) => (x.id === inventoryEditId ? edited : x));
 
     const ok = await handleSaveDetailInventory(next);
-    if (ok) closeInventoryEditModal();
+    if (ok) resetInventoryForm();
   }, [
-    closeInventoryEditModal,
+    resetInventoryForm,
     detailInventoryDraft,
     handleSaveDetailInventory,
     inventoryAddCondition,
@@ -962,21 +970,17 @@ export function UnitsView() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             placeholder={t('views.units.searchPlaceholder')}
-            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
-            style={{
-              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
-              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
-            }}
+            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="w-full sm:w-auto shrink-0">
+        <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
           <Filter className="w-4 h-4 mr-2" />
           {t('views.units.filter')}
         </Button>
@@ -1059,19 +1063,7 @@ export function UnitsView() {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Badge
-                    className={cn(
-                      unit.status === 'Available'
-                        ? 'bg-emerald-500'
-                        : unit.status === 'Occupied'
-                          ? 'bg-indigo-500'
-                          : unit.status === 'Maintenance'
-                            ? 'bg-rose-500'
-                            : unit.status === 'Reserved'
-                              ? 'bg-amber-500'
-                              : 'bg-slate-500'
-                    )}
-                  >
+                  <Badge className={statusBadgeClass(unit.status)}>
                     {statusLabel(unit.status)}
                   </Badge>
                 </div>
@@ -1208,32 +1200,30 @@ export function UnitsView() {
           </div>
         }
       >
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-5">
-            <div className="flex justify-end">
-              <Badge
-                className={cn(
-                  selectedUnit?.status === 'Available'
-                    ? 'bg-emerald-500'
-                    : selectedUnit?.status === 'Occupied'
-                      ? 'bg-indigo-500'
-                      : selectedUnit?.status === 'Maintenance'
-                        ? 'bg-rose-500'
-                        : selectedUnit?.status === 'Reserved'
-                          ? 'bg-amber-500'
-                          : 'bg-slate-500'
-                )}
-              >
-                {selectedUnit?.status ? statusLabel(selectedUnit.status) : ''}
-              </Badge>
-            </div>
+        <div className="flex justify-end items-start mb-2 pr-2">
+          <Badge
+            className={cn(
+              selectedUnit?.status === 'Available'
+                ? 'bg-emerald-500'
+                : selectedUnit?.status === 'Occupied'
+                  ? 'bg-indigo-500'
+                  : selectedUnit?.status === 'Maintenance'
+                    ? 'bg-rose-500'
+                    : selectedUnit?.status === 'Reserved'
+                      ? 'bg-amber-500'
+                      : 'bg-slate-500'
+            )}
+          >
+            {selectedUnit?.status ? statusLabel(selectedUnit.status) : ''}
+          </Badge>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.monthlyRate')}</p>
-                <p className="mt-1 text-3xl leading-none font-bold text-indigo-600">
-                  ₱{selectedUnit?.monthlyRate.toLocaleString()}
-                </p>
+        <ScrollArea className="max-h-[60vh] pr-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.monthlyRate')}</p>
+                <p className="text-lg font-bold text-slate-900">₱{selectedUnit?.monthlyRate.toLocaleString()}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
                 <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.unitType')}</p>
@@ -1248,7 +1238,7 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-900">
+              <h4 className="text-sm font-bold flex items-center gap-2">
                 <LayoutGrid className="w-4 h-4 text-indigo-600" />
                 {t('views.units.details.inventoryAssets')}
               </h4>
@@ -1271,18 +1261,27 @@ export function UnitsView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(selectedUnit?.inventory ?? []).map((inv) => (
-                        <TableRow key={inv.id} className="border-b border-slate-200 bg-white last:border-b-0">
-                          <TableCell className="px-4 py-2.5 text-[13px] font-medium text-slate-900">{inv.name}</TableCell>
-                          <TableCell className="px-4 py-2.5 text-center text-[13px] text-slate-800">{inv.quantity}</TableCell>
-                          <TableCell className="px-4 py-2.5 text-[13px] text-slate-700">
-                            {inv.condition === 'New'
-                              ? t('views.units.details.conditionNew')
-                              : inv.condition === 'Good'
-                                ? t('views.units.details.conditionGood')
-                                : inv.condition === 'Fair'
-                                  ? t('views.units.details.conditionFair')
-                                  : t('views.units.details.conditionPoor')}
+                      {selectedUnit.inventory.map((inv) => (
+                        <TableRow
+                          key={inv.id}
+                          className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
+                        >
+                          <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
+                            {inv.name}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
+                            {inv.quantity}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5">
+                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
+                              {inv.condition === 'New'
+                                ? t('views.units.details.conditionNew')
+                                : inv.condition === 'Good'
+                                  ? t('views.units.details.conditionGood')
+                                  : inv.condition === 'Fair'
+                                    ? t('views.units.details.conditionFair')
+                                    : t('views.units.details.conditionPoor')}
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1293,7 +1292,7 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-900">
+              <h4 className="text-sm font-bold flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-indigo-600" />
                 {t('views.units.details.legalAddress')}
               </h4>
@@ -1309,7 +1308,7 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-600">
+              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-500">
                 <History className="w-4 h-4" />
                 {t('views.units.details.historicalTenants')}
               </h4>
@@ -1338,7 +1337,7 @@ export function UnitsView() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 border-t border-slate-200 pt-4">
               <h4 className="text-sm font-bold flex items-center gap-2 text-amber-600">
                 <Plus className="w-4 h-4" />
                 {t('views.units.details.specialRequests')}
@@ -1427,13 +1426,7 @@ export function UnitsView() {
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
                           <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
-                            {inv.condition === 'New'
-                              ? t('views.units.details.conditionNew')
-                              : inv.condition === 'Good'
-                                ? t('views.units.details.conditionGood')
-                                : inv.condition === 'Fair'
-                                  ? t('views.units.details.conditionFair')
-                                  : t('views.units.details.conditionPoor')}
+                            {conditionLabel(inv.condition, t)}
                           </span>
                         </TableCell>
                         <TableCell className="border-l border-slate-200 px-3 py-2.5 text-right align-middle">
@@ -1504,13 +1497,7 @@ export function UnitsView() {
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
                           <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
-                            {inv.condition === 'New'
-                              ? t('views.units.details.conditionNew')
-                              : inv.condition === 'Good'
-                                ? t('views.units.details.conditionGood')
-                                : inv.condition === 'Fair'
-                                  ? t('views.units.details.conditionFair')
-                                  : t('views.units.details.conditionPoor')}
+                            {conditionLabel(inv.condition, t)}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -1525,12 +1512,12 @@ export function UnitsView() {
 
       <Modal
         isOpen={Boolean(inventoryAddOpen && isManageInventoryOpen && selectedUnit && canUpdate)}
-        onClose={closeInventoryAddModal}
+        onClose={resetInventoryForm}
         title={t('views.units.details.addInventoryModalTitle')}
         maxWidth="md"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeInventoryAddModal} disabled={inventorySaving}>
+            <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
@@ -1583,12 +1570,12 @@ export function UnitsView() {
 
       <Modal
         isOpen={Boolean(inventoryEditOpen && isManageInventoryOpen && selectedUnit && canUpdate && inventoryEditId)}
-        onClose={closeInventoryEditModal}
+        onClose={resetInventoryForm}
         title={t('common.edit')}
         maxWidth="md"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeInventoryEditModal} disabled={inventorySaving}>
+            <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button

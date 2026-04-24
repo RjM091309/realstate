@@ -1,38 +1,37 @@
-import React, { useMemo, useState } from 'react';
-import { 
-  TrendingUp, 
-  Users, 
-  Building2, 
+import React, { useMemo } from 'react';
+import {
+  TrendingUp,
+  Users,
+  Building2,
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Sun,
+  Sunset,
+  Moon,
 } from 'lucide-react';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
 } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import { units, payments, contracts, tenants } from '@/lib/mockData';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
@@ -40,6 +39,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import type { Contract, Payment } from '@/types';
 import { useDateRange } from '@/context/DateRangeContext';
+import { useAuth } from '@/context/AuthContext';
 
 const salesData = [
   { month: 'Jan', Profit: 450000, deals: 12 },
@@ -58,10 +58,63 @@ const occupancyData = (t: (key: string) => string) => [
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b'];
 
+function getGreeting(): { text: string; icon: React.ReactNode } {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: 'Good morning', icon: <Sun className="w-5 h-5 text-amber-400" /> };
+  if (hour < 18) return { text: 'Good afternoon', icon: <Sunset className="w-5 h-5 text-orange-400" /> };
+  return { text: 'Good evening', icon: <Moon className="w-5 h-5 text-indigo-400" /> };
+}
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  subtext: string;
+  subtextVariant?: 'up' | 'down' | 'alert' | 'neutral';
+  icon: React.ReactNode;
+  iconBg: string;
+}
+
+function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, iconBg }: StatCardProps) {
+  return (
+    <Card className="border border-slate-200/80 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-4">
+          <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center', iconBg)}>
+            {icon}
+          </div>
+        </div>
+        <div className="text-2xl font-bold text-slate-900 tracking-tight">{value}</div>
+        <p className="text-xs text-slate-500 mt-0.5 font-medium">{label}</p>
+        <div className={cn(
+          'flex items-center gap-1 mt-3 text-xs font-medium',
+          subtextVariant === 'up' && 'text-emerald-600',
+          subtextVariant === 'down' && 'text-rose-500',
+          subtextVariant === 'alert' && 'text-rose-500',
+          subtextVariant === 'neutral' && 'text-slate-400',
+        )}>
+          {subtextVariant === 'up' && <ArrowUpRight className="w-3 h-3" />}
+          {subtextVariant === 'down' && <ArrowDownRight className="w-3 h-3" />}
+          {subtextVariant === 'alert' && <AlertCircle className="w-3 h-3" />}
+          {subtext}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardView() {
   const { t, i18n } = useTranslation();
   const { dateRange } = useDateRange();
-  const [profitOverride, setProfitOverride] = useState<string>('');
+  const { session } = useAuth();
+
+  const firstName = session?.user?.firstName ?? 'there';
+  const greeting = getGreeting();
+  const today = new Date().toLocaleDateString(i18n.language === 'ko' ? 'ko-KR' : 'en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   const rangeLabel =
     dateRange.start && dateRange.end
@@ -75,16 +128,14 @@ export function DashboardView() {
           year: 'numeric',
         })}`
       : t('views.dashboard.last30Days');
+
   const totalProfit = salesData.reduce((acc, curr) => acc + curr.Profit, 0);
   const activeContracts = contracts.filter(c => c.status === 'Active').length;
-  const vacancyRate = ((units.filter(u => u.status === 'Available').length / units.length) * 100).toFixed(1);
+  const availableUnits = units.filter(u => u.status === 'Available').length;
+  const vacancyRate = ((availableUnits / units.length) * 100).toFixed(1);
   const overduePayments = payments.filter(p => p.status === 'Overdue').length;
   const baseMonthlyRentProfit = contracts.reduce((sum, contract) => sum + contract.monthlyRent, 0);
-  const parsedOverride = Number(profitOverride);
-  const computedNetProfit = useMemo(() => {
-    if (profitOverride.trim() === '') return baseMonthlyRentProfit;
-    return Number.isFinite(parsedOverride) ? parsedOverride : baseMonthlyRentProfit;
-  }, [baseMonthlyRentProfit, parsedOverride, profitOverride]);
+
   const upcomingPayments7Days = payments
     .filter((payment) => {
       const due = new Date(payment.dueDate);
@@ -180,34 +231,10 @@ export function DashboardView() {
   type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
   const agentRows: AgentRow[] = useMemo(
     () => [
-      {
-        id: 'dash-a1',
-        name: 'Maria Santos',
-        deals: 14,
-        profit: 420000,
-        status: t('views.dashboard.agents.statusTopPerformer'),
-      },
-      {
-        id: 'dash-a2',
-        name: 'Juan Dela Cruz',
-        deals: 9,
-        profit: 280000,
-        status: t('views.dashboard.agents.statusActive'),
-      },
-      {
-        id: 'dash-a3',
-        name: 'Elena Reyes',
-        deals: 6,
-        profit: 195000,
-        status: t('views.dashboard.agents.statusActive'),
-      },
-      {
-        id: 'dash-a4',
-        name: 'Ricardo Gomez',
-        deals: 3,
-        profit: 90000,
-        status: t('views.dashboard.agents.statusOnProbation'),
-      },
+      { id: 'dash-a1', name: 'Maria Santos', deals: 14, profit: 420000, status: t('views.dashboard.agents.statusTopPerformer') },
+      { id: 'dash-a2', name: 'Juan Dela Cruz', deals: 9, profit: 280000, status: t('views.dashboard.agents.statusActive') },
+      { id: 'dash-a3', name: 'Elena Reyes', deals: 6, profit: 195000, status: t('views.dashboard.agents.statusActive') },
+      { id: 'dash-a4', name: 'Ricardo Gomez', deals: 3, profit: 90000, status: t('views.dashboard.agents.statusOnProbation') },
     ],
     [t]
   );
@@ -216,14 +243,21 @@ export function DashboardView() {
     () => [
       {
         header: t('views.dashboard.agents.agentName'),
-        render: (a) => <span className="font-medium pl-0">{a.name}</span>,
+        render: (a) => (
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
+              {a.name.charAt(0)}
+            </div>
+            <span className="font-medium">{a.name}</span>
+          </div>
+        ),
       },
       {
         header: t('views.dashboard.agents.deals'),
         className: 'text-center',
         headerClassName: 'text-center',
         cellClassName: 'text-center',
-        render: (a) => <span>{a.deals}</span>,
+        render: (a) => <span className="font-medium">{a.deals}</span>,
       },
       {
         header: t('views.dashboard.agents.profit'),
@@ -252,147 +286,124 @@ export function DashboardView() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+
+      {/* Greeting Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.dashboard.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('views.dashboard.subtitle')}</p>
+          <div className="flex items-center gap-2 mb-1">
+            {greeting.icon}
+            <span className="text-sm font-medium text-slate-500">{greeting.text},</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{firstName} 👋</h1>
+          <p className="text-slate-400 text-sm mt-1">{today}</p>
         </div>
-        <div className="flex gap-3">
-          <Badge variant="outline" className="px-3 py-1 bg-white max-w-full truncate">
-            <CalendarIcon className="w-3 h-3 mr-2 shrink-0" />
-            <span className="truncate">{rangeLabel}</span>
-          </Badge>
-        </div>
+        <Badge variant="outline" className="px-3 py-1.5 bg-white border-slate-200 text-slate-500 self-start sm:self-auto">
+          <CalendarIcon className="w-3 h-3 mr-2 shrink-0" />
+          <span className="truncate text-xs">{rangeLabel}</span>
+        </Badge>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <Card className="border-none shadow-md bg-indigo-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium opacity-80">{t('views.dashboard.cards.totalProfit')}</CardTitle>
-            <DollarSign className="w-4 h-4 opacity-80" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱{totalProfit.toLocaleString()}</div>
-            <p className="text-xs mt-1 flex items-center opacity-80">
-              <ArrowUpRight className="w-3 h-3 mr-1" />
-              {t('views.dashboard.cards.profitTrend')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">{t('views.dashboard.cards.netProfit')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-2xl font-bold text-slate-900">₱{computedNetProfit.toLocaleString()}</div>
-            <Input
-              type="number"
-              min="0"
-              value={profitOverride}
-              onChange={(e) => setProfitOverride(e.target.value)}
-              placeholder={t('views.dashboard.cards.defaultProfit', { amount: baseMonthlyRentProfit.toLocaleString() })}
-              className="h-8 text-xs"
-            />
-            <p className="text-xs text-slate-500">{t('views.dashboard.cards.netProfitHint')}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-500">{t('views.dashboard.cards.activeLeases')}</CardTitle>
-            <Users className="w-4 h-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{activeContracts}</div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center">
-              <ArrowUpRight className="w-3 h-3 mr-1 text-emerald-500" />
-              {t('views.dashboard.cards.activeTrend')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-500">{t('views.dashboard.cards.vacancyRate')}</CardTitle>
-            <Building2 className="w-4 h-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{vacancyRate}%</div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center">
-              <ArrowDownRight className="w-3 h-3 mr-1 text-rose-500" />
-              {t('views.dashboard.cards.vacancyTrend')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-500">{t('views.dashboard.cards.overdueRent')}</CardTitle>
-            <AlertCircle className="w-4 h-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{overduePayments}</div>
-            <p className="text-xs text-rose-500 mt-1 font-medium">
-              {t('views.dashboard.cards.overdueHint')}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <StatCard
+          label={t('views.dashboard.cards.totalProfit')}
+          value={`₱${totalProfit.toLocaleString()}`}
+          subtext={t('views.dashboard.cards.profitTrend')}
+          subtextVariant="up"
+          iconBg="bg-indigo-50"
+          icon={<DollarSign className="w-5 h-5 text-indigo-600" />}
+        />
+        <StatCard
+          label={t('views.dashboard.cards.netProfit')}
+          value={`₱${baseMonthlyRentProfit.toLocaleString()}`}
+          subtext={t('views.dashboard.cards.netProfitHint')}
+          subtextVariant="neutral"
+          iconBg="bg-violet-50"
+          icon={<TrendingUp className="w-5 h-5 text-violet-600" />}
+        />
+        <StatCard
+          label={t('views.dashboard.cards.activeLeases')}
+          value={activeContracts}
+          subtext={t('views.dashboard.cards.activeTrend')}
+          subtextVariant="up"
+          iconBg="bg-emerald-50"
+          icon={<Users className="w-5 h-5 text-emerald-600" />}
+        />
+        <StatCard
+          label={t('views.dashboard.cards.vacancyRate')}
+          value={`${vacancyRate}%`}
+          subtext={`${availableUnits} ${availableUnits === 1 ? 'unit' : 'units'} available`}
+          subtextVariant="down"
+          iconBg="bg-amber-50"
+          icon={<Building2 className="w-5 h-5 text-amber-600" />}
+        />
+        <StatCard
+          label={t('views.dashboard.cards.overdueRent')}
+          value={overduePayments}
+          subtext={t('views.dashboard.cards.overdueHint')}
+          subtextVariant={overduePayments > 0 ? 'alert' : 'neutral'}
+          iconBg="bg-rose-50"
+          icon={<AlertCircle className="w-5 h-5 text-rose-500" />}
+        />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-none shadow-md">
-          <CardHeader>
-            <CardTitle>{t('views.dashboard.charts.salesTitle')}</CardTitle>
+        <Card className="lg:col-span-2 border border-slate-200/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{t('views.dashboard.charts.salesTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.salesDescription')}</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesData}>
+              <BarChart data={salesData} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `₱${val/1000}k`} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(val) => `₱${val / 1000}k`} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px -2px rgb(0 0 0 / 0.12)', fontSize: 13 }}
+                  cursor={{ fill: '#f8fafc' }}
                   formatter={(val: number) => [`₱${val.toLocaleString()}`, t('views.dashboard.charts.profitLabel')]}
                 />
-                <Bar dataKey="Profit" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Profit" fill="#4f46e5" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md">
-          <CardHeader>
-            <CardTitle>{t('views.dashboard.charts.unitStatusTitle')}</CardTitle>
+        <Card className="border border-slate-200/80 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{t('views.dashboard.charts.unitStatusTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.unitStatusDescription')}</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px] flex flex-col items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="h-[280px] flex flex-col items-center justify-center">
+            <ResponsiveContainer width="100%" height="80%">
               <PieChart>
                 <Pie
                   data={occupancyData(t)}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
+                  innerRadius={55}
                   outerRadius={80}
-                  paddingAngle={5}
+                  paddingAngle={4}
                   dataKey="value"
                 >
                   {occupancyData(t).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px -2px rgb(0 0 0 / 0.12)', fontSize: 13 }}
+                  formatter={(val: number, name: string) => [val, name]}
+                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex gap-4 mt-4 text-xs font-medium text-slate-500">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2">
               {occupancyData(t).map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[index]}}></div>
-                  {entry.name}
+                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index] }} />
+                  <span>{entry.name}</span>
+                  <span className="font-semibold text-slate-700">{entry.value}</span>
                 </div>
               ))}
             </div>
@@ -400,43 +411,57 @@ export function DashboardView() {
         </Card>
       </div>
 
-      {/* Upcoming Vacancies, Upcoming Payments & Agent Performance */}
+      {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
-          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
-            <CardTitle>{t('views.dashboard.vacancies.title')}</CardTitle>
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm">
+          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+            <CardTitle className="text-base">{t('views.dashboard.vacancies.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.vacancies.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <DataTable
-              data={vacancyContracts}
-              columns={vacancyColumns}
-              keyExtractor={(c) => c.id}
-              embedded
-              highlightFirstColumn={false}
-            />
+            {vacancyContracts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <Building2 className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-sm font-medium">No upcoming vacancies</p>
+              </div>
+            ) : (
+              <DataTable
+                data={vacancyContracts}
+                columns={vacancyColumns}
+                keyExtractor={(c) => c.id}
+                embedded
+                highlightFirstColumn={false}
+              />
+            )}
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
-          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
-            <CardTitle>{t('views.dashboard.payments.title')}</CardTitle>
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm">
+          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+            <CardTitle className="text-base">{t('views.dashboard.payments.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.payments.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <DataTable
-              data={upcomingPayments7Days}
-              columns={paymentColumns}
-              keyExtractor={(p) => p.id}
-              embedded
-              highlightFirstColumn={false}
-            />
+            {upcomingPayments7Days.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <CalendarIcon className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-sm font-medium">No upcoming payments this week 🎉</p>
+              </div>
+            ) : (
+              <DataTable
+                data={upcomingPayments7Days}
+                columns={paymentColumns}
+                keyExtractor={(p) => p.id}
+                embedded
+                highlightFirstColumn={false}
+              />
+            )}
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border-none py-0 shadow-md lg:col-span-2">
-          <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
-            <CardTitle>{t('views.dashboard.agents.title')}</CardTitle>
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm lg:col-span-2">
+          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+            <CardTitle className="text-base">{t('views.dashboard.agents.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.agents.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
