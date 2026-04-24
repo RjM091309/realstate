@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, path.resolve(configDir, '..'), ''),
     ...loadEnv(mode, configDir, ''),
   };
-  const apiPort = process.env.API_PORT ?? env.API_PORT ?? '3001';
+  const apiPort = process.env.API_PORT ?? env.API_PORT ?? '2550';
   /** Same proxy for `vite` and `vite preview` so `/api/*` always reaches Express. */
   const apiProxy = {
     '/api': {
@@ -36,8 +36,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      // UI dev port: avoid 6000 — Chrome blocks it (X11 / ERR_UNSAFE_PORT). 6001 is fine.
-      port: 6001,
+      // UI dev port: 2551 pairs with API on 2550 (see .env.example / ecosystem PM2).
+      port: 2551,
       strictPort: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => {
       proxy: apiProxy,
     },
     preview: {
-      port: 6001,
+      port: 2551,
       strictPort: true,
       proxy: apiProxy,
     },
