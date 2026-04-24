@@ -22,7 +22,7 @@ import { invoicesRouter } from './routes/invoicesRoutes.js';
 import { auditLogsRouter } from './routes/auditLogsRoutes.js';
 
 const app = express();
-const apiPort = Number(process.env.API_PORT ?? 3001);
+const apiPort = Number(process.env.API_PORT ?? 2550);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(cors({ origin: true, credentials: true }));

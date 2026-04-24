@@ -12,8 +12,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function loadServerEnv() {
   const workspaceRoot = path.join(__dirname, '../../.env');
   const projectRoot = path.join(__dirname, '../.env');
+  const cwdEnv = path.join(process.cwd(), '.env');
   dotenv.config({ path: workspaceRoot });
   dotenv.config({ path: projectRoot, override: true });
+  dotenv.config({ path: cwdEnv, override: true });
 }
 
 /** Run on import so `process.env` is set before `db.ts` and other modules load. */
