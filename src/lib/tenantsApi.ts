@@ -1,6 +1,27 @@
 import { apiFetch, getAuthHeaders } from '@/lib/api';
 import type { Tenant } from '@/types';
 
+async function tryParseJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
+function readApiErrorMessage(payload: unknown, fallback: string): string {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'error' in payload &&
+    typeof payload.error === 'string' &&
+    payload.error.trim()
+  ) {
+    return payload.error;
+  }
+  return fallback;
+}
+
 export type PortalDocumentItem =
   | {
       id: string;
@@ -91,8 +112,8 @@ export async function uploadTenantKycDocument(tenantId: string, file: File): Pro
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = typeof err?.error === 'string' ? err.error : res.statusText;
+    const err = await tryParseJson(res);
+    const msg = readApiErrorMessage(err, res.statusText || `HTTP ${res.status}`);
     throw new Error(msg || `HTTP ${res.status}`);
   }
 
@@ -117,8 +138,8 @@ export async function uploadTenantLeaseContract(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = typeof err?.error === 'string' ? err.error : res.statusText;
+    const err = await tryParseJson(res);
+    const msg = readApiErrorMessage(err, res.statusText || `HTTP ${res.status}`);
     throw new Error(msg || `HTTP ${res.status}`);
   }
 

@@ -46,6 +46,7 @@ export async function listTenantsByBranch(branchId) {
         AND d2.document_type IN (${kycTypesSqlList()})
     )
     WHERE (t.branch_id = ? OR t.branch_id IS NULL)
+      AND t.active = 1
     ORDER BY t.full_name ASC
     `,
     [branchId, ...types, branchId],
@@ -101,7 +102,7 @@ export async function updateTenantById(id, branchId, payload) {
       kyc_verified = ?,
       is_blacklisted = ?,
       blacklist_reason = ?
-    WHERE id = ? AND (branch_id <=> ? OR branch_id IS NULL)
+    WHERE id = ? AND (branch_id <=> ? OR branch_id IS NULL) AND active = 1
     `,
     [
       branchId,
@@ -157,7 +158,7 @@ export async function getTenantById(id, branchId) {
         AND d2.branch_id = ?
         AND d2.document_type IN (${kycTypesSqlList()})
     )
-    WHERE t.id = ? AND (t.branch_id <=> ? OR t.branch_id IS NULL)
+    WHERE t.id = ? AND (t.branch_id <=> ? OR t.branch_id IS NULL) AND t.active = 1
     LIMIT 1
     `,
     [branchId, ...types, id, branchId],
@@ -167,7 +168,9 @@ export async function getTenantById(id, branchId) {
 
 export async function deleteTenantById(id, branchId) {
   const [result] = await pool.query(
-    'DELETE FROM tenant_profile WHERE id = ? AND (branch_id <=> ? OR branch_id IS NULL)',
+    `UPDATE tenant_profile
+     SET active = 0
+     WHERE id = ? AND (branch_id <=> ? OR branch_id IS NULL) AND active = 1`,
     [id, branchId],
   );
   return result.affectedRows;
@@ -287,7 +290,7 @@ export async function listRepositoryDocumentsForPortal(tenantId, branchId) {
       AND (
         dr.tenant_id = ?
         OR dr.contract_id IN (
-          SELECT ct.contract_id FROM contract_tenant ct WHERE ct.tenant_id = ?
+          SELECT ct.contract_id FROM contract_tenant ct WHERE ct.tenant_id = ? AND ct.active = 1
         )
       )
     ORDER BY dr.created_at DESC
@@ -333,8 +336,8 @@ export async function getPrimaryContractIdForTenant(tenantId, branchId) {
     `
     SELECT lc.id
     FROM lease_contract lc
-    INNER JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.tenant_id = ?
-    WHERE lc.branch_id = ?
+    INNER JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.tenant_id = ? AND ct.active = 1
+    WHERE lc.branch_id = ? AND lc.active = 1
     ORDER BY (lc.status = 'active') DESC, lc.end_date DESC
     LIMIT 1
     `,

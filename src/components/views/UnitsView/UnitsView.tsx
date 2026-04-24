@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Search,
@@ -85,6 +85,27 @@ const AREA_CITIES_LUZON: string[] = [
   'Olongapo City',
   'Palayan City',
   'San Fernando City (Pampanga)',
+  // Pampanga — area field: city / municipality names only (no province suffix)
+  'Mabalacat City',
+  'Apalit',
+  'Arayat',
+  'Bacolor',
+  'Candaba',
+  'Floridablanca',
+  'Guagua',
+  'Lubao',
+  'Macabebe',
+  'Magalang',
+  'Masantol',
+  'Mexico',
+  'Minalin',
+  'Porac',
+  'San Luis',
+  'San Simon',
+  'Santa Ana',
+  'Santa Rita',
+  'Santo Tomas',
+  'Sasmuan',
   'San Jose del Monte City',
   'Tarlac City',
   'Antipolo City',
@@ -143,16 +164,6 @@ function defaultAddForm(): AddUnitForm {
   };
 }
 
-function suggestNextUnitNumber(units: Unit[]): string {
-  const numericUnitNumbers = units
-    .map((u) => String(u.unitNumber ?? '').trim())
-    .filter((v) => /^\d+$/.test(v))
-    .map((v) => Number(v))
-    .filter((v) => Number.isFinite(v));
-  if (numericUnitNumbers.length === 0) return '101';
-  return String(Math.max(...numericUnitNumbers) + 1);
-}
-
 function ordinalFloor(n: number): string {
   if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
   if (n % 10 === 1) return `${n}st`;
@@ -184,7 +195,21 @@ function areaDisplayLabel(rawArea: string): string {
   return normalizeAreaForForm(rawArea) || '—';
 }
 
-function formToWriteBody(form: AddUnitForm, inventory: Unit['inventory']): UnitWriteBody {
+async function toWebpDataUrl(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return `data:image/webp;base64,${btoa(binary)}`;
+}
+
+function formToWriteBody(
+  form: AddUnitForm,
+  inventory: Unit['inventory'],
+  photoDataUrl: string | null,
+): UnitWriteBody {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
@@ -199,6 +224,7 @@ function formToWriteBody(form: AddUnitForm, inventory: Unit['inventory']): UnitW
     status: form.status,
     area: form.area.trim(),
     monthlyRate: rate,
+    photoDataUrl,
     inventory,
   };
 }
@@ -243,11 +269,17 @@ function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
     status: u.status,
     area: u.area,
     monthlyRate: u.monthlyRate,
+    photoDataUrl: u.photoDataUrl ?? null,
     inventory,
   };
 }
 
-function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory']): Unit {
+function formToUnit(
+  id: string,
+  form: AddUnitForm,
+  inventory: Unit['inventory'],
+  photoDataUrl: string | null,
+): Unit {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
@@ -263,6 +295,7 @@ function formToUnit(id: string, form: AddUnitForm, inventory: Unit['inventory'])
     status: form.status,
     area: form.area.trim(),
     monthlyRate: Number.isFinite(rate) ? rate : 0,
+    photoDataUrl,
     inventory,
   };
 }
@@ -302,6 +335,10 @@ export function UnitsView() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<AddUnitForm>(defaultAddForm);
+  const addUnitPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const [addUnitPhotoPreview, setAddUnitPhotoPreview] = useState('');
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
+  const [photoPreviewTitle, setPhotoPreviewTitle] = useState('');
   /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
   const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
@@ -584,12 +621,11 @@ export function UnitsView() {
     setIsManageInventoryOpen(false);
     setFormMode('create');
     setEditingId(null);
-    setAddForm({
-      ...defaultAddForm(),
-      unitNumber: suggestNextUnitNumber(unitList),
-    });
+    setAddUnitPhotoPreview('');
+    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
+    setAddForm(defaultAddForm());
     setIsAddUnitOpen(true);
-  }, [unitList]);
+  }, []);
 
   const openEditUnitModal = useCallback((unit: Unit) => {
     setIsDetailsOpen(false);
@@ -597,6 +633,8 @@ export function UnitsView() {
     setFormMode('edit');
     setEditingId(unit.id);
     setAddForm(unitToForm(unit));
+    setAddUnitPhotoPreview(unit.photoDataUrl ?? '');
+    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
     setIsAddUnitOpen(true);
   }, []);
 
@@ -605,6 +643,49 @@ export function UnitsView() {
     setFormMode('create');
     setEditingId(null);
     setAddForm(defaultAddForm());
+    setAddUnitPhotoPreview('');
+    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
+  }, []);
+
+  const openAddUnitPhotoPicker = useCallback(() => {
+    addUnitPhotoInputRef.current?.click();
+  }, []);
+
+  const handleAddUnitPhotoChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const isWebpMime = file.type === 'image/webp';
+      const isWebpExt = /\.webp$/i.test(file.name);
+      if (!isWebpMime && !isWebpExt) {
+        toast.error(t('views.units.addModal.validationPhotoWebp'));
+        e.target.value = '';
+        return;
+      }
+      try {
+        const dataUrl = await toWebpDataUrl(file);
+        setAddUnitPhotoPreview(dataUrl);
+      } catch {
+        toast.error('Failed to load image.');
+      }
+      e.target.value = '';
+    },
+    [t],
+  );
+
+  const openPhotoPreview = useCallback(
+    (photoUrl: string | null | undefined, title?: string) => {
+      const url = String(photoUrl ?? '').trim();
+      if (!url) return;
+      setPhotoPreviewTitle(title ?? t('views.units.addModal.photo'));
+      setPhotoPreviewUrl(url);
+    },
+    [t],
+  );
+
+  const closePhotoPreview = useCallback(() => {
+    setPhotoPreviewUrl('');
+    setPhotoPreviewTitle('');
   }, []);
 
   const handleSaveUnit = useCallback(async () => {
@@ -626,10 +707,12 @@ export function UnitsView() {
         ? (unitList.find((u) => u.id === editingId)?.inventory ?? [])
         : [];
 
+    const photoDataUrl = addUnitPhotoPreview || null;
+
     if (!unitsBackedByApi) {
       try {
         if (formMode === 'edit' && editingId) {
-          const updated = formToUnit(editingId, addForm, existingInventory);
+          const updated = formToUnit(editingId, addForm, existingInventory, photoDataUrl);
           setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
           setSelectedUnit((s) => (s?.id === editingId ? updated : s));
           toast.success(t('views.units.updated'));
@@ -637,7 +720,7 @@ export function UnitsView() {
           setIsManageInventoryOpen(false);
         } else {
           const newId = `local-${Date.now()}`;
-          const created = formToUnit(newId, addForm, []);
+          const created = formToUnit(newId, addForm, [], photoDataUrl);
           setUnitList((prev) => [created, ...prev]);
           toast.success(t('views.units.addModal.saved'));
         }
@@ -648,7 +731,7 @@ export function UnitsView() {
       return;
     }
 
-    const body = formToWriteBody(addForm, existingInventory);
+    const body = formToWriteBody(addForm, existingInventory, photoDataUrl);
     try {
       if (formMode === 'edit' && editingId) {
         const updated = await updateUnit(editingId, body);
@@ -668,6 +751,7 @@ export function UnitsView() {
     }
   }, [
     addForm,
+    addUnitPhotoPreview,
     closeAddUnitModal,
     editingId,
     formMode,
@@ -991,8 +1075,21 @@ export function UnitsView() {
                     {statusLabel(unit.status)}
                   </Badge>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                  <Building2 className="w-16 h-16" />
+                <div
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center",
+                    unit.photoDataUrl ? "" : "opacity-20",
+                  )}
+                >
+                  {unit.photoDataUrl ? (
+                    <img
+                      src={unit.photoDataUrl}
+                      alt={`${unit.unitNumber} preview`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <Building2 className="w-16 h-16" />
+                  )}
                 </div>
               </div>
               <CardContent className="p-5">
@@ -1033,9 +1130,47 @@ export function UnitsView() {
         isOpen={isDetailsOpen && !isAddUnitOpen}
         onClose={() => setIsDetailsOpen(false)}
         title={
-          selectedUnit ? t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber }) : ''
+          selectedUnit ? (
+            <div className="flex items-start gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() =>
+                  openPhotoPreview(
+                    selectedUnit.photoDataUrl,
+                    `${t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })} ${t('views.units.addModal.photo')}`,
+                  )
+                }
+                className={cn(
+                  "h-16 w-24 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden",
+                  selectedUnit.photoDataUrl ? "cursor-zoom-in" : "cursor-default",
+                )}
+                title={t('views.units.addModal.photo')}
+              >
+                {selectedUnit.photoDataUrl ? (
+                  <img
+                    src={selectedUnit.photoDataUrl}
+                    alt={`${selectedUnit.unitNumber} photo`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-slate-400">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                )}
+              </button>
+              <div className="min-w-0">
+                <span className="block text-[32px] leading-none font-bold text-slate-900">
+                  {t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}
+                </span>
+                <span className="mt-1 block text-sm font-normal text-slate-500 truncate">
+                  {selectedUnit.buildingName} - {selectedUnit.legalAddress?.trim() || selectedUnit.commonAddress?.trim() || '—'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            ''
+          )
         }
-        subtitle={selectedUnit ? `${selectedUnit.buildingName} • ${selectedUnit?.legalAddress || '—'}` : ''}
         maxWidth="4xl"
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3 w-full">
@@ -1073,49 +1208,53 @@ export function UnitsView() {
           </div>
         }
       >
-        <div className="flex justify-end items-start mb-2 pr-2">
-          <Badge
-            className={cn(
-              selectedUnit?.status === 'Available'
-                ? 'bg-emerald-500'
-                : selectedUnit?.status === 'Occupied'
-                  ? 'bg-indigo-500'
-                  : selectedUnit?.status === 'Maintenance'
-                    ? 'bg-rose-500'
-                    : selectedUnit?.status === 'Reserved'
-                      ? 'bg-amber-500'
-                      : 'bg-slate-500'
-            )}
-          >
-            {selectedUnit?.status ? statusLabel(selectedUnit.status) : ''}
-          </Badge>
-        </div>
-
         <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.monthlyRate')}</p>
-                <p className="text-lg font-bold text-slate-900">₱{selectedUnit?.monthlyRate.toLocaleString()}</p>
+          <div className="space-y-5">
+            <div className="flex justify-end">
+              <Badge
+                className={cn(
+                  selectedUnit?.status === 'Available'
+                    ? 'bg-emerald-500'
+                    : selectedUnit?.status === 'Occupied'
+                      ? 'bg-indigo-500'
+                      : selectedUnit?.status === 'Maintenance'
+                        ? 'bg-rose-500'
+                        : selectedUnit?.status === 'Reserved'
+                          ? 'bg-amber-500'
+                          : 'bg-slate-500'
+                )}
+              >
+                {selectedUnit?.status ? statusLabel(selectedUnit.status) : ''}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.monthlyRate')}</p>
+                <p className="mt-1 text-3xl leading-none font-bold text-indigo-600">
+                  ₱{selectedUnit?.monthlyRate.toLocaleString()}
+                </p>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.unitType')}</p>
-                <p className="text-lg font-bold text-slate-900">{selectedUnit?.type}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.unitType')}</p>
+                <p className="mt-1 text-3xl leading-none font-bold text-slate-900">{selectedUnit?.type || '—'}</p>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.table.area')}</p>
-                <p className="text-lg font-bold text-slate-900">{areaDisplayLabel(selectedUnit?.area ?? '')}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.table.area')}</p>
+                <p className="mt-1 text-3xl leading-none font-bold text-slate-900">
+                  {areaDisplayLabel(selectedUnit?.area ?? '')}
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2">
+              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-900">
                 <LayoutGrid className="w-4 h-4 text-indigo-600" />
                 {t('views.units.details.inventoryAssets')}
               </h4>
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                 {!selectedUnit?.inventory?.length ? (
-                  <p className="text-sm text-slate-500 px-4 py-8 text-center">{t('views.units.inventoryEmpty')}</p>
+                  <p className="text-sm text-slate-500 px-4 py-8">{t('views.units.inventoryEmpty')}</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -1132,27 +1271,18 @@ export function UnitsView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedUnit.inventory.map((inv) => (
-                        <TableRow
-                          key={inv.id}
-                          className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
-                        >
-                          <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
-                            {inv.name}
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
-                            {inv.quantity}
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5">
-                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
-                              {inv.condition === 'New'
-                                ? t('views.units.details.conditionNew')
-                                : inv.condition === 'Good'
-                                  ? t('views.units.details.conditionGood')
-                                  : inv.condition === 'Fair'
-                                    ? t('views.units.details.conditionFair')
-                                    : t('views.units.details.conditionPoor')}
-                            </span>
+                      {(selectedUnit?.inventory ?? []).map((inv) => (
+                        <TableRow key={inv.id} className="border-b border-slate-200 bg-white last:border-b-0">
+                          <TableCell className="px-4 py-2.5 text-[13px] font-medium text-slate-900">{inv.name}</TableCell>
+                          <TableCell className="px-4 py-2.5 text-center text-[13px] text-slate-800">{inv.quantity}</TableCell>
+                          <TableCell className="px-4 py-2.5 text-[13px] text-slate-700">
+                            {inv.condition === 'New'
+                              ? t('views.units.details.conditionNew')
+                              : inv.condition === 'Good'
+                                ? t('views.units.details.conditionGood')
+                                : inv.condition === 'Fair'
+                                  ? t('views.units.details.conditionFair')
+                                  : t('views.units.details.conditionPoor')}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1163,7 +1293,7 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2">
+              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-900">
                 <MapPin className="w-4 h-4 text-indigo-600" />
                 {t('views.units.details.legalAddress')}
               </h4>
@@ -1179,7 +1309,7 @@ export function UnitsView() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-500">
+              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-600">
                 <History className="w-4 h-4" />
                 {t('views.units.details.historicalTenants')}
               </h4>
@@ -1190,11 +1320,11 @@ export function UnitsView() {
                     return (
                       <div
                         key={c.id}
-                        className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg border border-slate-100 text-xs"
+                        className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white text-sm"
                       >
                         <div className="flex flex-col min-w-0 pr-2">
-                          <span className="font-bold text-slate-700 truncate">{tenantName}</span>
-                          <span className="text-slate-400">{formatContractPeriod(c)}</span>
+                          <span className="font-semibold text-slate-700 truncate">{tenantName}</span>
+                          <span className="text-slate-500">{formatContractPeriod(c)}</span>
                         </div>
                         <Badge variant="outline" className="text-[10px] shrink-0">
                           {contractStatusLabel(c, t)}
@@ -1534,7 +1664,58 @@ export function UnitsView() {
           </div>
         }
       >
+        <input
+          ref={addUnitPhotoInputRef}
+          type="file"
+          accept="image/webp,.webp"
+          className="hidden"
+          onChange={handleAddUnitPhotoChange}
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2 sm:col-span-2">
+            <Label>{t('views.units.addModal.photo')}</Label>
+            <div className="flex items-center gap-3">
+              <div className="h-16 w-24 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center text-slate-400 shrink-0">
+                {addUnitPhotoPreview ? (
+                  <button
+                    type="button"
+                    className="h-full w-full cursor-zoom-in"
+                    onClick={() =>
+                      openPhotoPreview(
+                        addUnitPhotoPreview,
+                        `${addForm.unitNumber ? t('views.units.unitLabel', { unitNumber: addForm.unitNumber }) : t('views.units.addModal.title')} ${t('views.units.addModal.photo')}`,
+                      )
+                    }
+                  >
+                    <img src={addUnitPhotoPreview} alt="Unit photo preview" className="h-full w-full object-cover" />
+                  </button>
+                ) : (
+                  <Building2 className="w-6 h-6" />
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  onClick={openAddUnitPhotoPicker}
+                >
+                  {t('views.units.addModal.photoUpload')}
+                </Button>
+                {addUnitPhotoPreview ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl"
+                    onClick={() => setAddUnitPhotoPreview('')}
+                  >
+                    {t('common.delete')}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">{t('views.units.addModal.photoHint')}</p>
+          </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="add-unit-number">{t('views.units.addModal.unitNumber')}</Label>
             <Input
@@ -1624,6 +1805,26 @@ export function UnitsView() {
               className="h-12 rounded-xl border-slate-200"
             />
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(photoPreviewUrl)}
+        onClose={closePhotoPreview}
+        title={photoPreviewTitle || t('views.units.addModal.photo')}
+        maxWidth="3xl"
+        footer={
+          <div className="flex justify-end w-full">
+            <Button type="button" variant="outline" onClick={closePhotoPreview}>
+              {t('views.units.details.close')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+          {photoPreviewUrl ? (
+            <img src={photoPreviewUrl} alt="Photo preview" className="w-full max-h-[70vh] object-contain" />
+          ) : null}
         </div>
       </Modal>
     </div>

@@ -15,7 +15,7 @@ export async function listCalendarEventsByBranch(branchId) {
       metadata_json,
       created_at
     FROM calendar_event
-    WHERE branch_id = ?
+    WHERE branch_id = ? AND active = 1
     ORDER BY event_date ASC, id ASC
     `,
     [branchId],
@@ -63,7 +63,7 @@ export async function updateCalendarEventById(id, branchId, payload) {
       title = ?,
       color_code = ?,
       metadata_json = ?
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     `,
     [
       payload.contractId ?? null,
@@ -95,7 +95,7 @@ export async function getCalendarEventById(id, branchId) {
       metadata_json,
       created_at
     FROM calendar_event
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     LIMIT 1
     `,
     [id, branchId],
@@ -104,10 +104,10 @@ export async function getCalendarEventById(id, branchId) {
 }
 
 export async function deleteCalendarEventById(id, branchId) {
-  const [result] = await pool.query('DELETE FROM calendar_event WHERE id = ? AND branch_id = ?', [
-    id,
-    branchId,
-  ]);
+  const [result] = await pool.query(
+    'UPDATE calendar_event SET active = 0 WHERE id = ? AND branch_id = ? AND active = 1',
+    [id, branchId],
+  );
   return result.affectedRows;
 }
 

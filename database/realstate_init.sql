@@ -134,6 +134,7 @@ COMMENT='Staff CRUD rights per module (Control Panel)';
 CREATE TABLE `role_sidebar_permissions` (
   `role_id` INT UNSIGNED NOT NULL,
   `feature_key` VARCHAR(64) NOT NULL,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`role_id`, `feature_key`),
   KEY `idx_rsp_role` (`role_id`),
   CONSTRAINT `fk_rsp_user_role` FOREIGN KEY (`role_id`) REFERENCES `user_role` (`IDNo`)
@@ -198,6 +199,7 @@ CREATE TABLE `unit` (
   `unit_type` VARCHAR(40) NOT NULL COMMENT 'Studio, 1BR, 2BR, Loft, etc.',
   `listing_type` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
   `monthly_rent` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  `photo_data` LONGTEXT NULL COMMENT 'Optional WEBP data URL preview for the unit card',
   `market_value` DECIMAL(14,2) NULL DEFAULT NULL,
   `inventory_json` LONGTEXT NULL COMMENT 'Compatibility for current API (unitsController); may be removed after migration',
   `status` ENUM('vacant','occupied','reserved','maintenance','inactive') NOT NULL DEFAULT 'vacant',
@@ -296,6 +298,7 @@ CREATE TABLE `lease_contract` (
   `partner_agency_id` BIGINT UNSIGNED NULL DEFAULT NULL,
   `contract_type` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
   `status` ENUM('draft','active','completed','terminated','cancelled') NOT NULL DEFAULT 'draft',
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `start_date` DATE NOT NULL,
   `end_date` DATE NOT NULL,
   `move_in_date` DATE NULL DEFAULT NULL,
@@ -330,6 +333,7 @@ CREATE TABLE `contract_tenant` (
   `contract_id` BIGINT UNSIGNED NOT NULL,
   `tenant_id` BIGINT UNSIGNED NOT NULL,
   `is_primary` TINYINT(1) NOT NULL DEFAULT 0,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`contract_id`, `tenant_id`),
   KEY `idx_contract_tenant_tenant` (`tenant_id`),
@@ -430,7 +434,7 @@ CREATE TABLE `tenant_document` (
   KEY `idx_tenant_document_branch` (`branch_id`),
   KEY `idx_tenant_document_tenant` (`tenant_id`),
   CONSTRAINT `fk_tenant_document_branch` FOREIGN KEY (`branch_id`) REFERENCES `branch` (`id`),
-  CONSTRAINT `fk_tenant_document_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`),
+  CONSTRAINT `fk_tenant_document_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant_profile` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_tenant_document_verified_by` FOREIGN KEY (`verified_by`) REFERENCES `user_info` (`IDNO`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='KYC document uploads and verification trail';
@@ -476,6 +480,7 @@ CREATE TABLE `payment_schedule` (
   `due_date` DATE NOT NULL,
   `amount_due` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `status` ENUM('pending','partially_paid','paid','overdue','waived') NOT NULL DEFAULT 'pending',
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `notes` VARCHAR(255) NULL DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -499,6 +504,7 @@ CREATE TABLE `payment_transaction` (
   `amount_paid` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `payment_date` DATE NOT NULL,
   `payment_method` ENUM('cash','bank_transfer','online','check','other') NOT NULL DEFAULT 'cash',
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `reference_no` VARCHAR(100) NULL DEFAULT NULL,
   `received_by` INT UNSIGNED NULL DEFAULT NULL,
   `remarks` VARCHAR(255) NULL DEFAULT NULL,
@@ -570,6 +576,7 @@ CREATE TABLE `inventory_snapshot` (
   `inspection_date` DATE NOT NULL,
   `inspected_by` INT UNSIGNED NULL DEFAULT NULL,
   `remarks` TEXT NULL,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_inventory_snapshot_branch` (`branch_id`),
@@ -591,6 +598,7 @@ CREATE TABLE `inventory_snapshot_item` (
   `quantity` INT UNSIGNED NOT NULL DEFAULT 1,
   `condition_state` ENUM('excellent','good','fair','damaged','missing') NOT NULL DEFAULT 'good',
   `notes` VARCHAR(255) NULL DEFAULT NULL,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   KEY `idx_inventory_item_snapshot` (`snapshot_id`),
   CONSTRAINT `fk_inventory_item_snapshot` FOREIGN KEY (`snapshot_id`) REFERENCES `inventory_snapshot` (`id`)
@@ -610,6 +618,7 @@ CREATE TABLE `calendar_event` (
   `title` VARCHAR(180) NOT NULL,
   `color_code` VARCHAR(20) NULL DEFAULT NULL COMMENT 'Use app constants, e.g. #16a34a for paid',
   `metadata_json` JSON NULL,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_calendar_event_branch` (`branch_id`),
@@ -729,12 +738,12 @@ INSERT INTO `branch_sidebar_permissions` (`branch_id`, `feature_key`) VALUES
 -- ---------------------------------------------------------------------------
 -- Seed: role sidebar — all roles may see all modules by default (admin narrows later)
 -- ---------------------------------------------------------------------------
-INSERT INTO `role_sidebar_permissions` (`role_id`, `feature_key`) VALUES
-  (1, 'dashboard'), (1, 'units'), (1, 'contracts'), (1, 'crm'), (1, 'ledger'), (1, 'calendar'), (1, 'tenant_portal'), (1, 'agent_portal'),
-  (2, 'dashboard'), (2, 'units'), (2, 'contracts'), (2, 'crm'), (2, 'ledger'), (2, 'calendar'), (2, 'tenant_portal'), (2, 'agent_portal'),
-  (3, 'dashboard'), (3, 'units'), (3, 'contracts'), (3, 'crm'), (3, 'ledger'), (3, 'calendar'), (3, 'tenant_portal'), (3, 'agent_portal'),
-  (4, 'dashboard'), (4, 'units'), (4, 'contracts'), (4, 'crm'), (4, 'ledger'), (4, 'calendar'), (4, 'tenant_portal'), (4, 'agent_portal'),
-  (5, 'dashboard'), (5, 'units'), (5, 'contracts'), (5, 'crm'), (5, 'ledger'), (5, 'calendar'), (5, 'tenant_portal'), (5, 'agent_portal');
+INSERT INTO `role_sidebar_permissions` (`role_id`, `feature_key`, `active`) VALUES
+  (1, 'dashboard', 1), (1, 'units', 1), (1, 'contracts', 1), (1, 'crm', 1), (1, 'ledger', 1), (1, 'calendar', 1), (1, 'tenant_portal', 1), (1, 'agent_portal', 1),
+  (2, 'dashboard', 1), (2, 'units', 1), (2, 'contracts', 1), (2, 'crm', 1), (2, 'ledger', 1), (2, 'calendar', 1), (2, 'tenant_portal', 1), (2, 'agent_portal', 1),
+  (3, 'dashboard', 1), (3, 'units', 1), (3, 'contracts', 1), (3, 'crm', 1), (3, 'ledger', 1), (3, 'calendar', 1), (3, 'tenant_portal', 1), (3, 'agent_portal', 1),
+  (4, 'dashboard', 1), (4, 'units', 1), (4, 'contracts', 1), (4, 'crm', 1), (4, 'ledger', 1), (4, 'calendar', 1), (4, 'tenant_portal', 1), (4, 'agent_portal', 1),
+  (5, 'dashboard', 1), (5, 'units', 1), (5, 'contracts', 1), (5, 'crm', 1), (5, 'ledger', 1), (5, 'calendar', 1), (5, 'tenant_portal', 1), (5, 'agent_portal', 1);
 
 -- ---------------------------------------------------------------------------
 -- Seed: CRUD per role (module_key matches branch_sidebar + staff modules)

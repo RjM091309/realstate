@@ -246,10 +246,14 @@
         "status": "Status",
         "area": "Area",
         "monthlyRate": "Monthly rate (₱)",
+        "photo": "Unit photo",
+        "photoUpload": "Upload WEBP",
+        "photoHint": "WEBP files only.",
         "save": "Save unit",
         "cancel": "Cancel",
         "validationRequired": "Unit number and building name are required.",
         "validationRate": "Enter a valid monthly rate.",
+        "validationPhotoWebp": "Please upload a WEBP image only.",
         "saved": "Unit added to the list."
       },
       "editModal": {

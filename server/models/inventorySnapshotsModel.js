@@ -13,8 +13,8 @@ export async function listInventorySnapshotsByContract(contractId, branchId) {
       s.remarks,
       s.created_at
     FROM inventory_snapshot s
-    INNER JOIN lease_contract lc ON lc.id = s.contract_id AND lc.branch_id = ?
-    WHERE s.contract_id = ? AND s.branch_id = ?
+    INNER JOIN lease_contract lc ON lc.id = s.contract_id AND lc.branch_id = ? AND lc.active = 1
+    WHERE s.contract_id = ? AND s.branch_id = ? AND s.active = 1
     ORDER BY s.inspection_date DESC, s.id DESC
     `,
     [branchId, contractId, branchId],
@@ -34,8 +34,8 @@ export async function listInventorySnapshotItems(snapshotId, branchId) {
       i.condition_state,
       i.notes
     FROM inventory_snapshot_item i
-    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ?
-    WHERE i.snapshot_id = ?
+    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ? AND s.active = 1
+    WHERE i.snapshot_id = ? AND i.active = 1
     ORDER BY i.id ASC
     `,
     [branchId, snapshotId],
@@ -70,7 +70,7 @@ export async function insertInventorySnapshot(branchId, payload) {
 export async function insertInventorySnapshotItem(branchId, payload) {
   // Ensure snapshot belongs to branch.
   const [[snap]] = await pool.query(
-    `SELECT id FROM inventory_snapshot WHERE id = ? AND branch_id = ? LIMIT 1`,
+    `SELECT id FROM inventory_snapshot WHERE id = ? AND branch_id = ? AND active = 1 LIMIT 1`,
     [payload.snapshotId, branchId],
   );
   if (!snap) return null;
@@ -101,7 +101,7 @@ export async function insertInventorySnapshotItem(branchId, payload) {
 export async function updateInventorySnapshotById(branchId, snapshotId, patch) {
   // Ensure snapshot belongs to branch.
   const [[snap]] = await pool.query(
-    `SELECT id, contract_id FROM inventory_snapshot WHERE id = ? AND branch_id = ? LIMIT 1`,
+    `SELECT id, contract_id FROM inventory_snapshot WHERE id = ? AND branch_id = ? AND active = 1 LIMIT 1`,
     [snapshotId, branchId],
   );
   if (!snap) return null;
@@ -112,7 +112,7 @@ export async function updateInventorySnapshotById(branchId, snapshotId, patch) {
       snapshot_type = ?,
       inspection_date = ?,
       remarks = ?
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     `,
     [patch.snapshotType, patch.inspectionDate, patch.remarks ?? null, snapshotId, branchId],
   );
@@ -121,16 +121,18 @@ export async function updateInventorySnapshotById(branchId, snapshotId, patch) {
 
 export async function deleteInventorySnapshotById(branchId, snapshotId) {
   const [[snap]] = await pool.query(
-    `SELECT id, contract_id FROM inventory_snapshot WHERE id = ? AND branch_id = ? LIMIT 1`,
+    `SELECT id, contract_id FROM inventory_snapshot WHERE id = ? AND branch_id = ? AND active = 1 LIMIT 1`,
     [snapshotId, branchId],
   );
   if (!snap) return null;
 
-  await pool.query('DELETE FROM inventory_snapshot_item WHERE snapshot_id = ?', [snapshotId]);
-  const [res] = await pool.query('DELETE FROM inventory_snapshot WHERE id = ? AND branch_id = ?', [
+  await pool.query('UPDATE inventory_snapshot_item SET active = 0 WHERE snapshot_id = ? AND active = 1', [
     snapshotId,
-    branchId,
   ]);
+  const [res] = await pool.query(
+    'UPDATE inventory_snapshot SET active = 0 WHERE id = ? AND branch_id = ? AND active = 1',
+    [snapshotId, branchId],
+  );
   return res.affectedRows > 0 ? String(snap.contract_id) : null;
 }
 
@@ -139,8 +141,8 @@ export async function updateInventorySnapshotItemById(branchId, itemId, patch) {
     `
     SELECT i.id, i.snapshot_id
     FROM inventory_snapshot_item i
-    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ?
-    WHERE i.id = ?
+    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ? AND s.active = 1
+    WHERE i.id = ? AND i.active = 1
     LIMIT 1
     `,
     [branchId, itemId],
@@ -155,7 +157,7 @@ export async function updateInventorySnapshotItemById(branchId, itemId, patch) {
       quantity = ?,
       condition_state = ?,
       notes = ?
-    WHERE id = ?
+    WHERE id = ? AND active = 1
     `,
     [
       patch.itemName,
@@ -174,15 +176,17 @@ export async function deleteInventorySnapshotItemById(branchId, itemId) {
     `
     SELECT i.id, i.snapshot_id
     FROM inventory_snapshot_item i
-    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ?
-    WHERE i.id = ?
+    INNER JOIN inventory_snapshot s ON s.id = i.snapshot_id AND s.branch_id = ? AND s.active = 1
+    WHERE i.id = ? AND i.active = 1
     LIMIT 1
     `,
     [branchId, itemId],
   );
   if (!row) return null;
 
-  const [res] = await pool.query('DELETE FROM inventory_snapshot_item WHERE id = ?', [itemId]);
+  const [res] = await pool.query('UPDATE inventory_snapshot_item SET active = 0 WHERE id = ? AND active = 1', [
+    itemId,
+  ]);
   return res.affectedRows > 0 ? String(row.snapshot_id) : null;
 }
 

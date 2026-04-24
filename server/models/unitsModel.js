@@ -35,11 +35,12 @@ export async function listUnitsByBranch(branchId) {
       END AS status,
       a.name AS area,
       u.monthly_rent AS monthly_rate,
+      u.photo_data AS photo_data,
       COALESCE(u.inventory_json, '[]') AS inventory_json
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
-    WHERE pr.branch_id = ?
+    WHERE pr.branch_id = ? AND u.active = 1
     ORDER BY pr.name ASC, u.unit_no ASC
     `,
     [branchId],
@@ -101,9 +102,10 @@ export async function insertUnit(branchId, payload) {
       unit_type,
       listing_type,
       monthly_rent,
+      photo_data,
       status,
       inventory_json
-    ) VALUES (?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?)
     `,
     [
       propertyId,
@@ -113,6 +115,7 @@ export async function insertUnit(branchId, payload) {
       payload.tower,
       payload.unitType,
       payload.monthlyRate,
+      payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
     ],
@@ -128,7 +131,7 @@ export async function updateUnitById(id, branchId, payload) {
     SELECT u.id
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
-    WHERE u.id = ? AND pr.branch_id = ?
+    WHERE u.id = ? AND pr.branch_id = ? AND u.active = 1
     LIMIT 1
     `,
     [id, branchId],
@@ -149,9 +152,10 @@ export async function updateUnitById(id, branchId, payload) {
       tower = ?,
       unit_type = ?,
       monthly_rent = ?,
+      photo_data = ?,
       status = ?,
       inventory_json = ?
-    WHERE id = ?
+    WHERE id = ? AND active = 1
     `,
     [
       propertyId,
@@ -161,6 +165,7 @@ export async function updateUnitById(id, branchId, payload) {
       payload.tower,
       payload.unitType,
       payload.monthlyRate,
+      payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
       id,
@@ -191,11 +196,12 @@ export async function getUnitById(id, branchId) {
       END AS status,
       a.name AS area,
       u.monthly_rent AS monthly_rate,
+      u.photo_data AS photo_data,
       COALESCE(u.inventory_json, '[]') AS inventory_json
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
-    WHERE u.id = ? AND pr.branch_id = ?
+    WHERE u.id = ? AND pr.branch_id = ? AND u.active = 1
     LIMIT 1
     `,
     [id, branchId],
@@ -206,10 +212,12 @@ export async function getUnitById(id, branchId) {
 export async function deleteUnitById(id, branchId) {
   const [result] = await pool.query(
     `
-    DELETE u
-    FROM unit u
+    UPDATE unit u
     JOIN property pr ON pr.id = u.property_id
-    WHERE u.id = ? AND pr.branch_id = ?
+    SET
+      u.active = 0,
+      u.status = 'inactive'
+    WHERE u.id = ? AND pr.branch_id = ? AND u.active = 1
     `,
     [id, branchId],
   );

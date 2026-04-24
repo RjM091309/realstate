@@ -47,6 +47,138 @@ export async function ensureSchema() {
     );
   }
 
+  async function ensureUnitPhotoColumn() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'photo_data'
+      `,
+    );
+    if (rows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`photo_data\` LONGTEXT NULL AFTER \`monthly_rent\``,
+      );
+    }
+
+    const [activeRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'active'
+      `,
+    );
+    if (activeRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
+      );
+    }
+  }
+
+  async function ensureTenantDocumentCascade() {
+    const [rows] = await pool.query(
+      `
+      SELECT delete_rule
+      FROM information_schema.referential_constraints
+      WHERE constraint_schema = DATABASE()
+        AND constraint_name = 'fk_tenant_document_tenant'
+      LIMIT 1
+      `,
+    );
+    const deleteRule = String(rows[0]?.delete_rule ?? '').toUpperCase();
+    if (deleteRule === 'CASCADE') return;
+
+    await pool.query(
+      'ALTER TABLE `tenant_document` DROP FOREIGN KEY `fk_tenant_document_tenant`',
+    );
+    await pool.query(
+      `ALTER TABLE \`tenant_document\`
+       ADD CONSTRAINT \`fk_tenant_document_tenant\`
+       FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`)
+       ON DELETE CASCADE`,
+    );
+  }
+
+  async function ensureContractsOperationsActiveColumns() {
+    async function hasColumn(tableName, columnName) {
+      const [rows] = await pool.query(
+        `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = ?
+          AND column_name = ?
+        LIMIT 1
+        `,
+        [tableName, columnName],
+      );
+      return rows.length > 0;
+    }
+
+    if (!(await hasColumn('lease_contract', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`lease_contract\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
+      );
+    }
+    if (!(await hasColumn('inventory_snapshot', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`inventory_snapshot\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`remarks\``,
+      );
+    }
+    if (!(await hasColumn('inventory_snapshot_item', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`inventory_snapshot_item\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`notes\``,
+      );
+    }
+    if (!(await hasColumn('calendar_event', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`calendar_event\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`metadata_json\``,
+      );
+    }
+    if (!(await hasColumn('payment_schedule', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`payment_schedule\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
+      );
+    }
+    if (!(await hasColumn('payment_transaction', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`payment_transaction\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`payment_method\``,
+      );
+    }
+  }
+
+  async function ensureRoleAndContractMappingActiveColumns() {
+    async function hasColumn(tableName, columnName) {
+      const [rows] = await pool.query(
+        `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = ?
+          AND column_name = ?
+        LIMIT 1
+        `,
+        [tableName, columnName],
+      );
+      return rows.length > 0;
+    }
+
+    if (!(await hasColumn('role_sidebar_permissions', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`role_sidebar_permissions\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`feature_key\``,
+      );
+    }
+    if (!(await hasColumn('contract_tenant', 'active'))) {
+      await pool.query(
+        `ALTER TABLE \`contract_tenant\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`is_primary\``,
+      );
+    }
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`user_role\` (
       \`IDNo\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -235,11 +367,14 @@ export async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS \`role_sidebar_permissions\` (
       \`role_id\` INT UNSIGNED NOT NULL,
       \`feature_key\` VARCHAR(64) NOT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       PRIMARY KEY (\`role_id\`, \`feature_key\`),
       KEY \`idx_rsp_role\` (\`role_id\`),
       CONSTRAINT \`fk_rsp_user_role\` FOREIGN KEY (\`role_id\`) REFERENCES \`user_role\` (\`IDNo\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  // Existing DBs may already have this table without `active`; patch before seed INSERT.
+  await ensureRoleAndContractMappingActiveColumns();
 
   const values = [];
   for (let roleId = 1; roleId <= 5; roleId++) {
@@ -248,7 +383,9 @@ export async function ensureSchema() {
     }
   }
   await pool.query(
-    `INSERT IGNORE INTO \`role_sidebar_permissions\` (\`role_id\`, \`feature_key\`) VALUES ${values.join(',')}`,
+    `INSERT IGNORE INTO \`role_sidebar_permissions\` (\`role_id\`, \`feature_key\`, \`active\`) VALUES ${values
+      .map((v) => `${v.slice(0, -1)}, 1)`)
+      .join(',')}`,
   );
 
   await pool.query(`
@@ -303,6 +440,7 @@ export async function ensureSchema() {
       \`unit_type\` VARCHAR(40) NOT NULL,
       \`listing_type\` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
       \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+      \`photo_data\` LONGTEXT NULL,
       \`market_value\` DECIMAL(14,2) NULL DEFAULT NULL,
       \`inventory_json\` LONGTEXT NULL,
       \`status\` ENUM('vacant','occupied','reserved','maintenance','inactive') NOT NULL DEFAULT 'vacant',
@@ -318,6 +456,7 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_unit_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  await ensureUnitPhotoColumn();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`partner_agency\` (
@@ -405,6 +544,7 @@ export async function ensureSchema() {
       \`partner_agency_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
       \`contract_type\` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
       \`status\` ENUM('draft','active','completed','terminated','cancelled') NOT NULL DEFAULT 'draft',
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`start_date\` DATE NOT NULL,
       \`end_date\` DATE NOT NULL,
       \`move_in_date\` DATE NULL DEFAULT NULL,
@@ -437,6 +577,7 @@ export async function ensureSchema() {
       \`contract_id\` BIGINT UNSIGNED NOT NULL,
       \`tenant_id\` BIGINT UNSIGNED NOT NULL,
       \`is_primary\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`contract_id\`, \`tenant_id\`),
       KEY \`idx_contract_tenant_tenant\` (\`tenant_id\`),
@@ -444,6 +585,8 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_ct_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  // Existing DBs may already have this table without `active`; patch before runtime INSERTs.
+  await ensureRoleAndContractMappingActiveColumns();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`blacklist_record\` (
@@ -529,10 +672,11 @@ export async function ensureSchema() {
       KEY \`idx_tenant_document_branch\` (\`branch_id\`),
       KEY \`idx_tenant_document_tenant\` (\`tenant_id\`),
       CONSTRAINT \`fk_tenant_document_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
-      CONSTRAINT \`fk_tenant_document_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
+      CONSTRAINT \`fk_tenant_document_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`) ON DELETE CASCADE,
       CONSTRAINT \`fk_tenant_document_verified_by\` FOREIGN KEY (\`verified_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  await ensureTenantDocumentCascade();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`invoice\` (
@@ -571,6 +715,7 @@ export async function ensureSchema() {
       \`due_date\` DATE NOT NULL,
       \`amount_due\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
       \`status\` ENUM('pending','partially_paid','paid','overdue','waived') NOT NULL DEFAULT 'pending',
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`notes\` VARCHAR(255) NULL DEFAULT NULL,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
@@ -592,6 +737,7 @@ export async function ensureSchema() {
       \`amount_paid\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
       \`payment_date\` DATE NOT NULL,
       \`payment_method\` ENUM('cash','bank_transfer','online','check','other') NOT NULL DEFAULT 'cash',
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`reference_no\` VARCHAR(100) NULL DEFAULT NULL,
       \`received_by\` INT UNSIGNED NULL DEFAULT NULL,
       \`remarks\` VARCHAR(255) NULL DEFAULT NULL,
@@ -668,7 +814,8 @@ export async function ensureSchema() {
 
         const contractId = insLc.insertId;
         await pool.query(
-          'INSERT INTO contract_tenant (contract_id, tenant_id, is_primary) VALUES (?, ?, 1)',
+          `INSERT INTO contract_tenant (contract_id, tenant_id, is_primary, active) VALUES (?, ?, 1, 1)
+           ON DUPLICATE KEY UPDATE is_primary = VALUES(is_primary), active = 1`,
           [contractId, tenantId],
         );
 
@@ -738,6 +885,7 @@ export async function ensureSchema() {
       \`inspection_date\` DATE NOT NULL,
       \`inspected_by\` INT UNSIGNED NULL DEFAULT NULL,
       \`remarks\` TEXT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       KEY \`idx_inventory_snapshot_branch\` (\`branch_id\`),
@@ -757,6 +905,7 @@ export async function ensureSchema() {
       \`quantity\` INT UNSIGNED NOT NULL DEFAULT 1,
       \`condition_state\` ENUM('excellent','good','fair','damaged','missing') NOT NULL DEFAULT 'good',
       \`notes\` VARCHAR(255) NULL DEFAULT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       PRIMARY KEY (\`id\`),
       KEY \`idx_inventory_item_snapshot\` (\`snapshot_id\`),
       CONSTRAINT \`fk_inventory_item_snapshot\` FOREIGN KEY (\`snapshot_id\`) REFERENCES \`inventory_snapshot\` (\`id\`)
@@ -774,6 +923,7 @@ export async function ensureSchema() {
       \`title\` VARCHAR(180) NOT NULL,
       \`color_code\` VARCHAR(20) NULL DEFAULT NULL,
       \`metadata_json\` JSON NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       KEY \`idx_calendar_event_branch\` (\`branch_id\`),
@@ -783,6 +933,8 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_calendar_payment_schedule\` FOREIGN KEY (\`payment_schedule_id\`) REFERENCES \`payment_schedule\` (\`id\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+  await ensureContractsOperationsActiveColumns();
+  await ensureRoleAndContractMappingActiveColumns();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`audit_log\` (

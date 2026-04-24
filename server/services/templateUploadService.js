@@ -2,6 +2,14 @@ import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 
+async function unlinkQuietly(filePath) {
+  try {
+    await fs.unlink(filePath);
+  } catch {
+    // Ignore cleanup errors for temp uploads.
+  }
+}
+
 /** @param {import('multer').File} file */
 export async function finalizeTemplateUploadToWebpOrPdf(file) {
   const mime = String(file.mimetype ?? '').toLowerCase();
@@ -16,14 +24,14 @@ export async function finalizeTemplateUploadToWebpOrPdf(file) {
   }
 
   if (!mime.startsWith('image/')) {
-    await fs.unlink(file.path).catch(() => {});
+    await unlinkQuietly(file.path);
     const err = new Error('Only images (saved as WebP) or PDF files are allowed.');
     err.statusCode = 400;
     throw err;
   }
 
   if (mime === 'image/svg+xml') {
-    await fs.unlink(file.path).catch(() => {});
+    await unlinkQuietly(file.path);
     const err = new Error('SVG uploads are not supported. Use PNG, JPEG, or WebP.');
     err.statusCode = 400;
     throw err;
@@ -49,14 +57,14 @@ export async function finalizeTemplateUploadToWebpOrPdf(file) {
       path: file.path,
       error: e instanceof Error ? e.message : String(e),
     });
-    await fs.unlink(file.path).catch(() => {});
+    await unlinkQuietly(file.path);
     const err = new Error('Could not process this image. Try JPEG, PNG, GIF, or WebP (max 10MB).');
     err.statusCode = 400;
     err.cause = e;
     throw err;
   }
 
-  await fs.unlink(file.path).catch(() => {});
+  await unlinkQuietly(file.path);
 
   return {
     publicUrl: `/uploads/templates/${encodeURIComponent(outName)}`,

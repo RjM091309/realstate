@@ -1,6 +1,27 @@
 const TOKEN_KEY = 'realstate_token';
 const DEV_BYPASS_USER_ID_KEY = 'realstate_dev_user_id';
 
+async function tryParseJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
+function readApiErrorMessage(payload: unknown, fallback: string): string {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'error' in payload &&
+    typeof payload.error === 'string' &&
+    payload.error.trim()
+  ) {
+    return payload.error;
+  }
+  return fallback;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -43,8 +64,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new Error(e instanceof Error ? `${e.message}.${hint}` : `Request failed.${hint}`);
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = typeof err?.error === 'string' ? err.error : res.statusText;
+    const err = await tryParseJson(res);
+    const msg = readApiErrorMessage(err, res.statusText || `HTTP ${res.status}`);
     throw new Error(msg || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;

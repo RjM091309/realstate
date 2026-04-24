@@ -12,6 +12,7 @@ export type UnitWriteBody = {
   status: Unit['status'];
   area: Unit['area'];
   monthlyRate: number;
+  photoDataUrl?: string | null;
   inventory: Unit['inventory'];
 };
 

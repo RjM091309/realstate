@@ -178,13 +178,11 @@ async function toWebpIfNeeded(file: File): Promise<File> {
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close?.();
 
-  const blob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error('Failed to convert image to WEBP.'))),
-      'image/webp',
-      0.9,
-    );
-  });
+  const dataUrl = canvas.toDataURL('image/webp', 0.9);
+  if (!dataUrl.startsWith('data:image/webp')) {
+    throw new Error('Failed to convert image to WEBP.');
+  }
+  const blob = await (await fetch(dataUrl)).blob();
 
   const safeBase = (file.name || 'id')
     .replace(/\.[^.]+$/, '')

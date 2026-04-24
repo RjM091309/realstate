@@ -21,6 +21,7 @@ export async function listPartnerAgenciesByBranch(branchId) {
       active
     FROM partner_agency
     WHERE branch_id = ?
+      AND active = 1
     ORDER BY agency_name ASC
     `,
     [branchId],
@@ -87,7 +88,7 @@ export async function getPartnerAgencyById(id, branchId) {
       blacklist_reason,
       active
     FROM partner_agency
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     LIMIT 1
     `,
     [id, branchId],
@@ -112,7 +113,7 @@ export async function updatePartnerAgencyById(id, branchId, payload) {
       is_blacklisted = ?,
       blacklist_reason = ?,
       active = ?
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     `,
     [
       payload.agencyName,
@@ -139,7 +140,7 @@ export async function updatePartnerAgencyDocumentPathById(id, branchId, filePath
   const [result] = await pool.query(
     `
     UPDATE partner_agency SET file_path = ?
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     `,
     [filePath, id, branchId],
   );

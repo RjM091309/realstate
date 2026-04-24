@@ -24,7 +24,7 @@ export async function loadSessionPayload(userId) {
   const effectiveBranch = u.BRANCH_ID != null ? Number(u.BRANCH_ID) : 1;
 
   const [sidebarRows] = await pool.query(
-    'SELECT feature_key FROM role_sidebar_permissions WHERE role_id = ?',
+    'SELECT feature_key FROM role_sidebar_permissions WHERE role_id = ? AND active = 1',
     [roleId],
   );
 

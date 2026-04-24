@@ -32,6 +32,7 @@ function rowToUnit(row) {
     status: row.status,
     area: row.area,
     monthlyRate: Number(row.monthly_rate),
+    photoDataUrl: row.photo_data ? String(row.photo_data) : null,
     inventory,
   };
 }
@@ -49,6 +50,7 @@ function payloadToUnit(id, parsed) {
     status: parsed.status,
     area: parsed.area,
     monthlyRate: parsed.monthlyRate,
+    photoDataUrl: parsed.photoDataUrl,
     inventory: parsed.inventory ?? [],
   };
 }
@@ -66,6 +68,15 @@ function validatePayload(body) {
   const monthlyRate = Number(body.monthlyRate);
   if (!Number.isFinite(monthlyRate) || monthlyRate < 0) return null;
 
+  const photoRaw = body.photoDataUrl;
+  let photoDataUrl = null;
+  if (photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '') {
+    const value = String(photoRaw).trim();
+    if (!value.startsWith('data:image/webp;base64,')) return null;
+    if (value.length > 8 * 1024 * 1024) return null;
+    photoDataUrl = value;
+  }
+
   const inventory = body.inventory;
   if (inventory !== undefined && !Array.isArray(inventory)) return null;
 
@@ -80,6 +91,7 @@ function validatePayload(body) {
     status,
     area,
     monthlyRate,
+    photoDataUrl,
     inventory,
   };
 }
@@ -145,6 +157,7 @@ export async function createUnit(req, res) {
       status: parsed.status,
       area: parsed.area,
       monthlyRate: parsed.monthlyRate,
+      photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
     });
     if (!row) {
@@ -190,6 +203,7 @@ export async function updateUnit(req, res) {
       status: parsed.status,
       area: parsed.area,
       monthlyRate: parsed.monthlyRate,
+      photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
     });
     if (affectedRows === 0) {

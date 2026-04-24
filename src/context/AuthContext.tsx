@@ -112,7 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setDevBypassUserId(null);
     setSession(null);
-    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    void (async () => {
+      try {
+        await apiFetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // Ignore logout API errors since local session is already cleared.
+      }
+    })();
   }, []);
 
   const value = useMemo<AuthContextValue>(

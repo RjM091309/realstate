@@ -26,7 +26,7 @@ export async function listRoleCrudPermissions(roleId) {
 
 export async function listRoleSidebarPermissions(roleId) {
   const [rows] = await pool.query(
-    'SELECT feature_key FROM role_sidebar_permissions WHERE role_id = ?',
+    'SELECT feature_key FROM role_sidebar_permissions WHERE role_id = ? AND active = 1',
     [roleId],
   );
   return rows;
@@ -39,12 +39,13 @@ export async function replaceRoleSidebarPermissions(roleId, featureKeys) {
     if (!(await roleExists(roleId, conn))) {
       throw new Error('ROLE_NOT_FOUND');
     }
-    await conn.query('DELETE FROM role_sidebar_permissions WHERE role_id = ?', [roleId]);
+    await conn.query('UPDATE role_sidebar_permissions SET active = 0 WHERE role_id = ? AND active = 1', [roleId]);
     for (const fk of featureKeys) {
-      await conn.query('INSERT INTO role_sidebar_permissions (role_id, feature_key) VALUES (?, ?)', [
-        roleId,
-        fk,
-      ]);
+      await conn.query(
+        `INSERT INTO role_sidebar_permissions (role_id, feature_key, active) VALUES (?, ?, 1)
+         ON DUPLICATE KEY UPDATE active = 1`,
+        [roleId, fk],
+      );
     }
     await conn.commit();
   } catch (e) {

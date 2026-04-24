@@ -37,6 +37,7 @@ export async function getLandlordById(id, branchId) {
     FROM landlord_profile
     WHERE id = ?
       AND (branch_id = ? OR branch_id IS NULL)
+      AND active = 1
     LIMIT 1
     `,
     [id, branchId],

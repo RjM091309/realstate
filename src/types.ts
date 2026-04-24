@@ -20,6 +20,7 @@ export interface Unit {
   status: UnitStatus;
   area: string;
   monthlyRate: number;
+  photoDataUrl?: string | null;
   marketValue?: number;
   inventory: InventoryItem[];
 }

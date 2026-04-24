@@ -64,9 +64,9 @@ export async function listContractsByBranch(branchId) {
         c.special_remarks AS remarks
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
-       ON ct.contract_id = c.id AND ct.is_primary = 1
+       ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
      LEFT JOIN user_info u ON u.IDNO = c.agent_id
-     WHERE c.branch_id = ?
+     WHERE c.branch_id = ? AND c.active = 1
      ORDER BY c.created_at DESC`,
     [branchId],
   );
@@ -102,7 +102,8 @@ export async function insertContract(branchId, payload) {
 
     const contractId = result.insertId;
     await conn.query(
-      `INSERT INTO contract_tenant (contract_id, tenant_id, is_primary) VALUES (?, ?, 1)`,
+      `INSERT INTO contract_tenant (contract_id, tenant_id, is_primary, active) VALUES (?, ?, 1, 1)
+       ON DUPLICATE KEY UPDATE is_primary = VALUES(is_primary), active = 1`,
       [contractId, payload.tenantId],
     );
 
@@ -144,7 +145,7 @@ export async function updateContractById(id, branchId, payload) {
         contract_type = ?,
         status = ?,
         special_remarks = ?
-       WHERE id = ? AND branch_id = ?`,
+       WHERE id = ? AND branch_id = ? AND active = 1`,
       [
         payload.unitId,
         payload.agentId,
@@ -163,9 +164,12 @@ export async function updateContractById(id, branchId, payload) {
 
     if (result.affectedRows > 0) {
       // ensure a single primary tenant row
-      await conn.query('DELETE FROM contract_tenant WHERE contract_id = ? AND is_primary = 1', [id]);
+      await conn.query('UPDATE contract_tenant SET active = 0 WHERE contract_id = ? AND is_primary = 1 AND active = 1', [
+        id,
+      ]);
       await conn.query(
-        'INSERT INTO contract_tenant (contract_id, tenant_id, is_primary) VALUES (?, ?, 1)',
+        `INSERT INTO contract_tenant (contract_id, tenant_id, is_primary, active) VALUES (?, ?, 1, 1)
+         ON DUPLICATE KEY UPDATE is_primary = VALUES(is_primary), active = 1`,
         [id, payload.tenantId],
       );
 
@@ -212,9 +216,9 @@ export async function getContractById(id, branchId) {
         c.special_remarks AS remarks
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
-       ON ct.contract_id = c.id AND ct.is_primary = 1
+       ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
      LEFT JOIN user_info u ON u.IDNO = c.agent_id
-     WHERE c.id = ? AND c.branch_id = ?
+     WHERE c.id = ? AND c.branch_id = ? AND c.active = 1
      LIMIT 1`,
     [id, branchId],
   );
@@ -261,10 +265,10 @@ export async function getContractDocumentDetails(contractId, branchId) {
     FROM lease_contract c
     INNER JOIN unit u ON u.id = c.unit_id
     INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = c.branch_id
-    LEFT JOIN contract_tenant ct ON ct.contract_id = c.id AND ct.is_primary = 1
+    LEFT JOIN contract_tenant ct ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
     LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
     LEFT JOIN landlord_profile ll ON ll.id = c.landlord_id
-    WHERE c.id = ? AND c.branch_id = ?
+    WHERE c.id = ? AND c.branch_id = ? AND c.active = 1
     LIMIT 1
     `,
     [contractId, branchId],
@@ -273,10 +277,12 @@ export async function getContractDocumentDetails(contractId, branchId) {
 }
 
 export async function deleteContractById(id, branchId) {
-  const [result] = await pool.query('DELETE FROM lease_contract WHERE id = ? AND branch_id = ?', [
-    id,
-    branchId,
-  ]);
+  const [result] = await pool.query(
+    `UPDATE lease_contract
+     SET active = 0
+     WHERE id = ? AND branch_id = ? AND active = 1`,
+    [id, branchId],
+  );
   return result.affectedRows;
 }
 
@@ -292,9 +298,9 @@ export async function listContractTenants(contractId, branchId) {
       t.email AS tenant_email,
       t.mobile_no AS tenant_phone
     FROM contract_tenant ct
-    INNER JOIN lease_contract lc ON lc.id = ct.contract_id AND lc.branch_id = ?
-    INNER JOIN tenant_profile t ON t.id = ct.tenant_id
-    WHERE ct.contract_id = ?
+    INNER JOIN lease_contract lc ON lc.id = ct.contract_id AND lc.branch_id = ? AND lc.active = 1
+    INNER JOIN tenant_profile t ON t.id = ct.tenant_id AND t.active = 1
+    WHERE ct.contract_id = ? AND ct.active = 1
     ORDER BY ct.is_primary DESC, ct.created_at DESC
     `,
     [branchId, contractId],
@@ -319,7 +325,7 @@ export async function listContractCollaborations(contractId, branchId) {
       cc.created_by,
       cc.created_at
     FROM contract_collaboration cc
-    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ?
+    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ? AND lc.active = 1
     LEFT JOIN partner_agency pa ON pa.id = cc.partner_agency_id
     WHERE cc.contract_id = ? AND cc.branch_id = ?
     ORDER BY cc.created_at DESC, cc.id DESC

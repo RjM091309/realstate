@@ -246,10 +246,14 @@
         "status": "상태",
         "area": "지역",
         "monthlyRate": "월 임대료 (₱)",
+        "photo": "유닛 사진",
+        "photoUpload": "WEBP 업로드",
+        "photoHint": "WEBP 파일만 업로드할 수 있습니다.",
         "save": "유닛 저장",
         "cancel": "취소",
         "validationRequired": "유닛 번호와 건물명은 필수입니다.",
         "validationRate": "유효한 월 임대료를 입력하세요.",
+        "validationPhotoWebp": "WEBP 이미지 파일만 업로드하세요.",
         "saved": "목록에 유닛이 추가되었습니다."
       },
       "editModal": {

@@ -28,10 +28,11 @@ export async function listPaymentsByBranch(branchId) {
       END AS status
     FROM payment_schedule ps
     JOIN lease_contract lc
-      ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id
+      ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
     LEFT JOIN payment_transaction pt
-      ON pt.payment_schedule_id = ps.id
+      ON pt.payment_schedule_id = ps.id AND pt.active = 1
     WHERE ps.branch_id = ?
+      AND ps.active = 1
     GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status
     ORDER BY ps.due_date DESC, ps.created_at DESC
     `,
@@ -42,7 +43,7 @@ export async function listPaymentsByBranch(branchId) {
 
 export async function insertPayment(branchId, payload) {
   const [contractRows] = await pool.query(
-    `SELECT id FROM lease_contract WHERE id = ? AND branch_id = ? LIMIT 1`,
+    `SELECT id FROM lease_contract WHERE id = ? AND branch_id = ? AND active = 1 LIMIT 1`,
     [payload.contractId, branchId],
   );
   if (!contractRows[0]?.id) throw new Error('Contract not found for branch');
@@ -54,8 +55,9 @@ export async function insertPayment(branchId, payload) {
       contract_id,
       due_date,
       amount_due,
-      status
-    ) VALUES (?, ?, ?, ?, ?)
+      status,
+      active
+    ) VALUES (?, ?, ?, ?, ?, 1)
     `,
     [branchId, payload.contractId, payload.dueDate, payload.amount, mapToScheduleStatus(payload.status)],
   );
@@ -70,8 +72,9 @@ export async function insertPayment(branchId, payload) {
         payment_schedule_id,
         amount_paid,
         payment_date,
-        payment_method
-      ) VALUES (?, ?, ?, ?, 'cash')
+        payment_method,
+        active
+      ) VALUES (?, ?, ?, ?, 'cash', 1)
       `,
       [branchId, scheduleId, payload.amount, payload.paidDate ?? payload.dueDate],
     );
@@ -85,7 +88,7 @@ export async function updatePaymentById(id, branchId, payload) {
     `
     SELECT ps.id
     FROM payment_schedule ps
-    WHERE ps.id = ? AND ps.branch_id = ?
+    WHERE ps.id = ? AND ps.branch_id = ? AND ps.active = 1
     LIMIT 1
     `,
     [id, branchId],
@@ -101,13 +104,15 @@ export async function updatePaymentById(id, branchId, payload) {
       amount_due = ?,
       due_date = ?,
       status = ?
-    WHERE id = ? AND branch_id = ?
+    WHERE id = ? AND branch_id = ? AND active = 1
     `,
     [payload.amount, payload.dueDate, scheduleStatus, id, branchId],
   );
 
   // Keep payment_transaction consistent with payment_schedule.status
-  await pool.query(`DELETE FROM payment_transaction WHERE payment_schedule_id = ?`, [id]);
+  await pool.query(`UPDATE payment_transaction SET active = 0 WHERE payment_schedule_id = ? AND active = 1`, [
+    id,
+  ]);
 
   if (payload.status === 'Paid') {
     await pool.query(
@@ -117,8 +122,9 @@ export async function updatePaymentById(id, branchId, payload) {
         payment_schedule_id,
         amount_paid,
         payment_date,
-        payment_method
-      ) VALUES (?, ?, ?, ?, 'cash')
+        payment_method,
+        active
+      ) VALUES (?, ?, ?, ?, 'cash', 1)
       `,
       [branchId, id, payload.amount, payload.paidDate ?? payload.dueDate],
     );
@@ -145,10 +151,10 @@ export async function getPaymentById(id, branchId) {
       END AS status
     FROM payment_schedule ps
     JOIN lease_contract lc
-      ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id
+      ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
     LEFT JOIN payment_transaction pt
-      ON pt.payment_schedule_id = ps.id
-    WHERE ps.id = ? AND ps.branch_id = ?
+      ON pt.payment_schedule_id = ps.id AND pt.active = 1
+    WHERE ps.id = ? AND ps.branch_id = ? AND ps.active = 1
     GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status
     LIMIT 1
     `,
@@ -158,9 +164,9 @@ export async function getPaymentById(id, branchId) {
 }
 
 export async function deletePaymentById(id, branchId) {
-  await pool.query(`DELETE FROM payment_transaction WHERE payment_schedule_id = ?`, [id]);
+  await pool.query(`UPDATE payment_transaction SET active = 0 WHERE payment_schedule_id = ? AND active = 1`, [id]);
   const [result] = await pool.query(
-    'DELETE FROM payment_schedule WHERE id = ? AND branch_id = ?',
+    'UPDATE payment_schedule SET active = 0 WHERE id = ? AND branch_id = ? AND active = 1',
     [id, branchId],
   );
   return result.affectedRows;
