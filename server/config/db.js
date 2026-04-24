@@ -18,4 +18,14 @@ export const pool = mysql.createPool({
   database: process.env.DATABASE_NAME ?? 'realstate',
   waitForConnections: true,
   connectionLimit: 10,
+  // Allow large payloads (base64 WebP images can be several MB as strings).
+  maxAllowedPacket: 32 * 1024 * 1024, // 32 MB
 });
+
+// Raise max_allowed_packet at session level for every new connection.
+pool.on('connection', (conn) => {
+  conn.query('SET SESSION max_allowed_packet = 33554432', (err) => {
+    if (err) console.warn('[db] Could not set max_allowed_packet:', err.message);
+  });
+});
+

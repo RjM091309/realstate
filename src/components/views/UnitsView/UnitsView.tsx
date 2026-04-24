@@ -998,12 +998,45 @@ export function UnitsView() {
           onRowClick={(unit) => handleViewDetails(unit)}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredUnits.map((unit) => (
-            <Card key={unit.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-all group">
-              <div className="h-32 bg-slate-100 relative">
+            <div
+              key={unit.id}
+              className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden"
+            >
+              {/* Photo area */}
+              <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
+                {unit.photoDataUrl ? (
+                  <img
+                    src={unit.photoDataUrl}
+                    alt={`${unit.unitNumber} preview`}
+                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <Building2 className="w-14 h-14 text-slate-200" />
+                  </div>
+                )}
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
+
+                {/* Status pill — bottom left */}
+                <div className="absolute bottom-3 left-3">
+                  <span className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold backdrop-blur-sm',
+                    unit.status === 'Available' && 'bg-emerald-500/90 text-white',
+                    unit.status === 'Occupied' && 'bg-indigo-500/90 text-white',
+                    unit.status === 'Maintenance' && 'bg-rose-500/90 text-white',
+                    unit.status === 'Reserved' && 'bg-amber-500/90 text-white',
+                  )}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
+                    {statusLabel(unit.status)}
+                  </span>
+                </div>
+
+                {/* Actions menu — top right, visible on hover */}
                 <div
-                  className="absolute top-3 right-3 z-10 flex items-center gap-1"
+                  className="absolute top-2.5 right-2.5"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                   role="presentation"
@@ -1015,108 +1048,85 @@ export function UnitsView() {
                           type="button"
                           variant="secondary"
                           size="icon"
-                          className="h-8 w-8 border border-slate-200 bg-white/95 shadow-sm"
+                          className="h-7 w-7 rounded-full bg-white/90 border-0 shadow-sm hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => e.stopPropagation()}
                         />
                       }
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="w-3.5 h-3.5" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewDetails(unit);
-                        }}
-                      >
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(unit); }}>
                         {t('views.units.table.viewDetails')}
                       </DropdownMenuItem>
                       {canUpdate && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditUnitModal(unit);
-                          }}
-                        >
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditUnitModal(unit); }}>
                           {t('views.units.table.editUnit')}
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleManageInventory(unit);
-                        }}
-                      >
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleManageInventory(unit); }}>
                         {t('views.units.table.manageInventory')}
                       </DropdownMenuItem>
                       {canDelete && (
                         <DropdownMenuItem
                           variant="destructive"
                           className="text-rose-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteUnit(unit);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); void handleDeleteUnit(unit); }}
                         >
                           {t('views.units.table.delete')}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Badge className={statusBadgeClass(unit.status)}>
-                    {statusLabel(unit.status)}
-                  </Badge>
-                </div>
-                <div
-                  className={cn(
-                    "absolute inset-0 flex items-center justify-center",
-                    unit.photoDataUrl ? "" : "opacity-20",
-                  )}
-                >
-                  {unit.photoDataUrl ? (
-                    <img
-                      src={unit.photoDataUrl}
-                      alt={`${unit.unitNumber} preview`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Building2 className="w-16 h-16" />
-                  )}
                 </div>
               </div>
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">{t('views.units.unitLabel', { unitNumber: unit.unitNumber })}</h3>
-                    <p className="text-sm text-slate-500">{unit.buildingName}</p>
+
+              {/* Card body */}
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 truncate">
+                      {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
+                    </h3>
+                    <p className="text-xs text-slate-400 truncate mt-0.5">{unit.buildingName}</p>
                   </div>
-                  <p className="text-lg font-bold text-indigo-600">₱{unit.monthlyRate.toLocaleString()}</p>
+                  <p className="shrink-0 text-right">
+                    <span className="text-sm font-bold text-indigo-600 tabular-nums">₱{unit.monthlyRate.toLocaleString()}</span>
+                    <span className="block text-[10px] text-slate-400 font-normal">/mo</span>
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <MapPin className="w-3 h-3" />
-                    {areaDisplayLabel(unit.area)}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <LayoutGrid className="w-3 h-3" />
+                {/* Info row */}
+                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+                  <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0">
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{areaDisplayLabel(unit.area)}</span>
+                  </span>
+                  <span className="h-3 w-px bg-slate-200 shrink-0" />
+                  <span className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
+                    <LayoutGrid className="w-3 h-3 shrink-0" />
                     {unit.type}
-                  </div>
+                  </span>
                 </div>
+              </div>
 
-                <Button
-                  variant="outline"
-                  className="w-full group-hover:bg-indigo-600 group-hover:text-white transition-colors"
+              {/* Footer */}
+              <div className="px-4 pb-4">
+                <button
+                  type="button"
+                  className="w-full h-9 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center gap-1.5"
                   onClick={() => handleViewDetails(unit)}
                 >
                   {t('views.units.table.viewDetails')}
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              </CardContent>
-            </Card>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}
+
+
 
       <Modal
         isOpen={isDetailsOpen && !isAddUnitOpen}
@@ -1693,10 +1703,10 @@ export function UnitsView() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"
                     onClick={() => setAddUnitPhotoPreview('')}
                   >
-                    {t('common.delete')}
+                    {t('views.units.table.delete')}
                   </Button>
                 ) : null}
               </div>

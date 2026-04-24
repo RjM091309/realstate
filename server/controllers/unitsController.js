@@ -73,7 +73,7 @@ function validatePayload(body) {
   if (photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '') {
     const value = String(photoRaw).trim();
     if (!value.startsWith('data:image/webp;base64,')) return null;
-    if (value.length > 8 * 1024 * 1024) return null;
+    if (value.length > 20 * 1024 * 1024) return null;
     photoDataUrl = value;
   }
 
@@ -141,6 +141,7 @@ export async function createUnit(req, res) {
 
   const parsed = validatePayload(req.body ?? {});
   if (!parsed) {
+    console.warn('[createUnit] Invalid payload — photoLen:', String(req.body?.photoDataUrl ?? '').length, 'area:', req.body?.area, 'type:', req.body?.type);
     res.status(400).json({ error: 'Invalid unit payload' });
     return;
   }
@@ -187,6 +188,7 @@ export async function updateUnit(req, res) {
 
   const parsed = validatePayload(req.body ?? {});
   if (!parsed) {
+    console.warn('[updateUnit] Invalid payload — photoLen:', String(req.body?.photoDataUrl ?? '').length, 'area:', req.body?.area, 'type:', req.body?.type);
     res.status(400).json({ error: 'Invalid unit payload' });
     return;
   }
