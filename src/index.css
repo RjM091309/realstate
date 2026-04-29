@@ -155,6 +155,24 @@
   * {
     @apply border-border outline-ring/50;
     }
+  button,
+  [role="button"],
+  a[href],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+    }
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+    }
   body {
     @apply bg-background text-foreground;
     }
