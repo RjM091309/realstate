@@ -1,4 +1,4 @@
-import {StrictMode} from 'react';
+import { StrictMode, useEffect } from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from './context/AuthContext';
@@ -8,9 +8,18 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import './index.css';
 import './i18n';
+import { applyTheme, getInitialTheme } from './lib/theme';
+
+function ThemeBootstrap() {
+  useEffect(() => {
+    applyTheme(getInitialTheme());
+  }, []);
+  return null;
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ThemeBootstrap />
     <AuthProvider>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <DateRangeProvider>

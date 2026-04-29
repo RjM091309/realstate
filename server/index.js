@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
 import { pool } from './config/db.js';
 import { ensureSchema } from './ensureSchema.js';
 import { authRouter } from './routes/authRoutes.js';
@@ -57,6 +58,46 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+app.post('/api/system/theme', async (req, res) => {
+  const mode = req.body?.mode;
+  if (mode !== 'dark' && mode !== 'light') {
+    res.status(400).json({ error: 'mode must be "dark" or "light"' });
+    return;
+  }
+
+  if (process.platform !== 'win32') {
+    res.status(400).json({ error: 'System theme switching is only supported on Windows.' });
+    return;
+  }
+
+  const value = mode === 'dark' ? '0' : '1';
+  const personalizePath = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';
+
+  const runRegAdd = (name) =>
+    new Promise((resolve, reject) => {
+      execFile(
+        'reg',
+        ['add', personalizePath, '/v', name, '/t', 'REG_DWORD', '/d', value, '/f'],
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(new Error(stderr || stdout || error.message));
+            return;
+          }
+          resolve();
+        },
+      );
+    });
+
+  try {
+    await Promise.all([runRegAdd('AppsUseLightTheme'), runRegAdd('SystemUsesLightTheme')]);
+    res.json({ ok: true, mode });
+  } catch (error) {
+    console.error('[realstate-api] Failed to update system theme:', error);
+    const message = error instanceof Error && error.message ? error.message : 'Failed to update system theme.';
+    res.status(500).json({ error: message });
+  }
+});
+
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/units', unitsRouter);
@@ -87,7 +128,7 @@ void (async () => {
   const server = app.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
+      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
     );
   });
 

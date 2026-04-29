@@ -151,6 +151,44 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* App-wide dark overrides for views that still use fixed light utility classes */
+.dark .bg-white {
+  background-color: rgb(15 23 42) !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: rgb(2 6 23) !important;
+}
+
+.dark .text-slate-900 {
+  color: rgb(241 245 249) !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: rgb(148 163 184) !important;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: rgb(51 65 85) !important;
+}
+
+.theme-transition,
+.theme-transition * {
+  transition-property: background-color, color, border-color, fill, stroke, box-shadow !important;
+  transition-duration: 260ms !important;
+  transition-timing-function: ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition,
+  .theme-transition * {
+    transition: none !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

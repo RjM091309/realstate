@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import {
   LayoutDashboard,
   Building2,
@@ -16,6 +16,8 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,9 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
+import { setSystemTheme, type SystemThemeMode } from '@/lib/systemThemeApi';
+import { applyTheme } from '@/lib/theme';
+import { toast } from 'sonner';
 import {
   NotificationPanel,
   createDefaultNotifications,
@@ -117,7 +122,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       <div className="mx-4 border-t border-slate-800/80" />
 
       {/* Nav items */}
-      <div className={cn('flex-1 overflow-y-auto transition-all duration-300 py-3', isCollapsed ? 'px-3' : 'px-3')}>
+      <div className="flex-1 overflow-y-auto transition-all duration-300 py-3 px-3">
         <nav className="space-y-0.5" aria-label="Main">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
@@ -239,6 +244,8 @@ export function TopNav() {
   const { session } = useAuth();
   const { dateRange, setDateRange } = useDateRange();
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [themeLoading, setThemeLoading] = useState<SystemThemeMode | null>(null);
+  const [currentTheme, setCurrentTheme] = useState<SystemThemeMode>('light');
   const [notifications, setNotifications] = useState<Notification[]>(() =>
     createDefaultNotifications(t),
   );
@@ -262,6 +269,14 @@ export function TopNav() {
       dateRange.end ? parseISO(dateRange.end) : null,
     ]);
   }, [dateRange.start, dateRange.end]);
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncTheme = () => setCurrentTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    syncTheme();
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const showDateRangePicker = true;
   const name =
@@ -278,8 +293,25 @@ export function TopNav() {
     }
   }
 
+  async function handleSystemThemeChange(mode: SystemThemeMode) {
+    if (themeLoading) return;
+    setThemeLoading(mode);
+    try {
+      await setSystemTheme(mode);
+      applyTheme(mode);
+      toast.success(`System theme switched to ${mode}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to switch system theme.';
+      toast.error(message);
+    } finally {
+      setThemeLoading(null);
+    }
+  }
+  const nextTheme: SystemThemeMode = currentTheme === 'dark' ? 'light' : 'dark';
+  const nextThemeLabel = nextTheme === 'dark' ? 'Dark' : 'Light';
+
   return (
-    <header className="h-16 border-bottom bg-white flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -308,7 +340,7 @@ export function TopNav() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-        <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 p-1">
+        <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 p-1">
           <span className="sr-only">{t('header.languageLabel')}</span>
           <Button
             variant={currentLanguage === 'en' ? 'default' : 'ghost'}
@@ -325,6 +357,23 @@ export function TopNav() {
             onClick={() => i18n.changeLanguage('ko')}
           >
             KO
+          </Button>
+        </div>
+        <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 p-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 min-w-[92px] justify-center"
+            onClick={() => void handleSystemThemeChange(nextTheme)}
+            disabled={themeLoading !== null}
+            title={`Switch system to ${nextThemeLabel.toLowerCase()} mode`}
+          >
+            {nextTheme === 'dark' ? (
+              <Moon className="w-3.5 h-3.5 mr-1.5 transition-transform duration-300" />
+            ) : (
+              <Sun className="w-3.5 h-3.5 mr-1.5 transition-transform duration-300" />
+            )}
+            {themeLoading ? 'Switching...' : nextThemeLabel}
           </Button>
         </div>
 

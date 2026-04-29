@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   TrendingUp,
   Users,
@@ -76,21 +76,21 @@ interface StatCardProps {
 
 function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, iconBg }: StatCardProps) {
   return (
-    <Card className="border border-slate-200/80 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+    <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center', iconBg)}>
             {icon}
           </div>
         </div>
-        <div className="text-2xl font-bold text-slate-900 tracking-tight">{value}</div>
-        <p className="text-xs text-slate-500 mt-0.5 font-medium">{label}</p>
+        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{value}</div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">{label}</p>
         <div className={cn(
           'flex items-center gap-1 mt-3 text-xs font-medium',
           subtextVariant === 'up' && 'text-emerald-600',
           subtextVariant === 'down' && 'text-rose-500',
           subtextVariant === 'alert' && 'text-rose-500',
-          subtextVariant === 'neutral' && 'text-slate-400',
+          subtextVariant === 'neutral' && 'text-slate-400 dark:text-slate-500',
         )}>
           {subtextVariant === 'up' && <ArrowUpRight className="w-3 h-3" />}
           {subtextVariant === 'down' && <ArrowDownRight className="w-3 h-3" />}
@@ -106,6 +106,16 @@ export function DashboardView() {
   const { t, i18n } = useTranslation();
   const { dateRange } = useDateRange();
   const { session } = useAuth();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const updateMode = () => setIsDarkMode(root.classList.contains('dark'));
+    updateMode();
+    const observer = new MutationObserver(updateMode);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const firstName = session?.user?.firstName ?? 'there';
   const greeting = getGreeting();
@@ -245,7 +255,7 @@ export function DashboardView() {
         header: t('views.dashboard.agents.agentName'),
         render: (a) => (
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-500/25 text-indigo-700 dark:text-indigo-200 flex items-center justify-center text-xs font-bold shrink-0">
               {a.name.charAt(0)}
             </div>
             <span className="font-medium">{a.name}</span>
@@ -284,6 +294,18 @@ export function DashboardView() {
     [t]
   );
 
+  const chartGridColor = isDarkMode ? '#334155' : '#f1f5f9';
+  const chartTickColor = '#94a3b8';
+  const chartCursorColor = isDarkMode ? '#1e293b' : '#f8fafc';
+  const tooltipStyle = {
+    borderRadius: '10px',
+    border: isDarkMode ? '1px solid #334155' : 'none',
+    boxShadow: isDarkMode ? '0 4px 20px -2px rgb(0 0 0 / 0.45)' : '0 4px 20px -2px rgb(0 0 0 / 0.12)',
+    fontSize: 13,
+    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+    color: isDarkMode ? '#e2e8f0' : '#0f172a',
+  } as const;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
 
@@ -292,12 +314,12 @@ export function DashboardView() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             {greeting.icon}
-            <span className="text-sm font-medium text-slate-500">{greeting.text},</span>
+            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{greeting.text},</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{firstName} 👋</h1>
-          <p className="text-slate-400 text-sm mt-1">{today}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{firstName} 👋</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">{today}</p>
         </div>
-        <Badge variant="outline" className="px-3 py-1.5 bg-white border-slate-200 text-slate-500 self-start sm:self-auto">
+        <Badge variant="outline" className="px-3 py-1.5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 self-start sm:self-auto">
           <CalendarIcon className="w-3 h-3 mr-2 shrink-0" />
           <span className="truncate text-xs">{rangeLabel}</span>
         </Badge>
@@ -310,7 +332,7 @@ export function DashboardView() {
           value={`₱${totalProfit.toLocaleString()}`}
           subtext={t('views.dashboard.cards.profitTrend')}
           subtextVariant="up"
-          iconBg="bg-indigo-50"
+          iconBg="bg-indigo-50 dark:bg-indigo-500/20"
           icon={<DollarSign className="w-5 h-5 text-indigo-600" />}
         />
         <StatCard
@@ -318,7 +340,7 @@ export function DashboardView() {
           value={`₱${baseMonthlyRentProfit.toLocaleString()}`}
           subtext={t('views.dashboard.cards.netProfitHint')}
           subtextVariant="neutral"
-          iconBg="bg-violet-50"
+          iconBg="bg-violet-50 dark:bg-violet-500/20"
           icon={<TrendingUp className="w-5 h-5 text-violet-600" />}
         />
         <StatCard
@@ -326,7 +348,7 @@ export function DashboardView() {
           value={activeContracts}
           subtext={t('views.dashboard.cards.activeTrend')}
           subtextVariant="up"
-          iconBg="bg-emerald-50"
+          iconBg="bg-emerald-50 dark:bg-emerald-500/20"
           icon={<Users className="w-5 h-5 text-emerald-600" />}
         />
         <StatCard
@@ -334,7 +356,7 @@ export function DashboardView() {
           value={`${vacancyRate}%`}
           subtext={`${availableUnits} ${availableUnits === 1 ? 'unit' : 'units'} available`}
           subtextVariant="down"
-          iconBg="bg-amber-50"
+          iconBg="bg-amber-50 dark:bg-amber-500/20"
           icon={<Building2 className="w-5 h-5 text-amber-600" />}
         />
         <StatCard
@@ -342,14 +364,14 @@ export function DashboardView() {
           value={overduePayments}
           subtext={t('views.dashboard.cards.overdueHint')}
           subtextVariant={overduePayments > 0 ? 'alert' : 'neutral'}
-          iconBg="bg-rose-50"
+          iconBg="bg-rose-50 dark:bg-rose-500/20"
           icon={<AlertCircle className="w-5 h-5 text-rose-500" />}
         />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border border-slate-200/80 shadow-sm">
+        <Card className="lg:col-span-2 border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('views.dashboard.charts.salesTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.salesDescription')}</CardDescription>
@@ -357,12 +379,12 @@ export function DashboardView() {
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={salesData} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(val) => `₱${val / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} tickFormatter={(val) => `₱${val / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px -2px rgb(0 0 0 / 0.12)', fontSize: 13 }}
-                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={tooltipStyle}
+                  cursor={{ fill: chartCursorColor }}
                   formatter={(val: number) => [`₱${val.toLocaleString()}`, t('views.dashboard.charts.profitLabel')]}
                 />
                 <Bar dataKey="Profit" fill="#4f46e5" radius={[5, 5, 0, 0]} />
@@ -371,7 +393,7 @@ export function DashboardView() {
           </CardContent>
         </Card>
 
-        <Card className="border border-slate-200/80 shadow-sm">
+        <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('views.dashboard.charts.unitStatusTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.unitStatusDescription')}</CardDescription>
@@ -393,17 +415,17 @@ export function DashboardView() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px -2px rgb(0 0 0 / 0.12)', fontSize: 13 }}
+                  contentStyle={tooltipStyle}
                   formatter={(val: number, name: string) => [val, name]}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2">
               {occupancyData(t).map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-slate-500">
+                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index] }} />
                   <span>{entry.name}</span>
-                  <span className="font-semibold text-slate-700">{entry.value}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{entry.value}</span>
                 </div>
               ))}
             </div>
@@ -413,14 +435,14 @@ export function DashboardView() {
 
       {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm">
-          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 dark:border-slate-800 py-0 shadow-sm bg-white dark:bg-slate-900">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 px-6 pt-5 pb-4">
             <CardTitle className="text-base">{t('views.dashboard.vacancies.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.vacancies.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {vacancyContracts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                 <Building2 className="w-8 h-8 mb-2 opacity-40" />
                 <p className="text-sm font-medium">No upcoming vacancies</p>
               </div>
@@ -436,14 +458,14 @@ export function DashboardView() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm">
-          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 dark:border-slate-800 py-0 shadow-sm bg-white dark:bg-slate-900">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 px-6 pt-5 pb-4">
             <CardTitle className="text-base">{t('views.dashboard.payments.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.payments.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {upcomingPayments7Days.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                 <CalendarIcon className="w-8 h-8 mb-2 opacity-40" />
                 <p className="text-sm font-medium">No upcoming payments this week 🎉</p>
               </div>
@@ -459,8 +481,8 @@ export function DashboardView() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border border-slate-200/80 py-0 shadow-sm lg:col-span-2">
-          <CardHeader className="border-b border-slate-100 px-6 pt-5 pb-4">
+        <Card className="gap-0 overflow-hidden border border-slate-200/80 dark:border-slate-800 py-0 shadow-sm lg:col-span-2 bg-white dark:bg-slate-900">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 px-6 pt-5 pb-4">
             <CardTitle className="text-base">{t('views.dashboard.agents.title')}</CardTitle>
             <CardDescription>{t('views.dashboard.agents.description')}</CardDescription>
           </CardHeader>

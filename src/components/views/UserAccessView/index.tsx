@@ -35,12 +35,12 @@ function AccessToggle({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
         checked
           ? 'bg-indigo-600 shadow-sm shadow-indigo-900/10'
-          : 'bg-slate-200 hover:bg-slate-300',
+          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600',
       )}
     >
       <span
         className={cn(
-          'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-1 ring-black/5 transition duration-200',
+          'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white dark:bg-slate-100 shadow-md ring-1 ring-black/5 transition duration-200',
           checked ? 'translate-x-5' : 'translate-x-0.5',
         )}
       />
@@ -52,7 +52,7 @@ function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-2 p-1" aria-hidden>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
+        <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       ))}
     </div>
   );
@@ -210,39 +210,39 @@ export function UserAccessView() {
 
   if (forbidden) {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50 to-white px-8 py-10 text-center shadow-sm">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+      <div className="mx-auto max-w-lg rounded-2xl border border-amber-200/80 dark:border-amber-800/70 bg-gradient-to-b from-amber-50 to-white dark:from-amber-950/40 dark:to-slate-900 px-8 py-10 text-center shadow-sm">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
           <Shield className="h-6 w-6" />
         </div>
-        <p className="font-medium text-amber-950">{t('views.userAccess.forbidden')}</p>
+        <p className="font-medium text-amber-950 dark:text-amber-200">{t('views.userAccess.forbidden')}</p>
       </div>
     );
   }
 
   return (
     <div className="w-full animate-in fade-in duration-300">
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-800 text-white">
               <Shield className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
                 {t('views.userAccess.title')}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">{t('views.userAccess.subtitle')}</p>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t('views.userAccess.subtitle')}</p>
               {!initialLoading ? (
-                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                   {t('views.userAccess.threeColumnRolesTitle')}:{' '}
-                  <span className="tabular-nums text-slate-700">{roles.length}</span>
+                  <span className="tabular-nums text-slate-700 dark:text-slate-300">{roles.length}</span>
                 </p>
               ) : null}
             </div>
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             {roleSectionDirty ? (
-              <p className="text-xs font-medium text-amber-800">{t('views.userAccess.dirtyHint')}</p>
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{t('views.userAccess.dirtyHint')}</p>
             ) : null}
             <Button
               type="button"
@@ -258,7 +258,7 @@ export function UserAccessView() {
         <div className="mt-5 space-y-5">
           {loadError ? (
             <div
-              className="rounded-xl border border-rose-100 bg-rose-50/80 px-4 py-3 text-sm text-rose-800"
+              className="rounded-xl border border-rose-100 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-800 dark:text-rose-300"
               role="alert"
             >
               {loadError}
@@ -266,7 +266,7 @@ export function UserAccessView() {
           ) : null}
           {toast ? (
             <div
-              className="rounded-xl border border-emerald-100 bg-emerald-50/90 px-4 py-3 text-sm font-medium text-emerald-900"
+              className="rounded-xl border border-emerald-100 dark:border-emerald-900/60 bg-emerald-50/90 dark:bg-emerald-950/40 px-4 py-3 text-sm font-medium text-emerald-900 dark:text-emerald-300"
               role="status"
             >
               {toast}
@@ -278,12 +278,12 @@ export function UserAccessView() {
             style={{ minHeight: 'min(640px, calc(100vh - 13rem))' }}
             aria-label={t('views.userAccess.title')}
           >
-            <Card className="flex min-h-[280px] min-w-0 flex-col overflow-hidden border-slate-200/90 shadow-sm min-[1100px]:min-h-0">
-              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 px-4 py-3">
-                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <Card className="flex min-h-[280px] min-w-0 flex-col overflow-hidden border-slate-200/90 dark:border-slate-800 shadow-sm min-[1100px]:min-h-0 bg-white dark:bg-slate-900">
+              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.threeColumnRolesTitle')}
                 </CardTitle>
-                <CardDescription className="text-xs leading-snug text-slate-500">
+                <CardDescription className="text-xs leading-snug text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.threeColumnRolesDesc')}
                 </CardDescription>
               </CardHeader>
@@ -291,7 +291,7 @@ export function UserAccessView() {
                 {initialLoading ? (
                   <ListSkeleton rows={5} />
                 ) : roles.length === 0 ? (
-                  <p className="px-2 py-8 text-center text-sm text-slate-500">—</p>
+                  <p className="px-2 py-8 text-center text-sm text-slate-500 dark:text-slate-400">—</p>
                 ) : (
                   <ul className="space-y-1">
                     {roles.map((r, idx) => {
@@ -304,8 +304,8 @@ export function UserAccessView() {
                             className={cn(
                               'relative flex w-full items-center justify-between gap-2 rounded-lg py-2.5 pl-3 pr-2 text-left text-sm transition-colors',
                               active
-                                ? 'bg-violet-50 text-violet-950 shadow-sm ring-1 ring-violet-200/80'
-                                : 'text-slate-700 hover:bg-slate-50',
+                                ? 'bg-violet-50 dark:bg-violet-500/15 text-violet-950 dark:text-violet-100 shadow-sm ring-1 ring-violet-200/80 dark:ring-violet-500/40'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
                             )}
                           >
                             {active ? (
@@ -323,7 +323,7 @@ export function UserAccessView() {
                               className={cn(
                                 'inline-flex min-w-[1.75rem] shrink-0 justify-end tabular-nums',
                                 active
-                                  ? 'rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800'
+                                  ? 'rounded-full bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:text-violet-200'
                                   : 'text-transparent',
                               )}
                               aria-hidden={!active}
@@ -339,12 +339,12 @@ export function UserAccessView() {
               </CardContent>
             </Card>
 
-            <Card className="flex min-h-[280px] min-w-0 flex-col overflow-hidden border-slate-200/90 shadow-sm min-[1100px]:min-h-0">
-              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 px-4 py-3">
-                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <Card className="flex min-h-[280px] min-w-0 flex-col overflow-hidden border-slate-200/90 dark:border-slate-800 shadow-sm min-[1100px]:min-h-0 bg-white dark:bg-slate-900">
+              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.threeColumnModulesTitle')}
                 </CardTitle>
-                <CardDescription className="text-xs leading-snug text-slate-500">
+                <CardDescription className="text-xs leading-snug text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.threeColumnModulesDesc')}
                 </CardDescription>
               </CardHeader>
@@ -366,8 +366,8 @@ export function UserAccessView() {
                             className={cn(
                               'relative flex items-stretch gap-1 rounded-lg py-1.5 pl-3 pr-1.5 transition-colors',
                               active
-                                ? 'bg-amber-50 text-amber-950 shadow-sm ring-1 ring-amber-200/90'
-                                : 'text-slate-700 hover:bg-slate-50',
+                                ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-950 dark:text-amber-100 shadow-sm ring-1 ring-amber-200/90 dark:ring-amber-500/40'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
                             )}
                           >
                             {active ? (
@@ -387,15 +387,15 @@ export function UserAccessView() {
                               <span className="min-w-0 truncate font-medium">
                                 {idx + 1}. {label}
                               </span>
-                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-700">
+                              <span className="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-300">
                                 {crudCount}
                               </span>
                             </button>
                             <div
-                              className="flex shrink-0 flex-col items-center justify-center gap-0.5 border-l border-slate-200/80 pl-1.5"
+                              className="flex shrink-0 flex-col items-center justify-center gap-0.5 border-l border-slate-200/80 dark:border-slate-700 pl-1.5"
                               title={t('views.userAccess.modulesSidebarToggleTitle')}
                             >
-                              <span className="max-w-[4.5rem] text-center text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-400">
+                              <span className="max-w-[4.5rem] text-center text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-400 dark:text-slate-500">
                                 {t('views.userAccess.modulesSidebarToggleLabel')}
                               </span>
                               <AccessToggle
@@ -412,20 +412,20 @@ export function UserAccessView() {
               </CardContent>
             </Card>
 
-            <Card className="flex min-h-[320px] min-w-0 flex-col overflow-hidden border-slate-200/90 shadow-sm min-[1100px]:min-h-0">
-              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 px-4 py-3">
-                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <Card className="flex min-h-[320px] min-w-0 flex-col overflow-hidden border-slate-200/90 dark:border-slate-800 shadow-sm min-[1100px]:min-h-0 bg-white dark:bg-slate-900">
+              <CardHeader className="shrink-0 space-y-1 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+                <CardTitle className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.permHeading')}
                 </CardTitle>
-                <CardDescription className="text-xs leading-snug text-slate-500">
+                <CardDescription className="text-xs leading-snug text-slate-500 dark:text-slate-400">
                   {t('views.userAccess.permSub')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3 pb-3 pt-1 sm:px-4">
-                <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 bg-white custom-scrollbar">
+                <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 custom-scrollbar">
                   <table className="w-full min-w-[480px] text-sm">
-                    <thead className="sticky top-0 z-[1] border-b border-slate-200 bg-slate-50">
-                      <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                    <thead className="sticky top-0 z-[1] border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                      <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                         <th className="whitespace-nowrap px-3 py-3 sm:px-4">{t('views.userAccess.colModule')}</th>
                         <th className="whitespace-nowrap px-2 py-3 text-center sm:px-3">
                           {t('views.userAccess.colAdd')}
@@ -438,7 +438,7 @@ export function UserAccessView() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {SIDEBAR_FEATURE_KEYS.map((key) => {
                         const navKey = featureKeyToNavMenuKey(key);
                         const label = t(`nav.menu.${navKey}`);
@@ -453,12 +453,12 @@ export function UserAccessView() {
                             }}
                             className={cn(
                               'transition-colors',
-                              highlight ? 'bg-amber-50/90 ring-1 ring-inset ring-amber-200/80' : 'hover:bg-slate-50/80',
+                              highlight ? 'bg-amber-50/90 dark:bg-amber-500/15 ring-1 ring-inset ring-amber-200/80 dark:ring-amber-500/40' : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/70',
                             )}
                           >
                             <td className="px-3 py-3 sm:px-4">
-                              <p className="font-medium text-slate-900">{label}</p>
-                              <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
+                              <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
+                              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{desc}</p>
                             </td>
                             <td className="px-2 py-3 text-center align-middle sm:px-3">
                               <div className="flex justify-center">
@@ -490,7 +490,7 @@ export function UserAccessView() {
                     </tbody>
                   </table>
                 </div>
-                <p className="shrink-0 text-xs leading-relaxed text-slate-500">{t('views.userAccess.permFooter')}</p>
+                <p className="shrink-0 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t('views.userAccess.permFooter')}</p>
               </CardContent>
             </Card>
           </section>

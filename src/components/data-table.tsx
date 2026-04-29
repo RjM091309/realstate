@@ -52,13 +52,13 @@ export function DataTable<T>({
     <div
       className={cn(
         'w-full overflow-hidden',
-        embedded ? '' : 'rounded-2xl bg-white shadow-sm',
+        embedded ? '' : 'rounded-2xl bg-white dark:bg-slate-900 shadow-sm',
       )}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-white border-b border-gray-100">
+            <tr className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700">
               {columns.map((col, i) => (
                 <th
                   key={col.header}
@@ -66,11 +66,11 @@ export function DataTable<T>({
                     "px-6 text-[13px] font-medium whitespace-nowrap uppercase tracking-wider",
                     highlightFirstColumn ? "py-4" : "py-3",
                     highlightFirstColumn && i === 0
-                      ? "bg-violet-50 text-brand-text"
-                      : "text-brand-muted bg-white",
+                      ? "bg-violet-50 dark:bg-indigo-500/10 text-brand-text dark:text-slate-200"
+                      : "text-brand-muted dark:text-slate-400 bg-white dark:bg-slate-900",
                     col.className,
                     col.headerClassName,
-                    highlightFirstColumn && i === 0 && "border-r-[3px] border-white"
+                    highlightFirstColumn && i === 0 && "border-r-[3px] border-white dark:border-slate-700"
                   )}
                 >
                   {col.header}
@@ -78,7 +78,7 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
             {currentData.map((item) => (
               <tr
                 key={keyExtractor(item)}
@@ -93,10 +93,11 @@ export function DataTable<T>({
                     key={i}
                     className={cn(
                       "px-6 text-sm text-brand-text align-top",
+                      "dark:text-slate-200",
                       highlightFirstColumn ? "py-4" : "py-3",
                       highlightFirstColumn && i === 0
-                        ? "bg-violet-50 font-medium group-hover:bg-violet-100 border-r-[3px] border-white"
-                        : "bg-white group-hover:bg-slate-50/80",
+                        ? "bg-violet-50 dark:bg-indigo-500/10 font-medium group-hover:bg-violet-100 dark:group-hover:bg-indigo-500/20 border-r-[3px] border-white dark:border-slate-700"
+                        : "bg-white dark:bg-slate-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/70",
                       col.className,
                       col.cellClassName
                     )}
@@ -112,7 +113,7 @@ export function DataTable<T>({
             ))}
             {currentData.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-8 text-center text-brand-muted">
+                <td colSpan={columns.length} className="px-6 py-8 text-center text-brand-muted dark:text-slate-400">
                   {t('datatable.no_data')}
                 </td>
               </tr>
@@ -124,29 +125,29 @@ export function DataTable<T>({
       {/* Pagination Container */}
       <div
         className={cn(
-          'flex items-center justify-between px-6 py-4 border-t border-gray-100',
-          embedded ? 'bg-slate-50/60' : 'bg-white',
+          'flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-700',
+          embedded ? 'bg-slate-50/60 dark:bg-slate-800/70' : 'bg-white dark:bg-slate-900',
         )}
       >
-        <div className="flex items-center gap-4 text-sm text-brand-muted">
+        <div className="flex items-center gap-4 text-sm text-brand-muted dark:text-slate-400">
           <span>{t('datatable.show')}</span>
           <div className="relative">
             <button
               type="button"
               onClick={() => setPerPageOpen(!perPageOpen)}
-              className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-brand-orange/30 transition-all text-brand-text font-medium min-w-[60px] justify-between"
+              className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-brand-orange/30 transition-all text-brand-text dark:text-slate-100 font-medium min-w-[60px] justify-between"
             >
               {itemsPerPage}
               <ChevronDown
                 size={14}
-                className={cn("text-brand-muted transition-transform", perPageOpen && "rotate-180")}
+                className={cn("text-brand-muted dark:text-slate-400 transition-transform", perPageOpen && "rotate-180")}
               />
             </button>
 
             {perPageOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setPerPageOpen(false)} aria-hidden />
-                <div className="absolute bottom-full left-0 mb-1 w-full bg-white border border-gray-100 rounded-lg shadow-lg z-20 py-1 overflow-hidden">
+                <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700 rounded-lg shadow-lg z-20 py-1 overflow-hidden">
                   {[50, 100, 150, 200].map((num) => (
                     <button
                       type="button"
@@ -160,7 +161,7 @@ export function DataTable<T>({
                         "w-full text-left px-3 py-1.5 text-sm hover:bg-brand-primary/5 transition-colors",
                         itemsPerPage === num
                           ? "text-brand-orange font-bold bg-brand-orange/5"
-                          : "text-brand-text"
+                          : "text-brand-text dark:text-slate-200"
                       )}
                     >
                       {num}
@@ -174,7 +175,7 @@ export function DataTable<T>({
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-brand-muted mr-4">
+          <span className="text-brand-muted dark:text-slate-400 mr-4">
             {t('datatable.showing_info', {
               from: data.length > 0 ? startIndex + 1 : 0,
               to: Math.min(endIndex, data.length),
@@ -186,7 +187,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1 || data.length === 0}
-              className="p-1.5 rounded-lg text-brand-muted hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+              className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
@@ -201,7 +202,7 @@ export function DataTable<T>({
                     "w-8 h-8 rounded-lg flex items-center justify-center font-medium transition-all",
                     currentPage === page
                       ? "bg-brand-primary text-white shadow-md shadow-brand-primary/20"
-                      : "text-brand-muted hover:bg-gray-100 hover:text-brand-text"
+                      : "text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-brand-text dark:hover:text-slate-200"
                   )}
                 >
                   {page}
@@ -213,7 +214,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages || data.length === 0}
-              className="p-1.5 rounded-lg text-brand-muted hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+              className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
             >
               <ChevronRight size={18} />
             </button>

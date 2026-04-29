@@ -427,8 +427,8 @@ export function CalendarView() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.calendar.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('views.calendar.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{t('views.calendar.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{t('views.calendar.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canCreate ? (
@@ -437,7 +437,7 @@ export function CalendarView() {
               {t('views.calendar.addEvent')}
             </Button>
           ) : null}
-          <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
           <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -451,13 +451,13 @@ export function CalendarView() {
         </div>
       </div>
 
-      <Card className="border-none shadow-md overflow-hidden">
+      <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md overflow-hidden">
         <CardContent className="p-0">
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="inline-block min-w-full">
               {/* Timeline Header */}
-              <div className="flex border-b border-slate-100 bg-slate-50/50">
-                <div className="sticky left-0 z-20 w-48 bg-slate-50 border-r border-slate-200 p-4 font-bold text-xs text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/60">
+                <div className="sticky left-0 z-20 w-48 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 font-bold text-xs text-slate-500 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                   <Home className="w-3 h-3" />
                   {t('views.calendar.units')}
                 </div>
@@ -466,12 +466,12 @@ export function CalendarView() {
                     key={day.toString()} 
                     onClick={() => setSelectedDay(day)}
                     className={cn(
-                      "flex-shrink-0 w-12 h-16 flex flex-col items-center justify-center border-r border-slate-100 cursor-pointer transition-colors hover:bg-indigo-50",
-                      isToday(day) && "bg-indigo-50/50",
+                      "flex-shrink-0 w-12 h-16 flex flex-col items-center justify-center border-r border-slate-100 dark:border-slate-800 cursor-pointer transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/15",
+                      isToday(day) && "bg-indigo-50/50 dark:bg-indigo-500/10",
                       selectedDay && isSameDay(day, selectedDay) && "bg-indigo-600 text-white hover:bg-indigo-600"
                     )}
                   >
-                    <span className={cn("text-[10px] uppercase font-bold", selectedDay && isSameDay(day, selectedDay) ? "text-indigo-100" : "text-slate-400")}>
+                    <span className={cn("text-[10px] uppercase font-bold", selectedDay && isSameDay(day, selectedDay) ? "text-indigo-100" : "text-slate-400 dark:text-slate-500")}>
                       {format(day, 'EEE')}
                     </span>
                     <span className="text-sm font-bold">
@@ -482,16 +482,16 @@ export function CalendarView() {
               </div>
 
               {/* Timeline Rows */}
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {units.map((unit) => (
                   <div key={unit.id} className="flex group">
-                    <div className="sticky left-0 z-20 w-48 bg-white border-r border-slate-200 p-4 flex items-center gap-3 group-hover:bg-slate-50 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                    <div className="sticky left-0 z-20 w-48 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold text-xs">
                         {unit.unitNumber}
                       </div>
                       <div className="flex flex-col overflow-hidden">
-                        <span className="text-xs font-bold text-slate-900 truncate">{t('views.calendar.unitLabel', { unitNumber: unit.unitNumber })}</span>
-                        <span className="text-[10px] text-slate-400 truncate">{unit.buildingName}</span>
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{t('views.calendar.unitLabel', { unitNumber: unit.unitNumber })}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{unit.buildingName}</span>
                       </div>
                     </div>
                     {daysInMonth.map((day) => {
@@ -501,8 +501,8 @@ export function CalendarView() {
                           key={`${unit.id}-${day}`} 
                           onClick={() => setSelectedDay(day)}
                           className={cn(
-                            "flex-shrink-0 w-12 h-16 border-r border-slate-100 flex items-center justify-center gap-0.5 p-1 relative cursor-pointer hover:bg-slate-50 transition-colors",
-                            isToday(day) && "bg-indigo-50/20"
+                            "flex-shrink-0 w-12 h-16 border-r border-slate-100 dark:border-slate-800 flex items-center justify-center gap-0.5 p-1 relative cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors",
+                            isToday(day) && "bg-indigo-50/20 dark:bg-indigo-500/10"
                           )}
                         >
                           {dayEvents.map((event) => (
@@ -529,7 +529,7 @@ export function CalendarView() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 border-none shadow-md">
+        <Card className="lg:col-span-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -551,7 +551,7 @@ export function CalendarView() {
                   return (
                     <div 
                       key={event.id} 
-                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all"
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 group hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <div
@@ -564,8 +564,8 @@ export function CalendarView() {
                           {event.icon}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900">{event.typeLabel}</p>
-                          <p className="text-xs text-slate-500">{t('views.calendar.unitLabel', { unitNumber: unit?.unitNumber })} • {unit?.buildingName}</p>
+                          <p className="font-bold text-slate-900 dark:text-slate-100">{event.typeLabel}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{t('views.calendar.unitLabel', { unitNumber: unit?.unitNumber })} • {unit?.buildingName}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -607,7 +607,7 @@ export function CalendarView() {
                   );
                 })
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                   <CalendarIcon className="w-12 h-12 mb-3 opacity-20" />
                   <p className="text-sm italic">{t('views.calendar.noEvents')}</p>
                 </div>
@@ -616,7 +616,7 @@ export function CalendarView() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md">
+        <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Info className="w-4 h-4 text-indigo-600" />
@@ -625,38 +625,38 @@ export function CalendarView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.moveIn')}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveIn')}</span>
                 </div>
-                <ArrowRight className="w-3 h-3 text-slate-300" />
+                <ArrowRight className="w-3 h-3 text-slate-300 dark:text-slate-500" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.moveOut')}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveOut')}</span>
                 </div>
-                <ArrowLeft className="w-3 h-3 text-slate-300" />
+                <ArrowLeft className="w-3 h-3 text-slate-300 dark:text-slate-500" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.paymentPaid')}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPaid')}</span>
                 </div>
-                <DollarSign className="w-3 h-3 text-slate-300" />
+                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-500" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.paymentPending')}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPending')}</span>
                 </div>
-                <DollarSign className="w-3 h-3 text-slate-300" />
+                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-500" />
               </div>
             </div>
             
-            <div className="pt-4 border-t border-slate-100">
-              <p className="text-[10px] text-slate-400 leading-relaxed">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
                 {t('views.calendar.infoText')}
               </p>
             </div>

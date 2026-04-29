@@ -66,7 +66,7 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
         <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
         <p className="text-sm">Loading…</p>
       </div>
@@ -75,7 +75,7 @@ function MainApp() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
         <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
         <p className="text-sm">Opening dashboard…</p>
       </div>
@@ -108,7 +108,7 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -120,10 +120,10 @@ function MainApp() {
         }}
       />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
         <TopNav />
         
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50 dark:bg-slate-950">
           <div className="max-w-7xl mx-auto">
             {renderView()}
           </div>
