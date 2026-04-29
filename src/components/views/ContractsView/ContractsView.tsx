@@ -524,6 +524,7 @@ export function ContractsView() {
         onClose={closeContractModal}
         title={formMode === 'edit' ? 'Edit Lease Agreement' : t('views.contracts.newLeaseAgreement')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button

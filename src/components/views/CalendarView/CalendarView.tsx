@@ -669,6 +669,7 @@ export function CalendarView() {
         onClose={closeEventModal}
         title={eventFormMode === 'edit' ? t('views.calendar.editEvent') : t('views.calendar.addEvent')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeEventModal}>
@@ -728,6 +729,7 @@ export function CalendarView() {
         onClose={closeDetails}
         title={t('views.calendar.viewDetails')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeDetails}>

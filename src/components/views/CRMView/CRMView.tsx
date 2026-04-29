@@ -1316,6 +1316,7 @@ export function CRMView() {
         onClose={() => setIsDetailsOpen(false)}
         title={selectedTenant ? selectedTenant.name : ''}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
@@ -1575,6 +1576,7 @@ export function CRMView() {
         onClose={closeDeleteBroker}
         title={t('views.crm.brokers.delete')}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeDeleteBroker}>
@@ -1602,6 +1604,7 @@ export function CRMView() {
         onClose={closeBlacklistBroker}
         title={t('views.crm.table.blacklisted')}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeBlacklistBroker}>
@@ -1637,6 +1640,7 @@ export function CRMView() {
         onClose={closeActivateBroker}
         title={t('views.crm.brokers.activateTitle')}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeActivateBroker}>
@@ -1666,6 +1670,7 @@ export function CRMView() {
         onClose={closeActivateTenant}
         title={t('views.crm.table.activateTenantTitle')}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeActivateTenant}>
@@ -1695,6 +1700,7 @@ export function CRMView() {
         onClose={closeForm}
         title={formMode === 'edit' ? t('views.crm.tenantModal.editTitle') : t('views.crm.tenantModal.createTitle')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeForm}>
@@ -2039,6 +2045,7 @@ export function CRMView() {
         onClose={closeLandlordForm}
         title={landlordFormMode === 'edit' ? 'Edit landlord' : 'Add landlord'}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeLandlordForm}>
@@ -2092,6 +2099,7 @@ export function CRMView() {
         onClose={closeBrokerForm}
         title={brokerFormMode === 'edit' ? t('views.crm.brokers.editTitle') : t('views.crm.brokers.addTitle')}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button
@@ -2313,6 +2321,7 @@ export function CRMView() {
         onClose={closeBlacklistDetails}
         title={selectedBlacklist ? t('views.crm.blacklist.detailsTitle') : ''}
         maxWidth="lg"
+        variant="glass"
         footer={
           <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
             {selectedBlacklist?.entityType === 'tenant' && selectedBlacklist.tenantId ? (

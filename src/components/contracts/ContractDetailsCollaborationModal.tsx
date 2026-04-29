@@ -717,7 +717,7 @@ export function ContractDetailsCollaborationModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={summary.title} maxWidth="5xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={summary.title} maxWidth="5xl" variant="glass">
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <ContractSummaryCard title="Unit" value={summary.unitLabel} />

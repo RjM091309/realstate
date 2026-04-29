@@ -26,6 +26,12 @@
   }
 }
 
+/* Keep app UI above theme ripple background overlay */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;

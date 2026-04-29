@@ -482,18 +482,18 @@ export function LeaseLedgerView() {
         render: (payment) => (
           <div className="flex items-center gap-2">
             {payment.status === 'Paid' ? (
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
+              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300/80 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/40 hover:bg-emerald-100">
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.paid')}
               </Badge>
             ) : payment.status === 'Overdue' ? (
-              <Badge variant="destructive">
-                <AlertCircle className="w-3 h-3 mr-1" />
+              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-rose-100 text-rose-800 border border-rose-300/80 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/45 hover:bg-rose-100">
+                <AlertCircle className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.overdue')}
               </Badge>
             ) : (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                <Clock className="w-3 h-3 mr-1" />
+              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-amber-100 text-amber-800 border border-amber-300/80 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/45 hover:bg-amber-100">
+                <Clock className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.pending')}
               </Badge>
             )}
@@ -631,6 +631,7 @@ export function LeaseLedgerView() {
         onClose={closeModal}
         title={formMode === 'edit' ? 'Edit Payment' : t('views.ledger.recordPayment')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" onClick={closeModal}>Cancel</Button>

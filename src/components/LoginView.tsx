@@ -108,10 +108,13 @@ export function LoginView() {
   }
 
   const inputClass =
-    'h-11 border-stone-200 bg-stone-50/50 focus-visible:border-emerald-700/50 focus-visible:ring-emerald-700/20';
+    'h-11 rounded-xl';
   const selectClass = cn(
-    'flex h-11 w-full rounded-md border border-stone-200 bg-stone-50/50 px-3 py-2 text-sm text-stone-900 shadow-xs transition-colors',
-    'focus-visible:border-emerald-700/50 focus-visible:ring-[3px] focus-visible:ring-emerald-700/20 focus-visible:outline-none',
+    'flex h-11 w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition-colors outline-none',
+    'bg-white/55 supports-[backdrop-filter]:backdrop-blur-xl dark:bg-slate-950/45',
+    'border-white/30 dark:border-white/10',
+    'text-slate-900 dark:text-slate-50',
+    'focus-visible:border-emerald-700/40 focus-visible:ring-[3px] focus-visible:ring-emerald-700/20',
     'disabled:cursor-not-allowed disabled:opacity-50',
   );
   const submitBtnClass = cn(
@@ -121,7 +124,7 @@ export function LoginView() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-stone-100">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950">
       <aside
         className={cn(
           'relative hidden lg:flex lg:w-[44%] xl:w-[42%] min-h-screen flex-col justify-center overflow-hidden',
@@ -165,7 +168,25 @@ export function LoginView() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-10 overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(900px 500px at 20% 15%, rgba(79,70,229,0.20), transparent 60%), radial-gradient(700px 420px at 80% 60%, rgba(16,185,129,0.16), transparent 55%)',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage: `linear-gradient(to right, rgb(15 23 42) 1px, transparent 1px),
+              linear-gradient(to bottom, rgb(15 23 42) 1px, transparent 1px)`,
+            backgroundSize: '64px 64px',
+          }}
+        />
+        <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -right-28 bottom-10 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
+
         <div className="mb-8 flex w-full max-w-md items-center justify-center gap-2.5 lg:hidden">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-900 text-emerald-300 shadow-lg shadow-stone-900/15">
             <Building2 className="h-5 w-5" strokeWidth={1.75} />
@@ -175,15 +196,18 @@ export function LoginView() {
 
         <div
           className={cn(
-            'w-full max-w-md rounded-2xl border border-stone-200/90 bg-white p-8 shadow-xl shadow-stone-900/5',
-            'ring-1 ring-stone-900/[0.04]',
+            'relative z-10 w-full max-w-md rounded-3xl p-8',
+            'bg-white/70 dark:bg-slate-950/55',
+            'supports-[backdrop-filter]:backdrop-blur-xl',
+            'border border-white/30 dark:border-white/10',
+            'shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5 dark:ring-white/10',
           )}
         >
           <div className="mb-8 space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-stone-900">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
               {mode === 'signin' ? t('login.title') : t('login.register.title')}
             </h2>
-            <p className="text-sm leading-relaxed text-stone-500">
+            <p className="text-sm leading-relaxed text-slate-600/90 dark:text-slate-300/80">
               {mode === 'signin' ? t('login.subtitle') : t('login.register.subtitle')}
             </p>
           </div>
@@ -191,7 +215,7 @@ export function LoginView() {
           {mode === 'signin' ? (
             <form onSubmit={onSignIn} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-stone-700">
+                <Label htmlFor="username" className="text-slate-700 dark:text-slate-200">
                   {t('login.username')}
                 </Label>
                 <Input
@@ -205,7 +229,7 @@ export function LoginView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-stone-700">
+                <Label htmlFor="password" className="text-slate-700 dark:text-slate-200">
                   {t('login.password')}
                 </Label>
                 <Input
@@ -227,11 +251,11 @@ export function LoginView() {
               <Button type="submit" disabled={busy} className={submitBtnClass}>
                 {busy ? t('login.loading') : t('login.submit')}
               </Button>
-              <p className="text-center text-xs leading-relaxed text-stone-400">{t('login.hint')}</p>
-              <p className="text-center text-sm text-stone-600">
+              <p className="text-center text-xs leading-relaxed text-slate-500/80 dark:text-slate-300/60">{t('login.hint')}</p>
+              <p className="text-center text-sm text-slate-700 dark:text-slate-200">
                 <button
                   type="button"
-                  className="font-medium text-emerald-800 underline-offset-4 hover:underline"
+                  className="font-medium text-emerald-700 dark:text-emerald-300 underline-offset-4 hover:underline"
                   onClick={() => switchMode('register')}
                 >
                   {t('login.switchToRegister')}
@@ -242,7 +266,7 @@ export function LoginView() {
             <form onSubmit={onRegister} className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-stone-700">
+                  <Label htmlFor="firstName" className="text-slate-700 dark:text-slate-200">
                     {t('login.register.firstName')}
                   </Label>
                   <Input
@@ -257,7 +281,7 @@ export function LoginView() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-stone-700">
+                  <Label htmlFor="lastName" className="text-slate-700 dark:text-slate-200">
                     {t('login.register.lastName')}
                   </Label>
                   <Input
@@ -273,7 +297,7 @@ export function LoginView() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg-username" className="text-stone-700">
+                <Label htmlFor="reg-username" className="text-slate-700 dark:text-slate-200">
                   {t('login.username')}
                 </Label>
                 <Input
@@ -289,7 +313,7 @@ export function LoginView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg-password" className="text-stone-700">
+                <Label htmlFor="reg-password" className="text-slate-700 dark:text-slate-200">
                   {t('login.password')}
                 </Label>
                 <Input
@@ -305,7 +329,7 @@ export function LoginView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="passwordConfirm" className="text-stone-700">
+                <Label htmlFor="passwordConfirm" className="text-slate-700 dark:text-slate-200">
                   {t('login.register.confirmPassword')}
                 </Label>
                 <Input
@@ -321,7 +345,7 @@ export function LoginView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role" className="text-stone-700">
+                <Label htmlFor="role" className="text-slate-700 dark:text-slate-200">
                   {t('login.register.role')}
                 </Label>
                 <select
@@ -340,7 +364,7 @@ export function LoginView() {
                   ))}
                 </select>
                 {rolesLoading ? (
-                  <p className="text-xs text-stone-500">{t('login.register.loadingRoles')}</p>
+                  <p className="text-xs text-slate-600/80 dark:text-slate-300/70">{t('login.register.loadingRoles')}</p>
                 ) : null}
                 {rolesErr ? (
                   <p className="text-xs font-medium text-rose-600" role="alert">
@@ -360,10 +384,10 @@ export function LoginView() {
               >
                 {busy ? t('login.register.loading') : t('login.register.submit')}
               </Button>
-              <p className="text-center text-sm text-stone-600">
+              <p className="text-center text-sm text-slate-700 dark:text-slate-200">
                 <button
                   type="button"
-                  className="font-medium text-emerald-800 underline-offset-4 hover:underline"
+                  className="font-medium text-emerald-700 dark:text-emerald-300 underline-offset-4 hover:underline"
                   onClick={() => switchMode('signin')}
                 >
                   {t('login.switchToSignIn')}

@@ -1209,6 +1209,7 @@ export function UnitsView() {
             </div>
           </div>
         }
+        variant="glass"
       >
         <div className="flex justify-end items-start mb-2 pr-2">
           <Badge
@@ -1373,6 +1374,7 @@ export function UnitsView() {
             : t('views.units.table.manageInventory')
         }
         maxWidth="3xl"
+        variant="glass"
         footer={
           <div className="flex justify-end w-full">
             <Button type="button" variant="outline" onClick={() => setIsManageInventoryOpen(false)}>
@@ -1525,6 +1527,7 @@ export function UnitsView() {
         onClose={resetInventoryForm}
         title={t('views.units.details.addInventoryModalTitle')}
         maxWidth="md"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
@@ -1583,6 +1586,7 @@ export function UnitsView() {
         onClose={resetInventoryForm}
         title={t('common.edit')}
         maxWidth="md"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
@@ -1641,6 +1645,7 @@ export function UnitsView() {
         onClose={closeAddUnitModal}
         title={formMode === 'edit' ? t('views.units.editModal.title') : t('views.units.addModal.title')}
         maxWidth="2xl"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button
@@ -1810,6 +1815,7 @@ export function UnitsView() {
         onClose={closePhotoPreview}
         title={photoPreviewTitle || t('views.units.addModal.photo')}
         maxWidth="3xl"
+        variant="glass"
         footer={
           <div className="flex justify-end w-full">
             <Button type="button" variant="outline" onClick={closePhotoPreview}>

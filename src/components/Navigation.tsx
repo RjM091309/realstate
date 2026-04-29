@@ -18,18 +18,33 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
-import { setSystemTheme, type SystemThemeMode } from '@/lib/systemThemeApi';
+import { setSystemTheme, type SystemThemeMode } from '../lib/systemThemeApi';
 import { applyTheme } from '@/lib/theme';
+import { animateThemeRippleFromElement } from '@/lib/themeRipple';
+import { apiFetch } from '@/lib/api';
+import { getToken } from '@/lib/api';
 import { toast } from 'sonner';
+import { io, type Socket } from 'socket.io-client';
+import { Modal } from '@/components/modal';
 import {
   NotificationPanel,
   createDefaultNotifications,
@@ -193,62 +208,41 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
             <p className="text-[10px] text-slate-500 truncate">{userRole}</p>
           </div>
         </div>
-
-        {/* Settings & Logout */}
-        <div className={cn('border-t border-slate-800/60 space-y-0.5', isCollapsed ? 'p-3' : 'px-3 py-3')}>
-          <button
-            title={isCollapsed ? t('nav.settings') : undefined}
-            onClick={() => setActiveTab('settings')}
-            className={cn(
-              'w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150',
-              isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
-              activeTab === 'settings'
-                ? 'bg-indigo-500/15 text-indigo-300'
-                : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
-            )}
-          >
-            <Settings className={cn('shrink-0', isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]')} />
-            <span className={cn(
-              'truncate transition-all duration-300 overflow-hidden',
-              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-            )}>
-              {t('nav.settings')}
-            </span>
-          </button>
-          <button
-            type="button"
-            title={isCollapsed ? t('nav.logout') : undefined}
-            onClick={() => onLogout?.()}
-            className={cn(
-              'w-full flex items-center rounded-lg text-sm font-medium text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-300 transition-all duration-150',
-              isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
-            )}
-          >
-            <LogOut className={cn('shrink-0', isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]')} />
-            <span className={cn(
-              'truncate transition-all duration-300 overflow-hidden',
-              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-            )}>
-              {t('nav.logout')}
-            </span>
-          </button>
-        </div>
       </div>
     </div>
   );
 }
 
-export function TopNav() {
+export function TopNav({
+  onOpenSettings,
+  onLogout,
+}: {
+  onOpenSettings?: () => void;
+  onLogout?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
   const { session } = useAuth();
   const { dateRange, setDateRange } = useDateRange();
+  const socketRef = React.useRef<Socket | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [themeLoading, setThemeLoading] = useState<SystemThemeMode | null>(null);
   const [currentTheme, setCurrentTheme] = useState<SystemThemeMode>('light');
   const [notifications, setNotifications] = useState<Notification[]>(() =>
     createDefaultNotifications(t),
   );
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [notificationDetailOpen, setNotificationDetailOpen] = useState(false);
+
+  async function refreshNotifications() {
+    try {
+      const res = await apiFetch<{ notifications: Notification[] }>('/api/notifications?limit=40');
+      if (Array.isArray(res.notifications)) setNotifications(res.notifications);
+    } catch {
+      // Keep local demo notifications if API is unavailable.
+    }
+  }
+
   useEffect(() => {
     setNotifications((prev) => {
       const next = createDefaultNotifications(t);
@@ -258,7 +252,57 @@ export function TopNav() {
       });
     });
   }, [t, i18n.language]);
+
+  useEffect(() => {
+    if (!session) return;
+    void refreshNotifications();
+    const id = window.setInterval(() => void refreshNotifications(), 30_000);
+    return () => window.clearInterval(id);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const token = getToken();
+    const devUserId = localStorage.getItem('realstate_dev_user_id');
+    const socket = io('http://localhost:2550', {
+      transports: ['websocket'],
+      auth: { token, devUserId },
+    });
+    socketRef.current = socket;
+
+    socket.on('notifications:changed', () => {
+      void refreshNotifications();
+    });
+
+    return () => {
+      socket.off('notifications:changed');
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [session]);
   const unreadCount = notifications.filter((n) => n.unread).length;
+
+  function formatNotificationTime(value: string) {
+    const v = String(value ?? '').trim();
+    if (!v) return '';
+    const dt = new Date(v);
+    if (Number.isNaN(dt.getTime())) return v;
+    return dt.toLocaleString();
+  }
+
+  async function openNotificationDetails(n: Notification) {
+    setSelectedNotification(n);
+    setNotificationDetailOpen(true);
+    setNotificationOpen(false);
+    if (!n.unread) return;
+
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, unread: false } : x)));
+    try {
+      await apiFetch(`/api/notifications/${encodeURIComponent(n.id)}/read`, { method: 'POST' });
+    } catch {
+      // ignore
+    }
+  }
   const [pickerRange, setPickerRange] = useState<[Date | null, Date | null]>(() => [
     dateRange.start ? parseISO(dateRange.start) : null,
     dateRange.end ? parseISO(dateRange.end) : null,
@@ -284,6 +328,11 @@ export function TopNav() {
       ? `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username
       : '';
   const role = session?.role.name ?? '';
+  const initials = (() => {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]![0]!}${parts[1]![0]!}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase() || 'U';
+  })();
 
   function handleDateRangeChange(next: [Date | null, Date | null]) {
     const [start, end] = next;
@@ -293,12 +342,16 @@ export function TopNav() {
     }
   }
 
-  async function handleSystemThemeChange(mode: SystemThemeMode) {
+  async function handleSystemThemeChange(mode: SystemThemeMode, originEl: HTMLElement | null) {
     if (themeLoading) return;
     setThemeLoading(mode);
     try {
       await setSystemTheme(mode);
-      applyTheme(mode);
+      await animateThemeRippleFromElement({
+        mode,
+        element: originEl,
+        onApplyTheme: () => applyTheme(mode),
+      });
       toast.success(`System theme switched to ${mode}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to switch system theme.';
@@ -364,7 +417,7 @@ export function TopNav() {
             variant="ghost"
             size="sm"
             className="h-8 px-2.5 min-w-[92px] justify-center"
-            onClick={() => void handleSystemThemeChange(nextTheme)}
+            onClick={(e) => void handleSystemThemeChange(nextTheme, e.currentTarget as HTMLElement)}
             disabled={themeLoading !== null}
             title={`Switch system to ${nextThemeLabel.toLowerCase()} mode`}
           >
@@ -382,43 +435,131 @@ export function TopNav() {
             type="button"
             variant="ghost"
             size="icon"
-            className="relative"
+            className="relative h-10 w-10"
             aria-expanded={notificationOpen}
             aria-label={t('notifications.title')}
             onClick={() => setNotificationOpen((open) => !open)}
           >
-            <Bell className="w-5 h-5 text-slate-600" />
+            <Bell className="size-7 text-slate-600" />
             {unreadCount > 0 ? (
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full border-2 border-white bg-rose-500" />
+              <span
+                className={cn(
+                  'absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1',
+                  'rounded-full bg-rose-600 text-white',
+                  'text-[11px] font-bold leading-[20px] text-center',
+                  'border-2 border-white dark:border-slate-900',
+                  'shadow-sm',
+                )}
+                aria-label={t('notifications.unread_messages', { count: unreadCount })}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             ) : null}
           </Button>
           <NotificationPanel
             isOpen={notificationOpen}
             onClose={() => setNotificationOpen(false)}
             notifications={notifications}
-            onMarkAllRead={() =>
-              setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
-            }
+            onMarkAllRead={async () => {
+              setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+              try {
+                await apiFetch('/api/notifications/mark-all-read', { method: 'POST' });
+              } catch {
+                // ignore
+              }
+            }}
+            onNotificationClick={(n) => void openNotificationDetails(n)}
           />
         </div>
         <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-slate-900">{name}</p>
-            <p className="text-xs text-slate-500">{role}</p>
-          </div>
-          <Avatar>
-            <AvatarImage src="https://github.com/shadcn.png" />
-            <AvatarFallback>
-              {(() => {
-                const parts = name.split(/\s+/).filter(Boolean);
-                if (parts.length >= 2) return `${parts[0]![0]!}${parts[1]![0]!}`.toUpperCase();
-                return name.slice(0, 2).toUpperCase() || 'U';
-              })()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className={cn(
+                  'group flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md px-2 py-1.5 shadow-sm hover:shadow-md transition-all',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
+                )}
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="https://github.com/shadcn.png" />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 text-left hidden sm:block">
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                    {name || '—'}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                    {role || '—'}
+                  </p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400 transition-transform data-[popup-open]:rotate-180" />
+              </button>
+            }
+          />
+          <DropdownMenuContent
+            align="end"
+            className="w-56 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md shadow-xl"
+          >
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-2 py-2">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{name || '—'}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{role || '—'}</span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  setNotificationOpen(false);
+                  onOpenSettings?.();
+                }}
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => {
+                  setNotificationOpen(false);
+                  onLogout?.();
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <Modal
+        isOpen={notificationDetailOpen}
+        onClose={() => {
+          setNotificationDetailOpen(false);
+          setSelectedNotification(null);
+        }}
+        title={selectedNotification?.title ?? t('notifications.title')}
+        subtitle={selectedNotification ? formatNotificationTime(selectedNotification.time) : undefined}
+        maxWidth="lg"
+        variant="glass"
+      >
+        {selectedNotification ? (
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-600/80 dark:text-slate-200/70">
+              {selectedNotification.type}
+            </div>
+            <div className="rounded-2xl border border-white/30 bg-white/55 p-4 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+              <div className="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap break-words">
+                {selectedNotification.message}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">—</div>
+        )}
+      </Modal>
     </header>
   );
 }

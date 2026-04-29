@@ -70,29 +70,46 @@ export const Select2: React.FC<Select2Props> = ({
           SingleValue
         }}
         classNames={{
-          control: () => '!min-h-[48px] !rounded-xl !border-gray-200 !bg-gray-50 !shadow-none !cursor-pointer',
-          placeholder: () => '!text-gray-400 !text-sm',
-          input: () => '!text-brand-text !text-sm',
-          singleValue: () => '!text-brand-text !text-sm',
-          menu: () => '!rounded-xl !border !border-gray-100 !shadow-xl !mt-2 !overflow-hidden',
+          control: (state) =>
+            cn(
+              '!min-h-[48px] !rounded-xl !shadow-none !cursor-pointer',
+              '!bg-white/55 dark:!bg-slate-950/45',
+              'supports-[backdrop-filter]:!backdrop-blur-xl',
+              '!border !border-white/30 dark:!border-white/10',
+              state.isFocused ? '!ring-2 !ring-indigo-500/25' : '!ring-0',
+              disabled ? '!opacity-60 !cursor-not-allowed' : undefined,
+            ),
+          placeholder: () => '!text-slate-500/80 dark:!text-slate-300/70 !text-sm',
+          input: () => '!text-slate-900 dark:!text-slate-50 !text-sm',
+          singleValue: () => '!text-slate-900 dark:!text-slate-50 !text-sm',
+          menu: () =>
+            cn(
+              '!rounded-xl !mt-2 !overflow-hidden',
+              '!bg-white/75 dark:!bg-slate-950/65',
+              'supports-[backdrop-filter]:!backdrop-blur-xl',
+              '!border !border-white/30 dark:!border-white/10',
+              '!shadow-[0_18px_45px_-18px_rgba(0,0,0,0.45)] !ring-1 !ring-black/5 dark:!ring-white/10',
+            ),
+          menuList: () => '!py-1',
           option: ({ isSelected, isFocused }) => cn(
             '!py-2.5 !px-4 !text-sm !cursor-pointer !transition-colors',
-            isSelected ? '!bg-brand-primary/10 !text-brand-primary !font-bold' :
-              isFocused ? '!bg-brand-primary/5 !text-brand-text' : '!text-brand-text'
+            isSelected
+              ? '!bg-indigo-500/15 !text-indigo-700 dark:!text-indigo-200 !font-bold'
+              : isFocused
+                ? '!bg-indigo-500/10 !text-slate-900 dark:!text-slate-50'
+                : '!text-slate-900 dark:!text-slate-50'
           ),
           valueContainer: () => '!px-2',
-          clearIndicator: () => '!text-gray-400 hover:!text-red-500 !p-1',
-          dropdownIndicator: () => '!text-gray-400 !p-1',
+          clearIndicator: () => '!text-slate-500 hover:!text-rose-500 dark:!text-slate-300 !p-1',
+          dropdownIndicator: () => '!text-slate-500 dark:!text-slate-300 !p-1',
         }}
         menuPortalTarget={document.body}
         styles={{
           control: (base, state) => ({
             ...base,
-            borderColor: state.isFocused ? 'var(--color-brand-primary)' : 'rgb(226 232 240)',
-            boxShadow: state.isFocused ? '0 0 0 2px rgba(79, 70, 229, 0.2)' : 'none',
-            '&:hover': {
-              borderColor: state.isFocused ? 'var(--color-brand-primary)' : 'rgb(203 213 225)',
-            }
+            // Keep border + focus effects controlled by classNames (Tailwind).
+            borderColor: 'transparent',
+            boxShadow: 'none',
           }),
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
         }}

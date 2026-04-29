@@ -60,6 +60,7 @@ type NotificationPanelProps = {
   /** When omitted, the panel loads translated defaults and manages unread locally. */
   notifications?: Notification[];
   onMarkAllRead?: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 };
 
 export function NotificationPanel({
@@ -67,6 +68,7 @@ export function NotificationPanel({
   onClose,
   notifications: notificationsProp,
   onMarkAllRead,
+  onNotificationClick,
 }: NotificationPanelProps) {
   const { t } = useTranslation();
   const defaults = React.useMemo(() => createDefaultNotifications(t), [t]);
@@ -103,7 +105,7 @@ export function NotificationPanel({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 z-[45] bg-black/10"
+            className="fixed inset-0 z-[45] bg-black/10 dark:bg-black/35"
             aria-hidden
           />
 
@@ -115,16 +117,23 @@ export function NotificationPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="absolute right-0 top-full z-50 mt-2 flex max-h-[min(28rem,calc(100vh-5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xl ring-1 ring-black/5"
+            className={cn(
+              "absolute right-0 top-full z-50 mt-2 flex max-h-[min(28rem,calc(100vh-5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl",
+              "border border-slate-200/80 dark:border-slate-700/70",
+              "bg-white/80 dark:bg-slate-950/60 backdrop-blur-md supports-[backdrop-filter]:backdrop-blur-md",
+              "shadow-xl ring-1 ring-black/5 dark:ring-white/10",
+            )}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-slate-800 px-4 py-3">
               <div className="flex min-w-0 items-center gap-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200">
                   <Bell size={18} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="truncate text-base font-bold leading-tight">{t('notifications.title')}</h3>
-                  <p className="text-xs font-medium text-brand-muted">
+                  <h3 className="truncate text-base font-bold leading-tight text-slate-900 dark:text-slate-100">
+                    {t('notifications.title')}
+                  </h3>
+                  <p className="text-xs font-medium text-brand-muted dark:text-slate-400">
                     {t('notifications.unread_messages', { count: unreadCount })}
                   </p>
                 </div>
@@ -132,7 +141,7 @@ export function NotificationPanel({
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 cursor-pointer rounded-lg p-2 text-brand-muted transition-colors hover:bg-slate-100"
+                className="shrink-0 cursor-pointer rounded-lg p-2 text-brand-muted dark:text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X size={18} />
               </button>
@@ -143,13 +152,23 @@ export function NotificationPanel({
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
+                    role={onNotificationClick ? 'button' : undefined}
+                    tabIndex={onNotificationClick ? 0 : undefined}
+                    onClick={() => onNotificationClick?.(notification)}
+                    onKeyDown={(e) => {
+                      if (!onNotificationClick) return;
+                      if (e.key === 'Enter' || e.key === ' ') onNotificationClick(notification);
+                    }}
                     className={cn(
-                      'cursor-pointer rounded-xl border border-transparent p-3 transition-colors hover:bg-slate-50',
-                      notification.unread ? 'bg-slate-50/80' : 'bg-white',
+                      'cursor-pointer rounded-xl border p-3 transition-colors',
+                      'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                      notification.unread
+                        ? 'bg-slate-50/80 dark:bg-slate-800/55 dark:border-slate-700/70'
+                        : 'bg-white/60 dark:bg-slate-950/30',
                     )}
                   >
                     <div className="flex gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200">
                         {notification.type === 'lease' && <Building2 size={16} />}
                         {notification.type === 'payment' && <DollarSign size={16} />}
                         {notification.type === 'maintenance' && <Wrench size={16} />}
@@ -157,13 +176,17 @@ export function NotificationPanel({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-0.5 flex items-start justify-between gap-2">
-                          <h4 className="truncate text-sm font-semibold leading-snug">{notification.title}</h4>
+                          <h4 className="truncate text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
+                            {notification.title}
+                          </h4>
                           {notification.unread && (
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400 dark:bg-indigo-300" />
                           )}
                         </div>
-                        <p className="text-xs leading-relaxed text-brand-muted line-clamp-2">{notification.message}</p>
-                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide text-brand-muted/70">
+                        <p className="text-xs leading-relaxed text-brand-muted dark:text-slate-300/80 line-clamp-2">
+                          {notification.message}
+                        </p>
+                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide text-brand-muted/70 dark:text-slate-400/80">
                           {notification.time}
                         </span>
                       </div>
@@ -171,7 +194,7 @@ export function NotificationPanel({
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-brand-muted">
+                <div className="flex flex-col items-center justify-center py-12 text-brand-muted dark:text-slate-400">
                   <Bell size={40} className="mb-3 opacity-20" />
                   <p className="text-sm font-medium">{t('notifications.no_notifications')}</p>
                 </div>
@@ -179,11 +202,17 @@ export function NotificationPanel({
             </div>
 
             {showMarkAll && (
-              <div className="shrink-0 border-t border-slate-100 p-3">
+              <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-3">
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
-                  className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                  className={cn(
+                    "w-full cursor-pointer rounded-lg border py-2.5 text-sm font-medium shadow-sm transition-colors",
+                    "border-slate-200 dark:border-slate-700",
+                    "bg-white/70 dark:bg-slate-900/40 backdrop-blur",
+                    "text-slate-700 dark:text-slate-100",
+                    "hover:bg-slate-50 dark:hover:bg-slate-800/60",
+                  )}
                 >
                   {t('notifications.mark_all_as_read')}
                 </button>

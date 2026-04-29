@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { emitBranchNotificationsChanged } from '../realtime/io.js';
 
 const STATUS_MAP_TO_SCHEDULE = {
   Paid: 'paid',
@@ -80,6 +81,7 @@ export async function insertPayment(branchId, payload) {
     );
   }
 
+  emitBranchNotificationsChanged(branchId);
   return getPaymentById(scheduleId, branchId);
 }
 
@@ -130,6 +132,7 @@ export async function updatePaymentById(id, branchId, payload) {
     );
   }
 
+  emitBranchNotificationsChanged(branchId);
   return result.affectedRows;
 }
 
@@ -169,5 +172,6 @@ export async function deletePaymentById(id, branchId) {
     'UPDATE payment_schedule SET active = 0 WHERE id = ? AND branch_id = ? AND active = 1',
     [id, branchId],
   );
+  emitBranchNotificationsChanged(branchId);
   return result.affectedRows;
 }

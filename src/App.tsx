@@ -18,6 +18,7 @@ import { SettingsView } from './components/views/SettingsView/index';
 import { TenantPortalView } from './components/views/TenantPortalView/index';
 import { AgentPortalView } from './components/views/AgentPortalView/index';
 import { DocumentPreview } from './components/DocumentPreview';
+import { LoginView } from './components/LoginView';
 
 export default function App() {
   // Check for standalone preview mode
@@ -74,15 +75,8 @@ function MainApp() {
   }
 
   if (!session) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
-        <p className="text-sm">Opening dashboard…</p>
-      </div>
-    );
+    return <LoginView />;
   }
-
-  const displayName = `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username;
 
   const renderView = () => {
     switch (activeTab) {
@@ -121,7 +115,7 @@ function MainApp() {
       />
       
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-        <TopNav />
+        <TopNav onOpenSettings={() => setActiveTab('settings')} onLogout={() => logout()} />
         
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50 dark:bg-slate-950">
           <div className="max-w-7xl mx-auto">

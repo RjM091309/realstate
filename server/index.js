@@ -1,11 +1,17 @@
 import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
+import jwt from 'jsonwebtoken';
+import { Server as SocketIOServer } from 'socket.io';
 import { pool } from './config/db.js';
 import { ensureSchema } from './ensureSchema.js';
+import { getJwtSecret } from './jwt.js';
+import { loadSessionPayload } from './services/sessionService.js';
+import { setIO } from './realtime/io.js';
 import { authRouter } from './routes/authRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
 import { unitsRouter } from './routes/unitsRoutes.js';
@@ -21,6 +27,7 @@ import { specialRequestsRouter } from './routes/specialRequestsRoutes.js';
 import { landlordsRouter } from './routes/landlordsRoutes.js';
 import { invoicesRouter } from './routes/invoicesRoutes.js';
 import { auditLogsRouter } from './routes/auditLogsRoutes.js';
+import { notificationsRouter } from './routes/notificationsRoutes.js';
 
 const app = express();
 const apiPort = Number(process.env.API_PORT ?? 2550);
@@ -113,6 +120,7 @@ app.use('/api/special-requests', specialRequestsRouter);
 app.use('/api/landlords', landlordsRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/audit-logs', auditLogsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 void (async () => {
   try {
@@ -125,7 +133,57 @@ void (async () => {
     );
   }
 
-  const server = app.listen(apiPort, () => {
+  const server = http.createServer(app);
+  const io = new SocketIOServer(server, {
+    cors: { origin: true, credentials: true },
+  });
+  setIO(io);
+
+  io.use(async (socket, next) => {
+    try {
+      const auth = socket.handshake.auth ?? {};
+      const token = typeof auth.token === 'string' ? auth.token : null;
+      const devUserIdRaw = auth.devUserId;
+
+      const allowBypass =
+        process.env.NODE_ENV !== 'production' &&
+        String(process.env.ALLOW_BYPASS_AUTH ?? 'true').toLowerCase() === 'true';
+
+      let userId = null;
+      if (allowBypass && devUserIdRaw != null && String(devUserIdRaw).trim() !== '') {
+        userId = Number(String(devUserIdRaw).trim());
+      } else if (token) {
+        const decoded = jwt.verify(token, getJwtSecret());
+        userId = decoded?.userId ?? null;
+      }
+
+      if (!Number.isFinite(Number(userId)) || Number(userId) < 1) {
+        next(new Error('Unauthorized'));
+        return;
+      }
+
+      const session = await loadSessionPayload(Number(userId));
+      if (!session) {
+        next(new Error('Unauthorized'));
+        return;
+      }
+
+      socket.data.userId = Number(userId);
+      socket.data.branchId = Number(session.branchId ?? 1);
+      next();
+    } catch (e) {
+      next(new Error('Unauthorized'));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    const userId = Number(socket.data.userId);
+    const branchId = Number(socket.data.branchId);
+    socket.join(`user:${userId}`);
+    socket.join(`branch:${branchId}`);
+  });
+
+  server.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
       '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',

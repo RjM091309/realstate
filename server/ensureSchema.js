@@ -960,4 +960,132 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_audit_actor_user\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  // ---------------------------------------------------------------------------
+  // Notifications (derived feed + per-user read state)
+  // ---------------------------------------------------------------------------
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`notification_read\` (
+      \`user_id\` INT UNSIGNED NOT NULL,
+      \`notification_key\` VARCHAR(120) NOT NULL,
+      \`read_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`user_id\`, \`notification_key\`),
+      KEY \`idx_notification_read_user\` (\`user_id\`),
+      CONSTRAINT \`fk_notification_read_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`user_info\` (\`IDNO\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  // A view that normalizes several operational tables into a notification feed.
+  // Read status is stored in notification_read (per user).
+  await pool.query(`
+    CREATE OR REPLACE VIEW \`notification_feed\` AS
+      SELECT
+        CONCAT('payment_txn:', pt.id) AS notification_key,
+        pt.branch_id AS branch_id,
+        pt.id AS source_id,
+        'payment_transaction' AS source_table,
+        pt.created_at AS created_at,
+        'payment' AS type,
+        'Rent payment received' AS title,
+        CONCAT(
+          'Payment of ',
+          FORMAT(pt.amount_paid, 2),
+          ' was posted for ',
+          COALESCE(tp.full_name, 'tenant'),
+          ' (',
+          COALESCE(p.name, 'property'),
+          ' ',
+          COALESCE(u.unit_no, u.unit_code),
+          ').'
+        ) AS message
+      FROM payment_transaction pt
+      JOIN payment_schedule ps ON ps.id = pt.payment_schedule_id AND ps.branch_id = pt.branch_id AND ps.active = 1
+      JOIN lease_contract lc ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
+      JOIN unit u ON u.id = lc.unit_id AND u.active = 1
+      JOIN property p ON p.id = u.property_id AND p.active = 1
+      LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.active = 1 AND ct.is_primary = 1
+      LEFT JOIN tenant_profile tp ON tp.id = ct.tenant_id AND tp.active = 1
+      WHERE pt.active = 1
+
+      UNION ALL
+
+      SELECT
+        CONCAT('payment_due:', ps.id) AS notification_key,
+        ps.branch_id AS branch_id,
+        ps.id AS source_id,
+        'payment_schedule' AS source_table,
+        ps.created_at AS created_at,
+        'payment' AS type,
+        CASE ps.status
+          WHEN 'overdue' THEN 'Rent payment overdue'
+          ELSE 'Upcoming rent payment'
+        END AS title,
+        CONCAT(
+          'Due on ',
+          DATE_FORMAT(ps.due_date, '%Y-%m-%d'),
+          ': ',
+          FORMAT(ps.amount_due, 2),
+          ' for ',
+          COALESCE(tp.full_name, 'tenant'),
+          ' (',
+          COALESCE(p.name, 'property'),
+          ' ',
+          COALESCE(u.unit_no, u.unit_code),
+          ').'
+        ) AS message
+      FROM payment_schedule ps
+      JOIN lease_contract lc ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
+      JOIN unit u ON u.id = lc.unit_id AND u.active = 1
+      JOIN property p ON p.id = u.property_id AND p.active = 1
+      LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.active = 1 AND ct.is_primary = 1
+      LEFT JOIN tenant_profile tp ON tp.id = ct.tenant_id AND tp.active = 1
+      WHERE ps.active = 1 AND ps.status IN ('pending', 'overdue')
+
+      UNION ALL
+
+      SELECT
+        CONCAT('maintenance:', sr.id) AS notification_key,
+        sr.branch_id AS branch_id,
+        sr.id AS source_id,
+        'special_request' AS source_table,
+        sr.created_at AS created_at,
+        'maintenance' AS type,
+        'Maintenance ticket opened' AS title,
+        CONCAT(
+          COALESCE(NULLIF(TRIM(sr.title), ''), 'Maintenance request'),
+          ' — ',
+          LEFT(COALESCE(NULLIF(TRIM(sr.details), ''), ''), 160),
+          CASE WHEN CHAR_LENGTH(COALESCE(NULLIF(TRIM(sr.details), ''), '')) > 160 THEN '…' ELSE '' END
+        ) AS message
+      FROM special_request sr
+      JOIN lease_contract lc ON lc.id = sr.contract_id AND lc.branch_id = sr.branch_id AND lc.active = 1
+      WHERE sr.status IN ('open', 'in_progress')
+
+      UNION ALL
+
+      SELECT
+        CONCAT('lease:', lc.id, ':', lc.status) AS notification_key,
+        lc.branch_id AS branch_id,
+        lc.id AS source_id,
+        'lease_contract' AS source_table,
+        COALESCE(lc.updated_at, lc.created_at) AS created_at,
+        CASE lc.status
+          WHEN 'active' THEN 'success'
+          ELSE 'lease'
+        END AS type,
+        CASE lc.status
+          WHEN 'active' THEN 'Lease activated'
+          WHEN 'terminated' THEN 'Lease terminated'
+          WHEN 'cancelled' THEN 'Lease cancelled'
+          ELSE 'Lease updated'
+        END AS title,
+        CONCAT(
+          'Contract ',
+          lc.contract_no,
+          ' status: ',
+          lc.status
+        ) AS message
+      FROM lease_contract lc
+      WHERE lc.active = 1 AND lc.status IN ('active', 'terminated', 'cancelled')
+  `);
 }
