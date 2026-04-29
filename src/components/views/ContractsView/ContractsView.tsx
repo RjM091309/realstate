@@ -33,6 +33,7 @@ import {
   fetchContracts,
   inviteContractCollaborator,
   updateContract,
+  updateContractCollaborator,
 } from '@/lib/contractsApi';
 import { createContractInvoice } from '@/lib/invoicesApi';
 import { format } from 'date-fns';
@@ -280,13 +281,16 @@ export function ContractsView() {
       email: r.email || '',
       role: r.isPrimary ? 'Owner' : 'Viewer',
       dateAdded: r.createdAt || '',
+      remarks: r.remarks || '',
     }));
     const fromCollab = (collabRows ?? []).map<Collaborator>((c) => ({
       id: `agency-${c.id}`,
       name: c.partnerAgencyName || 'Agency',
-      email: '',
+      email: c.email || '',
       role: 'Viewer',
       dateAdded: c.createdAt || '',
+      remarks: c.remarks || '',
+      commissionTerms: c.commissionTerms || '',
     }));
     return [...fromTenants, ...fromCollab];
   };
@@ -659,6 +663,18 @@ export function ContractsView() {
             toast.success('Invite sent.');
           } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Failed to send invite');
+            throw e;
+          }
+        }}
+        onEditCollaborator={async (collabId, payload) => {
+          if (!selectedContract) return;
+          try {
+            const { collaborations, tenants } = await updateContractCollaborator(selectedContract.id, collabId, payload);
+            setContractCollaborations(collaborations);
+            setContractTenants(tenants);
+            toast.success('Collaborator updated.');
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to update collaborator');
             throw e;
           }
         }}

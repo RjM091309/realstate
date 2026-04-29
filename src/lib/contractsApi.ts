@@ -96,3 +96,18 @@ export async function inviteContractCollaborator(
   return collaborations;
 }
 
+export async function updateContractCollaborator(
+  contractId: string,
+  collabId: string,
+  body: { name?: string; email?: string; commissionTerms?: string; remarks?: string }
+): Promise<{ collaborations: ContractCollaborationRow[], tenants: ContractTenantRow[] }> {
+  const result = await apiFetch<{ collaborations: ContractCollaborationRow[], tenants: ContractTenantRow[] }>(
+    `/api/contracts/${encodeURIComponent(contractId)}/collaborations/${encodeURIComponent(collabId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+  );
+  return result;
+}
+

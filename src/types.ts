@@ -82,6 +82,7 @@ export interface ContractTenantRow {
   contractId: string;
   tenantId: string;
   isPrimary: boolean;
+  remarks?: string;
   createdAt: string;
   name: string;
   email: string;
@@ -93,6 +94,7 @@ export interface ContractCollaborationRow {
   contractId: string;
   partnerAgencyId?: string;
   partnerAgencyName: string;
+  email: string;
   commissionTerms: string;
   remarks: string;
   createdBy: string;

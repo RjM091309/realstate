@@ -9,6 +9,7 @@ import {
   listContractTenantsView,
   listContracts,
   updateContract,
+  updateContractCollaborationController,
 } from '../controllers/contractsController.js';
 
 const router = Router();
@@ -18,6 +19,7 @@ router.get('/:id/document-details', getContractDocumentDetailsView);
 router.get('/:id/tenants', listContractTenantsView);
 router.get('/:id/collaborations', listContractCollaborationsView);
 router.post('/:id/collaborations', createContractCollaborationInvite);
+router.patch('/:id/collaborations/:collabId', updateContractCollaborationController);
 router.post('/', createContract);
 router.patch('/:id', updateContract);
 router.delete('/:id', deleteContract);

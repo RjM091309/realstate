@@ -11,6 +11,8 @@ import {
   listContractTenants,
   listContractsByBranch,
   updateContractById,
+  updateContractCollaboration,
+  updateContractTenantRemarks,
 } from '../models/contractsModel.js';
 
 function fmtDate(d) {
@@ -321,6 +323,7 @@ export async function listContractTenantsView(req, res) {
       contractId: String(r.contract_id),
       tenantId: String(r.tenant_id),
       isPrimary: Boolean(Number(r.is_primary)),
+      remarks: r.remarks ? String(r.remarks) : '',
       createdAt: r.created_at ? fmtDate(r.created_at) : '',
       name: r.tenant_name ? String(r.tenant_name) : '—',
       email: r.tenant_email ? String(r.tenant_email) : '',
@@ -348,6 +351,7 @@ export async function listContractCollaborationsView(req, res) {
       contractId: String(r.contract_id),
       partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
       partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+      email: r.partner_email ? String(r.partner_email) : '',
       commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
       remarks: r.remarks ? String(r.remarks) : '',
       createdBy: r.created_by != null ? String(r.created_by) : '',
@@ -415,6 +419,7 @@ export async function createContractCollaborationInvite(req, res) {
       contractId: String(r.contract_id),
       partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
       partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+      email: r.partner_email ? String(r.partner_email) : '',
       commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
       remarks: r.remarks ? String(r.remarks) : '',
       createdBy: r.created_by != null ? String(r.created_by) : '',
@@ -424,6 +429,97 @@ export async function createContractCollaborationInvite(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to invite collaborator' });
+  }
+}
+
+export async function updateContractCollaborationController(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to update collaborators' });
+    return;
+  }
+
+  const contractId = String(req.params.id ?? '').trim();
+  const collabId = String(req.params.collabId ?? '').trim();
+  if (!contractId || !collabId) {
+    res.status(400).json({ error: 'Invalid contract or collab id' });
+    return;
+  }
+
+  try {
+    let affected = 0;
+    if (collabId.startsWith('tenant-')) {
+      const tenantId = collabId.replace('tenant-', '');
+      affected = await updateContractTenantRemarks(
+        ctx.session.branchId,
+        contractId,
+        tenantId,
+        {
+          remarks: req.body?.remarks ?? null,
+          name: req.body?.name,
+          email: req.body?.email,
+        }
+      );
+    } else {
+      const realCollabId = collabId.startsWith('agency-') ? collabId.replace('agency-', '') : collabId;
+      affected = await updateContractCollaboration(
+        ctx.session.branchId,
+        contractId,
+        realCollabId,
+        {
+          commissionTerms: req.body?.commissionTerms ?? null,
+          remarks: req.body?.remarks ?? null,
+          name: req.body?.name,
+          email: req.body?.email,
+        }
+      );
+    }
+
+    if (affected === 0) {
+      res.status(404).json({ error: 'Collaborator not found' });
+      return;
+    }
+
+    void logAudit({
+      branchId: ctx.session.branchId,
+      actorUserId: ctx.session.user.id,
+      moduleName: 'contracts',
+      recordTable: collabId.startsWith('tenant-') ? 'contract_tenant' : 'contract_collaboration',
+      recordId: collabId,
+      action: 'update',
+      changeSummary: `Updated collaborator (contract ${contractId})`,
+    });
+
+    const rows = await listContractCollaborations(contractId, ctx.session.branchId);
+    const collaborations = rows.map((r) => ({
+      id: String(r.id),
+      contractId: String(r.contract_id),
+      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
+      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+      email: r.partner_email ? String(r.partner_email) : '',
+      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
+      remarks: r.remarks ? String(r.remarks) : '',
+      createdBy: r.created_by != null ? String(r.created_by) : '',
+      createdAt: r.created_at ? fmtDate(r.created_at) : '',
+    }));
+    
+    const tenantRows = await listContractTenants(contractId, ctx.session.branchId);
+    const tenants = tenantRows.map((r) => ({
+      contractId: String(r.contract_id),
+      tenantId: String(r.tenant_id),
+      isPrimary: Boolean(Number(r.is_primary)),
+      remarks: r.remarks ? String(r.remarks) : '',
+      createdAt: r.created_at ? fmtDate(r.created_at) : '',
+      name: r.tenant_name ? String(r.tenant_name) : '—',
+      email: r.tenant_email ? String(r.tenant_email) : '',
+      phone: r.tenant_phone ? String(r.tenant_phone) : '',
+    }));
+
+    res.json({ collaborations, tenants });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update collaborator' });
   }
 }
 

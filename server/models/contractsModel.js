@@ -293,6 +293,7 @@ export async function listContractTenants(contractId, branchId) {
       ct.contract_id,
       ct.tenant_id,
       ct.is_primary,
+      ct.remarks,
       ct.created_at,
       t.full_name AS tenant_name,
       t.email AS tenant_email,
@@ -412,4 +413,82 @@ export async function insertContractCollaboration(branchId, contractId, payload)
     ],
   );
   return result.insertId;
+}
+
+export async function updateContractCollaboration(branchId, contractId, collabId, payload) {
+  const [result] = await pool.query(
+    `
+    UPDATE contract_collaboration
+    SET commission_terms = ?, remarks = ?
+    WHERE id = ? AND branch_id = ? AND contract_id = ?
+    `,
+    [
+      payload.commissionTerms ?? null,
+      payload.remarks ?? null,
+      collabId,
+      branchId,
+      contractId,
+    ],
+  );
+
+  if (result.affectedRows > 0 && (payload.name !== undefined || payload.email !== undefined)) {
+    const [rows] = await pool.query(
+      `SELECT partner_agency_id FROM contract_collaboration WHERE id = ?`,
+      [collabId]
+    );
+    if (rows[0]) {
+      const paId = rows[0].partner_agency_id;
+      const updates = [];
+      const values = [];
+      if (payload.name !== undefined) {
+        updates.push('agency_name = ?');
+        values.push(payload.name || '');
+      }
+      if (payload.email !== undefined) {
+        updates.push('email = ?');
+        values.push(payload.email || null);
+      }
+      if (updates.length > 0) {
+        await pool.query(
+          `UPDATE partner_agency SET ${updates.join(', ')} WHERE id = ?`,
+          [...values, paId]
+        );
+      }
+    }
+  }
+
+  return result.affectedRows;
+}
+
+export async function updateContractTenantRemarks(branchId, contractId, tenantId, payload) {
+  const [result] = await pool.query(
+    `
+    UPDATE contract_tenant ct
+    JOIN lease_contract lc ON ct.contract_id = lc.id
+    SET ct.remarks = ?
+    WHERE ct.contract_id = ? AND ct.tenant_id = ? AND lc.branch_id = ?
+    `,
+    [payload.remarks ?? null, contractId, tenantId, branchId],
+  );
+
+  if (result.affectedRows > 0 && (payload.name !== undefined || payload.email !== undefined)) {
+    const updates = [];
+    const values = [];
+    if (payload.name !== undefined) {
+      updates.push('full_name = ?');
+      values.push(payload.name || '');
+    }
+    if (payload.email !== undefined) {
+      updates.push('email = ?');
+      values.push(payload.email || null);
+    }
+    if (updates.length > 0) {
+      await pool.query(
+        `UPDATE tenant_profile SET ${updates.join(', ')} WHERE id = ?`,
+        [...values, tenantId]
+      );
+    }
+  }
+
+  return result.affectedRows;
 }

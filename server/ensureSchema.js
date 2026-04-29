@@ -177,6 +177,11 @@ export async function ensureSchema() {
         `ALTER TABLE \`contract_tenant\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`is_primary\``,
       );
     }
+    if (!(await hasColumn('contract_tenant', 'remarks'))) {
+      await pool.query(
+        `ALTER TABLE \`contract_tenant\` ADD COLUMN \`remarks\` TEXT NULL AFTER \`active\``,
+      );
+    }
   }
 
   await pool.query(`
@@ -578,6 +583,7 @@ export async function ensureSchema() {
       \`tenant_id\` BIGINT UNSIGNED NOT NULL,
       \`is_primary\` TINYINT(1) NOT NULL DEFAULT 0,
       \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`remarks\` TEXT NULL,
       \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`contract_id\`, \`tenant_id\`),
       KEY \`idx_contract_tenant_tenant\` (\`tenant_id\`),

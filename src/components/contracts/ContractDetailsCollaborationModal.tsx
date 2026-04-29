@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { DataTable, type ColumnDef } from '@/components/data-table';
+import { DatePicker } from '@/components/DatePicker';
 
 export type CollaboratorRole = 'Owner' | 'Editor' | 'Viewer';
 
@@ -33,6 +34,8 @@ export type Collaborator = {
   email: string;
   role: CollaboratorRole;
   dateAdded: string;
+  remarks?: string;
+  commissionTerms?: string;
 };
 
 export type ActivityItem = {
@@ -152,10 +155,12 @@ export function CollaboratorList({
   collaborators,
   onRoleChange,
   onRemove,
+  onEdit,
 }: {
   collaborators: Collaborator[];
   onRoleChange: (id: string, next: CollaboratorRole) => void;
   onRemove: (id: string) => void;
+  onEdit?: (c: Collaborator) => void;
 }) {
   const columns: ColumnDef<Collaborator>[] = useMemo(() => [
     {
@@ -163,9 +168,13 @@ export function CollaboratorList({
       render: (c) => (
         <div>
           <div className="font-semibold text-slate-900 truncate">{c.name || '—'}</div>
-          <div className="text-xs text-slate-500 break-all">{c.email || '—'}</div>
+          {c.email ? <div className="text-xs text-slate-500 break-all">{c.email}</div> : null}
         </div>
       ),
+    },
+    {
+      header: 'Remarks',
+      render: (c) => <span className="text-sm text-slate-600 truncate block max-w-[150px]">{c.remarks || '—'}</span>,
     },
     {
       header: 'Role',
@@ -199,6 +208,11 @@ export function CollaboratorList({
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onEdit && (
+                <DropdownMenuItem onClick={() => onEdit(c)}>
+                  Edit
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="text-rose-600" onClick={() => onRemove(c.id)}>
                 Remove
               </DropdownMenuItem>
@@ -383,6 +397,7 @@ export function ContractDetailsCollaborationModal({
   onEditItem,
   onDeleteItem,
   onSendInvite,
+  onEditCollaborator,
   onUploadRepositoryDocument,
   onUploadTemplate,
   onGenerateInvoice,
@@ -423,6 +438,10 @@ export function ContractDetailsCollaborationModal({
     commissionTerms?: string;
     remarks?: string;
   }) => Promise<void>;
+  onEditCollaborator?: (
+    collabId: string,
+    payload: { name?: string; email?: string; commissionTerms?: string; remarks?: string }
+  ) => Promise<void>;
   onUploadRepositoryDocument?: (payload: {
     file: File;
     docType: 'lease_contract' | 'invoice' | 'kyc' | 'receipt' | 'move_in_out' | 'other';
@@ -445,6 +464,14 @@ export function ContractDetailsCollaborationModal({
   const [inviteCommissionTerms, setInviteCommissionTerms] = useState('');
   const [inviteRemarks, setInviteRemarks] = useState('');
   const [inviteCommissionMode, setInviteCommissionMode] = useState<'preset' | 'custom'>('preset');
+
+  const [editCollabId, setEditCollabId] = useState<string | null>(null);
+  const [editCollabName, setEditCollabName] = useState('');
+  const [editCollabEmail, setEditCollabEmail] = useState('');
+  const [editCollabRemarks, setEditCollabRemarks] = useState('');
+  const [editCollabCommissionTerms, setEditCollabCommissionTerms] = useState('');
+  const [editCollabCommissionMode, setEditCollabCommissionMode] = useState<'preset' | 'custom'>('preset');
+  const [editCollabSaving, setEditCollabSaving] = useState(false);
 
   const [repoUploadOpen, setRepoUploadOpen] = useState(false);
   const [repoUploadFile, setRepoUploadFile] = useState<File | null>(null);
@@ -491,14 +518,7 @@ export function ContractDetailsCollaborationModal({
   const [editItemNotes, setEditItemNotes] = useState('');
   const [editItemSaving, setEditItemSaving] = useState(false);
 
-  const permissionsGuide = useMemo(
-    () => [
-      { role: 'Owner' as const, desc: 'Full access. Can manage roles and collaborators.' },
-      { role: 'Editor' as const, desc: 'Can update details and add notes.' },
-      { role: 'Viewer' as const, desc: 'Read-only access.' },
-    ],
-    [],
-  );
+
 
   const commissionTermOptions = useMemo(
     () => [
@@ -669,6 +689,33 @@ export function ContractDetailsCollaborationModal({
     }
   };
 
+  const submitEditCollab = async () => {
+    if (!editCollabId || !onEditCollaborator) return;
+    if (editCollabSaving) return;
+
+    setEditCollabSaving(true);
+    try {
+      await onEditCollaborator(editCollabId, {
+        name: editCollabName.trim() || undefined,
+        email: editCollabEmail.trim() || undefined,
+        commissionTerms:
+          editCollabCommissionMode === 'custom'
+            ? editCollabCommissionTerms
+            : editCollabCommissionTerms || undefined,
+        remarks: editCollabRemarks || undefined,
+      });
+      setEditCollabId(null);
+      setEditCollabName('');
+      setEditCollabEmail('');
+      setEditCollabRemarks('');
+      setEditCollabCommissionTerms('');
+      setEditCollabCommissionMode('preset');
+      logActivity(`Edited collaborator.`);
+    } finally {
+      setEditCollabSaving(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={summary.title} maxWidth="5xl">
       <div className="space-y-5">
@@ -743,8 +790,8 @@ export function ContractDetailsCollaborationModal({
               </div>
 
               {inviteOpen ? (
-                <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Name</Label>
                       <Input
@@ -822,21 +869,121 @@ export function ContractDetailsCollaborationModal({
                 </div>
               ) : null}
 
-              <CollaboratorList collaborators={collaborators} onRoleChange={handleRoleChange} onRemove={handleRemove} />
-
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Permissions guide</div>
-                <div className="space-y-2">
-                  {permissionsGuide.map((p) => (
-                    <div key={p.role} className="flex items-start gap-3">
-                      <Badge variant="outline" className={cn('border-0', roleBadgeClass(p.role))}>
-                        {p.role}
-                      </Badge>
-                      <div className="text-sm text-slate-600">{p.desc}</div>
+              {editCollabId ? (
+                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-semibold text-slate-900">
+                      Edit Collaborator — {collaborators.find((c) => c.id === editCollabId)?.name || 'Unknown'}
+                    </h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Name</Label>
+                      <Input
+                        className="rounded-xl"
+                        value={editCollabName}
+                        onChange={(e) => setEditCollabName(e.target.value)}
+                        placeholder="Collaborator name"
+                      />
                     </div>
-                  ))}
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        className="rounded-xl"
+                        value={editCollabEmail}
+                        onChange={(e) => setEditCollabEmail(e.target.value)}
+                        placeholder="collaborator@example.com"
+                      />
+                    </div>
+                    {editCollabId?.startsWith('agency-') ? (
+                      <div className="space-y-2">
+                        <Label>Commission terms</Label>
+                        <Select2
+                          options={commissionTermOptions}
+                          value={
+                            editCollabCommissionMode === 'custom'
+                              ? 'custom'
+                              : editCollabCommissionTerms
+                                ? editCollabCommissionTerms
+                                : null
+                          }
+                          onChange={(v) => {
+                            const next = String(v ?? '');
+                            if (next === 'custom') {
+                              setEditCollabCommissionMode('custom');
+                              setEditCollabCommissionTerms('');
+                              return;
+                            }
+                            setEditCollabCommissionMode('preset');
+                            setEditCollabCommissionTerms(next);
+                          }}
+                        />
+                        {editCollabCommissionMode === 'custom' ? (
+                          <Input
+                            className="rounded-xl mt-2"
+                            value={editCollabCommissionTerms}
+                            onChange={(e) => setEditCollabCommissionTerms(e.target.value)}
+                            placeholder="Type custom commission terms"
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-slate-400">Role</Label>
+                        <div className="text-sm font-medium text-slate-700 py-2">Primary Tenant</div>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label>Remarks</Label>
+                      <Textarea
+                        className="rounded-xl"
+                        value={editCollabRemarks}
+                        onChange={(e) => setEditCollabRemarks(e.target.value)}
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setEditCollabId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={submitEditCollab}
+                      disabled={editCollabSaving}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {editCollabSaving ? 'Saving…' : 'Save changes'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
+
+              <CollaboratorList
+                collaborators={collaborators}
+                onRoleChange={handleRoleChange}
+                onRemove={handleRemove}
+                onEdit={(c) => {
+                  setEditCollabId(c.id);
+                  setEditCollabName(c.name && c.name !== '—' ? c.name : '');
+                  setEditCollabEmail(c.email || '');
+                  setEditCollabRemarks(c.remarks || '');
+                  const terms = c.commissionTerms || '';
+                  if (!terms) {
+                    setEditCollabCommissionMode('preset');
+                    setEditCollabCommissionTerms('');
+                  } else if (commissionTermOptions.some((o) => o.value === terms)) {
+                    setEditCollabCommissionMode('preset');
+                    setEditCollabCommissionTerms(terms);
+                  } else {
+                    setEditCollabCommissionMode('custom');
+                    setEditCollabCommissionTerms(terms);
+                  }
+                  setInviteOpen(false);
+                }}
+              />
+
+
               </div>
             ) : tab === 'activity' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1145,11 +1292,20 @@ export function ContractDetailsCollaborationModal({
                     </div>
                     <div className="space-y-2">
                       <Label>Inspection date</Label>
-                      <Input
-                        type="date"
-                        className="rounded-xl"
-                        value={snapDate}
-                        onChange={(e) => setSnapDate(e.target.value)}
+                      <DatePicker
+                        mode="single"
+                        fullWidth
+                        placeholder="Select date"
+                        value={snapDate ? new Date(snapDate) : null}
+                        onChange={(d: Date | null) => {
+                          if (!d) setSnapDate('');
+                          else {
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            setSnapDate(`${yyyy}-${mm}-${dd}`);
+                          }
+                        }}
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-3">
@@ -1301,11 +1457,20 @@ export function ContractDetailsCollaborationModal({
                           </div>
                           <div className="space-y-2">
                             <Label>Inspection date</Label>
-                            <Input
-                              type="date"
-                              className="rounded-xl"
-                              value={editSnapDate}
-                              onChange={(e) => setEditSnapDate(e.target.value)}
+                            <DatePicker
+                              mode="single"
+                              fullWidth
+                              placeholder="Select date"
+                              value={editSnapDate ? new Date(editSnapDate) : null}
+                              onChange={(d: Date | null) => {
+                                if (!d) setEditSnapDate('');
+                                else {
+                                  const yyyy = d.getFullYear();
+                                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                  const dd = String(d.getDate()).padStart(2, '0');
+                                  setEditSnapDate(`${yyyy}-${mm}-${dd}`);
+                                }
+                              }}
                             />
                           </div>
                           <div className="space-y-2 md:col-span-2">
