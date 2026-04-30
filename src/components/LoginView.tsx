@@ -1,400 +1,199 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Building2, KeyRound, LayoutGrid } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Building, Mail, Lock, ArrowRight, Eye, EyeOff, Shield, Globe, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { apiFetch } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
-
-type AuthMode = 'signin' | 'register';
-
-interface RoleOption {
-  id: number;
-  name: string;
-}
 
 export function LoginView() {
-  const { t } = useTranslation();
-  const { login, register } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('signin');
-
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [roleId, setRoleId] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [roles, setRoles] = useState<RoleOption[]>([]);
-  const [rolesLoading, setRolesLoading] = useState(false);
-  const [rolesErr, setRolesErr] = useState<string | null>(null);
-
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const loadRoles = useCallback(async () => {
-    setRolesErr(null);
-    setRolesLoading(true);
-    try {
-      const data = await apiFetch<{ roles: RoleOption[] }>('/api/auth/roles');
-      setRoles(data.roles ?? []);
-    } catch {
-      setRolesErr(t('login.register.rolesError'));
-      setRoles([]);
-    } finally {
-      setRolesLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    if (mode !== 'register' || roles.length > 0 || rolesLoading || rolesErr) return;
-    void loadRoles();
-  }, [mode, roles.length, rolesLoading, rolesErr, loadRoles]);
-
-  function switchMode(next: AuthMode) {
-    setMode(next);
-    setErr(null);
-    setRolesErr(null);
-    if (next === 'signin') {
-      setFirstName('');
-      setLastName('');
-      setPasswordConfirm('');
-      setRoleId('');
-      setPassword('');
-    }
-  }
-
-  async function onSignIn(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null);
-    setBusy(true);
+    setError(null);
+    setIsLoading(true);
     try {
       await login(username.trim(), password);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('login.error'));
+      setError(e instanceof Error ? e.message : 'Unable to sign in. Please try again.');
     } finally {
-      setBusy(false);
+      setIsLoading(false);
     }
-  }
-
-  async function onRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    const rid = Number(roleId);
-    if (!Number.isFinite(rid) || rid < 1) {
-      setErr(t('login.register.roleRequired'));
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setErr(t('login.register.passwordMismatch'));
-      return;
-    }
-    setBusy(true);
-    try {
-      await register({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        username: username.trim(),
-        password,
-        roleId: rid,
-      });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : t('login.error'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const inputClass =
-    'h-11 rounded-xl';
-  const selectClass = cn(
-    'flex h-11 w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition-colors outline-none',
-    'bg-white/55 supports-[backdrop-filter]:backdrop-blur-xl dark:bg-slate-950/45',
-    'border-white/30 dark:border-white/10',
-    'text-slate-900 dark:text-slate-50',
-    'focus-visible:border-emerald-700/40 focus-visible:ring-[3px] focus-visible:ring-emerald-700/20',
-    'disabled:cursor-not-allowed disabled:opacity-50',
-  );
-  const submitBtnClass = cn(
-    'h-11 w-full rounded-xl font-medium shadow-md shadow-stone-900/10',
-    'bg-stone-900 text-white hover:bg-stone-800',
-    'focus-visible:ring-emerald-700/30',
-  );
+  };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950">
-      <aside
-        className={cn(
-          'relative hidden lg:flex lg:w-[44%] xl:w-[42%] min-h-screen flex-col justify-center overflow-hidden',
-          'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white px-10 xl:px-14 2xl:px-20',
-        )}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_20%_10%,rgba(79,70,229,0.28),transparent_60%),radial-gradient(900px_520px_at_80%_70%,rgba(16,185,129,0.18),transparent_62%)]" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.10]"
-          style={{
-            backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.7) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(255,255,255,0.7) 1px, transparent 1px)`,
-            backgroundSize: '72px 72px',
-          }}
+    <div className="min-h-screen font-sans text-slate-900 selection:bg-indigo-500/30 selection:text-indigo-900 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="fixed inset-0 z-0">
+        <motion.img
+          initial={{ scale: 1.1 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 10, repeat: Infinity, repeatType: 'reverse', ease: 'linear' }}
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070"
+          alt="Modern Architecture"
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
+        <div className="absolute inset-0 bg-[#0d121f]/80 backdrop-blur-[4px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 rounded-full blur-[120px] animate-pulse" />
+        <div
+          className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse"
+          style={{ animationDelay: '2s' }}
+        />
+      </div>
 
-        <div className="relative z-10 max-w-md space-y-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
-              <Building2 className="h-6 w-6 text-indigo-200" strokeWidth={1.75} />
+      <div className="w-full max-w-4xl grid lg:grid-cols-10 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/40 overflow-hidden relative z-10 border border-white/10">
+        <div className="hidden lg:flex lg:col-span-4 flex-col justify-between p-10 bg-[#0d121f]">
+          <div>
+            <div className="flex items-center gap-3 mb-12">
+              <div className="w-10 h-10 bg-[#10b981] rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                <Building size={22} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white italic">Realstate</span>
             </div>
-            <span className="font-semibold tracking-wide text-lg text-white/95">{t('login.brand')}</span>
+            <div className="space-y-8">
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
+                <h1 className="text-3xl font-bold text-white leading-tight mb-4">
+                  Manage your portfolio with <span className="text-emerald-400">precision.</span>
+                </h1>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  The complete 3CORE platform for property operations, CRM, and lease management.
+                </p>
+              </motion.div>
+              <div className="space-y-4 pt-4">
+                {[
+                  { icon: Shield, text: 'Enterprise Security' },
+                  { icon: MapPin, text: 'Local Insights' },
+                  { icon: Globe, text: 'Cloud Infrastructure' },
+                ].map((item, i) => (
+                  <motion.div
+                    key={item.text}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1 + i * 0.1 }}
+                    className="flex items-center gap-3 text-slate-400 text-sm"
+                  >
+                    <div className="p-1.5 bg-slate-800/50 rounded-md">
+                      <item.icon size={14} className="text-indigo-400" />
+                    </div>
+                    <span>{item.text}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="space-y-4">
-            <h1 className="text-3xl xl:text-4xl font-semibold leading-tight tracking-tight text-white">
-              {t('login.heroTitle')}
-            </h1>
-            <p className="text-base leading-relaxed text-slate-200/80">{t('login.heroSubtitle')}</p>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-black text-slate-600">
+            <span>Powered by 3CORE Systems</span>
           </div>
-          <ul className="flex flex-col gap-4 pt-2 text-sm text-slate-200/65">
-            <li className="flex items-start gap-3">
-              <LayoutGrid className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200/90" strokeWidth={1.75} />
-              <span>{t('login.heroBullet1')}</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200/90" strokeWidth={1.75} />
-              <span>{t('login.heroBullet2')}</span>
-            </li>
-          </ul>
-        </div>
-      </aside>
-
-      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-10 overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(900px 500px at 20% 15%, rgba(79,70,229,0.20), transparent 60%), radial-gradient(700px 420px at 80% 60%, rgba(16,185,129,0.16), transparent 55%)',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: `linear-gradient(to right, rgb(15 23 42) 1px, transparent 1px),
-              linear-gradient(to bottom, rgb(15 23 42) 1px, transparent 1px)`,
-            backgroundSize: '64px 64px',
-          }}
-        />
-        <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -right-28 bottom-10 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
-
-        <div className="mb-8 flex w-full max-w-md items-center justify-center gap-2.5 lg:hidden">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-900 text-emerald-300 shadow-lg shadow-stone-900/15">
-            <Building2 className="h-5 w-5" strokeWidth={1.75} />
-          </div>
-          <span className="text-lg font-semibold tracking-tight text-stone-900">{t('login.brand')}</span>
         </div>
 
-        <div
-          className={cn(
-            'relative z-10 w-full max-w-md rounded-3xl p-8',
-            'bg-white/70 dark:bg-slate-950/55',
-            'supports-[backdrop-filter]:backdrop-blur-xl',
-            'border border-white/30 dark:border-white/10',
-            'shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5 dark:ring-white/10',
-          )}
-        >
-          <div className="mb-8 space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-              {mode === 'signin' ? t('login.title') : t('login.register.title')}
-            </h2>
-            <p className="text-sm leading-relaxed text-slate-600/90 dark:text-slate-300/80">
-              {mode === 'signin' ? t('login.subtitle') : t('login.register.subtitle')}
-            </p>
+        <div className="col-span-full lg:col-span-6 p-8 md:p-14 bg-white flex flex-col justify-center">
+          <div className="lg:hidden flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-[#10b981] rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+              <Building size={22} />
+            </div>
+            <span className="text-xl font-bold tracking-tight italic">Realstate</span>
           </div>
 
-          {mode === 'signin' ? (
-            <form onSubmit={onSignIn} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-slate-700 dark:text-slate-200">
-                  {t('login.username')}
-                </Label>
-                <Input
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">System Admin Login</h2>
+            <p className="text-slate-500 text-sm">Please sign in to access your administrative dashboard.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="username" className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
+                Username
+              </label>
+              <div className="relative group">
+                <Mail
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"
+                  size={18}
+                />
+                <input
                   id="username"
                   autoComplete="username"
+                  required
+                  className="w-full bg-slate-50/50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-slate-300 text-sm"
+                  placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  disabled={busy}
-                  required
-                  className={inputClass}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-700 dark:text-slate-200">
-                  {t('login.password')}
-                </Label>
-                <Input
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <label htmlFor="password" className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Password
+                </label>
+              </div>
+              <div className="relative group">
+                <Lock
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"
+                  size={18}
+                />
+                <input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
+                  required
+                  className="w-full bg-slate-50/50 border border-slate-200 rounded-xl py-4 pl-12 pr-12 text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-slate-300 text-sm"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={busy}
-                  required
-                  className={inputClass}
                 />
-              </div>
-              {err ? (
-                <p className="text-sm font-medium text-rose-600" role="alert">
-                  {err}
-                </p>
-              ) : null}
-              <Button type="submit" disabled={busy} className={submitBtnClass}>
-                {busy ? t('login.loading') : t('login.submit')}
-              </Button>
-              <p className="text-center text-xs leading-relaxed text-slate-500/80 dark:text-slate-300/60">{t('login.hint')}</p>
-              <p className="text-center text-sm text-slate-700 dark:text-slate-200">
                 <button
                   type="button"
-                  className="font-medium text-emerald-700 dark:text-emerald-300 underline-offset-4 hover:underline"
-                  onClick={() => switchMode('register')}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-indigo-500 transition-colors"
                 >
-                  {t('login.switchToRegister')}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              </p>
-            </form>
-          ) : (
-            <form onSubmit={onRegister} className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-slate-700 dark:text-slate-200">
-                    {t('login.register.firstName')}
-                  </Label>
-                  <Input
-                    id="firstName"
-                    autoComplete="given-name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={busy}
-                    required
-                    maxLength={128}
-                    className={inputClass}
-                  />
+              </div>
+            </div>
+
+            {error ? <p className="text-sm font-medium text-rose-600">{error}</p> : null}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[#1c2434] hover:bg-[#2c3444] text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-slate-900/10 active:scale-[0.98] disabled:opacity-70 group overflow-hidden relative"
+            >
+              <AnimatePresence mode="wait">
+                {isLoading ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Signing in...</span>
+                  </motion.div>
+                ) : (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-3">
+                    <span>Login to Dashboard</span>
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <div className="absolute inset-0 bg-indigo-600 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out -z-10" />
+            </button>
+          </form>
+
+          <div className="mt-12 flex flex-col items-center gap-6">
+            <div className="flex items-center gap-3 w-full">
+              <span className="h-px grow bg-slate-100" />
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] whitespace-nowrap">Regional Support</span>
+              <span className="h-px grow bg-slate-100" />
+            </div>
+            <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
+              {['Manila', 'Cebu', 'Davao'].map((city) => (
+                <div key={city} className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{city}</span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-slate-700 dark:text-slate-200">
-                    {t('login.register.lastName')}
-                  </Label>
-                  <Input
-                    id="lastName"
-                    autoComplete="family-name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    disabled={busy}
-                    required
-                    maxLength={128}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-username" className="text-slate-700 dark:text-slate-200">
-                  {t('login.username')}
-                </Label>
-                <Input
-                  id="reg-username"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={busy}
-                  required
-                  minLength={3}
-                  maxLength={64}
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-password" className="text-slate-700 dark:text-slate-200">
-                  {t('login.password')}
-                </Label>
-                <Input
-                  id="reg-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={busy}
-                  required
-                  minLength={8}
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="passwordConfirm" className="text-slate-700 dark:text-slate-200">
-                  {t('login.register.confirmPassword')}
-                </Label>
-                <Input
-                  id="passwordConfirm"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  disabled={busy}
-                  required
-                  minLength={8}
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role" className="text-slate-700 dark:text-slate-200">
-                  {t('login.register.role')}
-                </Label>
-                <select
-                  id="role"
-                  className={selectClass}
-                  value={roleId}
-                  onChange={(e) => setRoleId(e.target.value)}
-                  disabled={busy || rolesLoading}
-                  required
-                >
-                  <option value="">{t('login.register.rolePlaceholder')}</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={String(r.id)}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                {rolesLoading ? (
-                  <p className="text-xs text-slate-600/80 dark:text-slate-300/70">{t('login.register.loadingRoles')}</p>
-                ) : null}
-                {rolesErr ? (
-                  <p className="text-xs font-medium text-rose-600" role="alert">
-                    {rolesErr}
-                  </p>
-                ) : null}
-              </div>
-              {err ? (
-                <p className="text-sm font-medium text-rose-600" role="alert">
-                  {err}
-                </p>
-              ) : null}
-              <Button
-                type="submit"
-                disabled={busy || rolesLoading || !!rolesErr || roles.length === 0}
-                className={submitBtnClass}
-              >
-                {busy ? t('login.register.loading') : t('login.register.submit')}
-              </Button>
-              <p className="text-center text-sm text-slate-700 dark:text-slate-200">
-                <button
-                  type="button"
-                  className="font-medium text-emerald-700 dark:text-emerald-300 underline-offset-4 hover:underline"
-                  onClick={() => switchMode('signin')}
-                >
-                  {t('login.switchToSignIn')}
-                </button>
-              </p>
-            </form>
-          )}
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
