@@ -281,7 +281,7 @@
         "cancel": "취소",
         "validationRequired": "유닛 번호와 건물명은 필수입니다.",
         "validationRate": "유효한 월 임대료를 입력하세요.",
-        "validationPhotoWebp": "WEBP 이미지 파일만 업로드하세요.",
+        "validationPhotoWebp": "이미지(JPG, PNG 등)를 업로드하세요. 자동으로 WEBP로 변환됩니다.",
         "saved": "목록에 유닛이 추가되었습니다."
       },
       "editModal": {

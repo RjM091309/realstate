@@ -281,7 +281,7 @@
         "cancel": "Cancel",
         "validationRequired": "Unit number and building name are required.",
         "validationRate": "Enter a valid monthly rate.",
-        "validationPhotoWebp": "Please upload a WEBP image only.",
+        "validationPhotoWebp": "Please upload an image (JPG, PNG, etc.). We'll convert it to WEBP.",
         "saved": "Unit added to the list."
       },
       "editModal": {

@@ -199,13 +199,57 @@ function areaDisplayLabel(rawArea: string): string {
 }
 
 async function toWebpDataUrl(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const chunkSize = 0x8000;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  if (!file.type || !file.type.startsWith('image/')) {
+    throw new Error('Not an image');
   }
-  return `data:image/webp;base64,${btoa(binary)}`;
+
+  // Convert any image type to WEBP using canvas.
+  // We also downscale large images to keep payload size reasonable for API transport.
+  const maxSide = 1600;
+  const quality = 0.82;
+
+  const bitmap = await createImageBitmap(file);
+  const srcW = bitmap.width;
+  const srcH = bitmap.height;
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
+  const outW = Math.max(1, Math.round(srcW * scale));
+  const outH = Math.max(1, Math.round(srcH * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas unsupported');
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, outW, outH);
+  bitmap.close();
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => {
+        if (!b) reject(new Error('WEBP conversion failed'));
+        else resolve(b);
+      },
+      'image/webp',
+      quality,
+    );
+  });
+
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read converted image'));
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.readAsDataURL(blob);
+  });
+
+  if (!dataUrl.startsWith('data:image/webp')) {
+    throw new Error('Unexpected output format');
+  }
+
+  return dataUrl;
 }
 
 function formToWriteBody(
@@ -772,18 +816,11 @@ export function UnitsView() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const isWebpMime = file.type === 'image/webp';
-      const isWebpExt = /\.webp$/i.test(file.name);
-      if (!isWebpMime && !isWebpExt) {
-        toast.error(t('views.units.addModal.validationPhotoWebp'));
-        e.target.value = '';
-        return;
-      }
       try {
         const dataUrl = await toWebpDataUrl(file);
         setAddUnitPhotoPreview(dataUrl);
       } catch {
-        toast.error('Failed to load image.');
+        toast.error(t('views.units.addModal.validationPhotoWebp'));
       }
       e.target.value = '';
     },
@@ -1913,7 +1950,7 @@ export function UnitsView() {
         <input
           ref={addUnitPhotoInputRef}
           type="file"
-          accept="image/webp,.webp"
+          accept="image/*"
           className="hidden"
           onChange={handleAddUnitPhotoChange}
         />
