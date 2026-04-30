@@ -41,6 +41,10 @@ function readTenantIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('tenantId')?.trim() || null;
 }
 
+function isDatabaseId(value: string | null | undefined): boolean {
+  return /^\d+$/.test(String(value ?? '').trim());
+}
+
 function toAbsoluteAssetUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
   return pathOrUrl.startsWith('/') ? `${window.location.origin}${pathOrUrl}` : `${window.location.origin}/${pathOrUrl}`;
@@ -148,6 +152,11 @@ export function TenantPortalView() {
 
   useEffect(() => {
     if (!tenant?.id) return;
+    if (!isDatabaseId(tenant.id)) {
+      setPortalDocuments([]);
+      setPortalDocumentsLoading(false);
+      return;
+    }
     let cancelled = false;
     setPortalDocumentsLoading(true);
     void (async () => {
@@ -193,6 +202,11 @@ export function TenantPortalView() {
       setInventoryItems([]);
       return;
     }
+    if (!isDatabaseId(contract.id)) {
+      setInventoryItems([]);
+      setInventoryLoading(false);
+      return;
+    }
     let cancelled = false;
     setInventoryLoading(true);
     void (async () => {
@@ -225,6 +239,11 @@ export function TenantPortalView() {
       setRequests([]);
       return;
     }
+    if (!isDatabaseId(contract.id)) {
+      setRequests([]);
+      setRequestsLoading(false);
+      return;
+    }
     let cancelled = false;
     setRequestsLoading(true);
     void (async () => {
@@ -244,6 +263,10 @@ export function TenantPortalView() {
 
   const submitMaintenance = async () => {
     if (!contract?.id) return;
+    if (!isDatabaseId(contract.id)) {
+      toast.error('Maintenance requests are unavailable in demo mode.');
+      return;
+    }
     const title = maintenanceTitle.trim();
     const details = maintenanceDetails.trim();
     if (!title || !details) {
