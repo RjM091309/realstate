@@ -200,7 +200,7 @@ export function ContractsView() {
   };
 
   const handlePreview = (contract: Contract, type: 'contract' | 'invoice') => {
-    const url = `${window.location.origin}${window.location.pathname}?view=preview&type=${type}&id=${contract.id}`;
+    const url = `${window.location.origin}/preview?type=${type}&id=${contract.id}`;
     window.open(url, '_blank');
   };
 
@@ -747,7 +747,7 @@ export function ContractsView() {
               status: 'issued',
             });
             toast.success('Invoice generated.');
-            const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${encodeURIComponent(created.id)}`;
+            const url = `${window.location.origin}/preview?type=invoice&id=${encodeURIComponent(created.id)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
           } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Failed to generate invoice');

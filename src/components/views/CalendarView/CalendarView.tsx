@@ -411,7 +411,7 @@ export function CalendarView() {
   );
 
   const openPreview = useCallback((type: 'contract' | 'invoice', id: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?view=preview&type=${type}&id=${encodeURIComponent(id)}`;
+    const url = `${window.location.origin}/preview?type=${type}&id=${encodeURIComponent(id)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 

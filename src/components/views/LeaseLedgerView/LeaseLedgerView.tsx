@@ -236,7 +236,7 @@ export function LeaseLedgerView() {
   );
 
   const handlePreviewInvoice = useCallback((contractId: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?view=preview&type=invoice&id=${encodeURIComponent(contractId)}`;
+    const url = `${window.location.origin}/preview?type=invoice&id=${encodeURIComponent(contractId)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 

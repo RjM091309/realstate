@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar, TopNav } from './components/Navigation';
 import { DashboardView } from './components/views/DashboardView/index';
@@ -21,49 +22,85 @@ import { DocumentPreview } from './components/DocumentPreview';
 import { LoginView } from './components/LoginView';
 
 export default function App() {
-  // Check for standalone preview mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const isPreview = urlParams.get('view') === 'preview';
-  const isPortalPage = urlParams.get('view') === 'portal';
-  const isAgentPortalPage = urlParams.get('view') === 'agent-portal';
-  const previewType = urlParams.get('type') as 'contract' | 'invoice';
-  const previewId = urlParams.get('id');
+  const { session, loading } = useAuth();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const legacyView = params.get('view');
+  const legacyType = params.get('type');
+  const legacyId = params.get('id');
+  const legacyTenantId = params.get('tenantId');
 
-  if (isPreview && previewType && previewId) {
+  // Backward compatibility for old query-string pages.
+  if (legacyView === 'preview' && legacyType && legacyId) {
+    return <Navigate to={`/preview?type=${encodeURIComponent(legacyType)}&id=${encodeURIComponent(legacyId)}`} replace />;
+  }
+  if (legacyView === 'portal') {
+    const suffix = legacyTenantId ? `?tenantId=${encodeURIComponent(legacyTenantId)}` : '';
+    return <Navigate to={`/portal${suffix}`} replace />;
+  }
+  if (legacyView === 'agent-portal') {
+    return <Navigate to="/agent-portal" replace />;
+  }
+
+  if (loading) {
     return (
-      <DocumentPreview 
-        type={previewType} 
-        contractId={previewId} 
-        isStandalone 
-      />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+        <p className="text-sm">Loading…</p>
+      </div>
     );
   }
 
-  if (isPortalPage) {
-    return <TenantPortalView />;
-  }
-
-  if (isAgentPortalPage) {
-    return <AgentPortalView />;
-  }
-
-  return <MainApp />;
+  return (
+    <Routes>
+      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <LoginView />} />
+      <Route path="/preview" element={<PreviewPage />} />
+      <Route path="/portal" element={<TenantPortalView />} />
+      <Route path="/agent-portal" element={<AgentPortalView />} />
+      <Route path="/*" element={<MainApp />} />
+    </Routes>
+  );
 }
 
 function MainApp() {
   const { session, loading, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const isAdmin = session?.role.id === 1;
+  const allowedTabIds = session?.sidebarTabIds ?? [];
+  const tabToPath: Record<string, string> = {
+    dashboard: '/dashboard',
+    units: '/units',
+    contracts: '/contracts',
+    crm: '/crm',
+    ledger: '/ledger',
+    calendar: '/calendar',
+    access: '/access',
+    settings: '/settings',
+  };
+  const pathToTab = Object.entries(tabToPath).reduce((acc, [tab, path]) => {
+    acc[path] = tab;
+    return acc;
+  }, {} as Record<string, string>);
+  const activeTab = pathToTab[location.pathname] ?? 'dashboard';
 
   useEffect(() => {
-    if (!session?.sidebarTabIds?.length) return;
-    if (activeTab === 'access' && isAdmin) return;
-    if (activeTab === 'settings') return;
-    if (!session.sidebarTabIds.includes(activeTab)) {
-      setActiveTab(session.sidebarTabIds[0]!);
+    if (location.pathname === '/') {
+      navigate('/dashboard', { replace: true });
+      return;
     }
-  }, [session, activeTab, isAdmin]);
+
+    if (!allowedTabIds.length) return;
+
+    const alwaysAllowedTabs = ['settings', ...(isAdmin ? ['access'] : [])];
+    if (alwaysAllowedTabs.includes(activeTab)) return;
+
+    if (!allowedTabIds.includes(activeTab)) {
+      const fallback = allowedTabIds[0] ?? 'dashboard';
+      navigate(tabToPath[fallback] ?? '/dashboard', { replace: true });
+    }
+  }, [location.pathname, allowedTabIds, isAdmin, activeTab, navigate]);
 
   if (loading) {
     return (
@@ -75,8 +112,12 @@ function MainApp() {
   }
 
   if (!session) {
-    return <LoginView />;
+    return <Navigate to="/login" replace />;
   }
+
+  const setActiveTab = (tab: string) => {
+    navigate(tabToPath[tab] ?? '/dashboard');
+  };
 
   const renderView = () => {
     switch (activeTab) {
@@ -106,10 +147,10 @@ function MainApp() {
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        allowedTabIds={session.sidebarTabIds}
+        allowedTabIds={allowedTabIds}
         isAdmin={isAdmin}
         onLogout={() => {
-          setActiveTab('dashboard');
+          navigate('/login');
           logout();
         }}
       />
@@ -125,4 +166,17 @@ function MainApp() {
       </div>
     </div>
   );
+}
+
+function PreviewPage() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const previewType = params.get('type') as 'contract' | 'invoice' | null;
+  const previewId = params.get('id');
+
+  if (!previewType || !previewId) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <DocumentPreview type={previewType} contractId={previewId} isStandalone />;
 }
