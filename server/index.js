@@ -8,7 +8,7 @@ import { execFile } from 'child_process';
 import jwt from 'jsonwebtoken';
 import { Server as SocketIOServer } from 'socket.io';
 import { pool } from './config/db.js';
-import { ensureSchema } from './ensureSchema.js';
+import { ensureSchema, ensureNotificationSchema } from './ensureSchema.js';
 import { getJwtSecret } from './jwt.js';
 import { loadSessionPayload } from './services/sessionService.js';
 import { setIO } from './realtime/io.js';
@@ -129,6 +129,16 @@ void (async () => {
   } catch (e) {
     console.error(
       '[realstate-api] Schema bootstrap failed — check MySQL and that `user_role` exists:',
+      e,
+    );
+  }
+
+  try {
+    await ensureNotificationSchema();
+    console.log('[realstate-api] Notification feed schema OK (notification_read + notification_feed view)');
+  } catch (e) {
+    console.error(
+      '[realstate-api] Notification schema failed — ensure base tables exist (payment_transaction, lease_contract, …):',
       e,
     );
   }
