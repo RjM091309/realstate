@@ -22,6 +22,7 @@ import { DocumentPreview } from './components/DocumentPreview';
 import { LoginView } from './components/LoginView';
 
 export default function App() {
+  const { session, loading } = useAuth();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const legacyView = params.get('view');
@@ -41,8 +42,18 @@ export default function App() {
     return <Navigate to="/agent-portal" replace />;
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+        <p className="text-sm">Loading…</p>
+      </div>
+    );
+  }
+
   return (
     <Routes>
+      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <LoginView />} />
       <Route path="/preview" element={<PreviewPage />} />
       <Route path="/portal" element={<TenantPortalView />} />
       <Route path="/agent-portal" element={<AgentPortalView />} />
@@ -101,7 +112,7 @@ function MainApp() {
   }
 
   if (!session) {
-    return <LoginView />;
+    return <Navigate to="/login" replace />;
   }
 
   const setActiveTab = (tab: string) => {
@@ -139,7 +150,7 @@ function MainApp() {
         allowedTabIds={allowedTabIds}
         isAdmin={isAdmin}
         onLogout={() => {
-          navigate('/dashboard');
+          navigate('/login');
           logout();
         }}
       />
