@@ -40,7 +40,8 @@ import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import { setSystemTheme, type SystemThemeMode } from '../lib/systemThemeApi';
 import { applyTheme } from '@/lib/theme';
 import { animateThemeRippleFromElement } from '@/lib/themeRipple';
-import { apiFetch, getToken } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
+import { getToken } from '@/lib/api';
 import { toast } from 'sonner';
 import { io, type Socket } from 'socket.io-client';
 import { Modal } from '@/components/modal';
@@ -147,11 +148,11 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                 title={isCollapsed ? item.label : undefined}
                 onClick={() => {
                   if (item.id === 'portal') {
-                    window.open(`${window.location.origin}/portal`, '_blank');
+                    window.open(`${window.location.origin}${window.location.pathname}?view=portal`, '_blank');
                     return;
                   }
                   if (item.id === 'agentPortal') {
-                    window.open(`${window.location.origin}/agent-portal`, '_blank');
+                    window.open(`${window.location.origin}${window.location.pathname}?view=agent-portal`, '_blank');
                     return;
                   }
                   setActiveTab(item.id);
