@@ -148,11 +148,11 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                 title={isCollapsed ? item.label : undefined}
                 onClick={() => {
                   if (item.id === 'portal') {
-                    window.open(`${window.location.origin}${window.location.pathname}?view=portal`, '_blank');
+                    window.open(`${window.location.origin}/portal`, '_blank');
                     return;
                   }
                   if (item.id === 'agentPortal') {
-                    window.open(`${window.location.origin}${window.location.pathname}?view=agent-portal`, '_blank');
+                    window.open(`${window.location.origin}/agent-portal`, '_blank');
                     return;
                   }
                   setActiveTab(item.id);

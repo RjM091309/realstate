@@ -1126,7 +1126,7 @@ export function CRMView() {
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    const url = `${window.location.origin}${window.location.pathname}?view=portal&tenantId=${encodeURIComponent(tenant.id)}`;
+                    const url = `${window.location.origin}/portal?tenantId=${encodeURIComponent(tenant.id)}`;
                     window.open(url, '_blank');
                   }}
                 >
@@ -1500,7 +1500,7 @@ export function CRMView() {
                         toast.info(t('views.crm.details.documentLeaseUnavailable'));
                         return;
                       }
-                      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${tenantLeaseContext.contract.id}`;
+                      const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
                       window.open(url, '_blank');
                     }}
                   >

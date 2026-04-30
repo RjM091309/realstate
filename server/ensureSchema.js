@@ -137,6 +137,15 @@ export async function ensureNotificationSchema() {
 
 export async function ensureSchema() {
   async function ensurePartnerAgencyDocColumns() {
+    async function addColumnIfMissing(sql) {
+      try {
+        await pool.query(sql);
+      } catch (error) {
+        // Concurrent API boots can race on ALTER TABLE; ignore duplicate-column in that case.
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
+
     const [rows] = await pool.query(
       `
       SELECT column_name
@@ -150,19 +159,29 @@ export async function ensureSchema() {
 
     // Keep each ALTER separate so one failure doesn't block others.
     if (!existing.has('nationality')) {
-      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`nationality\` CHAR(3) NULL DEFAULT NULL`);
+      await addColumnIfMissing(
+        `ALTER TABLE \`partner_agency\` ADD COLUMN \`nationality\` CHAR(3) NULL DEFAULT NULL`,
+      );
     }
     if (!existing.has('document_type')) {
-      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL`);
+      await addColumnIfMissing(
+        `ALTER TABLE \`partner_agency\` ADD COLUMN \`document_type\` VARCHAR(60) NULL DEFAULT NULL`,
+      );
     }
     if (!existing.has('document_no')) {
-      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`document_no\` VARCHAR(120) NULL DEFAULT NULL`);
+      await addColumnIfMissing(
+        `ALTER TABLE \`partner_agency\` ADD COLUMN \`document_no\` VARCHAR(120) NULL DEFAULT NULL`,
+      );
     }
     if (!existing.has('expiry_date')) {
-      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`expiry_date\` DATE NULL DEFAULT NULL`);
+      await addColumnIfMissing(
+        `ALTER TABLE \`partner_agency\` ADD COLUMN \`expiry_date\` DATE NULL DEFAULT NULL`,
+      );
     }
     if (!existing.has('file_path')) {
-      await pool.query(`ALTER TABLE \`partner_agency\` ADD COLUMN \`file_path\` VARCHAR(255) NULL DEFAULT NULL`);
+      await addColumnIfMissing(
+        `ALTER TABLE \`partner_agency\` ADD COLUMN \`file_path\` VARCHAR(255) NULL DEFAULT NULL`,
+      );
     }
 
     // Enforce column order (phpMyAdmin shows in physical order).

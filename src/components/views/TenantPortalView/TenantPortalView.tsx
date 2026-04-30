@@ -309,7 +309,7 @@ export function TenantPortalView() {
 
   const handlePreviewContract = () => {
     if (contract) {
-      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${contract.id}`;
+      const url = `${window.location.origin}/preview?type=contract&id=${contract.id}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
@@ -317,7 +317,7 @@ export function TenantPortalView() {
   const handlePortalDocumentActivate = async (doc: PortalDocumentItem) => {
     if (!tenant || downloadingId) return;
     if (doc.kind === 'preview') {
-      const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${doc.contractId}`;
+      const url = `${window.location.origin}/preview?type=contract&id=${doc.contractId}`;
       window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }

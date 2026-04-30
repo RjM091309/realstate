@@ -1106,7 +1106,7 @@ export function ContractDetailsCollaborationModal({
                           className="h-8 w-8 text-slate-400 hover:text-indigo-600"
                           onClick={() => {
                             if (d.docType === 'lease_contract' && d.contractId) {
-                              const url = `${window.location.origin}${window.location.pathname}?view=preview&type=contract&id=${encodeURIComponent(d.contractId)}`;
+                              const url = `${window.location.origin}/preview?type=contract&id=${encodeURIComponent(d.contractId)}`;
                               window.open(url, '_blank', 'noopener,noreferrer');
                               return;
                             }
