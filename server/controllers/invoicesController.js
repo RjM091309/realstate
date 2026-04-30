@@ -145,11 +145,30 @@ export async function getInvoice(req, res) {
   }
   try {
     const row = await getInvoiceById(id, ctx.session.branchId);
-    if (!row) {
+    if (row) {
+      res.json({ invoice: rowToInvoice(row) });
+      return;
+    }
+
+    // Backward compatibility:
+    // some clients still pass contractId to /api/invoices/:id for preview links.
+    const contract = await getContractById(id, ctx.session.branchId);
+    if (!contract) {
       res.status(404).json({ error: 'Invoice not found' });
       return;
     }
-    res.json({ invoice: rowToInvoice(row) });
+
+    const rows = await listInvoicesByContract(id, ctx.session.branchId);
+    const fallback =
+      rows.find((r) => String(r.status ?? '').toLowerCase() === 'issued') ??
+      rows.find((r) => String(r.status ?? '').toLowerCase() === 'draft') ??
+      rows[0];
+    if (!fallback) {
+      res.status(404).json({ error: 'Invoice not found' });
+      return;
+    }
+
+    res.json({ invoice: rowToInvoice(fallback) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load invoice' });

@@ -32,22 +32,24 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
       try {
         let contractIdForDetails = contractId;
         let resolvedInvoice: InvoiceRow | null = null;
-        if (type === 'invoice') {
-          // In standalone preview URLs, `id` may be an invoice id (not a contract id).
-          try {
-            const invRow = await fetchInvoice(contractId);
-            if (!active) return;
-            resolvedInvoice = invRow;
-            contractIdForDetails = invRow.contractId;
-          } catch {
-            // Backward compatibility: some places still pass contractId for invoice preview.
-            contractIdForDetails = contractId;
-          }
+
+        // Prefer treating incoming `id` as contractId first.
+        // This avoids noisy /api/invoices/:id 404 logs for contract-based preview links.
+        let details;
+        try {
+          details = await fetchContractDocumentDetails(contractIdForDetails);
+        } catch {
+          if (type !== 'invoice') throw new Error('Contract details not found');
+          // If contract lookup fails in invoice mode, retry by resolving as invoice id.
+          const invRow = await fetchInvoice(contractId);
+          if (!active) return;
+          resolvedInvoice = invRow;
+          contractIdForDetails = invRow.contractId;
+          details = await fetchContractDocumentDetails(contractIdForDetails);
         }
 
-        setResolvedContractId(contractIdForDetails);
-        const details = await fetchContractDocumentDetails(contractIdForDetails);
         if (!active) return;
+        setResolvedContractId(contractIdForDetails);
         setContracts([details.contract]);
         setUnits([
           {
@@ -83,23 +85,19 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
         );
 
         if (type === 'invoice') {
-          setInvoice(resolvedInvoice);
-          // If invoice wasn't resolved by id above, fall back to picking from contract invoices.
-          if (!resolvedInvoice) {
-            try {
-              const inv = await fetchContractInvoices(contractIdForDetails);
-              if (!active) return;
-              const pick =
-                inv.find((x) => x.status === 'issued') ??
-                inv.find((x) => x.status === 'draft') ??
-                inv[0] ??
-                null;
-              resolvedInvoice = pick;
-              setInvoice(pick);
-            } catch {
-              if (!active) return;
-              setInvoice(null);
-            }
+          // Prefer invoices scoped to contract; fallback to resolved invoice-id lookup.
+          try {
+            const inv = await fetchContractInvoices(contractIdForDetails);
+            if (!active) return;
+            const pick =
+              inv.find((x) => x.status === 'issued') ??
+              inv.find((x) => x.status === 'draft') ??
+              inv[0] ??
+              resolvedInvoice;
+            setInvoice(pick ?? null);
+          } catch {
+            if (!active) return;
+            setInvoice(resolvedInvoice);
           }
         }
 
