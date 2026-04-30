@@ -109,8 +109,9 @@ export function UserAccessView() {
       try {
         const rl = await apiFetch<{ roles: RoleRow[] }>('/api/admin/roles');
         if (!alive) return;
-        setRoles(rl.roles);
-        if (rl.roles.length) setRoleId(rl.roles[0]!.id);
+        const filtered = rl.roles.filter((r) => r.id !== 1 && r.id !== 5);
+        setRoles(filtered);
+        if (filtered.length) setRoleId(filtered[0]!.id);
       } catch (e) {
         if (!alive) return;
         const msg = e instanceof Error ? e.message : '';

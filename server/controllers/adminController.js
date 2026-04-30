@@ -1,4 +1,5 @@
 import { SIDEBAR_FEATURE_KEYS } from '../accessConfig.js';
+import { emitRoleAccessChanged } from '../realtime/io.js';
 import {
   listActiveRoles,
   listRoleCrudPermissions,
@@ -93,6 +94,7 @@ export async function updateRoleSidebar(req, res) {
 
   try {
     await replaceRoleSidebarPermissions(roleId, unique);
+    emitRoleAccessChanged(roleId);
     res.json({ ok: true, roleId, featureKeys: unique });
   } catch (e) {
     if (e instanceof Error && e.message === 'ROLE_NOT_FOUND') {
@@ -114,6 +116,7 @@ export async function updateRoleCrud(req, res) {
   }
   try {
     await upsertRoleCrudPermissions(roleId, body, SIDEBAR_FEATURE_KEYS);
+    emitRoleAccessChanged(roleId);
     res.json({ ok: true, roleId });
   } catch (e) {
     if (e instanceof Error && e.message === 'ROLE_NOT_FOUND') {

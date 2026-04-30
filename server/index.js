@@ -180,6 +180,7 @@ void (async () => {
 
       socket.data.userId = Number(userId);
       socket.data.branchId = Number(session.branchId ?? 1);
+      socket.data.roleId = Number(session.role?.id ?? 0);
       next();
     } catch (e) {
       next(new Error('Unauthorized'));
@@ -189,8 +190,10 @@ void (async () => {
   io.on('connection', (socket) => {
     const userId = Number(socket.data.userId);
     const branchId = Number(socket.data.branchId);
+    const roleId = Number(socket.data.roleId);
     socket.join(`user:${userId}`);
     socket.join(`branch:${branchId}`);
+    if (Number.isFinite(roleId) && roleId > 0) socket.join(`role:${roleId}`);
   });
 
   server.listen(apiPort, () => {

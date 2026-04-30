@@ -2,7 +2,10 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { RegisterInput, SessionPayload } from '@/types/session';
 import { apiFetch, getToken, setDevBypassUserId, setToken } from '@/lib/api';
 
-const BYPASS_LOGIN = true;
+const BYPASS_LOGIN = (() => {
+  const raw = import.meta.env.VITE_BYPASS_LOGIN;
+  return raw != null ? String(raw).toLowerCase() === 'true' : false;
+})();
 
 function createBypassSession(): SessionPayload {
   return {

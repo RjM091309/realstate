@@ -40,8 +40,7 @@ import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import { setSystemTheme, type SystemThemeMode } from '../lib/systemThemeApi';
 import { applyTheme } from '@/lib/theme';
 import { animateThemeRippleFromElement } from '@/lib/themeRipple';
-import { apiFetch } from '@/lib/api';
-import { getToken } from '@/lib/api';
+import { apiFetch, getToken } from '@/lib/api';
 import { toast } from 'sonner';
 import { io, type Socket } from 'socket.io-client';
 import { Modal } from '@/components/modal';
@@ -76,10 +75,10 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
     { id: 'portal', label: t('nav.menu.portal'), icon: UserCircle },
   ];
 
-  const visibleOperational =
-    allowedTabIds && allowedTabIds.length > 0
-      ? operationalItems.filter((item) => allowedTabIds.includes(item.id))
-      : operationalItems;
+  const hasAllowedTabs = Array.isArray(allowedTabIds);
+  const visibleOperational = hasAllowedTabs
+    ? operationalItems.filter((item) => allowedTabIds.includes(item.id))
+    : operationalItems;
 
   const accessItem = isAdmin
     ? [{ id: 'access', label: t('nav.menu.controlPanelAccess'), icon: SlidersHorizontal }]
@@ -222,9 +221,10 @@ export function TopNav({
 }) {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
-  const { session } = useAuth();
+  const { session, refreshSession } = useAuth();
   const { dateRange, setDateRange } = useDateRange();
   const socketRef = React.useRef<Socket | null>(null);
+  const refreshTimeoutRef = React.useRef<number | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [themeLoading, setThemeLoading] = useState<SystemThemeMode | null>(null);
   const [currentTheme, setCurrentTheme] = useState<SystemThemeMode>('light');
@@ -274,10 +274,25 @@ export function TopNav({
       void refreshNotifications();
     });
 
+    socket.on('access:changed', (payload: { roleId?: number } | undefined) => {
+      const changedRoleId = Number(payload?.roleId);
+      const myRoleId = Number(session.role?.id);
+      if (!Number.isFinite(changedRoleId) || changedRoleId < 1) return;
+      if (changedRoleId !== myRoleId) return;
+      if (refreshTimeoutRef.current != null) window.clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = window.setTimeout(() => {
+        void refreshSession();
+        refreshTimeoutRef.current = null;
+      }, 250);
+    });
+
     return () => {
       socket.off('notifications:changed');
+      socket.off('access:changed');
       socket.disconnect();
       socketRef.current = null;
+      if (refreshTimeoutRef.current != null) window.clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = null;
     };
   }, [session]);
   const unreadCount = notifications.filter((n) => n.unread).length;
