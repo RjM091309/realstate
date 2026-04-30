@@ -181,8 +181,36 @@
       "title": "Units & Vacancy",
       "subtitle": "Manage your property inventory and availability.",
       "addUnit": "Add New Unit",
-      "searchPlaceholder": "Search by unit, building, or area...",
+      "searchPlaceholder": "Search by unit number, building, or type...",
       "filter": "Filter",
+      "viewGrid": "Grid",
+      "viewList": "List",
+      "filters": {
+        "property": "Property",
+        "propertyPh": "All properties",
+        "floor": "Floor",
+        "floorPh": "All floors",
+        "type": "Type",
+        "typePh": "All types",
+        "status": "Status",
+        "statusPh": "All statuses"
+      },
+      "sort": {
+        "label": "Sort",
+        "unitAsc": "Unit number A–Z",
+        "unitDesc": "Unit number Z–A",
+        "buildingAsc": "Building A–Z",
+        "rateAsc": "Monthly rate (low to high)",
+        "rateDesc": "Monthly rate (high to low)"
+      },
+      "card": {
+        "view": "View",
+        "edit": "Edit",
+        "more": "More",
+        "perMonth": "/mo",
+        "sqm": "sqm",
+        "noResults": "No units match your search or filters."
+      },
       "table": {
         "unit": "Unit",
         "building": "Building",
@@ -195,7 +223,8 @@
         "viewDetails": "View Details",
         "editUnit": "Edit Unit",
         "manageInventory": "Manage Inventory",
-        "delete": "Delete"
+        "delete": "Delete",
+        "moreOptions": "More options"
       },
       "statuses": {
         "available": "Available",
@@ -247,8 +276,7 @@
         "area": "Area",
         "monthlyRate": "Monthly rate (₱)",
         "photo": "Unit photo",
-        "photoUpload": "Upload WEBP",
-        "photoHint": "WEBP files only.",
+        "photoUpload": "Upload Photo",
         "save": "Save unit",
         "cancel": "Cancel",
         "validationRequired": "Unit number and building name are required.",

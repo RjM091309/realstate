@@ -181,8 +181,36 @@
       "title": "유닛 및 공실",
       "subtitle": "부동산 재고와 가용 상태를 관리하세요.",
       "addUnit": "새 유닛 추가",
-      "searchPlaceholder": "유닛, 건물 또는 지역으로 검색...",
+      "searchPlaceholder": "유닛 번호, 건물 또는 유형으로 검색...",
       "filter": "필터",
+      "viewGrid": "그리드",
+      "viewList": "목록",
+      "filters": {
+        "property": "자산(건물)",
+        "propertyPh": "전체 건물",
+        "floor": "층",
+        "floorPh": "전체 층",
+        "type": "유형",
+        "typePh": "전체 유형",
+        "status": "상태",
+        "statusPh": "전체 상태"
+      },
+      "sort": {
+        "label": "정렬",
+        "unitAsc": "유닛 번호 오름차순",
+        "unitDesc": "유닛 번호 내림차순",
+        "buildingAsc": "건물명 오름차순",
+        "rateAsc": "월세 낮은 순",
+        "rateDesc": "월세 높은 순"
+      },
+      "card": {
+        "view": "보기",
+        "edit": "수정",
+        "more": "더보기",
+        "perMonth": "/월",
+        "sqm": "㎡",
+        "noResults": "검색 또는 필터에 맞는 유닛이 없습니다."
+      },
       "table": {
         "unit": "유닛",
         "building": "건물",
@@ -195,7 +223,8 @@
         "viewDetails": "상세 보기",
         "editUnit": "유닛 수정",
         "manageInventory": "재고 관리",
-        "delete": "삭제"
+        "delete": "삭제",
+        "moreOptions": "추가 옵션"
       },
       "statuses": {
         "available": "공실",
@@ -247,8 +276,7 @@
         "area": "지역",
         "monthlyRate": "월 임대료 (₱)",
         "photo": "유닛 사진",
-        "photoUpload": "WEBP 업로드",
-        "photoHint": "WEBP 파일만 업로드할 수 있습니다.",
+        "photoUpload": "사진 업로드",
         "save": "유닛 저장",
         "cancel": "취소",
         "validationRequired": "유닛 번호와 건물명은 필수입니다.",

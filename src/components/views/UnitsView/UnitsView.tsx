@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
   Search,
   Plus,
-  Filter,
   MoreVertical,
   Building2,
   MapPin,
   LayoutGrid,
   List as ListIcon,
-  ChevronRight,
   History,
   Loader2,
   Pencil,
   Trash2,
+  Eye,
+  BedDouble,
+  Bath,
+  Maximize2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -257,12 +260,24 @@ function normalizeInventoryDraft(items: InventoryItem[] | undefined | null): Inv
   }));
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === 'Available') return 'bg-emerald-500';
-  if (status === 'Occupied') return 'bg-indigo-500';
-  if (status === 'Maintenance') return 'bg-rose-500';
-  if (status === 'Reserved') return 'bg-amber-500';
-  return 'bg-slate-500';
+/** Typical layout metrics by unit type (listing cards — not stored on `Unit`). */
+function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths: number } {
+  const map: Record<UnitType, { sqm: number; beds: number; baths: number }> = {
+    Studio: { sqm: 32, beds: 1, baths: 1 },
+    '1BR': { sqm: 45, beds: 1, baths: 1 },
+    '2BR': { sqm: 72, beds: 2, baths: 2 },
+    '3BR': { sqm: 105, beds: 3, baths: 2 },
+    Loft: { sqm: 58, beds: 1, baths: 1 },
+    Penthouse: { sqm: 165, beds: 3, baths: 3 },
+  };
+  return map[type];
+}
+
+function floorLabelForCard(floor: string, floorWord: string): string {
+  const f = String(floor ?? '').trim();
+  if (!f || f === '—') return '—';
+  if (/\bfloor\b/i.test(f)) return f;
+  return `${floorWord} ${f}`;
 }
 
 function conditionLabel(condition: string, t: (k: string) => string): string {
@@ -342,7 +357,14 @@ export function UnitsView() {
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [unitsLoading, setUnitsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [filterBuilding, setFilterBuilding] = useState<string | null>(null);
+  const [filterFloor, setFilterFloor] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<
+    'unit_asc' | 'unit_desc' | 'rate_asc' | 'rate_desc' | 'building_asc'
+  >('unit_asc');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isManageInventoryOpen, setIsManageInventoryOpen] = useState(false);
@@ -354,6 +376,8 @@ export function UnitsView() {
   const [addUnitPhotoPreview, setAddUnitPhotoPreview] = useState('');
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
   const [photoPreviewTitle, setPhotoPreviewTitle] = useState('');
+  const [detailHeaderPhotoPeek, setDetailHeaderPhotoPeek] = useState(false);
+  const detailPhotoPeekCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
   const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
@@ -366,6 +390,21 @@ export function UnitsView() {
   const [inventoryAddName, setInventoryAddName] = useState('');
   const [inventoryAddQty, setInventoryAddQty] = useState(1);
   const [inventoryAddCondition, setInventoryAddCondition] = useState<InventoryItem['condition']>('Good');
+
+  const clearDetailPhotoPeekCloseTimer = useCallback(() => {
+    if (detailPhotoPeekCloseTimer.current) {
+      clearTimeout(detailPhotoPeekCloseTimer.current);
+      detailPhotoPeekCloseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleDetailPhotoPeekClose = useCallback(() => {
+    clearDetailPhotoPeekCloseTimer();
+    detailPhotoPeekCloseTimer.current = setTimeout(() => {
+      setDetailHeaderPhotoPeek(false);
+      detailPhotoPeekCloseTimer.current = null;
+    }, 280);
+  }, [clearDetailPhotoPeekCloseTimer]);
 
   const reloadUnits = useCallback(async () => {
     setUnitsLoading(true);
@@ -434,6 +473,15 @@ export function UnitsView() {
     if ((!isDetailsOpen && !isManageInventoryOpen) || !selectedUnit) return;
     setDetailInventoryDraft(normalizeInventoryDraft(selectedUnit.inventory));
   }, [isDetailsOpen, isManageInventoryOpen, selectedUnit]);
+
+  useEffect(() => {
+    if (!isDetailsOpen) {
+      clearDetailPhotoPeekCloseTimer();
+      setDetailHeaderPhotoPeek(false);
+    }
+  }, [isDetailsOpen, clearDetailPhotoPeekCloseTimer]);
+
+  useEffect(() => () => clearDetailPhotoPeekCloseTimer(), [clearDetailPhotoPeekCloseTimer]);
 
   useEffect(() => {
     if (!isDetailsOpen && !isManageInventoryOpen) {
@@ -606,13 +654,6 @@ export function UnitsView() {
     setIsManageInventoryOpen(true);
   }, []);
 
-  const filteredUnits = unitList.filter(
-    (u) =>
-      u.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.buildingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.area.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const statusLabel = useCallback(
     (status: string) => {
       if (status === 'Available') return t('views.units.statuses.available');
@@ -623,6 +664,74 @@ export function UnitsView() {
     },
     [t],
   );
+
+  const buildingFilterOptions = useMemo(() => {
+    const names = [...new Set(unitList.map((u) => u.buildingName).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    return names.map((n) => ({ value: n, label: n }));
+  }, [unitList]);
+
+  const floorFilterOptions = useMemo(() => {
+    const floors = [...new Set(unitList.map((u) => u.floor).filter((f) => f && f !== '—'))].sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { numeric: true }),
+    );
+    return floors.map((f) => ({ value: String(f), label: String(f) }));
+  }, [unitList]);
+
+  const typeFilterOptions = useMemo(
+    () => UNIT_TYPES.map((ut) => ({ value: ut, label: ut })),
+    [],
+  );
+
+  const statusFilterOptions = useMemo(
+    () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+    [statusLabel],
+  );
+
+  const sortSelectOptions = useMemo(
+    () => [
+      { value: 'unit_asc', label: t('views.units.sort.unitAsc') },
+      { value: 'unit_desc', label: t('views.units.sort.unitDesc') },
+      { value: 'building_asc', label: t('views.units.sort.buildingAsc') },
+      { value: 'rate_asc', label: t('views.units.sort.rateAsc') },
+      { value: 'rate_desc', label: t('views.units.sort.rateDesc') },
+    ],
+    [t],
+  );
+
+  const processedUnits = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const rows = unitList.filter((u) => {
+      if (q) {
+        const hay = `${u.unitNumber} ${u.buildingName} ${u.area} ${u.type}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filterBuilding && u.buildingName !== filterBuilding) return false;
+      if (filterFloor && u.floor !== filterFloor) return false;
+      if (filterType && u.type !== filterType) return false;
+      if (filterStatus && u.status !== filterStatus) return false;
+      return true;
+    });
+
+    return [...rows].sort((a, b) => {
+      switch (sortBy) {
+        case 'unit_desc':
+          return b.unitNumber.localeCompare(a.unitNumber, undefined, { numeric: true });
+        case 'rate_asc':
+          return a.monthlyRate - b.monthlyRate;
+        case 'rate_desc':
+          return b.monthlyRate - a.monthlyRate;
+        case 'building_asc': {
+          const c = a.buildingName.localeCompare(b.buildingName);
+          return c !== 0 ? c : a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
+        }
+        case 'unit_asc':
+        default:
+          return a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
+      }
+    });
+  }, [unitList, searchTerm, filterBuilding, filterFloor, filterType, filterStatus, sortBy]);
 
   const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);
@@ -861,11 +970,15 @@ export function UnitsView() {
           <Badge
             variant="outline"
             className={cn(
-              'font-medium border-0',
-              unit.status === 'Available' && 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
-              unit.status === 'Occupied' && 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100',
-              unit.status === 'Maintenance' && 'bg-rose-100 text-rose-700 hover:bg-rose-100',
-              unit.status === 'Reserved' && 'bg-amber-100 text-amber-800 hover:bg-amber-100'
+              'font-medium border shadow-none',
+              unit.status === 'Available' &&
+                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50',
+              unit.status === 'Occupied' &&
+                'border-red-200 bg-red-50 text-red-800 hover:bg-red-50',
+              unit.status === 'Maintenance' &&
+                'border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-100',
+              unit.status === 'Reserved' &&
+                'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100',
             )}
           >
             {statusLabel(unit.status)}
@@ -894,6 +1007,7 @@ export function UnitsView() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    title={t('views.units.table.moreOptions')}
                     onClick={(e) => e.stopPropagation()}
                   />
                 }
@@ -949,20 +1063,40 @@ export function UnitsView() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.units.title')}</h1>
           <p className="text-slate-500 mt-1">{t('views.units.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setViewMode('list')} className={cn(viewMode === 'list' && 'bg-slate-100')}>
-            <ListIcon className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => setViewMode('grid')} className={cn(viewMode === 'grid' && 'bg-slate-100')}>
-            <LayoutGrid className="w-4 h-4" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
+            <Button
+              type="button"
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn('h-9 rounded-lg px-3 gap-1.5', viewMode === 'grid' && 'bg-slate-100 shadow-sm')}
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('views.units.viewGrid')}</span>
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn('h-9 rounded-lg px-3 gap-1.5', viewMode === 'list' && 'bg-slate-100 shadow-sm')}
+              onClick={() => setViewMode('list')}
+            >
+              <ListIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('views.units.viewList')}</span>
+            </Button>
+          </div>
           {canCreate && (
-            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddUnitModal}>
+            <Button
+              type="button"
+              className="h-10 rounded-xl bg-slate-900 shadow-md shadow-slate-900/15 hover:bg-slate-800"
+              onClick={openAddUnitModal}
+            >
               <Plus className="w-4 h-4 mr-2" />
               {t('views.units.addUnit')}
             </Button>
@@ -970,159 +1104,274 @@ export function UnitsView() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <Input
-            placeholder={t('views.units.searchPlaceholder')}
-            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+          <div className="relative min-w-0 flex-1 lg:max-w-md">
+            <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder={t('views.units.searchPlaceholder')}
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="min-w-0">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+                {t('views.units.filters.property')}
+              </Label>
+              <Select2
+                options={buildingFilterOptions}
+                value={filterBuilding}
+                onChange={(v) => setFilterBuilding(typeof v === 'string' ? v : null)}
+                placeholder={t('views.units.filters.propertyPh')}
+                className="text-sm"
+              />
+            </div>
+            <div className="min-w-0">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+                {t('views.units.filters.floor')}
+              </Label>
+              <Select2
+                options={floorFilterOptions}
+                value={filterFloor}
+                onChange={(v) => setFilterFloor(typeof v === 'string' ? v : null)}
+                placeholder={t('views.units.filters.floorPh')}
+                className="text-sm"
+              />
+            </div>
+            <div className="min-w-0">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+                {t('views.units.filters.type')}
+              </Label>
+              <Select2
+                options={typeFilterOptions}
+                value={filterType}
+                onChange={(v) => setFilterType(typeof v === 'string' ? v : null)}
+                placeholder={t('views.units.filters.typePh')}
+                className="text-sm"
+              />
+            </div>
+            <div className="min-w-0">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+                {t('views.units.filters.status')}
+              </Label>
+              <Select2
+                options={statusFilterOptions}
+                value={filterStatus}
+                onChange={(v) => setFilterStatus(typeof v === 'string' ? v : null)}
+                placeholder={t('views.units.filters.statusPh')}
+                className="text-sm"
+              />
+            </div>
+            <div className="min-w-0">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+                {t('views.units.sort.label')}
+              </Label>
+              <Select2
+                options={sortSelectOptions}
+                value={sortBy}
+                onChange={(v) => {
+                  if (v === 'unit_asc' || v === 'unit_desc' || v === 'rate_asc' || v === 'rate_desc' || v === 'building_asc') {
+                    setSortBy(v);
+                  } else {
+                    setSortBy('unit_asc');
+                  }
+                }}
+                placeholder={t('views.units.sort.unitAsc')}
+                className="text-sm"
+              />
+            </div>
+          </div>
         </div>
-        <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
-          <Filter className="w-4 h-4 mr-2" />
-          {t('views.units.filter')}
-        </Button>
       </div>
 
       {unitsLoading ? (
-        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
-          <SkeletonTable rows={8} columns={7} />
-        </div>
+        viewMode === 'list' ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <SkeletonTable rows={8} columns={7} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md"
+              >
+                <div className="aspect-[4/3] animate-pulse bg-slate-100" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                  <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                  <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : viewMode === 'list' ? (
         <DataTable
-          data={filteredUnits}
+          data={processedUnits}
           columns={columns}
           keyExtractor={(u) => u.id}
           onRowClick={(unit) => handleViewDetails(unit)}
         />
+      ) : processedUnits.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center">
+          <Building2 className="mb-3 h-12 w-12 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">{t('views.units.card.noResults')}</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredUnits.map((unit) => (
-            <div
-              key={unit.id}
-              className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden"
-            >
-              {/* Photo area */}
-              <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
-                {unit.photoDataUrl ? (
-                  <img
-                    src={unit.photoDataUrl}
-                    alt={`${unit.unitNumber} preview`}
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <Building2 className="w-14 h-14 text-slate-200" />
-                  </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {processedUnits.map((unit) => {
+            const metrics = unitDisplayMetrics(unit.type);
+            const towerLine =
+              unit.tower && unit.tower !== '—' ? `${unit.buildingName} · ${unit.tower}` : unit.buildingName;
+            return (
+              <Card
+                key={unit.id}
+                className={cn(
+                  'group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/50',
+                  'transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-300/45',
                 )}
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
-
-                {/* Status pill — bottom left */}
-                <div className="absolute bottom-3 left-3">
-                  <span className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold backdrop-blur-sm',
-                    unit.status === 'Available' && 'bg-emerald-500/90 text-white',
-                    unit.status === 'Occupied' && 'bg-indigo-500/90 text-white',
-                    unit.status === 'Maintenance' && 'bg-rose-500/90 text-white',
-                    unit.status === 'Reserved' && 'bg-amber-500/90 text-white',
-                  )}>
-                    <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
-                    {statusLabel(unit.status)}
-                  </span>
-                </div>
-
-                {/* Actions menu — top right, visible on hover */}
-                <div
-                  className="absolute top-2.5 right-2.5"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  role="presentation"
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="h-7 w-7 rounded-full bg-white/90 border-0 shadow-sm hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      }
+              >
+                <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50">
+                  {unit.photoDataUrl ? (
+                    <img
+                      src={unit.photoDataUrl}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Building2 className="h-14 w-14 text-slate-200" />
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex max-w-[70%] items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-md',
+                        unit.status === 'Available' && 'bg-emerald-500/95 text-white',
+                        unit.status === 'Occupied' && 'bg-red-600/95 text-white',
+                        unit.status === 'Maintenance' && 'bg-amber-400/95 text-amber-950',
+                        unit.status === 'Reserved' && 'bg-white/90 text-slate-800',
+                      )}
                     >
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(unit); }}>
-                        {t('views.units.table.viewDetails')}
-                      </DropdownMenuItem>
-                      {canUpdate && (
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditUnitModal(unit); }}>
-                          {t('views.units.table.editUnit')}
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleManageInventory(unit); }}>
-                        {t('views.units.table.manageInventory')}
-                      </DropdownMenuItem>
-                      {canDelete && (
-                        <DropdownMenuItem
-                          variant="destructive"
-                          className="text-rose-600"
-                          onClick={(e) => { e.stopPropagation(); void handleDeleteUnit(unit); }}
-                        >
-                          {t('views.units.table.delete')}
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      {statusLabel(unit.status)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Card body */}
-              <div className="px-4 pt-4 pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-slate-900 truncate">
+                <CardContent className="space-y-3 p-4 pt-4">
+                  <div>
+                    <h3 className="truncate text-base font-semibold tracking-tight text-slate-900">
                       {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
                     </h3>
-                    <p className="text-xs text-slate-400 truncate mt-0.5">{unit.buildingName}</p>
+                    <p className="mt-0.5 truncate text-sm text-slate-500">{towerLine}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      <span className="font-medium text-slate-600">
+                        {floorLabelForCard(unit.floor, t('views.units.table.floor'))}
+                      </span>
+                      <span className="mx-1.5 text-slate-300">·</span>
+                      <span>{unit.type}</span>
+                    </p>
                   </div>
-                  <p className="shrink-0 text-right">
-                    <span className="text-sm font-bold text-indigo-600 tabular-nums">₱{unit.monthlyRate.toLocaleString()}</span>
-                    <span className="block text-[10px] text-slate-400 font-normal">/mo</span>
-                  </p>
-                </div>
-
-                {/* Info row */}
-                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
-                  <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0">
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{areaDisplayLabel(unit.area)}</span>
-                  </span>
-                  <span className="h-3 w-px bg-slate-200 shrink-0" />
-                  <span className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
-                    <LayoutGrid className="w-3 h-3 shrink-0" />
-                    {unit.type}
-                  </span>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-4 pb-4">
-                <button
-                  type="button"
-                  className="w-full h-9 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center gap-1.5"
-                  onClick={() => handleViewDetails(unit)}
-                >
-                  {t('views.units.table.viewDetails')}
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+                    <span className="inline-flex items-center gap-1 tabular-nums">
+                      <Maximize2 className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                      {metrics.sqm} {t('views.units.card.sqm')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 tabular-nums">
+                      <BedDouble className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                      {metrics.beds}
+                    </span>
+                    <span className="inline-flex items-center gap-1 tabular-nums">
+                      <Bath className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                      {metrics.baths}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-3">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {t('views.units.table.monthlyRate')}
+                    </span>
+                    <p className="text-right">
+                      <span className="text-lg font-bold tabular-nums text-slate-900">
+                        ₱{unit.monthlyRate.toLocaleString()}
+                      </span>
+                      <span className="ml-1 text-xs font-normal text-slate-400">
+                        {t('views.units.card.perMonth')}
+                      </span>
+                    </p>
+                  </div>
+                  <div
+                    className="flex items-stretch gap-2 pt-1"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    role="presentation"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10 flex-1 rounded-xl border-slate-200 font-medium shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                      onClick={() => handleViewDetails(unit)}
+                    >
+                      <Eye className="mr-1.5 h-4 w-4" />
+                      {t('views.units.card.view')}
+                    </Button>
+                    {canUpdate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-10 flex-1 rounded-xl border-slate-200 font-medium shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                        onClick={() => openEditUnitModal(unit)}
+                      >
+                        <Pencil className="mr-1.5 h-4 w-4" />
+                        {t('views.units.card.edit')}
+                      </Button>
+                    ) : null}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            title={t('views.units.table.moreOptions')}
+                            className="h-10 w-10 shrink-0 rounded-xl border-slate-200 shadow-sm hover:bg-slate-50"
+                          />
+                        }
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManageInventory(unit);
+                          }}
+                        >
+                          {t('views.units.table.manageInventory')}
+                        </DropdownMenuItem>
+                        {canDelete ? (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            className="text-rose-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteUnit(unit);
+                            }}
+                          >
+                            {t('views.units.table.delete')}
+                          </DropdownMenuItem>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -1133,33 +1382,28 @@ export function UnitsView() {
         onClose={() => setIsDetailsOpen(false)}
         title={
           selectedUnit ? (
-            <div className="flex items-start gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() =>
-                  openPhotoPreview(
-                    selectedUnit.photoDataUrl,
-                    `${t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })} ${t('views.units.addModal.photo')}`,
-                  )
-                }
-                className={cn(
-                  "h-16 w-24 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden",
-                  selectedUnit.photoDataUrl ? "cursor-zoom-in" : "cursor-default",
-                )}
-                title={t('views.units.addModal.photo')}
-              >
-                {selectedUnit.photoDataUrl ? (
-                  <img
-                    src={selectedUnit.photoDataUrl}
-                    alt={`${selectedUnit.unitNumber} photo`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-slate-400">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                )}
-              </button>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative shrink-0" onMouseLeave={scheduleDetailPhotoPeekClose}>
+                <div
+                  className="h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                  onMouseEnter={() => {
+                    clearDetailPhotoPeekCloseTimer();
+                    if (selectedUnit.photoDataUrl) setDetailHeaderPhotoPeek(true);
+                  }}
+                >
+                  {selectedUnit.photoDataUrl ? (
+                    <img
+                      src={selectedUnit.photoDataUrl}
+                      alt={`${selectedUnit.unitNumber} photo`}
+                      className="h-full w-full object-cover object-center"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                      <Building2 className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="min-w-0">
                 <span className="block text-[32px] leading-none font-bold text-slate-900">
                   {t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}
@@ -1644,7 +1888,7 @@ export function UnitsView() {
         isOpen={isAddUnitOpen}
         onClose={closeAddUnitModal}
         title={formMode === 'edit' ? t('views.units.editModal.title') : t('views.units.addModal.title')}
-        maxWidth="2xl"
+        maxWidth="3xl"
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
@@ -1676,12 +1920,12 @@ export function UnitsView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label>{t('views.units.addModal.photo')}</Label>
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-24 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center text-slate-400 shrink-0">
+            <div className="flex flex-col gap-3">
+              <div className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[4/3] max-h-[min(20rem,50vh)] sm:max-h-[22rem]">
                 {addUnitPhotoPreview ? (
                   <button
                     type="button"
-                    className="h-full w-full cursor-zoom-in"
+                    className="flex h-full w-full cursor-zoom-in items-center justify-center"
                     onClick={() =>
                       openPhotoPreview(
                         addUnitPhotoPreview,
@@ -1689,10 +1933,16 @@ export function UnitsView() {
                       )
                     }
                   >
-                    <img src={addUnitPhotoPreview} alt="Unit photo preview" className="h-full w-full object-cover" />
+                    <img
+                      src={addUnitPhotoPreview}
+                      alt="Unit photo preview"
+                      className="h-full w-full object-cover"
+                    />
                   </button>
                 ) : (
-                  <Building2 className="w-6 h-6" />
+                  <div className="flex h-full w-full items-center justify-center text-slate-300">
+                    <Building2 className="h-14 w-14 sm:h-16 sm:w-16" />
+                  </div>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1716,7 +1966,6 @@ export function UnitsView() {
                 ) : null}
               </div>
             </div>
-            <p className="text-xs text-slate-500">{t('views.units.addModal.photoHint')}</p>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="add-unit-number">{t('views.units.addModal.unitNumber')}</Label>
@@ -1830,6 +2079,27 @@ export function UnitsView() {
           ) : null}
         </div>
       </Modal>
+
+      {typeof document !== 'undefined' &&
+        detailHeaderPhotoPeek &&
+        selectedUnit?.photoDataUrl &&
+        createPortal(
+          <div
+            role="presentation"
+            className="pointer-events-auto fixed left-1/2 top-1/2 z-[160] flex max-h-[min(90vh,52rem)] w-[min(94vw,44rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+            onMouseEnter={clearDetailPhotoPeekCloseTimer}
+            onMouseLeave={scheduleDetailPhotoPeekClose}
+          >
+            <div className="animate-in fade-in zoom-in-95 flex w-full max-h-[min(90vh,52rem)] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-2xl ring-4 ring-black/5 duration-150 sm:p-5">
+              <img
+                src={selectedUnit.photoDataUrl}
+                alt=""
+                className="mx-auto max-h-[min(86vh,48rem)] w-auto max-w-full object-contain object-center"
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -163,7 +163,11 @@ export function NotificationPanel({
                       'cursor-pointer rounded-xl border p-3 transition-colors',
                       'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60',
                       notification.unread
-                        ? 'bg-slate-50/80 dark:bg-slate-800/55 dark:border-slate-700/70'
+                        ? [
+                            'bg-indigo-50/70 border-indigo-200/70',
+                            'shadow-[0_10px_22px_-14px_rgba(79,70,229,0.35)]',
+                            'dark:bg-slate-800/55 dark:border-slate-700/70 dark:shadow-none',
+                          ].join(' ')
                         : 'bg-white/60 dark:bg-slate-950/30',
                     )}
                   >
@@ -176,11 +180,16 @@ export function NotificationPanel({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-0.5 flex items-start justify-between gap-2">
-                          <h4 className="truncate text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
+                          <h4
+                            className={cn(
+                              'truncate text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100',
+                              notification.unread ? 'font-bold' : undefined,
+                            )}
+                          >
                             {notification.title}
                           </h4>
                           {notification.unread && (
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400 dark:bg-indigo-300" />
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 dark:bg-indigo-300" />
                           )}
                         </div>
                         <p className="text-xs leading-relaxed text-brand-muted dark:text-slate-300/80 line-clamp-2">

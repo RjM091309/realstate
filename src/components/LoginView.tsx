@@ -128,24 +128,24 @@ export function LoginView() {
       <aside
         className={cn(
           'relative hidden lg:flex lg:w-[44%] xl:w-[42%] min-h-screen flex-col justify-center overflow-hidden',
-          'bg-gradient-to-br from-stone-900 via-stone-800 to-emerald-950 text-white px-10 xl:px-14 2xl:px-20',
+          'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white px-10 xl:px-14 2xl:px-20',
         )}
       >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_20%_10%,rgba(79,70,229,0.28),transparent_60%),radial-gradient(900px_520px_at_80%_70%,rgba(16,185,129,0.18),transparent_62%)]" />
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12]"
+          className="pointer-events-none absolute inset-0 opacity-[0.10]"
           style={{
-            backgroundImage: `linear-gradient(to right, white 1px, transparent 1px),
-              linear-gradient(to bottom, white 1px, transparent 1px)`,
-            backgroundSize: '56px 56px',
+            backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.7) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(255,255,255,0.7) 1px, transparent 1px)`,
+            backgroundSize: '72px 72px',
           }}
         />
-        <div className="pointer-events-none absolute -right-24 top-1/4 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-72 w-72 rounded-full bg-amber-200/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
 
         <div className="relative z-10 max-w-md space-y-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur">
-              <Building2 className="h-6 w-6 text-emerald-200" strokeWidth={1.75} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
+              <Building2 className="h-6 w-6 text-indigo-200" strokeWidth={1.75} />
             </div>
             <span className="font-semibold tracking-wide text-lg text-white/95">{t('login.brand')}</span>
           </div>
@@ -153,15 +153,15 @@ export function LoginView() {
             <h1 className="text-3xl xl:text-4xl font-semibold leading-tight tracking-tight text-white">
               {t('login.heroTitle')}
             </h1>
-            <p className="text-base leading-relaxed text-stone-300">{t('login.heroSubtitle')}</p>
+            <p className="text-base leading-relaxed text-slate-200/80">{t('login.heroSubtitle')}</p>
           </div>
-          <ul className="flex flex-col gap-4 pt-2 text-sm text-stone-400">
+          <ul className="flex flex-col gap-4 pt-2 text-sm text-slate-200/65">
             <li className="flex items-start gap-3">
-              <LayoutGrid className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400/90" strokeWidth={1.75} />
+              <LayoutGrid className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200/90" strokeWidth={1.75} />
               <span>{t('login.heroBullet1')}</span>
             </li>
             <li className="flex items-start gap-3">
-              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400/90" strokeWidth={1.75} />
+              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200/90" strokeWidth={1.75} />
               <span>{t('login.heroBullet2')}</span>
             </li>
           </ul>
