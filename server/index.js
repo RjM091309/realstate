@@ -199,7 +199,7 @@ void (async () => {
   server.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
+      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/auth/change-password  PATCH /api/auth/profile  POST /api/auth/profile-photo  DELETE /api/auth/profile-photo  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
     );
   });
 

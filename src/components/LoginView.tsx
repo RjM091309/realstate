@@ -2,59 +2,27 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Building, Mail, Lock, ArrowRight, Eye, EyeOff, Shield, Globe, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { apiFetch } from '@/lib/api';
 
 export function LoginView() {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [roleId, setRoleId] = useState<number>(1);
-  const [roles, setRoles] = useState<Array<{ id: number; name: string }>>([]);
-  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
     try {
-      if (mode === 'login') {
-        await login(username.trim(), password);
-      } else {
-        await register({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          username: username.trim(),
-          password,
-          roleId,
-        });
-      }
+      await login(username.trim(), password);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to sign in. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  async function ensureRolesLoaded() {
-    if (rolesLoaded) return;
-    setRolesLoaded(true);
-    try {
-      const data = await apiFetch<{ roles: Array<{ id: number; name: string }> }>('/api/auth/roles');
-      if (Array.isArray(data.roles)) {
-        setRoles(data.roles);
-        if (data.roles.length) setRoleId(data.roles[0]!.id);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load roles.');
-    }
-  }
 
   return (
     <div className="min-h-screen font-sans text-slate-900 selection:bg-indigo-500/30 selection:text-indigo-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -130,50 +98,15 @@ export function LoginView() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-              {mode === 'login' ? 'System Admin Login' : 'Create Account'}
-            </h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">System Admin Login</h2>
             <p className="text-slate-500 dark:text-slate-300/80 text-sm">
-              {mode === 'login'
-                ? 'Please sign in to access your administrative dashboard.'
-                : 'Create an account to start using the system.'}
+              Please sign in to access your administrative dashboard. New staff accounts are created from{' '}
+              <span className="font-semibold text-slate-700 dark:text-slate-200">User Management → User Info</span> after
+              you sign in.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {mode === 'register' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="firstName" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider ml-1">
-                    First name
-                  </label>
-                  <input
-                    id="firstName"
-                    autoComplete="given-name"
-                    required
-                    className="w-full bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/80 rounded-xl py-4 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-400/15 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-500 text-sm"
-                    placeholder="Juan"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="lastName" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider ml-1">
-                    Last name
-                  </label>
-                  <input
-                    id="lastName"
-                    autoComplete="family-name"
-                    required
-                    className="w-full bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/80 rounded-xl py-4 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-400/15 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-500 text-sm"
-                    placeholder="Dela Cruz"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : null}
-
             <div className="space-y-2">
               <label htmlFor="username" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider ml-1">
                 Username
@@ -226,30 +159,6 @@ export function LoginView() {
               </div>
             </div>
 
-            {mode === 'register' ? (
-              <div className="space-y-2">
-                <label htmlFor="roleId" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider ml-1">
-                  Role
-                </label>
-                <select
-                  id="roleId"
-                  className="w-full bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/80 rounded-xl py-4 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-400/15 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all text-sm"
-                  value={roleId}
-                  onChange={(e) => setRoleId(Number(e.target.value))}
-                  onFocus={() => void ensureRolesLoaded()}
-                >
-                  {(roles.length ? roles : [{ id: 1, name: 'Administrator' }]).map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 dark:text-slate-400/80">
-                  Tip: Create an Administrator account first so you can access the Control Panel.
-                </p>
-              </div>
-            ) : null}
-
             {error ? <p className="text-sm font-medium text-rose-600">{error}</p> : null}
 
             <button
@@ -261,61 +170,17 @@ export function LoginView() {
                 {isLoading ? (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>{mode === 'login' ? 'Signing in...' : 'Creating account...'}</span>
+                    <span>Signing in...</span>
                   </motion.div>
                 ) : (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-3">
-                    <span>{mode === 'login' ? 'Login to Dashboard' : 'Create account'}</span>
+                    <span>Login to Dashboard</span>
                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </motion.div>
                 )}
               </AnimatePresence>
               <div className="absolute inset-0 bg-indigo-600 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out -z-10" />
             </button>
-
-            <div
-              className="pt-2 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-300/80"
-              role="tablist"
-              aria-label="Authentication mode"
-            >
-              <span className="text-slate-400 dark:text-slate-400/80">
-                {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}
-              </span>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'login'}
-                className={`font-extrabold tracking-wide transition-colors ${
-                  mode === 'login'
-                    ? 'text-slate-900 dark:text-slate-100'
-                    : 'text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200'
-                }`}
-                onClick={() => {
-                  setMode('login');
-                  setError(null);
-                }}
-              >
-                Login
-              </button>
-              <span className="text-slate-300 dark:text-slate-600">/</span>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'register'}
-                className={`font-extrabold tracking-wide transition-colors ${
-                  mode === 'register'
-                    ? 'text-slate-900 dark:text-slate-100'
-                    : 'text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200'
-                }`}
-                onClick={() => {
-                  setMode('register');
-                  setError(null);
-                  void ensureRolesLoaded();
-                }}
-              >
-                Create account
-              </button>
-            </div>
           </form>
 
           <div className="mt-12 flex flex-col items-center gap-6">

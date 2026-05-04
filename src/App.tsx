@@ -14,6 +14,7 @@ import { ContractsView } from './components/views/ContractsView/index';
 import { CRMView } from './components/views/CRMView/index';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
+import { UserManagementView, UserRoleManagementView } from './components/views/UserManagementView/index';
 import { UserAccessView } from './components/views/UserAccessView/index';
 import { SettingsView } from './components/views/SettingsView/index';
 import { TenantPortalView } from './components/views/TenantPortalView/index';
@@ -76,14 +77,16 @@ function MainApp() {
     crm: '/crm',
     ledger: '/ledger',
     calendar: '/calendar',
-    access: '/access',
+    userManagement: '/user-management/user-info',
     settings: '/settings',
   };
   const pathToTab = Object.entries(tabToPath).reduce((acc, [tab, path]) => {
     acc[path] = tab;
     return acc;
   }, {} as Record<string, string>);
-  const activeTab = pathToTab[location.pathname] ?? 'dashboard';
+  const activeTab = location.pathname.startsWith('/user-management')
+    ? 'userManagement'
+    : pathToTab[location.pathname] ?? 'dashboard';
 
   useEffect(() => {
     if (location.pathname === '/') {
@@ -91,9 +94,14 @@ function MainApp() {
       return;
     }
 
+    if (location.pathname.startsWith('/user-management') && !isAdmin) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
     if (!allowedTabIds.length) return;
 
-    const alwaysAllowedTabs = ['settings', ...(isAdmin ? ['access'] : [])];
+    const alwaysAllowedTabs = ['settings', ...(isAdmin ? ['userManagement'] : [])];
     if (alwaysAllowedTabs.includes(activeTab)) return;
 
     if (!allowedTabIds.includes(activeTab)) {
@@ -115,11 +123,34 @@ function MainApp() {
     return <Navigate to="/login" replace />;
   }
 
+  if (location.pathname === '/access') {
+    return <Navigate to="/user-management/control-panel" replace />;
+  }
+  if (location.pathname === '/user-management') {
+    return <Navigate to="/user-management/user-info" replace />;
+  }
+  if (location.pathname === '/user-management/branches') {
+    return <Navigate to="/user-management/user-info" replace />;
+  }
+
   const setActiveTab = (tab: string) => {
     navigate(tabToPath[tab] ?? '/dashboard');
   };
 
   const renderView = () => {
+    if (location.pathname.startsWith('/user-management')) {
+      if (location.pathname === '/user-management/control-panel') {
+        if (!isAdmin) {
+          return <Navigate to="/user-management/user-info" replace />;
+        }
+        return <UserAccessView />;
+      }
+      if (location.pathname === '/user-management/user-role') {
+        return <UserRoleManagementView />;
+      }
+      return <UserManagementView />;
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView />;
@@ -133,8 +164,6 @@ function MainApp() {
         return <LeaseLedgerView />;
       case 'calendar':
         return <CalendarView />;
-      case 'access':
-        return <UserAccessView />;
       case 'settings':
         return <SettingsView />;
       default:

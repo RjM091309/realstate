@@ -17,6 +17,11 @@ import {
   BedDouble,
   Bath,
   Maximize2,
+  User,
+  Calendar,
+  CircleDollarSign,
+  Home,
+  Check,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,8 +40,7 @@ import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
-import { format, parseISO } from 'date-fns';
-import { units as seedUnits } from '@/lib/mockData';
+import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
@@ -324,6 +328,25 @@ function floorLabelForCard(floor: string, floorWord: string): string {
   return `${floorWord} ${f}`;
 }
 
+function activeContractForUnit(unitId: string, contracts: Contract[]): Contract | null {
+  const actives = contracts.filter((c) => c.unitId === unitId && c.status === 'Active');
+  if (actives.length === 0) return null;
+  return actives[0];
+}
+
+function leaseEndInsight(endIso: string | undefined): { daysToEnd: number | null; endLabel: string | null } {
+  if (!endIso) return { daysToEnd: null, endLabel: null };
+  try {
+    const end = startOfDay(parseISO(endIso));
+    const today = startOfDay(new Date());
+    const daysToEnd = differenceInCalendarDays(end, today);
+    const endLabel = format(end, 'MMM d, yyyy');
+    return { daysToEnd, endLabel };
+  } catch {
+    return { daysToEnd: null, endLabel: null };
+  }
+}
+
 function conditionLabel(condition: string, t: (k: string) => string): string {
   if (condition === 'New') return t('views.units.details.conditionNew');
   if (condition === 'Good') return t('views.units.details.conditionGood');
@@ -457,7 +480,7 @@ export function UnitsView() {
       setUnitList(units);
       setUnitsBackedByApi(true);
     } catch {
-      setUnitList([...seedUnits]);
+      setUnitList([]);
       setUnitsBackedByApi(false);
       toast.warning(t('views.units.loadError'));
     } finally {
@@ -1102,16 +1125,19 @@ export function UnitsView() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.units.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('views.units.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{t('views.units.title')}</h1>
+          <p className="text-slate-500 mt-1 dark:text-slate-400">{t('views.units.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
+          <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-none">
             <Button
               type="button"
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
-              className={cn('h-9 rounded-lg px-3 gap-1.5', viewMode === 'grid' && 'bg-slate-100 shadow-sm')}
+              className={cn(
+                'h-9 rounded-lg px-3 gap-1.5 dark:text-slate-200',
+                viewMode === 'grid' && 'bg-slate-100 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:shadow-none',
+              )}
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -1121,7 +1147,10 @@ export function UnitsView() {
               type="button"
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
-              className={cn('h-9 rounded-lg px-3 gap-1.5', viewMode === 'list' && 'bg-slate-100 shadow-sm')}
+              className={cn(
+                'h-9 rounded-lg px-3 gap-1.5 dark:text-slate-200',
+                viewMode === 'list' && 'bg-slate-100 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:shadow-none',
+              )}
               onClick={() => setViewMode('list')}
             >
               <ListIcon className="w-4 h-4" />
@@ -1131,7 +1160,7 @@ export function UnitsView() {
           {canCreate && (
             <Button
               type="button"
-              className="h-10 rounded-xl bg-slate-900 shadow-md shadow-slate-900/15 hover:bg-slate-800"
+              className="h-10 rounded-xl bg-slate-900 shadow-md shadow-slate-900/15 hover:bg-slate-800 dark:bg-indigo-600 dark:shadow-indigo-950/40 dark:hover:bg-indigo-500"
               onClick={openAddUnitModal}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -1141,20 +1170,20 @@ export function UnitsView() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm sm:p-5">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm dark:border-slate-700/90 dark:bg-slate-900/85 dark:shadow-lg dark:shadow-black/30 sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
           <div className="relative min-w-0 flex-1 lg:max-w-md">
-            <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />
             <Input
               placeholder={t('views.units.searchPlaceholder')}
-              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10"
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus-visible:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('views.units.filters.property')}
               </Label>
               <Select2
@@ -1166,7 +1195,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('views.units.filters.floor')}
               </Label>
               <Select2
@@ -1178,7 +1207,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('views.units.filters.type')}
               </Label>
               <Select2
@@ -1190,7 +1219,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('views.units.filters.status')}
               </Label>
               <Select2
@@ -1202,7 +1231,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500">
+              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('views.units.sort.label')}
               </Label>
               <Select2
@@ -1233,13 +1262,14 @@ export function UnitsView() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md"
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900"
               >
-                <div className="aspect-[4/3] animate-pulse bg-slate-100" />
+                <div className="aspect-[4/3] animate-pulse bg-slate-100 dark:bg-slate-800" />
                 <div className="space-y-3 p-4">
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
-                  <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-3 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-16 w-full animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-10 w-full animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
                 </div>
               </div>
             ))}
@@ -1253,9 +1283,9 @@ export function UnitsView() {
           onRowClick={(unit) => handleViewDetails(unit)}
         />
       ) : processedUnits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center">
-          <Building2 className="mb-3 h-12 w-12 text-slate-300" />
-          <p className="text-sm font-medium text-slate-600">{t('views.units.card.noResults')}</p>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center dark:border-slate-700 dark:bg-slate-900/40">
+          <Building2 className="mb-3 h-12 w-12 text-slate-300 dark:text-slate-600" />
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('views.units.card.noResults')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1263,15 +1293,105 @@ export function UnitsView() {
             const metrics = unitDisplayMetrics(unit.type);
             const towerLine =
               unit.tower && unit.tower !== '—' ? `${unit.buildingName} · ${unit.tower}` : unit.buildingName;
+            const floorPart = floorLabelForCard(unit.floor, t('views.units.table.floor'));
+            const locationSubtitle = floorPart === '—' ? towerLine : `${towerLine} · ${floorPart}`;
+            const active = activeContractForUnit(unit.id, branchContracts);
+            const tenantName = active
+              ? tenantsList.find((x) => x.id === active.tenantId)?.name.trim() || '—'
+              : '—';
+            const { daysToEnd, endLabel } = active ? leaseEndInsight(active.endDate) : { daysToEnd: null, endLabel: null };
+
+            const secondaryPill = (() => {
+              if (unit.status === 'Available' && !active) {
+                return {
+                  cls: 'bg-blue-600 text-white shadow-md ring-1 ring-black/15 dark:bg-blue-600 dark:text-white',
+                  label: t('views.units.card.badgeVacant'),
+                } as const;
+              }
+              if (!active) return null;
+              if (daysToEnd === null) return null;
+              if (daysToEnd < 0) {
+                return {
+                  cls:
+                    'bg-amber-500 text-amber-950 shadow-md ring-1 ring-black/10 dark:bg-amber-500 dark:text-amber-950',
+                  label: t('views.units.card.badgeOverdue', { count: Math.abs(daysToEnd) }),
+                } as const;
+              }
+              if (daysToEnd <= 30) {
+                return {
+                  cls:
+                    'bg-amber-400 text-amber-950 shadow-md ring-1 ring-black/10 dark:bg-amber-400 dark:text-amber-950',
+                  label: t('views.units.card.badgeEndingSoon'),
+                } as const;
+              }
+              return {
+                cls:
+                  'bg-emerald-600 text-white shadow-md ring-1 ring-black/15 dark:bg-emerald-600 dark:text-white',
+                label: t('views.units.card.badgePaid'),
+              } as const;
+            })();
+
+            const leaseEndsNode = (() => {
+              if (!active || !endLabel) {
+                return <span className="font-medium text-slate-500 dark:text-slate-400">—</span>;
+              }
+              if (daysToEnd !== null && daysToEnd < 0) {
+                return (
+                  <span className="font-semibold text-rose-500 dark:text-rose-400">
+                    {endLabel}{' '}
+                    <span className="whitespace-nowrap">
+                      ({t('views.units.card.overdueDays', { count: Math.abs(daysToEnd) })})
+                    </span>
+                  </span>
+                );
+              }
+              if (daysToEnd !== null && daysToEnd <= 30) {
+                return (
+                  <span className="font-semibold text-amber-500 dark:text-amber-400">
+                    {endLabel}{' '}
+                    <span className="whitespace-nowrap">({t('views.units.card.daysLeft', { count: daysToEnd })})</span>
+                  </span>
+                );
+              }
+              return (
+                <span className="font-semibold text-sky-500 dark:text-sky-300">
+                  {endLabel}
+                  {daysToEnd !== null ? (
+                    <span className="whitespace-nowrap"> ({t('views.units.card.daysLeft', { count: daysToEnd })})</span>
+                  ) : null}
+                </span>
+              );
+            })();
+
+            const rentStatusNode = (() => {
+              if (!active) {
+                return <span className="font-medium text-slate-500 dark:text-slate-400">—</span>;
+              }
+              if (daysToEnd !== null && daysToEnd < 0) {
+                return (
+                  <span className="font-semibold text-rose-500 dark:text-rose-400">
+                    {t('views.units.card.rentOverdue')}
+                  </span>
+                );
+              }
+              return (
+                <span className="inline-flex items-center gap-1 font-semibold text-emerald-500 dark:text-emerald-400">
+                  <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+                  {t('views.units.card.rentCurrent')}
+                </span>
+              );
+            })();
+
             return (
               <Card
                 key={unit.id}
                 className={cn(
-                  'group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/50',
-                  'transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-300/45',
+                  'group relative flex flex-col overflow-hidden rounded-xl border bg-white shadow-lg transition-all duration-300',
+                  'border-slate-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50',
+                  'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 dark:hover:shadow-xl dark:hover:shadow-black/60',
                 )}
               >
-                <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50">
+                <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
                   {unit.photoDataUrl ? (
                     <img
                       src={unit.photoDataUrl}
@@ -1280,67 +1400,110 @@ export function UnitsView() {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <Building2 className="h-14 w-14 text-slate-200" />
+                      <Building2 className="h-14 w-14 text-slate-200 dark:text-slate-600" />
                     </div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-end gap-2">
                     <span
                       className={cn(
-                        'inline-flex max-w-[70%] items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-md',
-                        unit.status === 'Available' && 'bg-emerald-500/95 text-white',
-                        unit.status === 'Occupied' && 'bg-red-600/95 text-white',
-                        unit.status === 'Maintenance' && 'bg-amber-400/95 text-amber-950',
-                        unit.status === 'Reserved' && 'bg-white/90 text-slate-800',
+                        'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-md backdrop-blur-md',
+                        unit.status === 'Available' && 'bg-emerald-600 text-white',
+                        unit.status === 'Occupied' && 'bg-red-600 text-white',
+                        unit.status === 'Maintenance' && 'bg-amber-500 text-amber-950',
+                        unit.status === 'Reserved' && 'bg-slate-100 text-slate-900 dark:bg-white/90 dark:text-slate-900',
                       )}
                     >
                       {statusLabel(unit.status)}
                     </span>
+                    {secondaryPill ? (
+                      <span
+                        className={cn(
+                          'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-md',
+                          secondaryPill.cls,
+                        )}
+                      >
+                        {secondaryPill.label}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
-                <CardContent className="space-y-3 p-4 pt-4">
-                  <div>
-                    <h3 className="truncate text-base font-semibold tracking-tight text-slate-900">
-                      {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
-                    </h3>
-                    <p className="mt-0.5 truncate text-sm text-slate-500">{towerLine}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">
-                        {floorLabelForCard(unit.floor, t('views.units.table.floor'))}
-                      </span>
-                      <span className="mx-1.5 text-slate-300">·</span>
-                      <span>{unit.type}</span>
-                    </p>
+                <CardContent className="flex flex-1 flex-col p-4 pt-4 dark:bg-slate-900">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                        {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
+                      </h3>
+                      <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{locationSubtitle}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-white">
+                        ₱{unit.monthlyRate.toLocaleString()}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                        {t('views.units.card.perMonth')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Maximize2 className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                      <BedDouble className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                      {unit.type}
+                    </span>
+                    <span className="inline-flex items-center gap-1 tabular-nums">
+                      <Maximize2 className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
                       {metrics.sqm} {t('views.units.card.sqm')}
                     </span>
                     <span className="inline-flex items-center gap-1 tabular-nums">
-                      <BedDouble className="h-3.5 w-3.5 text-slate-400" aria-hidden />
-                      {metrics.beds}
-                    </span>
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Bath className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                      <Bath className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
                       {metrics.baths}
                     </span>
                   </div>
-                  <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-3">
-                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      {t('views.units.table.monthlyRate')}
-                    </span>
-                    <p className="text-right">
-                      <span className="text-lg font-bold tabular-nums text-slate-900">
-                        ₱{unit.monthlyRate.toLocaleString()}
+
+                  <div className="my-4 border-t border-slate-100 dark:border-slate-800" />
+
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                        <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        {t('views.units.card.tenant')}
                       </span>
-                      <span className="ml-1 text-xs font-normal text-slate-400">
-                        {t('views.units.card.perMonth')}
+                      <span className="max-w-[58%] text-right font-semibold text-slate-900 dark:text-slate-100">
+                        {tenantName === '—' ? (
+                          <span className="font-medium text-slate-400 dark:text-slate-500">—</span>
+                        ) : (
+                          <span className="truncate">{tenantName}</span>
+                        )}
                       </span>
-                    </p>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                        <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        {t('views.units.card.leaseEnds')}
+                      </span>
+                      <div className="max-w-[58%] text-right text-[11px] leading-snug sm:text-xs">{leaseEndsNode}</div>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                        <CircleDollarSign className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        {t('views.units.card.rentStatus')}
+                      </span>
+                      <div className="max-w-[58%] text-right">{rentStatusNode}</div>
+                    </div>
+                    {unit.status === 'Available' ? (
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                          <Home className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                          {t('views.units.card.vacantSince')}
+                        </span>
+                        <span className="max-w-[58%] text-right font-medium text-slate-400 dark:text-slate-500">—</span>
+                      </div>
+                    ) : null}
                   </div>
+
                   <div
-                    className="flex items-stretch gap-2 pt-1"
+                    className="mt-auto flex items-stretch gap-2 pt-4"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                     role="presentation"
@@ -1349,7 +1512,7 @@ export function UnitsView() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-10 flex-1 rounded-xl border-slate-200 font-medium shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                      className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                       onClick={() => handleViewDetails(unit)}
                     >
                       <Eye className="mr-1.5 h-4 w-4" />
@@ -1360,7 +1523,7 @@ export function UnitsView() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-10 flex-1 rounded-xl border-slate-200 font-medium shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                        className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                         onClick={() => openEditUnitModal(unit)}
                       >
                         <Pencil className="mr-1.5 h-4 w-4" />
@@ -1375,7 +1538,7 @@ export function UnitsView() {
                             variant="outline"
                             size="icon"
                             title={t('views.units.table.moreOptions')}
-                            className="h-10 w-10 shrink-0 rounded-xl border-slate-200 shadow-sm hover:bg-slate-50"
+                            className="h-10 w-10 shrink-0 rounded-lg border-slate-200 bg-white shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
                           />
                         }
                       >
@@ -1422,7 +1585,7 @@ export function UnitsView() {
             <div className="flex min-w-0 items-center gap-3">
               <div className="relative shrink-0" onMouseLeave={scheduleDetailPhotoPeekClose}>
                 <div
-                  className="h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                  className="h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white"
                   onMouseEnter={() => {
                     clearDetailPhotoPeekCloseTimer();
                     if (selectedUnit.photoDataUrl) setDetailHeaderPhotoPeek(true);
@@ -1490,7 +1653,7 @@ export function UnitsView() {
             </div>
           </div>
         }
-        variant="glass"
+        variant="default"
       >
         <div className="flex justify-end items-start mb-2 pr-2">
           <Badge
@@ -1513,15 +1676,15 @@ export function UnitsView() {
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-4">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div className="p-3 rounded-lg border border-slate-100 bg-white">
                 <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.monthlyRate')}</p>
                 <p className="text-lg font-bold text-slate-900">₱{selectedUnit?.monthlyRate.toLocaleString()}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                 <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.unitType')}</p>
                 <p className="mt-1 text-3xl leading-none font-bold text-slate-900">{selectedUnit?.type || '—'}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                 <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.table.area')}</p>
                 <p className="mt-1 text-3xl leading-none font-bold text-slate-900">
                   {areaDisplayLabel(selectedUnit?.area ?? '')}
@@ -1588,7 +1751,7 @@ export function UnitsView() {
                 <MapPin className="w-4 h-4 text-indigo-600" />
                 {t('views.units.details.legalAddress')}
               </h4>
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
+              <div className="p-4 rounded-xl border border-slate-100 bg-white text-sm text-slate-600 leading-relaxed">
                 {selectedUnit?.legalAddress?.trim() ||
                   selectedUnit?.commonAddress?.trim() ||
                   t('views.units.details.addressTemplate', {
@@ -1655,7 +1818,7 @@ export function UnitsView() {
             : t('views.units.table.manageInventory')
         }
         maxWidth="3xl"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end w-full">
             <Button type="button" variant="outline" onClick={() => setIsManageInventoryOpen(false)}>
@@ -1808,7 +1971,7 @@ export function UnitsView() {
         onClose={resetInventoryForm}
         title={t('views.units.details.addInventoryModalTitle')}
         maxWidth="md"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
@@ -1867,7 +2030,7 @@ export function UnitsView() {
         onClose={resetInventoryForm}
         title={t('common.edit')}
         maxWidth="md"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
@@ -1926,7 +2089,7 @@ export function UnitsView() {
         onClose={closeAddUnitModal}
         title={formMode === 'edit' ? t('views.units.editModal.title') : t('views.units.addModal.title')}
         maxWidth="3xl"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button
@@ -2101,7 +2264,7 @@ export function UnitsView() {
         onClose={closePhotoPreview}
         title={photoPreviewTitle || t('views.units.addModal.photo')}
         maxWidth="3xl"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end w-full">
             <Button type="button" variant="outline" onClick={closePhotoPreview}>

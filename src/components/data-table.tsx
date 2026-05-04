@@ -67,7 +67,7 @@ export function DataTable<T>({
                     highlightFirstColumn ? "py-4" : "py-3",
                     highlightFirstColumn && i === 0
                       ? "bg-violet-50 dark:bg-indigo-500/10 text-brand-text dark:text-slate-200"
-                      : "text-brand-muted dark:text-slate-400 bg-white dark:bg-slate-900",
+                      : "text-brand-muted dark:text-slate-300 bg-white dark:bg-slate-900",
                     col.className,
                     col.headerClassName,
                     highlightFirstColumn && i === 0 && "border-r-[3px] border-white dark:border-slate-700"
@@ -126,10 +126,10 @@ export function DataTable<T>({
       <div
         className={cn(
           'flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-700',
-          embedded ? 'bg-slate-50/60 dark:bg-slate-800/70' : 'bg-white dark:bg-slate-900',
+          embedded ? 'bg-slate-50/60 dark:bg-slate-800/90' : 'bg-white dark:bg-slate-900',
         )}
       >
-        <div className="flex items-center gap-4 text-sm text-brand-muted dark:text-slate-400">
+        <div className="flex items-center gap-4 text-sm text-brand-muted dark:text-slate-300">
           <span>{t('datatable.show')}</span>
           <div className="relative">
             <button

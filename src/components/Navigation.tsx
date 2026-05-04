@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { parseISO } from 'date-fns';
 import {
   LayoutDashboard,
@@ -13,7 +14,7 @@ import {
   Bell,
   UserCircle,
   Briefcase,
-  SlidersHorizontal,
+  UsersRound,
   ChevronLeft,
   ChevronRight,
   Moon,
@@ -23,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileAvatarHoverPreview } from '@/components/ProfileAvatarHoverPreview';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,11 +38,16 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
-import { setSystemTheme, type SystemThemeMode } from '../lib/systemThemeApi';
-import { applyTheme } from '@/lib/theme';
+import { applyTheme, type AppThemeMode } from '@/lib/theme';
 import { animateThemeRippleFromElement } from '@/lib/themeRipple';
 import { apiFetch } from '@/lib/api';
 import { getToken } from '@/lib/api';
+import {
+  effectiveUnreadCount,
+  filterNotificationsByPreferences,
+  loadNotificationPreferences,
+  subscribeNotificationPreferences,
+} from '@/lib/notificationPreferences';
 import { toast } from 'sonner';
 import { io, type Socket } from 'socket.io-client';
 import { Modal } from '@/components/modal';
@@ -56,36 +62,54 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   /** From DB `branch_sidebar_permissions`; omit to show all items */
   allowedTabIds?: string[];
-  /** Administrator (role id 1) — show Control Panel access screen */
+  /** Administrator (role id 1) — show Control Panel under User Management */
   isAdmin?: boolean;
   onLogout?: () => void;
 }
 
+const USER_MGMT_PATHS = {
+  info: '/user-management/user-info',
+  role: '/user-management/user-role',
+  control: '/user-management/control-panel',
+} as const;
+
 export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLogout }: SidebarProps) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [userMgmtOpen, setUserMgmtOpen] = useState(() => location.pathname.startsWith('/user-management'));
 
-  const operationalItems = [
-    { id: 'dashboard', label: t('nav.menu.dashboard'), icon: LayoutDashboard },
-    { id: 'units', label: t('nav.menu.units'), icon: Building2 },
-    { id: 'contracts', label: t('nav.menu.contracts'), icon: FilePen },
-    { id: 'crm', label: t('nav.menu.crm'), icon: Users },
-    { id: 'ledger', label: t('nav.menu.ledger'), icon: BookOpen },
-    { id: 'calendar', label: t('nav.menu.calendar'), icon: Calendar },
-    { id: 'agentPortal', label: t('nav.menu.agentPortal'), icon: Briefcase },
-    { id: 'portal', label: t('nav.menu.portal'), icon: UserCircle },
-  ];
+  const operationalItems = useMemo(
+    () => [
+      { id: 'dashboard', label: t('nav.menu.dashboard'), icon: LayoutDashboard },
+      { id: 'units', label: t('nav.menu.units'), icon: Building2 },
+      { id: 'contracts', label: t('nav.menu.contracts'), icon: FilePen },
+      { id: 'crm', label: t('nav.menu.crm'), icon: Users },
+      { id: 'ledger', label: t('nav.menu.ledger'), icon: BookOpen },
+      { id: 'calendar', label: t('nav.menu.calendar'), icon: Calendar },
+      { id: 'userManagement', label: t('nav.menu.userManagement'), icon: UsersRound },
+      { id: 'agentPortal', label: t('nav.menu.agentPortal'), icon: Briefcase },
+      { id: 'portal', label: t('nav.menu.portal'), icon: UserCircle },
+    ],
+    [t],
+  );
 
   const hasAllowedTabs = Array.isArray(allowedTabIds);
   const visibleOperational = hasAllowedTabs
-    ? operationalItems.filter((item) => allowedTabIds.includes(item.id))
-    : operationalItems;
+    ? operationalItems.filter((item) => {
+        if (item.id === 'userManagement') return Boolean(isAdmin);
+        return allowedTabIds.includes(item.id);
+      })
+    : operationalItems.filter((item) => item.id !== 'userManagement' || Boolean(isAdmin));
 
-  const accessItem = isAdmin
-    ? [{ id: 'access', label: t('nav.menu.controlPanelAccess'), icon: SlidersHorizontal }]
-    : [];
+  const navItems = visibleOperational;
 
-  const navItems = [...visibleOperational, ...accessItem];
+  useEffect(() => {
+    if (location.pathname.startsWith('/user-management')) {
+      setUserMgmtOpen(true);
+    }
+  }, [location.pathname]);
 
   const { session } = useAuth();
   const userName = session
@@ -140,6 +164,90 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       <div className="flex-1 overflow-y-auto transition-all duration-300 py-3 px-3">
         <nav className="space-y-0.5" aria-label="Main">
           {navItems.map((item) => {
+            if (item.id === 'userManagement') {
+              const umActive = activeTab === 'userManagement';
+              const Icon = item.icon;
+              const subLinks: { path: string; label: string }[] = [
+                { path: USER_MGMT_PATHS.info, label: t('nav.userMgmt.userInfo') },
+                { path: USER_MGMT_PATHS.role, label: t('nav.userMgmt.userRole') },
+                ...(isAdmin ? [{ path: USER_MGMT_PATHS.control, label: t('nav.userMgmt.controlPanel') }] : []),
+              ];
+
+              if (isCollapsed) {
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    title={item.label}
+                    onClick={() => void navigate(USER_MGMT_PATHS.info)}
+                    className={cn(
+                      'relative w-full flex items-center justify-center rounded-lg p-2.5 text-sm font-medium transition-all duration-150',
+                      umActive
+                        ? 'bg-indigo-500/15 text-indigo-300'
+                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
+                    )}
+                  >
+                    {umActive ? (
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
+                    ) : null}
+                    <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-indigo-400' : '')} />
+                  </button>
+                );
+              }
+
+              return (
+                <div key={item.id} className="space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setUserMgmtOpen((o) => !o)}
+                    className={cn(
+                      'relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-all duration-150',
+                      umActive
+                        ? 'bg-indigo-500/15 text-indigo-300'
+                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
+                    )}
+                  >
+                    {umActive ? (
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
+                    ) : null}
+                    <Icon className={cn('h-[17px] w-[17px] shrink-0', umActive ? 'text-indigo-400' : '')} />
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200',
+                        userMgmtOpen ? 'rotate-180' : '',
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  {userMgmtOpen ? (
+                    <div className="ml-3 space-y-0.5 border-l border-slate-700/80 pl-2.5 pt-0.5">
+                      {subLinks.map(({ path, label }) => {
+                        const subActive = location.pathname === path;
+                        return (
+                          <button
+                            key={path}
+                            type="button"
+                            onClick={() => void navigate(path)}
+                            className={cn(
+                              'relative flex w-full items-center gap-2 rounded-md py-1.5 pl-1 pr-2 text-left text-[13px] transition-colors',
+                              subActive ? 'text-indigo-200' : 'text-slate-500 hover:text-slate-200',
+                            )}
+                          >
+                            <span
+                              className="h-1 w-1 shrink-0 rounded-full bg-current opacity-60"
+                              aria-hidden
+                            />
+                            <span className="min-w-0 truncate">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
+
             const isActive = activeTab === item.id;
             return (
               <button
@@ -148,7 +256,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                 title={isCollapsed ? item.label : undefined}
                 onClick={() => {
                   if (item.id === 'portal') {
-                    window.open(`${window.location.origin}${window.location.pathname}?view=portal`, '_blank');
+                    let suffix = '';
+                    try {
+                      const tenantId = localStorage.getItem('realstate_portal_tenant_id')?.trim();
+                      if (tenantId) suffix = `?tenantId=${encodeURIComponent(tenantId)}`;
+                    } catch {
+                      // ignore
+                    }
+                    window.open(`${window.location.origin}/portal${suffix}`, '_blank');
                     return;
                   }
                   if (item.id === 'agentPortal') {
@@ -162,24 +277,23 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                   isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
                   isActive
                     ? 'bg-indigo-500/15 text-indigo-300'
-                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
+                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
                 )}
               >
-                {/* Left accent bar for active */}
                 {isActive && !isCollapsed && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-full" />
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
                 )}
                 <item.icon
                   className={cn(
                     'shrink-0 transition-colors',
                     isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
-                    isActive ? 'text-indigo-400' : ''
+                    isActive ? 'text-indigo-400' : '',
                   )}
                 />
                 <span
                   className={cn(
                     'truncate transition-all duration-300 overflow-hidden',
-                    isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                    isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
                   )}
                 >
                   {item.label}
@@ -227,11 +341,12 @@ export function TopNav({
   const socketRef = React.useRef<Socket | null>(null);
   const refreshTimeoutRef = React.useRef<number | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [themeLoading, setThemeLoading] = useState<SystemThemeMode | null>(null);
-  const [currentTheme, setCurrentTheme] = useState<SystemThemeMode>('light');
+  const [themeLoading, setThemeLoading] = useState<AppThemeMode | null>(null);
+  const [currentTheme, setCurrentTheme] = useState<AppThemeMode>('light');
   const [notifications, setNotifications] = useState<Notification[]>(() =>
     createDefaultNotifications(t),
   );
+  const [notifyPrefs, setNotifyPrefs] = useState(loadNotificationPreferences);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [notificationDetailOpen, setNotificationDetailOpen] = useState(false);
 
@@ -255,11 +370,15 @@ export function TopNav({
   }, [t, i18n.language]);
 
   useEffect(() => {
-    if (!session) return;
+    return subscribeNotificationPreferences(() => setNotifyPrefs(loadNotificationPreferences()));
+  }, []);
+
+  useEffect(() => {
+    if (!session || !notifyPrefs.inAppMaster) return;
     void refreshNotifications();
     const id = window.setInterval(() => void refreshNotifications(), 30_000);
     return () => window.clearInterval(id);
-  }, [session]);
+  }, [session, notifyPrefs.inAppMaster]);
 
   useEffect(() => {
     if (!session) return;
@@ -296,7 +415,11 @@ export function TopNav({
       refreshTimeoutRef.current = null;
     };
   }, [session]);
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const filteredNotifications = React.useMemo(
+    () => filterNotificationsByPreferences(notifications, notifyPrefs),
+    [notifications, notifyPrefs],
+  );
+  const unreadCount = effectiveUnreadCount(notifications, notifyPrefs);
 
   function formatNotificationTime(value: string) {
     const v = String(value ?? '').trim();
@@ -358,25 +481,24 @@ export function TopNav({
     }
   }
 
-  async function handleSystemThemeChange(mode: SystemThemeMode, originEl: HTMLElement | null) {
+  async function handleAppThemeChange(mode: AppThemeMode, originEl: HTMLElement | null) {
     if (themeLoading) return;
     setThemeLoading(mode);
     try {
-      await setSystemTheme(mode);
       await animateThemeRippleFromElement({
         mode,
         element: originEl,
         onApplyTheme: () => applyTheme(mode),
       });
-      toast.success(`System theme switched to ${mode}.`);
+      toast.success(mode === 'dark' ? 'Dark mode on' : 'Light mode on');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to switch system theme.';
+      const message = error instanceof Error ? error.message : 'Could not change theme.';
       toast.error(message);
     } finally {
       setThemeLoading(null);
     }
   }
-  const nextTheme: SystemThemeMode = currentTheme === 'dark' ? 'light' : 'dark';
+  const nextTheme: AppThemeMode = currentTheme === 'dark' ? 'light' : 'dark';
   const nextThemeLabel = nextTheme === 'dark' ? 'Dark' : 'Light';
 
   return (
@@ -433,7 +555,7 @@ export function TopNav({
             variant="ghost"
             size="sm"
             className="h-8 px-2.5 min-w-[92px] justify-center"
-            onClick={(e) => void handleSystemThemeChange(nextTheme, e.currentTarget as HTMLElement)}
+            onClick={(e) => void handleAppThemeChange(nextTheme, e.currentTarget as HTMLElement)}
             disabled={themeLoading !== null}
             title={`Switch system to ${nextThemeLabel.toLowerCase()} mode`}
           >
@@ -475,7 +597,7 @@ export function TopNav({
           <NotificationPanel
             isOpen={notificationOpen}
             onClose={() => setNotificationOpen(false)}
-            notifications={notifications}
+            notifications={filteredNotifications}
             onMarkAllRead={async () => {
               setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
               try {
@@ -498,10 +620,11 @@ export function TopNav({
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
                 )}
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>{initials}</AvatarFallback>
-                </Avatar>
+                <ProfileAvatarHoverPreview
+                  avatarUrl={session?.user.avatarUrl}
+                  initials={initials}
+                  avatarClassName="h-8 w-8"
+                />
                 <div className="min-w-0 text-left hidden sm:block">
                   <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
                     {name || '—'}

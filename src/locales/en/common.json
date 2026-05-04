@@ -75,12 +75,18 @@
       "crm": "CRM & Tenants",
       "ledger": "Lease Ledger",
       "calendar": "Calendar",
+      "userManagement": "User Management",
       "agentPortal": "Agent Portal (Demo)",
       "portal": "Tenant Portal (Demo)",
       "controlPanelAccess": "Control Panel"
     },
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "userMgmt": {
+      "userInfo": "User Info",
+      "userRole": "User Role",
+      "controlPanel": "Control Panel"
+    }
   },
   "views": {
     "userAccess": {
@@ -116,29 +122,135 @@
         "agent_portal": "Agent-facing portal (demo)"
       }
     },
+    "userInfo": {
+      "title": "User Info",
+      "subtitle": "Manage staff accounts and roles.",
+      "adminOnly": "Only administrators can manage users here. Use an administrator account or ask an admin to grant access.",
+      "searchPlaceholder": "Search users…",
+      "addUser": "Add New User",
+      "stats": {
+        "totalUsers": "Total Users",
+        "activeUsers": "Active Users",
+        "inactiveUsers": "Inactive Users",
+        "userRoles": "User Roles"
+      },
+      "columns": {
+        "fullName": "Full name",
+        "username": "Username",
+        "role": "Role",
+        "status": "Status",
+        "action": "Action"
+      },
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "modalAddTitle": "Add New User",
+      "modalEditTitle": "Edit User",
+      "labels": {
+        "userRole": "User role",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "username": "Username",
+        "password": "Password",
+        "confirmPassword": "Confirm password"
+      },
+      "placeholders": {
+        "selectRole": "Select role",
+        "firstName": "Enter first name",
+        "lastName": "Enter last name",
+        "username": "Enter username"
+      },
+      "cancel": "Cancel",
+      "saveUser": "Save user",
+      "passwordLeaveBlank": "Leave blank to keep the current password.",
+      "loadError": "Could not load users.",
+      "saveError": "Could not save user.",
+      "savedAdd": "User created.",
+      "savedEdit": "User updated.",
+      "deactivated": "User deactivated.",
+      "activated": "User activated.",
+      "confirmDeactivate": "Deactivate this user? They will no longer be able to sign in.",
+      "confirmActivate": "Activate this user? They will be able to sign in again.",
+      "passwordMismatch": "Passwords do not match.",
+      "passwordMin": "Password must be at least 4 characters.",
+      "missingFields": "Please fill in all required fields.",
+      "edit": "Edit",
+      "delete": "Deactivate",
+      "activateUser": "Activate user",
+      "cannotDeactivateSelf": "You cannot deactivate your own account.",
+      "accountAccessLabel": "Account access",
+      "accountAccessHint": "Turn off to block sign-in. Credentials stay in the database and you can turn access back on anytime.",
+      "accountAccessLockedHint": "You cannot disable your own account here."
+    },
+    "userRole": {
+      "title": "User Role",
+      "subtitle": "Create roles and manage which staff can sign in with each profile.",
+      "adminOnly": "Only administrators can manage roles here.",
+      "searchPlaceholder": "Search roles…",
+      "addRole": "Add New Role",
+      "accessLevelProfile": "Access level profile",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "moreUsers": "+{{count}}",
+      "loadError": "Could not load roles.",
+      "savedAdd": "Role created.",
+      "savedEdit": "Role updated.",
+      "removed": "Role deactivated.",
+      "duplicateName": "A role with this name already exists.",
+      "hasUsers": "Reassign or deactivate users before removing this role.",
+      "cannotRemoveAdmin": "The Administrator role cannot be removed.",
+      "cannotDeactivateAdmin": "The Administrator role cannot be deactivated.",
+      "modalAddTitle": "Add New Role",
+      "modalEditTitle": "Edit Role",
+      "roleName": "Role Name",
+      "roleNamePlaceholder": "e.g. Supervisor, Leasing Agent",
+      "helperNew": "Configure a new role for your staff. You can manage specific access in User Access under Control Panel.",
+      "activeLabel": "Role is active",
+      "activeHint": "Inactive roles cannot be assigned to new users.",
+      "cancel": "Cancel",
+      "saveRole": "Save Role",
+      "confirmRemoveTitle": "Deactivate role?",
+      "confirmRemoveBody": "This role will be hidden from new assignments. You can reactivate it later if no users are using it.",
+      "confirmRemoveAction": "Deactivate",
+      "edit": "Edit",
+      "remove": "Deactivate"
+    },
     "dashboard": {
       "title": "Executive Dashboard",
       "subtitle": "Real-time overview of your property portfolio performance.",
       "last30Days": "Last 30 Days",
+      "loading": "Loading dashboard…",
       "cards": {
-        "totalProfit": "Total Profit",
+        "totalProfit": "Collected rent",
         "profitTrend": "+12.5% from last month",
+        "collectedHint": "Paid invoices in selected period",
+        "trendUp": "+{{pct}}% vs previous period",
+        "trendDown": "{{pct}}% vs previous period",
+        "trendFlat": "Same as previous period",
+        "trendNoData": "No paid collections in either period",
+        "collectionsStarted": "Paid rent recorded this period",
         "netProfit": "Net Profit (Monthly Rent Base)",
-        "netProfitHint": "Leave blank to use default monthly rent base.",
+        "netProfitHint": "Sum of monthly rent (active contracts)",
         "defaultProfit": "Default: ₱{{amount}}",
         "activeLeases": "Active Leases",
         "activeTrend": "+3 new this week",
+        "newLeasesThisWeek": "{{count}} new lease(s) this week",
+        "newLeasesThisWeekZero": "No new leases started this week",
         "vacancyRate": "Vacancy Rate",
         "vacancyTrend": "-2.1% from last month",
         "overdueRent": "Overdue Rent",
         "overdueHint": "Requires immediate attention"
       },
       "charts": {
-        "salesTitle": "Sales Performance",
-        "salesDescription": "Profit and closed deals by month",
+        "salesTitle": "Rent collected & new leases",
+        "salesDescription": "Last 6 months from paid invoices and contract start dates",
+        "chartMetricAria": "Choose what this chart shows",
+        "chartStyleAria": "Chart style (bars or lines)",
+        "chartStyleBar": "Bar",
+        "chartStyleLine": "Line",
         "unitStatusTitle": "Unit Status",
         "unitStatusDescription": "Portfolio distribution",
-        "profitLabel": "Profit",
+        "profitLabel": "Collected",
+        "newLeasesLabel": "New leases",
         "statuses": {
           "occupied": "Occupied",
           "available": "Available",
@@ -167,7 +279,8 @@
       },
       "agents": {
         "title": "Agent Performance",
-        "description": "Staff accountability and deal tracking",
+        "description": "Contracts and active monthly rent by assigned agent",
+        "empty": "No agent-assigned contracts yet.",
         "agentName": "Agent Name",
         "deals": "Deals",
         "profit": "Profit",
@@ -209,7 +322,20 @@
         "more": "More",
         "perMonth": "/mo",
         "sqm": "sqm",
-        "noResults": "No units match your search or filters."
+        "noResults": "No units match your search or filters.",
+        "selectUnit": "Select unit",
+        "tenant": "Tenant",
+        "leaseEnds": "Lease ends",
+        "rentStatus": "Rent status",
+        "vacantSince": "Vacant since",
+        "daysLeft": "{{count}} days left",
+        "overdueDays": "Overdue ({{count}} days)",
+        "rentCurrent": "Current",
+        "rentOverdue": "Overdue",
+        "badgeVacant": "Vacant",
+        "badgeOverdue": "Overdue ({{count}}d)",
+        "badgeEndingSoon": "Lease ending soon",
+        "badgePaid": "Paid"
       },
       "table": {
         "unit": "Unit",
@@ -339,6 +465,7 @@
       "registerTenant": "Register New Tenant",
       "tabs": {
         "tenants": "Tenants",
+        "landlords": "Landlords",
         "brokers": "Broker Agencies",
         "blacklist": "Blacklist"
       },
@@ -456,7 +583,22 @@
         "activateActive": "Activate",
         "markedActive": "Agency marked as active.",
         "markedInactive": "Agency marked as inactive.",
-        "statusUpdateError": "Failed to update agency status."
+        "statusUpdateError": "Failed to update agency status.",
+        "verifyButton": "Verify",
+        "messageButton": "Message",
+        "noEmailForMessage": "No email on file.",
+        "bannerExpired": "Document expired",
+        "bannerExpiring": "Passport expiring in {{days}} days",
+        "bannerBlacklisted": "Agency is blacklisted",
+        "bannerVerifiedOk": "Verification complete — documents OK",
+        "bannerPending": "Verification pending — review documents",
+        "passport": "Passport",
+        "stats": "Stats",
+        "statsOk": "OK",
+        "statsReview": "Review",
+        "lastCollaboration": "Last collaboration",
+        "totalLabel": "Total",
+        "nationality": "Nationality"
       },
       "blacklist": {
         "title": "Problematic Tenants & Landlords",
@@ -480,7 +622,9 @@
         "taggedBy": "Tagged by (user id)",
         "viewTenantProfile": "View tenant profile",
         "close": "Close",
-        "tenantNotFound": "Tenant not found in the current directory list."
+        "tenantNotFound": "Tenant not found in the current directory list.",
+        "cardBanner": "Restricted party — internal blacklist record.",
+        "emptyCards": "No blacklist records match the current filter."
       }
     },
     "ledger": {
@@ -635,6 +779,11 @@
       "welcome": "Welcome, {{name}}!",
       "subtitle": "Manage your assigned deals, clients, and daily tasks.",
       "contactManagement": "Contact Management",
+      "portalLabel": "Agent Portal",
+      "overview": {
+        "title": "Portfolio overview",
+        "description": "Active deals, clients, and renewals at a glance."
+      },
       "stats": {
         "activeDeals": "Active Deals",
         "clients": "Clients",

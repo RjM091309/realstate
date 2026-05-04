@@ -12,6 +12,8 @@ export interface SessionPayload {
     username: string;
     firstName: string;
     lastName: string;
+    /** Public URL path e.g. `/uploads/avatars/….webp` */
+    avatarUrl?: string | null;
   };
   role: { id: number; name: string };
   branchId: number;

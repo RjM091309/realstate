@@ -181,6 +181,33 @@
   border-color: rgb(51 65 85) !important;
 }
 
+/* Lease / invoice preview: always light “paper” + dark ink (overrides .dark .bg-white / slate text hacks above). */
+.dark .lease-document-sheet {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+.dark .lease-document-sheet .text-slate-900 {
+  color: #0f172a !important;
+}
+.dark .lease-document-sheet .text-slate-800 {
+  color: #1e293b !important;
+}
+.dark .lease-document-sheet .text-slate-700 {
+  color: #334155 !important;
+}
+.dark .lease-document-sheet .text-slate-600,
+.dark .lease-document-sheet .text-slate-500,
+.dark .lease-document-sheet .text-slate-400 {
+  color: #475569 !important;
+}
+.dark .lease-document-sheet .border-slate-200,
+.dark .lease-document-sheet .border-slate-100 {
+  border-color: #e2e8f0 !important;
+}
+.dark .lease-document-sheet .border-slate-400 {
+  border-color: #94a3b8 !important;
+}
+
 .theme-transition,
 .theme-transition * {
   transition-property: background-color, color, border-color, fill, stroke, box-shadow !important;

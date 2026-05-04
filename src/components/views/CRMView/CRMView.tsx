@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import {
   Users,
+  Home,
+  Building2,
+  Ban,
   Search,
   Plus,
   Mail,
@@ -12,6 +15,10 @@ import {
   ExternalLink,
   ShieldAlert,
   ShieldQuestion,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Calendar,
   CalendarRange,
   FileText,
   FileImage,
@@ -19,7 +26,6 @@ import {
   Upload,
   Loader2,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +42,6 @@ import {
 import { SkeletonTable } from '@/components/skeleton';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
-import { tenants as seedTenants, contracts as seedContracts, units } from '@/lib/mockData';
 import {
   createTenant,
   deleteTenant,
@@ -74,7 +79,14 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import type { BrokerAgency, Contract, Landlord, Tenant, Unit } from '@/types';
-import { format, parseISO } from 'date-fns';
+import {
+  differenceInCalendarDays,
+  format,
+  formatDistanceToNow,
+  isValid,
+  parseISO,
+  startOfDay,
+} from 'date-fns';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 
 type BlacklistRow = BlacklistRowDto;
@@ -191,6 +203,51 @@ async function toWebpIfNeeded(file: File): Promise<File> {
   return new File([blob], `${safeBase}.webp`, { type: 'image/webp' });
 }
 
+function brokerParseExpiry(raw?: string): Date | null {
+  if (!raw?.trim()) return null;
+  try {
+    const d = parseISO(raw);
+    return isValid(d) ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+type BrokerExpiryInsight =
+  | 'none'
+  | { status: 'expired'; daysPast: number }
+  | { status: 'expiring'; daysLeft: number }
+  | { status: 'ok'; daysLeft: number };
+
+function brokerExpiryInsight(expiryDate?: string): BrokerExpiryInsight {
+  const d = brokerParseExpiry(expiryDate);
+  if (!d) return 'none';
+  const today = startOfDay(new Date());
+  const end = startOfDay(d);
+  const diff = differenceInCalendarDays(end, today);
+  if (diff < 0) return { status: 'expired', daysPast: Math.abs(diff) };
+  if (diff <= 14) return { status: 'expiring', daysLeft: diff };
+  return { status: 'ok', daysLeft: diff };
+}
+
+function brokerCollaborationStats(
+  agencyId: string,
+  contracts: Contract[],
+): { count: number; lastAt: Date | null } {
+  const relevant = contracts.filter((c) => c.brokerAgencyId === agencyId);
+  let lastAt: Date | null = null;
+  for (const c of relevant) {
+    try {
+      const sd = parseISO(c.startDate);
+      if (!isValid(sd)) continue;
+      if (!lastAt || sd > lastAt) lastAt = sd;
+    } catch {
+      /* skip */
+    }
+  }
+  return { count: relevant.length, lastAt };
+}
+
 export function CRMView() {
   const { t } = useTranslation();
   const { session } = useAuth();
@@ -280,7 +337,7 @@ export function CRMView() {
       const list = await fetchTenants();
       setTenantList(list);
     } catch {
-      setTenantList([...seedTenants]);
+      setTenantList([]);
       toast.warning(t('views.crm.tenantModal.loadError'));
     } finally {
       setCrmLoading(false);
@@ -388,7 +445,7 @@ export function CRMView() {
         const list = await fetchContracts();
         setContractList(list);
       } catch {
-        setContractList(seedContracts);
+        setContractList([]);
       }
     })();
   }, []);
@@ -399,7 +456,7 @@ export function CRMView() {
         const list = await fetchUnits();
         setUnitList(list);
       } catch {
-        setUnitList(units);
+        setUnitList([]);
       }
     })();
   }, []);
@@ -1126,6 +1183,11 @@ export function CRMView() {
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
+                    try {
+                      localStorage.setItem('realstate_portal_tenant_id', String(tenant.id));
+                    } catch {
+                      // ignore storage failures (private mode, etc.)
+                    }
                     const url = `${window.location.origin}/portal?tenantId=${encodeURIComponent(tenant.id)}`;
                     window.open(url, '_blank');
                   }}
@@ -1236,75 +1298,27 @@ export function CRMView() {
     [canDelete, canUpdate],
   );
 
-  const blacklistColumns: ColumnDef<BlacklistRow>[] = useMemo(
-    () => [
-      {
-        header: t('views.crm.blacklist.name'),
-        render: (item) => <span className="font-medium text-slate-900">{item.name}</span>,
-      },
-      {
-        header: t('views.crm.blacklist.type'),
-        render: (item) => (
-          <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 font-medium">
-            {item.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker')}
-          </Badge>
-        ),
-      },
-      {
-        header: t('views.crm.blacklist.reason'),
-        render: (item) => <span className="text-sm text-slate-600">{item.reason}</span>,
-      },
-      {
-        header: t('views.crm.blacklist.dateAdded'),
-        render: (item) => (
-          <span className="text-xs text-slate-400">{format(parseISO(item.date), 'MMM d, yyyy')}</span>
-        ),
-      },
-      {
-        header: t('views.crm.blacklist.actions'),
-        className: 'text-right',
-        headerClassName: 'text-right',
-        cellClassName: 'text-right',
-        render: (item) => (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 border-slate-200 text-slate-700 hover:bg-slate-50"
-            onClick={(e) => {
-              e.stopPropagation();
-              openBlacklistDetails(item);
-            }}
-          >
-            {t('views.crm.blacklist.details')}
-          </Button>
-        ),
-      },
-    ],
-    [t],
-  );
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.crm.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('views.crm.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{t('views.crm.title')}</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">{t('views.crm.subtitle')}</p>
         </div>
         {canCreate && activeTab === 'tenants' && (
-          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openRegister}>
+          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openRegister}>
             <Plus className="w-4 h-4 mr-2" />
             {t('views.crm.registerTenant')}
           </Button>
         )}
         {canCreate && activeTab === 'brokers' && (
-          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddBroker}>
+          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openAddBroker}>
             <Plus className="w-4 h-4 mr-2" />
             {t('views.crm.brokers.addAgency')}
           </Button>
         )}
         {canCreate && activeTab === 'landlords' && (
-          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddLandlord}>
+          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openAddLandlord}>
             <Plus className="w-4 h-4 mr-2" />
             Add Landlord
           </Button>
@@ -1316,14 +1330,14 @@ export function CRMView() {
         onClose={() => setIsDetailsOpen(false)}
         title={selectedTenant ? selectedTenant.name : ''}
         maxWidth="2xl"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               {t('views.crm.details.close')}
             </Button>
             {canUpdate && selectedTenant && (
-              <Button className="bg-indigo-600" onClick={() => openEdit(selectedTenant)}>
+              <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => openEdit(selectedTenant)}>
                 {t('views.crm.details.editTenant')}
               </Button>
             )}
@@ -1535,7 +1549,7 @@ export function CRMView() {
                 </div>
 
                 {selectedTenant.idImageUrl ? (
-                  <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
                     <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
                       Preview
                     </div>
@@ -1576,7 +1590,7 @@ export function CRMView() {
         onClose={closeDeleteBroker}
         title={t('views.crm.brokers.delete')}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeDeleteBroker}>
@@ -1604,7 +1618,7 @@ export function CRMView() {
         onClose={closeBlacklistBroker}
         title={t('views.crm.table.blacklisted')}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeBlacklistBroker}>
@@ -1640,7 +1654,7 @@ export function CRMView() {
         onClose={closeActivateBroker}
         title={t('views.crm.brokers.activateTitle')}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeActivateBroker}>
@@ -1670,7 +1684,7 @@ export function CRMView() {
         onClose={closeActivateTenant}
         title={t('views.crm.table.activateTenantTitle')}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeActivateTenant}>
@@ -1700,13 +1714,13 @@ export function CRMView() {
         onClose={closeForm}
         title={formMode === 'edit' ? t('views.crm.tenantModal.editTitle') : t('views.crm.tenantModal.createTitle')}
         maxWidth="2xl"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeForm}>
               {t('views.crm.tenantModal.cancel')}
             </Button>
-            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
+            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
               {t('views.crm.tenantModal.save')}
             </Button>
           </div>
@@ -2045,13 +2059,13 @@ export function CRMView() {
         onClose={closeLandlordForm}
         title={landlordFormMode === 'edit' ? 'Edit landlord' : 'Add landlord'}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" onClick={closeLandlordForm}>
               Cancel
             </Button>
-            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
+            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
               Save
             </Button>
           </div>
@@ -2099,7 +2113,7 @@ export function CRMView() {
         onClose={closeBrokerForm}
         title={brokerFormMode === 'edit' ? t('views.crm.brokers.editTitle') : t('views.crm.brokers.addTitle')}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button
@@ -2112,7 +2126,7 @@ export function CRMView() {
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[100px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[100px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
               onClick={() => void handleSaveBroker()}
             >
               {t('views.crm.brokers.save')}
@@ -2321,11 +2335,11 @@ export function CRMView() {
         onClose={closeBlacklistDetails}
         title={selectedBlacklist ? t('views.crm.blacklist.detailsTitle') : ''}
         maxWidth="lg"
-        variant="glass"
+        variant="default"
         footer={
           <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
             {selectedBlacklist?.entityType === 'tenant' && selectedBlacklist.tenantId ? (
-              <Button type="button" className="sm:mr-auto bg-indigo-600 hover:bg-indigo-700" onClick={openTenantFromBlacklist}>
+              <Button type="button" className="sm:mr-auto bg-indigo-600 text-white hover:bg-indigo-700" onClick={openTenantFromBlacklist}>
                 {t('views.crm.blacklist.viewTenantProfile')}
               </Button>
             ) : null}
@@ -2405,7 +2419,7 @@ export function CRMView() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             placeholder={t('views.crm.searchPlaceholder')}
-            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
+            className="h-10 rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-900/40"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -2413,11 +2427,35 @@ export function CRMView() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
-          <TabsTrigger value="tenants">{t('views.crm.tabs.tenants')}</TabsTrigger>
-          <TabsTrigger value="landlords">Landlords</TabsTrigger>
-          <TabsTrigger value="brokers">{t('views.crm.tabs.brokers')}</TabsTrigger>
-          <TabsTrigger value="blacklist">{t('views.crm.tabs.blacklist')}</TabsTrigger>
+        <TabsList className="mb-6 grid h-12 w-full max-w-3xl grid-cols-4 gap-1 rounded-2xl border border-slate-200/90 bg-slate-100 p-1.5 shadow-inner dark:border-slate-700 dark:bg-slate-800/90">
+          <TabsTrigger
+            value="tenants"
+            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
+          >
+            <Users className="size-4 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate">{t('views.crm.tabs.tenants')}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="landlords"
+            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
+          >
+            <Home className="size-4 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate">{t('views.crm.tabs.landlords')}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="brokers"
+            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
+          >
+            <Building2 className="size-4 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate">{t('views.crm.tabs.brokers')}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="blacklist"
+            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
+          >
+            <Ban className="size-4 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate">{t('views.crm.tabs.blacklist')}</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tenants" className="space-y-6">
@@ -2447,245 +2485,559 @@ export function CRMView() {
 
         <TabsContent value="brokers" className="space-y-6">
           {brokersLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
-                  <div className="h-12 w-12 rounded-lg bg-slate-100 mb-4" />
-                  <div className="h-5 w-2/3 bg-slate-100 rounded mb-2" />
-                  <div className="h-3 w-1/2 bg-slate-100 rounded mb-6" />
-                  <div className="h-4 w-full bg-slate-100 rounded mb-2" />
-                  <div className="h-4 w-5/6 bg-slate-100 rounded mb-4" />
-                  <div className="h-9 w-full bg-slate-100 rounded" />
+                <div
+                  key={i}
+                  className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <div className="border-b border-slate-100 p-4 dark:border-slate-800">
+                    <div className="flex gap-3">
+                      <div className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                      <div className="flex-1 space-y-2 pt-0.5">
+                        <div className="h-4 w-3/5 rounded bg-slate-100 dark:bg-slate-800" />
+                        <div className="h-3 w-2/5 rounded bg-slate-100 dark:bg-slate-800" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-10 bg-slate-50 dark:bg-slate-800/80" />
+                  <div className="space-y-2 p-4">
+                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
+                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
+                    <div className="h-3 w-4/5 rounded bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <div className="mb-3 flex justify-between">
+                      <div className="h-3 w-24 rounded bg-slate-100 dark:bg-slate-800" />
+                      <div className="h-3 w-12 rounded bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                      <div className="h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid min-w-0 grid-cols-1 items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3">
               {filteredBrokers.map((agency) => {
                 const isBrokerBl =
                   Boolean(agency.isBlacklisted) ||
                   blacklistList.some((r) => r.entityType === 'broker' && r.partnerAgencyId === agency.id);
-                return (
-                <div
-                  key={agency.id}
-                  className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden"
-                >
-                  {/* Header */}
-                  <div className="px-5 pt-5 pb-4">
-                    <div className="flex items-start gap-3.5">
-                      <div className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-600 font-semibold text-base">
-                        {(agency.name || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">{agency.name}</h3>
-                          {(canUpdate || canDelete) ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                }
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {canUpdate ? (
-                                  <DropdownMenuItem onClick={() => openEditBroker(agency)}>
-                                    {t('views.crm.brokers.edit')}
-                                  </DropdownMenuItem>
-                                ) : null}
-                                {canUpdate ? (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      if (isBrokerBl) {
-                                        openActivateBroker(agency);
-                                        return;
-                                      }
-                                      openBlacklistBroker(agency);
-                                    }}
-                                  >
-                                    {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
-                                  </DropdownMenuItem>
-                                ) : null}
-                                {canUpdate ? (
-                                  <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
-                                    {agency.kycVerified
-                                      ? t('views.crm.brokers.unverify')
-                                      : t('views.crm.brokers.verify')}
-                                  </DropdownMenuItem>
-                                ) : null}
-                                {canUpdate ? (
-                                  <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
-                                    {agency.active !== false
-                                      ? t('views.crm.brokers.deactivate')
-                                      : t('views.crm.brokers.activateActive')}
-                                  </DropdownMenuItem>
-                                ) : null}
-                                {canDelete ? (
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    className="text-rose-600"
-                                    onClick={() => void handleDeleteBroker(agency)}
-                                  >
-                                    {t('views.crm.brokers.delete')}
-                                  </DropdownMenuItem>
-                                ) : null}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">{agency.contactPerson || '—'}</p>
-                        {/* Status indicators */}
-                        <div className="flex items-center gap-3 mt-2">
-                          {isBrokerBl ? (
-                            <span className="flex items-center gap-1.5 text-[11px] text-rose-600 font-medium">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                              {t('views.crm.table.blacklisted')}
-                            </span>
-                          ) : (
-                            <>
-                              <span className={cn(
-                                'flex items-center gap-1.5 text-[11px] font-medium',
-                                agency.kycVerified ? 'text-emerald-600' : 'text-amber-600',
-                              )}>
-                                <span className={cn('h-1.5 w-1.5 rounded-full', agency.kycVerified ? 'bg-emerald-500' : 'bg-amber-500')} />
-                                {agency.kycVerified ? t('views.crm.table.verified') : t('views.crm.table.verificationPending')}
-                              </span>
-                              <span className={cn(
-                                'flex items-center gap-1.5 text-[11px] font-medium',
-                                agency.active !== false ? 'text-slate-600' : 'text-slate-400',
-                              )}>
-                                <span className={cn('h-1.5 w-1.5 rounded-full', agency.active !== false ? 'bg-slate-500' : 'bg-slate-300')} />
-                                {agency.active !== false ? t('views.crm.table.active') : t('views.crm.table.inactive')}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                const expInsight = brokerExpiryInsight(agency.expiryDate);
+                const collab = brokerCollaborationStats(agency.id, contractList);
 
-                  {/* Details */}
-                  <div className="px-5 pb-4 space-y-2">
-                    <div className="border-t border-slate-100 pt-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-400 font-medium">{t('views.crm.brokers.phone')}</span>
-                        <span className="text-slate-700 font-medium tabular-nums">{agency.phone || '—'}</span>
-                      </div>
-                      {agency.email ? (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-medium">{t('views.crm.brokers.emailShort')}</span>
-                          <span className="text-slate-700 font-medium break-all text-right">{agency.email}</span>
-                        </div>
-                      ) : null}
-                      {agency.nationality ? (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-medium">Nationality</span>
-                          <span className="text-slate-700 font-medium">{agency.nationality}</span>
-                        </div>
-                      ) : null}
-                      {agency.documentType ? (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-medium">Document</span>
-                          <span className="text-slate-700 font-medium">{agency.documentType}{agency.documentNo ? ` • ${agency.documentNo}` : ''}</span>
-                        </div>
-                      ) : null}
-                      {agency.expiryDate ? (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-medium">Expiry</span>
-                          <span className="text-slate-700 font-medium tabular-nums">{agency.expiryDate}</span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                const passportValue =
+                  agency.documentType || agency.documentNo
+                    ? `${agency.documentType ?? '—'}${agency.documentNo ? ` · ${agency.documentNo}` : ''}`
+                    : '—';
 
-                  {/* Footer */}
-                  <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100">
-                    <Button type="button" variant="ghost" size="sm" className="w-full h-7 text-xs font-medium text-slate-500 hover:text-slate-900" onClick={handleViewBrokerLogs}>
-                      {t('views.crm.brokers.viewLogs')}
+                const banner = (() => {
+                  if (isBrokerBl) {
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 dark:bg-rose-950/45 dark:text-rose-100">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+                        {t('views.crm.brokers.bannerBlacklisted')}
+                      </div>
+                    );
+                  }
+                  if (expInsight !== 'none' && expInsight.status === 'expired') {
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-900 dark:bg-red-950/40 dark:text-red-100">
+                        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.bannerExpired')}
+                      </div>
+                    );
+                  }
+                  if (expInsight !== 'none' && expInsight.status === 'expiring') {
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 dark:bg-amber-950/35 dark:text-amber-100">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+                        {t('views.crm.brokers.bannerExpiring', { days: expInsight.daysLeft })}
+                      </div>
+                    );
+                  }
+                  if (agency.kycVerified) {
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                        {t('views.crm.brokers.bannerVerifiedOk')}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 dark:bg-amber-950/35 dark:text-amber-100">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+                      {t('views.crm.brokers.bannerPending')}
+                    </div>
+                  );
+                })();
+
+                let statsNode: React.ReactNode;
+                if (isBrokerBl) {
+                  statsNode = (
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">{t('views.crm.table.blacklisted')}</span>
+                  );
+                } else if (
+                  !agency.kycVerified ||
+                  (expInsight !== 'none' &&
+                    (expInsight.status === 'expired' || expInsight.status === 'expiring'))
+                ) {
+                  statsNode = (
+                    <span className="font-semibold text-amber-700 dark:text-amber-400">
+                      {t('views.crm.brokers.statsReview')}
+                    </span>
+                  );
+                } else {
+                  statsNode = (
+                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {t('views.crm.brokers.statsOk')}
+                    </span>
+                  );
+                }
+
+                const primaryButton = (() => {
+                  if (isBrokerBl && canUpdate) {
+                    return (
+                      <Button
+                        type="button"
+                        className="h-10 w-full min-w-0 rounded-lg border border-amber-300 bg-amber-50 text-sm font-semibold text-amber-950 shadow-sm hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
+                        onClick={() => openActivateBroker(agency)}
+                      >
+                        {t('views.crm.brokers.activate')}
+                      </Button>
+                    );
+                  }
+                  if (!isBrokerBl && canUpdate && !agency.kycVerified) {
+                    return (
+                      <Button
+                        type="button"
+                        className="h-10 w-full min-w-0 rounded-lg bg-amber-400 text-sm font-semibold text-slate-900 shadow-sm hover:bg-amber-500"
+                        onClick={() => void toggleBrokerVerified(agency)}
+                      >
+                        <ShieldCheck className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.verifyButton')}
+                      </Button>
+                    );
+                  }
+                  return (
+                    <Button
+                      type="button"
+                      className="h-10 w-full min-w-0 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                      onClick={() => {
+                        const em = agency.email?.trim();
+                        if (em) window.location.href = `mailto:${encodeURIComponent(em)}`;
+                        else toast.info(t('views.crm.brokers.noEmailForMessage'));
+                      }}
+                    >
+                      <Mail className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                      {t('views.crm.brokers.messageButton')}
                     </Button>
+                  );
+                })();
+
+                return (
+                  <div
+                    key={agency.id}
+                    className="group flex min-h-[420px] min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <div className="relative min-w-0 border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
+                      <div className="flex items-start gap-3 pr-9">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-base font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                          {(agency.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                            {agency.name}
+                          </h3>
+                          <p className="mt-0.5 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
+                            {agency.contactPerson || '—'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-3">
+                            {isBrokerBl ? (
+                              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                {t('views.crm.table.blacklisted')}
+                              </span>
+                            ) : (
+                              <>
+                                <span
+                                  className={cn(
+                                    'flex items-center gap-1.5 text-[11px] font-semibold',
+                                    agency.kycVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      'h-1.5 w-1.5 rounded-full',
+                                      agency.kycVerified ? 'bg-emerald-500' : 'bg-amber-500',
+                                    )}
+                                  />
+                                  {agency.kycVerified
+                                    ? t('views.crm.table.verified')
+                                    : t('views.crm.table.verificationPending')}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'flex items-center gap-1.5 text-[11px] font-semibold',
+                                    agency.active !== false
+                                      ? 'text-slate-600 dark:text-slate-300'
+                                      : 'text-slate-400 dark:text-slate-500',
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      'h-1.5 w-1.5 rounded-full',
+                                      agency.active !== false ? 'bg-slate-500 dark:bg-slate-400' : 'bg-slate-300 dark:bg-slate-600',
+                                    )}
+                                  />
+                                  {agency.active !== false
+                                    ? t('views.crm.table.active')
+                                    : t('views.crm.table.inactive')}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {canUpdate || canDelete ? (
+                        <div className="absolute right-3 top-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              }
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => openEditBroker(agency)}>
+                                  {t('views.crm.brokers.edit')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (isBrokerBl) {
+                                      openActivateBroker(agency);
+                                      return;
+                                    }
+                                    openBlacklistBroker(agency);
+                                  }}
+                                >
+                                  {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
+                                  {agency.kycVerified
+                                    ? t('views.crm.brokers.unverify')
+                                    : t('views.crm.brokers.verify')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canUpdate ? (
+                                <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
+                                  {agency.active !== false
+                                    ? t('views.crm.brokers.deactivate')
+                                    : t('views.crm.brokers.activateActive')}
+                                </DropdownMenuItem>
+                              ) : null}
+                              {canDelete ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  className="text-rose-600"
+                                  onClick={() => void handleDeleteBroker(agency)}
+                                >
+                                  {t('views.crm.brokers.delete')}
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">{banner}</div>
+
+                    <div className="flex min-w-0 flex-1 flex-col px-4 py-3">
+                      <div className="min-w-0 space-y-2.5 text-xs">
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            {t('views.crm.brokers.phone')}
+                          </span>
+                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
+                            {agency.phone || '—'}
+                          </span>
+                        </div>
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            {t('views.crm.brokers.emailShort')}
+                          </span>
+                          <span className="min-w-0 break-all text-right font-semibold text-slate-900 dark:text-slate-100">
+                            {agency.email?.trim() || '—'}
+                          </span>
+                        </div>
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            {t('views.crm.brokers.nationality')}
+                          </span>
+                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
+                            {agency.nationality?.trim() || '—'}
+                          </span>
+                        </div>
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            {t('views.crm.brokers.passport')}
+                          </span>
+                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
+                            {passportValue}
+                          </span>
+                        </div>
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            {t('views.crm.brokers.stats')}
+                          </span>
+                          <div className="min-w-0 text-right">{statsNode}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto min-w-0 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="mb-3 flex min-w-0 items-start justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="flex min-w-0 flex-1 items-start gap-1">
+                          <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
+                          <span className="min-w-0 leading-snug break-words">
+                            <span className="font-medium text-slate-600 dark:text-slate-300">
+                              {t('views.crm.brokers.lastCollaboration')}:
+                            </span>{' '}
+                            {collab.lastAt
+                              ? formatDistanceToNow(collab.lastAt, { addSuffix: true })
+                              : '—'}
+                          </span>
+                        </span>
+                        <span className="shrink-0 pl-1 font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                          {t('views.crm.brokers.totalLabel')}: {collab.count}
+                        </span>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <div className="min-w-0 w-full">{primaryButton}</div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-auto min-h-10 w-full min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 whitespace-normal rounded-lg border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-snug text-blue-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800 [&_svg]:shrink-0"
+                          onClick={handleViewBrokerLogs}
+                        >
+                          <span className="max-w-full text-center">{t('views.crm.brokers.viewLogs')}</span>
+                          <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
                 );
               })}
             </div>
           )}
         </TabsContent>
         <TabsContent value="blacklist" className="space-y-6">
-          <Card className="gap-0 overflow-hidden rounded-xl border border-rose-100/80 py-0 shadow-sm">
-            <CardHeader className="bg-rose-50/50 border-b border-rose-100 px-6 py-4">
-              <CardTitle className="text-rose-900 flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5" />
-                {t('views.crm.blacklist.title')}
-              </CardTitle>
-              <CardDescription className="text-rose-700/70">{t('views.crm.blacklist.description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="flex flex-wrap items-center gap-2 px-6 py-4 border-b border-rose-100 bg-white">
-                <Button
-                  type="button"
-                  variant={blacklistTypeFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(
-                    'h-8',
-                    blacklistTypeFilter === 'all'
-                      ? 'bg-rose-600 hover:bg-rose-700'
-                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
-                  )}
-                  onClick={() => setBlacklistTypeFilter('all')}
-                >
-                  All
-                </Button>
-                <Button
-                  type="button"
-                  variant={blacklistTypeFilter === 'tenant' ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(
-                    'h-8',
-                    blacklistTypeFilter === 'tenant'
-                      ? 'bg-rose-600 hover:bg-rose-700'
-                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
-                  )}
-                  onClick={() => setBlacklistTypeFilter('tenant')}
-                >
-                  {t('views.crm.blacklist.tenant')}
-                </Button>
-                <Button
-                  type="button"
-                  variant={blacklistTypeFilter === 'broker' ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(
-                    'h-8',
-                    blacklistTypeFilter === 'broker'
-                      ? 'bg-rose-600 hover:bg-rose-700'
-                      : 'border-rose-200 text-rose-700 hover:bg-rose-50',
-                  )}
-                  onClick={() => setBlacklistTypeFilter('broker')}
-                >
-                  {t('views.crm.blacklist.broker')}
-                </Button>
+          <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white px-4 py-4 shadow-sm dark:border-rose-900/50 dark:from-rose-950/35 dark:via-slate-900 dark:to-slate-900">
+            <div className="flex gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/80">
+                <ShieldAlert className="h-6 w-6 text-rose-600 dark:text-rose-400" aria-hidden />
               </div>
-              {crmLoading || blacklistLoading ? (
-                <div className="p-6">
-                  <SkeletonTable rows={5} columns={5} showToolbar={false} />
-                </div>
-              ) : (
-                <DataTable
-                  data={filteredBlacklist}
-                  columns={blacklistColumns}
-                  keyExtractor={(row) => row.id}
-                  highlightFirstColumn={false}
-                  embedded
-                />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-rose-950 dark:text-rose-50">{t('views.crm.blacklist.title')}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-rose-900/85 dark:text-rose-200/90">
+                  {t('views.crm.blacklist.description')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <Button
+              type="button"
+              variant={blacklistTypeFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-9 rounded-lg px-3',
+                blacklistTypeFilter === 'all'
+                  ? 'bg-rose-600 text-white hover:bg-rose-700'
+                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
               )}
-            </CardContent>
-          </Card>
+              onClick={() => setBlacklistTypeFilter('all')}
+            >
+              All
+            </Button>
+            <Button
+              type="button"
+              variant={blacklistTypeFilter === 'tenant' ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-9 rounded-lg px-3',
+                blacklistTypeFilter === 'tenant'
+                  ? 'bg-rose-600 text-white hover:bg-rose-700'
+                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
+              )}
+              onClick={() => setBlacklistTypeFilter('tenant')}
+            >
+              {t('views.crm.blacklist.tenant')}
+            </Button>
+            <Button
+              type="button"
+              variant={blacklistTypeFilter === 'broker' ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-9 rounded-lg px-3',
+                blacklistTypeFilter === 'broker'
+                  ? 'bg-rose-600 text-white hover:bg-rose-700'
+                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
+              )}
+              onClick={() => setBlacklistTypeFilter('broker')}
+            >
+              {t('views.crm.blacklist.broker')}
+            </Button>
+          </div>
+
+          {crmLoading || blacklistLoading ? (
+            <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <div className="border-b border-slate-100 p-4 dark:border-slate-800">
+                    <div className="flex gap-3">
+                      <div className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                      <div className="flex-1 space-y-2 pt-0.5">
+                        <div className="h-4 w-3/5 rounded bg-slate-100 dark:bg-slate-800" />
+                        <div className="h-3 w-2/5 rounded bg-slate-100 dark:bg-slate-800" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-12 bg-rose-50/80 dark:bg-rose-950/30" />
+                  <div className="space-y-2 p-4">
+                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
+                    <div className="h-12 w-full rounded bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <div className="h-10 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredBlacklist.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center dark:border-slate-700 dark:bg-slate-900/40">
+              <ShieldAlert className="mb-3 h-12 w-12 text-rose-300 dark:text-rose-700" />
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('views.crm.blacklist.emptyCards')}</p>
+            </div>
+          ) : (
+            <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {filteredBlacklist.map((row) => {
+                const initial = (row.name || '?').trim().charAt(0).toUpperCase();
+                const typeLabel =
+                  row.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker');
+                let dateAdded = row.date;
+                try {
+                  const d = parseISO(row.date);
+                  if (isValid(d)) dateAdded = format(d, 'MMM d, yyyy');
+                } catch {
+                  /* keep raw */
+                }
+                return (
+                  <div
+                    key={row.id}
+                    className="flex min-h-[320px] min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <div className="relative min-w-0 border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-base font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                          {initial}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                            {row.name}
+                          </h3>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-950/80 dark:text-rose-200">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              {t('views.crm.table.blacklisted')}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="border-0 bg-slate-100 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            >
+                              {typeLabel}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                      <div className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 dark:bg-rose-950/45 dark:text-rose-100">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+                        <span className="leading-snug">{t('views.crm.blacklist.cardBanner')}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex min-w-0 flex-1 flex-col px-4 py-3">
+                      <div className="min-w-0 space-y-2.5 text-xs">
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="flex shrink-0 items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                            <Calendar className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                            {t('views.crm.blacklist.dateAdded')}
+                          </span>
+                          <span className="min-w-0 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                            {dateAdded}
+                          </span>
+                        </div>
+                        {row.taggedBy ? (
+                          <div className="flex min-w-0 items-start justify-between gap-3 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                            <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                              {t('views.crm.blacklist.taggedBy')}
+                            </span>
+                            <span className="min-w-0 break-all text-right font-mono text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                              {row.taggedBy}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {t('views.crm.blacklist.reason')}
+                        </div>
+                        <p className="mt-1.5 text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
+                          {row.reason?.trim() || '—'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto min-w-0 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 w-full min-w-0 rounded-lg border-slate-200 bg-white text-sm font-semibold text-blue-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800"
+                        onClick={() => openBlacklistDetails(row)}
+                      >
+                        <Eye className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.blacklist.details')}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

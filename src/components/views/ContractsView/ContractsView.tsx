@@ -22,7 +22,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { units as seedUnits, tenants as seedTenants, agents } from '@/lib/mockData';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import {
@@ -157,7 +156,7 @@ export function ContractsView() {
         const list = await fetchTenants();
         setTenantList(list);
       } catch {
-        setTenantList(seedTenants);
+        setTenantList([]);
       }
     })();
   }, []);
@@ -168,7 +167,7 @@ export function ContractsView() {
         const list = await fetchUnits();
         setUnitList(list);
       } catch {
-        setUnitList(seedUnits);
+        setUnitList([]);
       }
     })();
   }, []);
@@ -333,8 +332,7 @@ export function ContractsView() {
       {
         header: t('views.contracts.table.agent'),
         render: (contract) => {
-          const fallback = agents.find((a) => a.id === contract.agentId)?.name;
-          const label = (contract.agentName && contract.agentName.trim()) || fallback || '—';
+          const label = (contract.agentName && contract.agentName.trim()) || '—';
           return <span className="text-sm font-medium">{label}</span>;
         },
       },
@@ -453,7 +451,7 @@ export function ContractsView() {
       return;
     }
 
-    const agentId = session?.user?.id ? `a${session.user.id}` : agents[0]?.id ?? 'a1';
+    const agentId = session?.user?.id ? String(session.user.id) : '';
     const newContractPayload: Parameters<typeof createContract>[0] = {
       unitId,
       tenantId,
@@ -491,8 +489,7 @@ export function ContractsView() {
     return contractList.filter((c) => {
       const unit = unitList.find((u) => u.id === c.unitId);
       const tenant = tenantList.find((ten) => ten.id === c.tenantId);
-      const agentFallback = agents.find((a) => a.id === c.agentId)?.name;
-      const agentLabel = (c.agentName && c.agentName.trim()) || agentFallback || '';
+      const agentLabel = (c.agentName && c.agentName.trim()) || '';
       const hay = [c.id, unit?.unitNumber, unit?.buildingName, tenant?.name, agentLabel]
         .filter(Boolean)
         .join(' ')

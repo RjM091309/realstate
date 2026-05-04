@@ -21,5 +21,6 @@ export function getInitialTheme(): AppThemeMode {
   if (saved === 'dark' || saved === 'light') {
     return saved;
   }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  /** App default only — do not follow the browser/OS color scheme. */
+  return 'light';
 }

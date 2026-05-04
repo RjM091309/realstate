@@ -11,52 +11,71 @@ import {
   Sun,
   Sunset,
   Moon,
+  Loader2,
 } from 'lucide-react';
 import {
   Card,
+  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
   PieChart,
   Pie,
   Cell,
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, type ColumnDef } from '@/components/data-table';
-import { units, payments, contracts, tenants } from '@/lib/mockData';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import {
+  format,
+  isAfter,
+  isBefore,
+  addDays,
+  parseISO,
+  subDays,
+  subMonths,
+  differenceInCalendarDays,
+  startOfDay,
+  endOfDay,
+} from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import type { Contract, Payment } from '@/types';
-import { useDateRange } from '@/context/DateRangeContext';
+import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { useAuth } from '@/context/AuthContext';
-
-const salesData = [
-  { month: 'Jan', Profit: 450000, deals: 12 },
-  { month: 'Feb', Profit: 520000, deals: 15 },
-  { month: 'Mar', Profit: 480000, deals: 10 },
-  { month: 'Apr', Profit: 610000, deals: 18 },
-  { month: 'May', Profit: 550000, deals: 14 },
-  { month: 'Jun', Profit: 670000, deals: 20 },
-];
-
-const occupancyData = (t: (key: string) => string) => [
-  { name: t('views.dashboard.charts.statuses.occupied'), value: units.filter(u => u.status === 'Occupied').length },
-  { name: t('views.dashboard.charts.statuses.available'), value: units.filter(u => u.status === 'Available').length },
-  { name: t('views.dashboard.charts.statuses.maintenance'), value: units.filter(u => u.status === 'Maintenance').length },
-];
+import { fetchUnits } from '@/lib/unitsApi';
+import { fetchContracts } from '@/lib/contractsApi';
+import { fetchPayments } from '@/lib/paymentsApi';
+import { fetchTenants } from '@/lib/tenantsApi';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b'];
+
+function sumPaidBetween(payments: Payment[], startYmd: string, endYmd: string): number {
+  return payments
+    .filter((p) => p.status === 'Paid')
+    .filter((p) => {
+      const d = (p.paidDate || p.dueDate || '').slice(0, 10);
+      return d.length >= 10 && d >= startYmd && d <= endYmd;
+    })
+    .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+}
+
+const occupancyData = (t: (key: string) => string, units: Array<{ status: string }>) => [
+  { name: t('views.dashboard.charts.statuses.occupied'), value: units.filter((u) => u.status === 'Occupied').length },
+  { name: t('views.dashboard.charts.statuses.available'), value: units.filter((u) => u.status === 'Available').length },
+  { name: t('views.dashboard.charts.statuses.maintenance'), value: units.filter((u) => u.status === 'Maintenance').length },
+];
 
 function getGreeting(): { text: string; icon: React.ReactNode } {
   const hour = new Date().getHours();
@@ -79,19 +98,19 @@ function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, ico
     <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-4">
-          <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center', iconBg)}>
-            {icon}
-          </div>
+          <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center', iconBg)}>{icon}</div>
         </div>
         <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{value}</div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">{label}</p>
-        <div className={cn(
-          'flex items-center gap-1 mt-3 text-xs font-medium',
-          subtextVariant === 'up' && 'text-emerald-600',
-          subtextVariant === 'down' && 'text-rose-500',
-          subtextVariant === 'alert' && 'text-rose-500',
-          subtextVariant === 'neutral' && 'text-slate-400 dark:text-slate-500',
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-1 mt-3 text-xs font-medium',
+            subtextVariant === 'up' && 'text-emerald-600',
+            subtextVariant === 'down' && 'text-rose-500',
+            subtextVariant === 'alert' && 'text-rose-500',
+            subtextVariant === 'neutral' && 'text-slate-400 dark:text-slate-500',
+          )}
+        >
           {subtextVariant === 'up' && <ArrowUpRight className="w-3 h-3" />}
           {subtextVariant === 'down' && <ArrowDownRight className="w-3 h-3" />}
           {subtextVariant === 'alert' && <AlertCircle className="w-3 h-3" />}
@@ -102,11 +121,46 @@ function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, ico
   );
 }
 
+type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
+
 export function DashboardView() {
   const { t, i18n } = useTranslation();
   const { dateRange } = useDateRange();
   const { session } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [units, setUnits] = useState<any[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [salesChartMetric, setSalesChartMetric] = useState<'collected' | 'newLeases'>('collected');
+  const [salesChartStyle, setSalesChartStyle] = useState<'bar' | 'line'>('bar');
+
+  useEffect(() => {
+    let cancelled = false;
+    setDataLoading(true);
+    void (async () => {
+      try {
+        const [u, c, p, tn] = await Promise.all([fetchUnits(), fetchContracts(), fetchPayments(), fetchTenants()]);
+        if (cancelled) return;
+        setUnits(u);
+        setContracts(c);
+        setPayments(p);
+        setTenants(tn);
+      } catch {
+        if (cancelled) return;
+        setUnits([]);
+        setContracts([]);
+        setPayments([]);
+        setTenants([]);
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -139,31 +193,160 @@ export function DashboardView() {
         })}`
       : t('views.dashboard.last30Days');
 
-  const totalProfit = salesData.reduce((acc, curr) => acc + curr.Profit, 0);
-  const activeContracts = contracts.filter(c => c.status === 'Active').length;
-  const availableUnits = units.filter(u => u.status === 'Available').length;
-  const vacancyRate = ((availableUnits / units.length) * 100).toFixed(1);
-  const overduePayments = payments.filter(p => p.status === 'Overdue').length;
-  const baseMonthlyRentProfit = contracts.reduce((sum, contract) => sum + contract.monthlyRent, 0);
+  const periodTotals = useMemo(() => {
+    if (!dateRange.start || !dateRange.end) {
+      return { current: 0, previous: 0, prevStart: '', prevEnd: '' };
+    }
+    const rangeStart = parseISO(dateRange.start + 'T12:00:00');
+    const rangeEnd = parseISO(dateRange.end + 'T12:00:00');
+    const days = differenceInCalendarDays(rangeEnd, rangeStart) + 1;
+    const prevEnd = subDays(rangeStart, 1);
+    const prevStart = subDays(prevEnd, days - 1);
+    const startCur = toYYYYMMDD(rangeStart);
+    const endCur = toYYYYMMDD(rangeEnd);
+    const startPrev = toYYYYMMDD(prevStart);
+    const endPrev = toYYYYMMDD(prevEnd);
+    return {
+      current: sumPaidBetween(payments, startCur, endCur),
+      previous: sumPaidBetween(payments, startPrev, endPrev),
+      prevStart: startPrev,
+      prevEnd: endPrev,
+    };
+  }, [payments, dateRange.start, dateRange.end]);
 
-  const upcomingPayments7Days = payments
-    .filter((payment) => {
-      const due = new Date(payment.dueDate);
-      return payment.status !== 'Paid' && isAfter(due, new Date()) && isBefore(due, addDays(new Date(), 8));
-    })
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const collectedTrend = useMemo(() => {
+    const { current, previous } = periodTotals;
+    if (current === 0 && previous === 0) {
+      return { variant: 'neutral' as const, text: t('views.dashboard.cards.trendNoData') };
+    }
+    if (previous === 0 && current > 0) {
+      return { variant: 'up' as const, text: t('views.dashboard.cards.collectionsStarted') };
+    }
+    const pct = Math.round(((current - previous) / previous) * 1000) / 10;
+    if (pct === 0) return { variant: 'neutral' as const, text: t('views.dashboard.cards.trendFlat') };
+    if (pct > 0) return { variant: 'up' as const, text: t('views.dashboard.cards.trendUp', { pct: Math.abs(pct) }) };
+    return { variant: 'down' as const, text: t('views.dashboard.cards.trendDown', { pct: Math.abs(pct) }) };
+  }, [periodTotals, t]);
+
+  const activeContracts = useMemo(() => contracts.filter((c) => c.status === 'Active').length, [contracts]);
+
+  const baseMonthlyRentProfit = useMemo(
+    () => contracts.filter((c) => c.status === 'Active').reduce((sum, contract) => sum + (Number(contract.monthlyRent) || 0), 0),
+    [contracts],
+  );
+
+  const availableUnits = useMemo(() => units.filter((u) => u.status === 'Available').length, [units]);
+  const vacancyRate = units.length ? ((availableUnits / units.length) * 100).toFixed(1) : '0.0';
+
+  const overduePayments = useMemo(() => payments.filter((p) => p.status === 'Overdue').length, [payments]);
+
+  const newLeasesThisWeekCount = useMemo(() => {
+    const startWeek = startOfDay(subDays(new Date(), 7));
+    const endToday = endOfDay(new Date());
+    return contracts.filter((c) => {
+      try {
+        const sd = parseISO(c.startDate);
+        return !isBefore(sd, startWeek) && !isAfter(sd, endToday);
+      } catch {
+        return false;
+      }
+    }).length;
+  }, [contracts]);
+
+  const upcomingPayments7Days = useMemo(
+    () =>
+      payments
+        .filter((payment) => {
+          try {
+            const due = parseISO(payment.dueDate);
+            return (
+              payment.status !== 'Paid' && isAfter(due, new Date()) && isBefore(due, addDays(new Date(), 8))
+            );
+          } catch {
+            return false;
+          }
+        })
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()),
+    [payments],
+  );
 
   const vacancyContracts = useMemo(
     () => contracts.filter((c) => isBefore(new Date(c.endDate), addDays(new Date(), 60))),
-    []
+    [contracts],
   );
+
+  const chartAnchor = useMemo(() => {
+    if (dateRange.end) {
+      try {
+        return parseISO(dateRange.end + 'T12:00:00');
+      } catch {
+        return new Date();
+      }
+    }
+    return new Date();
+  }, [dateRange.end]);
+
+  const monthlyBars = useMemo(() => {
+    const rows: { label: string; collected: number; newLeases: number }[] = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = subMonths(chartAnchor, i);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = format(d, 'MMM');
+      const collected = payments
+        .filter((p) => p.status === 'Paid')
+        .filter((p) => {
+          const raw = (p.paidDate || p.dueDate || '').slice(0, 7);
+          return raw === ym;
+        })
+        .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const newLeases = contracts.filter((c) => (c.startDate || '').slice(0, 7) === ym).length;
+      rows.push({ label, collected, newLeases });
+    }
+    return rows;
+  }, [payments, contracts, chartAnchor]);
+
+  const pieSlices = useMemo(() => occupancyData(t, units), [t, units]);
+
+  const agentRows: AgentRow[] = useMemo(() => {
+    const map = new Map<string, { name: string; deals: number; profit: number }>();
+    for (const c of contracts) {
+      const aid = String(c.agentId ?? '').trim();
+      if (!aid) continue;
+      const name = (c.agentName && c.agentName.trim()) || `Agent ${aid}`;
+      const prev = map.get(aid);
+      const rent = Number(c.monthlyRent) || 0;
+      if (prev) {
+        prev.deals += 1;
+        if (c.status === 'Active') prev.profit += rent;
+      } else {
+        map.set(aid, { name, deals: 1, profit: c.status === 'Active' ? rent : 0 });
+      }
+    }
+    const rows = Array.from(map.entries())
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.deals - a.deals || b.profit - a.profit);
+    if (rows.length === 0) return [];
+    const topDeals = rows[0].deals;
+    return rows.map((r, idx) => ({
+      id: r.id,
+      name: r.name,
+      deals: r.deals,
+      profit: r.profit,
+      status:
+        idx === 0 && topDeals > 0
+          ? t('views.dashboard.agents.statusTopPerformer')
+          : r.deals >= 3
+            ? t('views.dashboard.agents.statusActive')
+            : t('views.dashboard.agents.statusOnProbation'),
+    }));
+  }, [contracts, t]);
 
   const vacancyColumns: ColumnDef<Contract>[] = useMemo(
     () => [
       {
         header: t('views.dashboard.vacancies.unit'),
         render: (c) => {
-          const unit = units.find((u) => u.id === c.unitId);
+          const unit = units.find((u) => String(u.id) === String(c.unitId));
           return (
             <span className="font-medium">
               {unit?.unitNumber} - {unit?.buildingName}
@@ -174,7 +357,7 @@ export function DashboardView() {
       {
         header: t('views.dashboard.vacancies.tenant'),
         render: (c) => {
-          const tenant = tenants.find((ten) => ten.id === c.tenantId);
+          const tenant = tenants.find((ten: any) => String(ten.id) === String(c.tenantId));
           return <span>{tenant?.name || t('views.dashboard.vacancies.fallbackTenant')}</span>;
         },
       },
@@ -195,7 +378,7 @@ export function DashboardView() {
                 'h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide border',
                 daysLeft <= 30
                   ? 'bg-rose-100 text-rose-800 border-rose-300/80 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/45'
-                  : 'bg-amber-100 text-amber-800 border-amber-300/80 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/45'
+                  : 'bg-amber-100 text-amber-800 border-amber-300/80 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/45',
               )}
             >
               {daysLeft <= 30 ? t('views.dashboard.vacancies.oneMonth') : t('views.dashboard.vacancies.twoMonth')}
@@ -204,7 +387,7 @@ export function DashboardView() {
         },
       },
     ],
-    [t]
+    [t, units, tenants],
   );
 
   const paymentColumns: ColumnDef<Payment>[] = useMemo(
@@ -212,7 +395,7 @@ export function DashboardView() {
       {
         header: t('views.dashboard.payments.unit'),
         render: (payment) => {
-          const unit = units.find((u) => u.id === payment.unitId);
+          const unit = units.find((u) => String(u.id) === String(payment.unitId));
           return (
             <span className="font-medium">
               {unit?.unitNumber} - {unit?.buildingName}
@@ -223,8 +406,8 @@ export function DashboardView() {
       {
         header: t('views.dashboard.payments.tenant'),
         render: (payment) => {
-          const contract = contracts.find((c) => c.id === payment.contractId);
-          const tenant = contract ? tenants.find((ten) => ten.id === contract.tenantId) : null;
+          const contract = contracts.find((c) => String(c.id) === String(payment.contractId));
+          const tenant = contract ? tenants.find((ten: any) => String(ten.id) === String(contract.tenantId)) : null;
           return <span>{tenant?.name}</span>;
         },
       },
@@ -237,23 +420,10 @@ export function DashboardView() {
         className: 'text-right',
         headerClassName: 'text-right',
         cellClassName: 'text-right',
-        render: (payment) => (
-          <span className="font-semibold">₱{payment.amount.toLocaleString()}</span>
-        ),
+        render: (payment) => <span className="font-semibold">₱{payment.amount.toLocaleString()}</span>,
       },
     ],
-    [t]
-  );
-
-  type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
-  const agentRows: AgentRow[] = useMemo(
-    () => [
-      { id: 'dash-a1', name: 'Maria Santos', deals: 14, profit: 420000, status: t('views.dashboard.agents.statusTopPerformer') },
-      { id: 'dash-a2', name: 'Juan Dela Cruz', deals: 9, profit: 280000, status: t('views.dashboard.agents.statusActive') },
-      { id: 'dash-a3', name: 'Elena Reyes', deals: 6, profit: 195000, status: t('views.dashboard.agents.statusActive') },
-      { id: 'dash-a4', name: 'Ricardo Gomez', deals: 3, profit: 90000, status: t('views.dashboard.agents.statusOnProbation') },
-    ],
-    [t]
+    [t, units, tenants, contracts],
   );
 
   const agentColumns: ColumnDef<AgentRow>[] = useMemo(
@@ -298,7 +468,7 @@ export function DashboardView() {
         ),
       },
     ],
-    [t]
+    [t],
   );
 
   const chartGridColor = isDarkMode ? '#334155' : '#f1f5f9';
@@ -313,9 +483,17 @@ export function DashboardView() {
     color: isDarkMode ? '#e2e8f0' : '#0f172a',
   } as const;
 
+  if (dataLoading) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 animate-in fade-in duration-300">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden />
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t('views.dashboard.loading')}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-
       {/* Greeting Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
@@ -336,9 +514,9 @@ export function DashboardView() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard
           label={t('views.dashboard.cards.totalProfit')}
-          value={`₱${totalProfit.toLocaleString()}`}
-          subtext={t('views.dashboard.cards.profitTrend')}
-          subtextVariant="up"
+          value={`₱${periodTotals.current.toLocaleString()}`}
+          subtext={collectedTrend.text}
+          subtextVariant={collectedTrend.variant === 'down' ? 'down' : collectedTrend.variant === 'up' ? 'up' : 'neutral'}
           iconBg="bg-indigo-50 dark:bg-indigo-500/20"
           icon={<DollarSign className="w-5 h-5 text-indigo-600" />}
         />
@@ -353,8 +531,12 @@ export function DashboardView() {
         <StatCard
           label={t('views.dashboard.cards.activeLeases')}
           value={activeContracts}
-          subtext={t('views.dashboard.cards.activeTrend')}
-          subtextVariant="up"
+          subtext={
+            newLeasesThisWeekCount > 0
+              ? t('views.dashboard.cards.newLeasesThisWeek', { count: newLeasesThisWeekCount })
+              : t('views.dashboard.cards.newLeasesThisWeekZero')
+          }
+          subtextVariant={newLeasesThisWeekCount > 0 ? 'up' : 'neutral'}
           iconBg="bg-emerald-50 dark:bg-emerald-500/20"
           icon={<Users className="w-5 h-5 text-emerald-600" />}
         />
@@ -382,20 +564,154 @@ export function DashboardView() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('views.dashboard.charts.salesTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.salesDescription')}</CardDescription>
+            <CardAction className="flex flex-col items-end gap-2 sm:flex-row sm:items-start sm:gap-2">
+              <div
+                className="inline-flex rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/60 p-0.5"
+                role="group"
+                aria-label={t('views.dashboard.charts.chartMetricAria')}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSalesChartMetric('collected')}
+                  aria-pressed={salesChartMetric === 'collected'}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                    salesChartMetric === 'collected'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                  )}
+                >
+                  {t('views.dashboard.charts.profitLabel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalesChartMetric('newLeases')}
+                  aria-pressed={salesChartMetric === 'newLeases'}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                    salesChartMetric === 'newLeases'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                  )}
+                >
+                  {t('views.dashboard.charts.newLeasesLabel')}
+                </button>
+              </div>
+              <div
+                className="inline-flex rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/60 p-0.5"
+                role="group"
+                aria-label={t('views.dashboard.charts.chartStyleAria')}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSalesChartStyle('bar')}
+                  aria-pressed={salesChartStyle === 'bar'}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                    salesChartStyle === 'bar'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                  )}
+                >
+                  {t('views.dashboard.charts.chartStyleBar')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalesChartStyle('line')}
+                  aria-pressed={salesChartStyle === 'line'}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                    salesChartStyle === 'line'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                  )}
+                >
+                  {t('views.dashboard.charts.chartStyleLine')}
+                </button>
+              </div>
+            </CardAction>
           </CardHeader>
-          <CardContent className="h-[280px]">
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesData} barSize={28}>
+              <ComposedChart data={monthlyBars} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} tickFormatter={(val) => `₱${val / 1000}k`} />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} />
+                {salesChartMetric === 'collected' ? (
+                  <YAxis
+                    yAxisId="left"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: chartTickColor, fontSize: 12 }}
+                    tickFormatter={(val) => `₱${Number(val) / 1000}k`}
+                  />
+                ) : (
+                  <YAxis
+                    yAxisId="left"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: chartTickColor, fontSize: 12 }}
+                    allowDecimals={false}
+                  />
+                )}
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  cursor={{ fill: chartCursorColor }}
-                  formatter={(val: number) => [`₱${val.toLocaleString()}`, t('views.dashboard.charts.profitLabel')]}
+                  cursor={
+                    salesChartStyle === 'bar'
+                      ? { fill: chartCursorColor }
+                      : { stroke: chartGridColor, strokeWidth: 1, strokeDasharray: '4 4' }
+                  }
+                  formatter={(val: number, name: string) =>
+                    salesChartMetric === 'newLeases' || name === t('views.dashboard.charts.newLeasesLabel')
+                      ? [val, name]
+                      : [`₱${val.toLocaleString()}`, name]
+                  }
                 />
-                <Bar dataKey="Profit" fill="#4f46e5" radius={[5, 5, 0, 0]} />
-              </BarChart>
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {salesChartMetric === 'collected' &&
+                  (salesChartStyle === 'bar' ? (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="collected"
+                      name={t('views.dashboard.charts.profitLabel')}
+                      fill="#4f46e5"
+                      radius={[5, 5, 0, 0]}
+                      maxBarSize={36}
+                    />
+                  ) : (
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="collected"
+                      name={t('views.dashboard.charts.profitLabel')}
+                      stroke="#4f46e5"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  ))}
+                {salesChartMetric === 'newLeases' &&
+                  (salesChartStyle === 'bar' ? (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="newLeases"
+                      name={t('views.dashboard.charts.newLeasesLabel')}
+                      fill="#10b981"
+                      radius={[5, 5, 0, 0]}
+                      maxBarSize={36}
+                    />
+                  ) : (
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="newLeases"
+                      name={t('views.dashboard.charts.newLeasesLabel')}
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  ))}
+              </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -405,11 +721,11 @@ export function DashboardView() {
             <CardTitle className="text-base">{t('views.dashboard.charts.unitStatusTitle')}</CardTitle>
             <CardDescription>{t('views.dashboard.charts.unitStatusDescription')}</CardDescription>
           </CardHeader>
-          <CardContent className="h-[280px] flex flex-col items-center justify-center">
-            <ResponsiveContainer width="100%" height="80%">
+          <CardContent className="h-[300px] flex flex-col items-center justify-center">
+            <ResponsiveContainer width="100%" height="78%">
               <PieChart>
                 <Pie
-                  data={occupancyData(t)}
+                  data={pieSlices}
                   cx="50%"
                   cy="50%"
                   innerRadius={55}
@@ -417,20 +733,17 @@ export function DashboardView() {
                   paddingAngle={4}
                   dataKey="value"
                 >
-                  {occupancyData(t).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {pieSlices.map((entry, index) => (
+                    <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(val: number, name: string) => [val, name]}
-                />
+                <Tooltip contentStyle={tooltipStyle} formatter={(val: number, name: string) => [val, name]} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2">
-              {occupancyData(t).map((entry, index) => (
+              {pieSlices.map((entry, index) => (
                 <div key={entry.name} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index] }} />
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                   <span>{entry.name}</span>
                   <span className="font-semibold text-slate-700 dark:text-slate-200">{entry.value}</span>
                 </div>
@@ -474,7 +787,7 @@ export function DashboardView() {
             {upcomingPayments7Days.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                 <CalendarIcon className="w-8 h-8 mb-2 opacity-40" />
-                <p className="text-sm font-medium">No upcoming payments this week 🎉</p>
+                <p className="text-sm font-medium">{t('views.dashboard.payments.empty')}</p>
               </div>
             ) : (
               <DataTable
@@ -494,13 +807,20 @@ export function DashboardView() {
             <CardDescription>{t('views.dashboard.agents.description')}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <DataTable
-              data={agentRows}
-              columns={agentColumns}
-              keyExtractor={(a) => a.id}
-              embedded
-              highlightFirstColumn={false}
-            />
+            {agentRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center text-slate-400 dark:text-slate-500">
+                <Users className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-sm font-medium">{t('views.dashboard.agents.empty')}</p>
+              </div>
+            ) : (
+              <DataTable
+                data={agentRows}
+                columns={agentColumns}
+                keyExtractor={(a) => a.id}
+                embedded
+                highlightFirstColumn={false}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

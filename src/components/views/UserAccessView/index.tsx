@@ -351,7 +351,7 @@ export function UserAccessView() {
               </CardHeader>
               <CardContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1 custom-scrollbar">
                 {initialLoading ? (
-                  <ListSkeleton rows={6} />
+                  <ListSkeleton rows={SIDEBAR_FEATURE_KEYS.length} />
                 ) : (
                   <ul className="space-y-1.5">
                     {SIDEBAR_FEATURE_KEYS.map((key, idx) => {

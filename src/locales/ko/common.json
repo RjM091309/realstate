@@ -75,12 +75,18 @@
       "crm": "CRM 및 임차인",
       "ledger": "임대 원장",
       "calendar": "캘린더",
+      "userManagement": "사용자 관리",
       "agentPortal": "에이전트 포털 (데모)",
       "portal": "임차인 포털 (데모)",
       "controlPanelAccess": "제어 패널"
     },
     "settings": "설정",
-    "logout": "로그아웃"
+    "logout": "로그아웃",
+    "userMgmt": {
+      "userInfo": "사용자 정보",
+      "userRole": "사용자 역할",
+      "controlPanel": "제어 패널"
+    }
   },
   "views": {
     "userAccess": {
@@ -116,29 +122,135 @@
         "agent_portal": "에이전트 포털 (데모)"
       }
     },
+    "userInfo": {
+      "title": "사용자 정보",
+      "subtitle": "직원 계정과 역할을 관리합니다.",
+      "adminOnly": "여기서 사용자를 관리할 수 있는 권한은 관리자만 있습니다. 관리자 계정으로 로그인하거나 관리자에게 문의하세요.",
+      "searchPlaceholder": "사용자 검색…",
+      "addUser": "새 사용자 추가",
+      "stats": {
+        "totalUsers": "전체 사용자",
+        "activeUsers": "활성 사용자",
+        "inactiveUsers": "비활성 사용자",
+        "userRoles": "사용자 역할 수"
+      },
+      "columns": {
+        "fullName": "이름",
+        "username": "사용자 이름",
+        "role": "역할",
+        "status": "상태",
+        "action": "작업"
+      },
+      "statusActive": "활성",
+      "statusInactive": "비활성",
+      "modalAddTitle": "새 사용자 추가",
+      "modalEditTitle": "사용자 수정",
+      "labels": {
+        "userRole": "사용자 역할",
+        "firstName": "이름",
+        "lastName": "성",
+        "username": "사용자 이름",
+        "password": "비밀번호",
+        "confirmPassword": "비밀번호 확인"
+      },
+      "placeholders": {
+        "selectRole": "역할 선택",
+        "firstName": "이름 입력",
+        "lastName": "성 입력",
+        "username": "사용자 이름 입력"
+      },
+      "cancel": "취소",
+      "saveUser": "저장",
+      "passwordLeaveBlank": "비워 두면 현재 비밀번호를 유지합니다.",
+      "loadError": "사용자를 불러올 수 없습니다.",
+      "saveError": "저장할 수 없습니다.",
+      "savedAdd": "사용자가 생성되었습니다.",
+      "savedEdit": "사용자가 수정되었습니다.",
+      "deactivated": "사용자가 비활성화되었습니다.",
+      "activated": "사용자가 활성화되었습니다.",
+      "confirmDeactivate": "이 사용자를 비활성화할까요? 로그인할 수 없게 됩니다.",
+      "confirmActivate": "이 사용자를 활성화할까요? 다시 로그인할 수 있습니다.",
+      "passwordMismatch": "비밀번호가 일치하지 않습니다.",
+      "passwordMin": "비밀번호는 4자 이상이어야 합니다.",
+      "missingFields": "필수 항목을 모두 입력하세요.",
+      "edit": "수정",
+      "delete": "비활성화",
+      "activateUser": "사용자 활성화",
+      "cannotDeactivateSelf": "본인 계정은 비활성화할 수 없습니다.",
+      "accountAccessLabel": "계정 액세스",
+      "accountAccessHint": "끄면 로그인할 수 없게 됩니다. 자격 증명은 DB에 그대로 두었다가 언제든 다시 켤 수 있습니다.",
+      "accountAccessLockedHint": "본인 계정은 여기서 비활성화할 수 없습니다."
+    },
+    "userRole": {
+      "title": "사용자 역할",
+      "subtitle": "역할을 만들고 직원 계정에 연결할 수 있게 관리합니다.",
+      "adminOnly": "관리자만 여기서 역할을 관리할 수 있습니다.",
+      "searchPlaceholder": "역할 검색…",
+      "addRole": "새 역할 추가",
+      "accessLevelProfile": "액세스 수준 프로필",
+      "statusActive": "활성",
+      "statusInactive": "비활성",
+      "moreUsers": "+{{count}}",
+      "loadError": "역할을 불러올 수 없습니다.",
+      "savedAdd": "역할이 생성되었습니다.",
+      "savedEdit": "역할이 수정되었습니다.",
+      "removed": "역할이 비활성화되었습니다.",
+      "duplicateName": "이미 같은 이름의 역할이 있습니다.",
+      "hasUsers": "역할을 제거하기 전에 사용자를 다른 역할로 옮기거나 비활성화하세요.",
+      "cannotRemoveAdmin": "관리자 역할은 제거할 수 없습니다.",
+      "cannotDeactivateAdmin": "관리자 역할은 비활성화할 수 없습니다.",
+      "modalAddTitle": "새 역할 추가",
+      "modalEditTitle": "역할 수정",
+      "roleName": "역할 이름",
+      "roleNamePlaceholder": "예: 슈퍼바이저, 임대 담당",
+      "helperNew": "새 역할을 만듭니다. 세부 권한은 제어판의 사용자 액세스에서 설정할 수 있습니다.",
+      "activeLabel": "역할 활성",
+      "activeHint": "비활성 역할은 신규 사용자에게 부여할 수 없습니다.",
+      "cancel": "취소",
+      "saveRole": "역할 저장",
+      "confirmRemoveTitle": "역할을 비활성화할까요?",
+      "confirmRemoveBody": "비활성화된 역할은 신규 배정에서 숨겨집니다. 사용자가 없으면 나중에 다시 활성화할 수 있습니다.",
+      "confirmRemoveAction": "비활성화",
+      "edit": "수정",
+      "remove": "비활성화"
+    },
     "dashboard": {
       "title": "경영 대시보드",
       "subtitle": "부동산 포트폴리오 성과를 실시간으로 확인하세요.",
       "last30Days": "최근 30일",
+      "loading": "대시보드 불러오는 중…",
       "cards": {
-        "totalProfit": "총 수익",
+        "totalProfit": "수납 임대료",
         "profitTrend": "지난달 대비 +12.5%",
+        "collectedHint": "선택 기간 내 유료 납부 합계",
+        "trendUp": "이전 기간 대비 +{{pct}}%",
+        "trendDown": "이전 기간 대비 {{pct}}%",
+        "trendFlat": "이전 기간과 동일",
+        "trendNoData": "두 기간 모두 수납 데이터 없음",
+        "collectionsStarted": "이번 기간에 수납이 집계되기 시작함",
         "netProfit": "순이익(월 임대료 기준)",
-        "netProfitHint": "기본 월 임대료 기준을 사용하려면 비워두세요.",
+        "netProfitHint": "활성 계약 월 임대료 합계",
         "defaultProfit": "기본값: ₱{{amount}}",
         "activeLeases": "활성 임대 계약",
         "activeTrend": "이번 주 신규 +3건",
+        "newLeasesThisWeek": "이번 주 신규 계약 {{count}}건",
+        "newLeasesThisWeekZero": "이번 주 시작한 신규 계약 없음",
         "vacancyRate": "공실률",
         "vacancyTrend": "지난달 대비 -2.1%",
         "overdueRent": "연체 임대료",
         "overdueHint": "즉시 조치가 필요합니다"
       },
       "charts": {
-        "salesTitle": "매출 성과",
-        "salesDescription": "월별 수익 및 계약 성사 건수",
+        "salesTitle": "임대료 수납 및 신규 계약",
+        "salesDescription": "지난 6개월 유료 인보이스 및 계약 시작일 기준",
+        "chartMetricAria": "차트에 표시할 데이터",
+        "chartStyleAria": "차트 형식(막대 또는 선)",
+        "chartStyleBar": "막대",
+        "chartStyleLine": "선",
         "unitStatusTitle": "유닛 상태",
         "unitStatusDescription": "포트폴리오 분포",
-        "profitLabel": "수익",
+        "profitLabel": "수납액",
+        "newLeasesLabel": "신규 계약",
         "statuses": {
           "occupied": "입주 중",
           "available": "공실",
@@ -167,7 +279,8 @@
       },
       "agents": {
         "title": "에이전트 성과",
-        "description": "직원 책임성과 계약 추적",
+        "description": "담당 에이전트별 계약 및 활성 월 임대료",
+        "empty": "에이전트가 배정된 계약이 아직 없습니다.",
         "agentName": "에이전트 이름",
         "deals": "계약 건수",
         "profit": "수익",
@@ -209,7 +322,20 @@
         "more": "더보기",
         "perMonth": "/월",
         "sqm": "㎡",
-        "noResults": "검색 또는 필터에 맞는 유닛이 없습니다."
+        "noResults": "검색 또는 필터에 맞는 유닛이 없습니다.",
+        "selectUnit": "유닛 선택",
+        "tenant": "임차인",
+        "leaseEnds": "임대 종료",
+        "rentStatus": "임대료 상태",
+        "vacantSince": "공실 시작",
+        "daysLeft": "{{count}}일 남음",
+        "overdueDays": "연체 ({{count}}일)",
+        "rentCurrent": "정상",
+        "rentOverdue": "연체",
+        "badgeVacant": "공실",
+        "badgeOverdue": "연체 ({{count}}일)",
+        "badgeEndingSoon": "임대 종료 임박",
+        "badgePaid": "납부 완료"
       },
       "table": {
         "unit": "유닛",
@@ -339,6 +465,7 @@
       "registerTenant": "새 임차인 등록",
       "tabs": {
         "tenants": "임차인",
+        "landlords": "집주인",
         "brokers": "중개사",
         "blacklist": "블랙리스트"
       },
@@ -456,7 +583,22 @@
         "activateActive": "활성화",
         "markedActive": "중개사가 활성으로 변경되었습니다.",
         "markedInactive": "중개사가 비활성으로 변경되었습니다.",
-        "statusUpdateError": "중개사 상태 변경에 실패했습니다."
+        "statusUpdateError": "중개사 상태 변경에 실패했습니다.",
+        "verifyButton": "인증",
+        "messageButton": "메시지",
+        "noEmailForMessage": "등록된 이메일이 없습니다.",
+        "bannerExpired": "문서 만료",
+        "bannerExpiring": "여권 만료 {{days}}일 전",
+        "bannerBlacklisted": "블랙리스트 등록됨",
+        "bannerVerifiedOk": "인증 완료 — 서류 정상",
+        "bannerPending": "인증 대기 — 서류 검토 필요",
+        "passport": "여권",
+        "stats": "상태",
+        "statsOk": "정상",
+        "statsReview": "검토",
+        "lastCollaboration": "최근 협업",
+        "totalLabel": "합계",
+        "nationality": "국적"
       },
       "blacklist": {
         "title": "문제 이력 임차인 및 집주인",
@@ -480,7 +622,9 @@
         "taggedBy": "등록자(사용자 ID)",
         "viewTenantProfile": "임차인 프로필 보기",
         "close": "닫기",
-        "tenantNotFound": "현재 목록에서 해당 임차인을 찾을 수 없습니다."
+        "tenantNotFound": "현재 목록에서 해당 임차인을 찾을 수 없습니다.",
+        "cardBanner": "제한 대상 — 내부 블랙리스트 기록입니다.",
+        "emptyCards": "선택한 필터와 일치하는 블랙리스트 기록이 없습니다."
       }
     },
     "ledger": {
@@ -631,6 +775,11 @@
       "welcome": "{{name}}님, 환영합니다!",
       "subtitle": "담당 계약, 고객, 오늘의 업무를 관리하세요.",
       "contactManagement": "관리팀 연락",
+      "portalLabel": "에이전트 포털",
+      "overview": {
+        "title": "포트폴리오 개요",
+        "description": "활성 계약, 고객, 갱신 현황을 한눈에 확인하세요."
+      },
       "stats": {
         "activeDeals": "활성 계약",
         "clients": "고객 수",

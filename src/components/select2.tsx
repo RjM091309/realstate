@@ -72,11 +72,12 @@ export const Select2: React.FC<Select2Props> = ({
         classNames={{
           control: (state) =>
             cn(
-              '!min-h-[48px] !rounded-xl !shadow-none !cursor-pointer',
-              '!bg-white/55 dark:!bg-slate-950/45',
-              'supports-[backdrop-filter]:!backdrop-blur-xl',
-              '!border !border-white/30 dark:!border-white/10',
-              state.isFocused ? '!ring-2 !ring-indigo-500/25' : '!ring-0',
+              '!min-h-10 !rounded-xl !cursor-pointer !shadow-sm',
+              '!bg-white dark:!bg-slate-950',
+              '!border !border-slate-300 dark:!border-slate-600',
+              state.isFocused
+                ? '!border-indigo-500 !ring-2 !ring-indigo-500/25'
+                : '!ring-0',
               disabled ? '!opacity-60 !cursor-not-allowed' : undefined,
             ),
           placeholder: () => '!text-slate-500/80 dark:!text-slate-300/70 !text-sm',
@@ -84,11 +85,9 @@ export const Select2: React.FC<Select2Props> = ({
           singleValue: () => '!text-slate-900 dark:!text-slate-50 !text-sm',
           menu: () =>
             cn(
-              '!rounded-xl !mt-2 !overflow-hidden',
-              '!bg-white/75 dark:!bg-slate-950/65',
-              'supports-[backdrop-filter]:!backdrop-blur-xl',
-              '!border !border-white/30 dark:!border-white/10',
-              '!shadow-[0_18px_45px_-18px_rgba(0,0,0,0.45)] !ring-1 !ring-black/5 dark:!ring-white/10',
+              '!rounded-xl !mt-1.5 !overflow-hidden !shadow-lg',
+              '!border !border-slate-200 !bg-white dark:!border-slate-600 dark:!bg-slate-950',
+              '!ring-1 !ring-black/5 dark:!ring-white/10',
             ),
           menuList: () => '!py-1',
           option: ({ isSelected, isFocused }) => cn(
@@ -99,16 +98,18 @@ export const Select2: React.FC<Select2Props> = ({
                 ? '!bg-indigo-500/10 !text-slate-900 dark:!text-slate-50'
                 : '!text-slate-900 dark:!text-slate-50'
           ),
-          valueContainer: () => '!px-2',
-          clearIndicator: () => '!text-slate-500 hover:!text-rose-500 dark:!text-slate-300 !p-1',
-          dropdownIndicator: () => '!text-slate-500 dark:!text-slate-300 !p-1',
+          valueContainer: () => '!px-3 !py-1',
+          indicatorsContainer: () => '!pr-1.5',
+          clearIndicator: () =>
+            '!px-1 !py-2 !text-slate-500 hover:!text-rose-600 dark:!text-slate-400',
+          dropdownIndicator: () =>
+            '!px-1.5 !py-2 !text-slate-500 dark:!text-slate-400',
         }}
         menuPortalTarget={document.body}
         styles={{
-          control: (base, state) => ({
+          control: (base) => ({
             ...base,
-            // Keep border + focus effects controlled by classNames (Tailwind).
-            borderColor: 'transparent',
+            // Border + colors come from classNames (Tailwind); avoid transparent override.
             boxShadow: 'none',
           }),
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),

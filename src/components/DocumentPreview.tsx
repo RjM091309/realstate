@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { contracts as seedContracts, units as seedUnits, tenants as seedTenants } from '@/lib/mockData';
 import { fetchContractDocumentDetails } from '@/lib/contractsApi';
 import { fetchContractRepositoryDocuments } from '@/lib/documentsApi';
 import { fetchContractInvoices, fetchInvoice } from '@/lib/invoicesApi';
@@ -24,12 +23,14 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
   const [invoice, setInvoice] = useState<InvoiceRow | null>(null);
   const [resolvedContractId, setResolvedContractId] = useState<string>(contractId);
   const [leaseAttachmentPath, setLeaseAttachmentPath] = useState<string>('');
+  const [loadError, setLoadError] = useState<string>('');
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     void (async () => {
       try {
+        setLoadError('');
         let contractIdForDetails = contractId;
         let resolvedInvoice: InvoiceRow | null = null;
 
@@ -104,13 +105,13 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
         // Always use the generated HTML view for 'contract' preview
         setLeaseAttachmentPath('');
       } catch {
-        // Fallback keeps document preview usable when API is unavailable.
         if (!active) return;
-        setContracts(seedContracts);
-        setUnits(seedUnits);
-        setTenants(seedTenants);
+        setContracts([]);
+        setUnits([]);
+        setTenants([]);
         setInvoice(null);
         setLeaseAttachmentPath('');
+        setLoadError('Failed to load document preview.');
       } finally {
         if (active) setLoading(false);
       }
@@ -133,8 +134,27 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
     [tenants, contract?.tenantId],
   );
 
-  if (loading) return <div className="p-8 text-center">Loading document...</div>;
-  if (!contract) return <div className="p-8 text-center">Contract not found.</div>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-200 p-8 text-center text-slate-700 dark:bg-slate-950 dark:text-slate-300">
+        Loading document…
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-200 p-8 text-center text-rose-600 dark:bg-slate-950 dark:text-rose-400">
+        {loadError}
+      </div>
+    );
+  }
+  if (!contract) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-200 p-8 text-center text-slate-700 dark:bg-slate-950 dark:text-slate-300">
+        Contract not found.
+      </div>
+    );
+  }
 
   const invoiceNoLabel = invoice?.invoiceNo ? invoice.invoiceNo : `INV-${new Date().getFullYear()}-001`;
   const issuedLabel = invoice?.issuedAt ? invoice.issuedAt : format(new Date(), 'MMMM dd, yyyy');
@@ -173,17 +193,19 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
   };
 
   return (
-    <div className="min-h-screen bg-slate-200 flex flex-col">
+    <div className="flex min-h-screen flex-col bg-slate-200 dark:bg-slate-950">
       {/* Toolbar */}
-      <div className="sticky top-0 z-30 bg-white border-b p-4 flex items-center justify-between shadow-sm print:hidden">
+      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-[#ffffff] p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => isStandalone ? window.close() : onBack?.()}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex flex-col">
-            <h1 className="text-lg font-bold">{type === 'contract' ? 'Lease Agreement' : 'Billing Statement'}</h1>
-            <p className="text-xs text-slate-500">Document ID: {type === 'invoice' ? (invoice?.id ?? '') : contract.id}</p>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              {type === 'contract' ? 'Lease Agreement' : 'Billing Statement'}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Document ID: {type === 'invoice' ? (invoice?.id ?? '') : contract.id}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -198,10 +220,12 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
         </div>
       </div>
       
-      {/* Document Area */}
-      <div className="flex-1 flex justify-center p-8 sm:p-12 overflow-y-auto">
-        {/* A4 Container */}
-        <div className="bg-white shadow-2xl w-[210mm] min-h-[297mm] p-[20mm] sm:p-[25mm] font-serif text-slate-800 relative overflow-hidden print:shadow-none print:p-0 print:w-full">
+      {/* Document Area — full width chrome, centered paper */}
+      <div className="flex flex-1 justify-center overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 md:px-10 md:py-12">
+        {/* A4 / readable sheet — lease-document-sheet reverses global .dark .bg-white for readable print preview */}
+        <div
+          className="lease-document-sheet relative w-full max-w-[min(210mm,calc(100vw-2rem))] min-h-[297mm] overflow-visible bg-white p-[clamp(12mm,4vw,20mm)] font-serif text-slate-800 shadow-2xl sm:p-[clamp(14mm,4vw,25mm)] print:max-w-none print:min-h-0 print:w-full print:p-0 print:shadow-none"
+        >
           {type === 'contract' && leaseAttachmentPath ? (
             <div className="w-full h-[calc(297mm-40mm)] print:h-auto">
               {isLikelyPdfPath(leaseAttachmentPath) ? (
@@ -258,14 +282,14 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                   <p><span className="font-bold">4. DEPOSIT:</span> The LESSEE shall deposit to the LESSOR an amount equivalent to two (2) months rent or <span className="font-bold">₱{contract.securityDeposit.toLocaleString()}</span> as security deposit.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-20 mt-24 pt-20">
-                  <div className="text-center border-t border-slate-400 pt-2">
-                    <p className="font-bold uppercase text-xs">3CORE Management</p>
-                    <p className="text-[10px] text-slate-500">LESSOR</p>
+                <div className="mt-24 grid grid-cols-1 gap-10 pt-16 sm:grid-cols-2 sm:gap-16 sm:pt-20 md:gap-24">
+                  <div className="border-t border-slate-400 pt-2 text-center">
+                    <p className="text-xs font-bold uppercase text-slate-900">3CORE Management</p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">LESSOR</p>
                   </div>
-                  <div className="text-center border-t border-slate-400 pt-2">
-                    <p className="font-bold uppercase text-xs">{tenant?.name}</p>
-                    <p className="text-[10px] text-slate-500">LESSEE</p>
+                  <div className="border-t border-slate-400 pt-2 text-center">
+                    <p className="text-xs font-bold uppercase text-slate-900">{tenant?.name}</p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">LESSEE</p>
                   </div>
                 </div>
               </div>

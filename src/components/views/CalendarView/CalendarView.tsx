@@ -675,37 +675,40 @@ export function CalendarView() {
             <Button type="button" variant="outline" onClick={closeEventModal}>
               {t('views.calendar.cancel')}
             </Button>
-            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => void saveEvent()}>
+            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void saveEvent()}>
               {eventFormMode === 'edit' ? t('views.calendar.save') : t('views.calendar.create')}
             </Button>
           </div>
         }
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2 sm:col-span-2">
+        <div className="flex flex-col gap-5">
+          <div className="space-y-1.5">
             <Label>{t('views.calendar.eventTitle')}</Label>
             <Input
               value={eventForm.title}
               onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))}
             />
           </div>
-          <div className="space-y-2">
-            <Label>{t('views.calendar.eventDate')}</Label>
-            <Input
-              type="date"
-              value={eventForm.eventDate}
-              onChange={(e) => setEventForm((p) => ({ ...p, eventDate: e.target.value }))}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+            <div className="min-w-0 space-y-1.5">
+              <Label>{t('views.calendar.eventDate')}</Label>
+              <Input
+                type="date"
+                value={eventForm.eventDate}
+                onChange={(e) => setEventForm((p) => ({ ...p, eventDate: e.target.value }))}
+                className="w-full"
+              />
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <Label>{t('views.calendar.eventType')}</Label>
+              <Select2
+                options={eventTypeOptions}
+                value={eventForm.eventType}
+                onChange={(v) => setEventForm((p) => ({ ...p, eventType: (v ?? 'other') as CalendarEventType }))}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>{t('views.calendar.eventType')}</Label>
-            <Select2
-              options={eventTypeOptions}
-              value={eventForm.eventType}
-              onChange={(v) => setEventForm((p) => ({ ...p, eventType: (v ?? 'other') as CalendarEventType }))}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-1.5">
             <Label>{t('views.calendar.unit')}</Label>
             <Select2
               options={unitOptions}
@@ -713,7 +716,7 @@ export function CalendarView() {
               onChange={(v) => setEventForm((p) => ({ ...p, unitId: (v ?? '') as string }))}
             />
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-1.5">
             <Label>{t('views.calendar.color')}</Label>
             <Input
               placeholder="#4f46e5"
@@ -755,7 +758,7 @@ export function CalendarView() {
             {(() => {
               const unit = units.find((u) => u.id === detailsEvent.unitId);
               return unit ? (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600">
                   <p className="text-xs text-slate-500">{t('views.calendar.unit')}</p>
                   <p className="text-sm font-bold text-slate-900">
                     {t('views.calendar.unitLabel', { unitNumber: unit.unitNumber })}
@@ -766,7 +769,7 @@ export function CalendarView() {
             })()}
 
             {detailsEvent.source === 'custom' && detailsEvent.raw ? (
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-600 space-y-1">
+              <div className="space-y-1 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 dark:border-slate-600">
                 {detailsEvent.raw.contractId ? (
                   <p>
                     <span className="font-semibold text-slate-800">contract_id:</span> {detailsEvent.raw.contractId}
@@ -795,7 +798,7 @@ export function CalendarView() {
                 </Button>
               ) : null}
               {detailsEvent.source === 'custom' && canUpdate ? (
-                <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => openEditEvent(detailsEvent)}>
+                <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => openEditEvent(detailsEvent)}>
                   <Pencil className="w-4 h-4 mr-2" />
                   {t('views.calendar.edit')}
                 </Button>

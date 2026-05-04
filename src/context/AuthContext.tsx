@@ -15,10 +15,11 @@ function createBypassSession(): SessionPayload {
       username: 'admin',
       firstName: 'System',
       lastName: 'Admin',
+      avatarUrl: null,
     },
     role: { id: 1, name: 'Admin' },
     branchId: 1,
-    sidebarTabIds: ['dashboard', 'units', 'contracts', 'crm', 'ledger', 'calendar', 'access'],
+    sidebarTabIds: ['dashboard', 'units', 'contracts', 'crm', 'ledger', 'calendar'],
     crud: {
       units: { create: true, update: true, delete: true },
       contracts: { create: true, update: true, delete: true },
@@ -35,6 +36,8 @@ interface AuthContextValue {
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   refreshSession: () => Promise<void>;
+  /** Replace session from API (e.g. after profile PATCH) without re-fetching. */
+  applySession: (next: SessionPayload) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -106,6 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(data.session);
   }, []);
 
+  const applySession = useCallback((next: SessionPayload) => {
+    setSession(next);
+  }, []);
+
   const logout = useCallback(() => {
     if (BYPASS_LOGIN) {
       setToken(null);
@@ -133,8 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       logout,
       refreshSession,
+      applySession,
     }),
-    [session, loading, login, register, logout, refreshSession],
+    [session, loading, login, register, logout, refreshSession, applySession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

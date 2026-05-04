@@ -1,25 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  User,
+  CreditCard,
   FileText,
+  Wrench,
+  Bell,
   Download,
-  Upload,
-  CheckCircle2,
   AlertCircle,
-  MessageSquare,
-  Package,
   Loader2,
+  User,
+  MessageSquare,
+  Upload,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { tenants, units, contracts, payments } from '@/lib/mockData';
-import { format, isValid, parseISO } from 'date-fns';
+import { differenceInDays, format, isValid, parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import type { Contract, Payment, Tenant, Unit } from '@/types';
 import {
@@ -28,17 +26,29 @@ import {
   uploadTenantKycDocument,
   type PortalDocumentItem,
 } from '@/lib/tenantsApi';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch, getAuthHeaders } from '@/lib/api';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
-import { fetchPayments } from '@/lib/paymentsApi';
-import { fetchContractInventorySnapshots, fetchSnapshotItems } from '@/lib/inventoryApi';
+import { fetchPayments, updatePayment } from '@/lib/paymentsApi';
 import { createContractSpecialRequest, fetchContractSpecialRequests } from '@/lib/specialRequestsApi';
 import { Textarea } from '@/components/ui/textarea';
-import type { InventorySnapshotItemRow } from '@/types';
+import { DataTable, type ColumnDef } from '@/components/data-table';
+import { Modal } from '@/components/modal';
+
+function isPaidPayment(p: Pick<Payment, 'status'>): boolean {
+  return String(p.status ?? '').toLowerCase() === 'paid';
+}
 
 function readTenantIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('tenantId')?.trim() || null;
+}
+
+function readTenantIdFromStorage(): string | null {
+  try {
+    return localStorage.getItem('realstate_portal_tenant_id')?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function isDatabaseId(value: string | null | undefined): boolean {
@@ -87,34 +97,42 @@ async function saveResponseAsFile(res: Response, fileName: string) {
 export function TenantPortalView() {
   const { t } = useTranslation();
   const [tenantIdParam] = useState(readTenantIdFromUrl);
+  const tenantId = useMemo(() => tenantIdParam || readTenantIdFromStorage(), [tenantIdParam]);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [contractsList, setContractsList] = useState<Contract[]>([]);
   const [unitsList, setUnitsList] = useState<Unit[]>([]);
   const [paymentsList, setPaymentsList] = useState<Payment[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [kycDocUrl, setKycDocUrl] = useState<string | undefined>(undefined);
   const [portalDocuments, setPortalDocuments] = useState<PortalDocumentItem[] | null>(null);
   const [portalDocumentsLoading, setPortalDocumentsLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventoryItems, setInventoryItems] = useState<InventorySnapshotItemRow[]>([]);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTitle, setMaintenanceTitle] = useState('');
   const [maintenanceDetails, setMaintenanceDetails] = useState('');
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requests, setRequests] = useState<Array<{ id: string; title: string; details: string; status: string; createdAt: string }>>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<
+    Array<{ id: string; title: string; message: string; time: string; unread: boolean; type?: string }>
+  >([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [kycDocUrl, setKycDocUrl] = useState<string | undefined>(undefined);
+  const [uploading, setUploading] = useState(false);
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [supportContactOpen, setSupportContactOpen] = useState(false);
+
+  const supportInboxEmail =
+    String(import.meta.env.VITE_TENANT_PORTAL_SUPPORT_EMAIL ?? '').trim() || 'support@realstate.app';
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      if (tenantIdParam) {
+      if (tenantId) {
         try {
           const [tdata, cdata, udata, pdata] = await Promise.all([
-            fetchTenantById(tenantIdParam),
+            fetchTenantById(tenantId),
             fetchContracts(),
             fetchUnits(),
             fetchPayments(),
@@ -125,26 +143,30 @@ export function TenantPortalView() {
           setUnitsList(udata);
           setPaymentsList(pdata);
           setBootError(null);
+          try {
+            localStorage.setItem('realstate_portal_tenant_id', String(tdata.id));
+          } catch {
+            // ignore
+          }
         } catch (e) {
           if (cancelled) return;
           setBootError(e instanceof Error ? e.message : t('views.portal.loadError'));
           setTenant(null);
         }
       } else {
-        const t0 = tenants[0];
         if (cancelled) return;
-        setTenant(t0 ?? null);
-        setContractsList(contracts);
-        setUnitsList(units);
-        setPaymentsList(payments);
-        setBootError(t0 ? null : t('views.portal.loadError'));
+        setTenant(null);
+        setContractsList([]);
+        setUnitsList([]);
+        setPaymentsList([]);
+        setBootError('Select a tenant from CRM and open the portal again.');
       }
       if (!cancelled) setPageLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [tenantIdParam, t]);
+  }, [tenantId, t]);
 
   useEffect(() => {
     setKycDocUrl(tenant?.idImageUrl);
@@ -197,42 +219,55 @@ export function TenantPortalView() {
     [paymentsList, contract],
   );
 
+  const currentBalance = useMemo(() => {
+    return tenantPayments
+      .filter((p) => String(p.status ?? '').toLowerCase() !== 'paid')
+      .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+  }, [tenantPayments]);
+
+  const verificationProgress = useMemo(() => {
+    if (!tenant) return 0;
+    return tenant.kycVerified ? 100 : 0;
+  }, [tenant]);
+
+  const nextDue = useMemo(() => {
+    const rows = tenantPayments
+      .map((p) => ({ p, due: p.dueDate ? parseISO(p.dueDate) : null }))
+      .filter((x) => x.due && isValid(x.due as Date));
+    rows.sort((a, b) => (a.due as Date).getTime() - (b.due as Date).getTime());
+    const today = new Date();
+    const upcoming = rows.find((x) => (x.due as Date).getTime() >= today.getTime());
+    return upcoming ?? rows[rows.length - 1] ?? null;
+  }, [tenantPayments]);
+
+  const statusLabel = useMemo(() => {
+    if (!contract) return t('views.portal.currentStatus');
+    const overdue = tenantPayments.some(
+      (p) => String(p.status ?? '').toLowerCase() === 'overdue' || (!p.paidDate && p.dueDate && parseISO(p.dueDate) < new Date()),
+    );
+    if (overdue) return 'Overdue';
+    return t('views.portal.paidActive');
+  }, [contract, tenantPayments, t]);
+
   useEffect(() => {
-    if (!contract?.id) {
-      setInventoryItems([]);
-      return;
-    }
-    if (!isDatabaseId(contract.id)) {
-      setInventoryItems([]);
-      setInventoryLoading(false);
-      return;
-    }
     let cancelled = false;
-    setInventoryLoading(true);
+    setNotificationsLoading(true);
     void (async () => {
       try {
-        const snaps = await fetchContractInventorySnapshots(contract.id);
-        if (cancelled) return;
-        const moveIn = snaps
-          .filter((s) => s.snapshotType === 'move_in')
-          .sort((a, b) => String(b.inspectionDate).localeCompare(String(a.inspectionDate)))[0];
-        const pick = moveIn ?? snaps.sort((a, b) => String(b.inspectionDate).localeCompare(String(a.inspectionDate)))[0];
-        if (!pick) {
-          setInventoryItems([]);
-          return;
-        }
-        const items = await fetchSnapshotItems(pick.id);
-        if (!cancelled) setInventoryItems(items);
+        const res = await apiFetch<{
+          notifications: Array<{ id: string; title: string; message: string; time: string; type: string; unread: boolean }>;
+        }>('/api/notifications?limit=10');
+        if (!cancelled) setNotifications(Array.isArray(res.notifications) ? res.notifications : []);
       } catch {
-        if (!cancelled) setInventoryItems([]);
+        if (!cancelled) setNotifications([]);
       } finally {
-        if (!cancelled) setInventoryLoading(false);
+        if (!cancelled) setNotificationsLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [contract?.id]);
+  }, []);
 
   useEffect(() => {
     if (!contract?.id) {
@@ -289,45 +324,40 @@ export function TenantPortalView() {
     }
   };
 
+  const paymentStatusBadge = useCallback((p: Payment) => {
+    const s = String(p.status ?? '').toLowerCase();
+    if (s === 'paid') return <Badge className="bg-emerald-600 hover:bg-emerald-600">Paid</Badge>;
+    if (s === 'overdue') return <Badge className="bg-rose-600 hover:bg-rose-600">Overdue</Badge>;
+    if (s === 'pending')
+      return <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">Pending</Badge>;
+    return <Badge variant="outline">{p.status || '—'}</Badge>;
+  }, []);
+
   const paymentColumns: ColumnDef<Payment>[] = useMemo(
     () => [
       {
-        header: t('views.portal.table.date'),
-        render: (p) => {
-          const raw = p.paidDate || p.dueDate;
-          const d = raw ? parseISO(raw) : new Date('');
-          return <span>{isValid(d) ? format(d, 'MMM dd, yyyy') : '—'}</span>;
+        header: t('views.dashboard.payments.dueDate'),
+        render: (payment) => {
+          if (!payment.dueDate) return <span>—</span>;
+          const d = parseISO(payment.dueDate);
+          return <span>{isValid(d) ? format(d, 'MMM dd, yyyy') : payment.dueDate}</span>;
         },
       },
       {
-        header: t('views.portal.table.reference'),
-        render: (p) => <span className="font-mono text-xs uppercase">{p.id}</span>,
-      },
-      {
-        header: t('views.portal.table.amount'),
-        render: (p) => <span className="font-bold">₱{p.amount.toLocaleString()}</span>,
-      },
-      {
-        header: t('views.portal.table.status'),
-        render: () => (
-          <Badge variant="default" className="bg-emerald-500">
-            {t('views.portal.table.paid')}
-          </Badge>
-        ),
-      },
-      {
-        header: t('views.portal.table.action'),
+        header: t('views.dashboard.payments.amount'),
         className: 'text-right',
         headerClassName: 'text-right',
         cellClassName: 'text-right',
-        render: () => (
-          <Button variant="ghost" size="sm">
-            <Download className="w-4 h-4" />
-          </Button>
+        render: (payment) => (
+          <span className="font-semibold">₱{Number(payment.amount ?? 0).toLocaleString()}</span>
         ),
       },
+      {
+        header: t('views.portal.table.status'),
+        render: (payment) => paymentStatusBadge(payment),
+      },
     ],
-    [t]
+    [t, paymentStatusBadge],
   );
 
   const handlePreviewContract = () => {
@@ -373,31 +403,107 @@ export function TenantPortalView() {
   };
 
   const handlePickDocument = () => {
-    if (uploading) return;
     fileRef.current?.click();
   };
 
-  const handleUploadDocument: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !tenant) return;
-
+    if (!isDatabaseId(tenant.id)) {
+      toast.error('KYC upload is unavailable in demo mode.');
+      return;
+    }
     setUploading(true);
     try {
       const updated = await uploadTenantKycDocument(tenant.id, file);
+      setTenant(updated);
       setKycDocUrl(updated.idImageUrl);
-      toast.success(t('views.portal.uploadSuccess'));
+      toast.success('ID document uploaded.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('views.portal.uploadError'));
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
   };
 
+  const handlePayNow = async () => {
+    if (!contract?.id) {
+      toast.message('No contract linked to this portal.');
+      return;
+    }
+    if (!isDatabaseId(contract.id)) {
+      toast.message('Pay Now is not available in demo mode.');
+      return;
+    }
+    const unpaid = tenantPayments.filter((p) => !isPaidPayment(p));
+    if (unpaid.length === 0) {
+      toast.success('You have no outstanding payments.');
+      return;
+    }
+    unpaid.sort((a, b) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? '')));
+    const pick = unpaid[0];
+    const dueSlice = String(pick.dueDate ?? '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueSlice)) {
+      toast.error('This payment row has an invalid due date. Update it in Lease Ledger.');
+      return;
+    }
+    if (paySubmitting) return;
+    setPaySubmitting(true);
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      await updatePayment(pick.id, {
+        contractId: pick.contractId,
+        unitId: pick.unitId,
+        amount: Number(pick.amount),
+        dueDate: dueSlice,
+        paidDate: today,
+        status: 'Paid',
+      });
+      const refreshed = await fetchPayments();
+      setPaymentsList(refreshed);
+      toast.success(t('views.ledger.markedPaid'));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('views.ledger.saveError'));
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
+  const scrollToPayments = useCallback(() => {
+    document.getElementById('payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const scrollToMaintenance = useCallback(() => {
+    document.getElementById('maintenance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const scrollToDocuments = useCallback(() => {
+    document.getElementById('documents')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  function handleQuickPayFromHero() {
+    scrollToPayments();
+    if (currentBalance <= 0 || paySubmitting) return;
+    window.setTimeout(() => void handlePayNow(), 420);
+  }
+
+  function handleViewDocumentsQuick() {
+    scrollToDocuments();
+    if (portalDocumentsLoading) return;
+    if (portalDocuments !== null && portalDocuments.length === 0) {
+      toast.message('No documents yet. Files will appear here when your property office publishes them.');
+    }
+  }
+
+  function handleContactSupport() {
+    setSupportContactOpen(true);
+  }
+
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden />
         <p className="text-sm">{t('views.portal.loading')}</p>
       </div>
     );
@@ -405,335 +511,583 @@ export function TenantPortalView() {
 
   if (bootError || !tenant) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 px-6 text-center dark:bg-slate-950">
         <AlertCircle className="h-10 w-10 text-rose-500" aria-hidden />
-        <p className="text-slate-700 max-w-md">{bootError ?? t('views.portal.loadError')}</p>
+        <p className="text-slate-700 max-w-md dark:text-slate-200">{bootError ?? t('views.portal.loadError')}</p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            window.location.assign(`${window.location.origin}/crm`);
+          }}
+        >
+          Go to CRM
+        </Button>
       </div>
     );
   }
 
+  const leaseStart = contract?.startDate ? parseISO(contract.startDate) : null;
   const leaseEnd = contract?.endDate ? parseISO(contract.endDate) : null;
 
+  const requestStatusBadge = (raw: string) => {
+    const s = String(raw ?? '').toLowerCase();
+    if (s === 'open' || s === 'pending') {
+      return (
+        <Badge variant="outline" className="border-amber-200 text-amber-800">
+          Pending
+        </Badge>
+      );
+    }
+    if (s === 'in_progress' || s === 'in progress') {
+      return (
+        <Badge variant="outline" className="border-indigo-200 text-indigo-700">
+          In Progress
+        </Badge>
+      );
+    }
+    if (s === 'resolved' || s === 'completed') {
+      return (
+        <Badge variant="outline" className="border-emerald-200 text-emerald-700">
+          Completed
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="border-slate-200 text-slate-700">
+        {raw || '—'}
+      </Badge>
+    );
+  };
+
+  const leaseStatusPill = (() => {
+    const s = String(statusLabel ?? '').toLowerCase();
+    const isOverdue = s.includes('overdue');
+    if (isOverdue) {
+      return <Badge className="bg-rose-600 hover:bg-rose-600">Overdue</Badge>;
+    }
+    if (currentBalance > 0) {
+      return (
+        <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">
+          Pending
+        </Badge>
+      );
+    }
+    return <Badge className="bg-emerald-600 hover:bg-emerald-600">Good</Badge>;
+  })();
+
+  const contractStatusPill = (() => {
+    const s = String(contract?.status ?? '').toLowerCase();
+    if (s === 'active') return <Badge className="bg-emerald-600 hover:bg-emerald-600">Active</Badge>;
+    if (s === 'expired') return <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">Expired</Badge>;
+    if (s) return <Badge className="bg-slate-700 hover:bg-slate-700">{contract?.status}</Badge>;
+    return <Badge variant="outline">—</Badge>;
+  })();
+
   return (
-    <div className="min-h-screen bg-slate-50 animate-in fade-in duration-500">
-      <div className="bg-indigo-600 text-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <User className="w-8 h-8" />
+    <div className="min-h-screen bg-slate-100/90 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="relative overflow-hidden bg-gradient-to-br from-violet-800 via-indigo-700 to-indigo-950 text-white shadow-[inset_0_-1px_0_0_rgb(255_255_255/0.08)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_-20%,rgb(196_181_253/0.35),transparent)]" aria-hidden />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-0">
+            <div className="flex min-w-0 flex-1 items-center gap-4 lg:border-r lg:border-white/[0.18] lg:pr-10">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                <User className="h-6 w-6" aria-hidden />
+              </div>
+              <div className="min-w-0 py-0.5">
+                <div className="text-sm font-medium tracking-wide text-white/75">Tenant Portal</div>
+                <h1 className="mt-0.5 truncate text-2xl font-bold sm:text-3xl">
+                  {t('views.portal.welcome', { name: tenant.name })}
+                </h1>
+                <div className="mt-1 truncate text-sm text-white/75">
+                  Unit {unit?.unitNumber ?? '—'} · {unit?.buildingName ?? '—'}
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">{t('views.portal.welcome', { name: tenant.name })}</h1>
-              <p className="text-indigo-100">{t('views.portal.unitInfo', { unitNumber: unit?.unitNumber, buildingName: unit?.buildingName })}</p>
+            <div className="flex flex-wrap gap-2 lg:min-w-[min(100%,20rem)] lg:flex-col lg:justify-center lg:pl-10 xl:min-w-[22rem] xl:flex-row xl:flex-wrap xl:items-center">
+              <Button
+                className="bg-white text-indigo-700 shadow-sm hover:bg-indigo-50"
+                onClick={handleQuickPayFromHero}
+              >
+                <CreditCard className="mr-2 h-4 w-4" aria-hidden />
+                Pay
+              </Button>
+              <Button
+                variant="outline"
+                className="border-white/35 bg-white/10 text-white hover:bg-white/15"
+                onClick={() => {
+                  setMaintenanceOpen(true);
+                  scrollToMaintenance();
+                }}
+              >
+                <Wrench className="mr-2 h-4 w-4" aria-hidden />
+                Request Maintenance
+              </Button>
+              <Button
+                variant="outline"
+                className="border-white/35 bg-white/10 text-white hover:bg-white/15"
+                onClick={handleContactSupport}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" aria-hidden />
+                Contact Support
+              </Button>
             </div>
-          </div>
-          <div className="flex gap-3">
-            <Button className="bg-white text-indigo-600 hover:bg-indigo-50">
-              <MessageSquare className="w-4 h-4 mr-2" />
-              {t('views.portal.contactManagement')}
-            </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8 pb-12">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Quick Stats & Actions */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="border-none shadow-sm bg-emerald-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-emerald-600 flex items-center">
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  {t('views.portal.currentStatus')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-900">{t('views.portal.paidActive')}</div>
-                <p className="text-xs text-emerald-600 mt-1">{t('views.portal.nextPaymentDue')}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-none shadow-sm bg-indigo-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-indigo-600 flex items-center">
-                  <FileText className="w-4 h-4 mr-2" />
-                  {t('views.portal.contractPeriod')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-indigo-900">
-                  {leaseEnd && isValid(leaseEnd) ? format(leaseEnd, 'MMM yyyy') : '—'}
+      <div className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-950/[0.04] dark:border-slate-800 dark:bg-slate-950 lg:flex-row lg:items-stretch">
+          <main className="min-w-0 flex-1 space-y-6 bg-white p-6 sm:p-8 dark:bg-slate-950 lg:shadow-[inset_-8px_0_24px_-20px_rgb(15_23_42/0.06)] dark:lg:shadow-[inset_-8px_0_24px_-20px_rgb(0_0_0/0.35)]">
+            <Card className="border border-slate-200/80 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 text-indigo-700" aria-hidden />
+                Lease Info
+              </CardTitle>
+              <CardDescription>Unit, rent, contract dates, and status.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-900/70">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Unit</div>
+                <div className="mt-1 text-lg font-bold dark:text-slate-100">
+                  {unit?.unitNumber ?? '—'} · {unit?.buildingName ?? '—'}
                 </div>
-                <p className="text-xs text-indigo-600 mt-1">{t('views.portal.leaseExpires')}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="gap-0 overflow-hidden border-none py-0 shadow-md">
-            <CardHeader className="border-b border-slate-100 px-6 pt-6 pb-4">
-              <CardTitle>{t('views.portal.recentPayments')}</CardTitle>
-              <CardDescription>{t('views.portal.recentPaymentsDescription')}</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <DataTable
-                data={tenantPayments}
-                columns={paymentColumns}
-                keyExtractor={(p) => p.id}
-                embedded
-                highlightFirstColumn={false}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle>{t('views.portal.unitInventory')}</CardTitle>
-              <CardDescription>{t('views.portal.unitInventoryDescription')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {inventoryLoading ? (
-                  <div className="col-span-full text-sm text-slate-500">Loading inventory…</div>
-                ) : inventoryItems.length === 0 ? (
-                  <div className="col-span-full text-sm text-slate-500">No inventory snapshot found for this contract.</div>
-                ) : (
-                  inventoryItems.map((it) => {
-                    const ok = it.conditionState === 'excellent' || it.conditionState === 'good';
-                    return (
-                      <div key={it.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Package className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-sm font-medium truncate">
-                            {it.itemName}{it.quantity > 1 ? ` ×${it.quantity}` : ''}
-                          </span>
-                        </div>
-                        <Badge variant={ok ? 'outline' : 'destructive'} className="text-[10px] shrink-0">
-                          {ok ? t('views.portal.inventoryStatus.good') : t('views.portal.inventoryStatus.maintenanceNeeded')}
-                        </Badge>
-                      </div>
-                    );
-                  })
-                )}
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{unit?.commonAddress ?? unit?.legalAddress ?? '—'}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-900/70">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Rent</div>
+                <div className="mt-1 text-lg font-bold dark:text-slate-100">₱{Number(contract?.monthlyRent ?? 0).toLocaleString()}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <span>
+                    {leaseStart && isValid(leaseStart) ? format(leaseStart, 'MMM dd, yyyy') : '—'} →{' '}
+                    {leaseEnd && isValid(leaseEnd) ? format(leaseEnd, 'MMM dd, yyyy') : '—'}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  {contractStatusPill}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-900/70">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</div>
+                  {leaseStatusPill}
+                </div>
+                <div className="mt-1 text-lg font-bold dark:text-slate-100">{statusLabel}</div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {nextDue?.due
+                    ? `Next payment due in ${Math.max(0, differenceInDays(nextDue.due as Date, new Date()))} days`
+                    : 'No upcoming due date found.'}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-900/70">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">KYC</div>
+                <div className="mt-1 flex items-center justify-between">
+                  <div className="text-lg font-bold dark:text-slate-100">{verificationProgress}%</div>
+                  <Badge variant="outline" className="border-indigo-200 text-indigo-700">
+                    {tenant.kycVerified ? 'Verified' : 'Pending'}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/webp,image/*,application/pdf"
+                    className="hidden"
+                    onChange={handleUploadDocument}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={handlePickDocument}
+                    disabled={uploading}
+                  >
+                    <Upload className="mr-2 h-4 w-4" aria-hidden />
+                    {uploading ? 'Uploading…' : 'Upload ID document'}
+                  </Button>
+                  {kycDocUrl ? (
+                    <a
+                      href={toAbsoluteAssetUrl(kycDocUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-700 hover:underline dark:text-indigo-400"
+                    >
+                      View uploaded file
+                    </a>
+                  ) : null}
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Right Column: KYC & Documents */}
-        <div className="space-y-8">
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                {t('views.portal.kycTitle')}
-              </CardTitle>
-              <CardDescription>{t('views.portal.kycDescription')}</CardDescription>
+          <Card id="payments" className="border border-slate-200/80 shadow-sm scroll-mt-6 transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-indigo-700" aria-hidden />
+                    Payments
+                  </CardTitle>
+                  <CardDescription>Current balance + payment history.</CardDescription>
+                </div>
+                <Button
+                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                  onClick={() => void handlePayNow()}
+                  disabled={paySubmitting || currentBalance <= 0}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" aria-hidden />
+                  {paySubmitting ? 'Processing…' : 'Pay Now'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
-                  <Upload className="w-6 h-6 text-indigo-600" />
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-500/25 dark:bg-indigo-950/50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">Current Balance</div>
+                  {currentBalance > 0 ? (
+                    <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">Due</Badge>
+                  ) : (
+                    <Badge className="bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
+                  )}
                 </div>
-                <h4 className="text-sm font-bold">{t('views.portal.passportCard')}</h4>
-                <p className="text-xs text-slate-500 mt-1 mb-4">{t('views.portal.passportHint')}</p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/webp,image/*,application/pdf"
-                  className="hidden"
-                  onChange={handleUploadDocument}
-                />
-                <Button
-                  size="sm"
-                  className="bg-indigo-600 w-full"
-                  onClick={handlePickDocument}
-                  disabled={uploading}
-                >
-                  {uploading ? t('views.portal.uploading') : t('views.portal.updateDocument')}
-                </Button>
-                {kycDocUrl ? (
-                  <a
-                    href={toAbsoluteAssetUrl(kycDocUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block mt-3 text-xs text-indigo-600 hover:underline"
-                  >
-                    {t('views.portal.viewUploaded')}
-                  </a>
-                ) : null}
+                <div className="mt-1 text-2xl font-black text-indigo-900 dark:text-indigo-100">₱{Number(currentBalance).toLocaleString()}</div>
+                <div className="mt-1 text-xs text-indigo-700/80 dark:text-indigo-200/80">
+                  {currentBalance > 0 ? 'Includes pending/overdue items.' : 'You are all set.'}
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">{t('views.portal.verificationProgress')}</span>
-                  <span className="font-bold text-indigo-600">85%</span>
-                </div>
-                <Progress value={85} className="h-2" />
-                <p className="text-[10px] text-slate-400">{t('views.portal.lastUpdated')}</p>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950/50">
+                <DataTable
+                  data={tenantPayments}
+                  columns={paymentColumns}
+                  keyExtractor={(p) => p.id}
+                  embedded
+                  highlightFirstColumn={false}
+                />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle>{t('views.portal.myDocuments')}</CardTitle>
-              <CardDescription>{t('views.portal.myDocumentsDescription')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {portalDocumentsLoading ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" aria-hidden />
-                  {t('views.portal.documentsLoading')}
+          <Card id="maintenance" className="border border-slate-200/80 shadow-sm scroll-mt-6 transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-indigo-700" aria-hidden />
+                    Maintenance
+                  </CardTitle>
+                  <CardDescription>Requests with status.</CardDescription>
                 </div>
-              ) : portalDocuments && portalDocuments.length > 0 ? (
-                portalDocuments.map((doc) => {
-                  const sizeLabel =
-                    doc.sizeLabel ??
-                    (doc.kind === 'preview' ? t('views.portal.documentOpenPreview') : '—');
-                  const busy = downloadingId === doc.id;
-                  return (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between gap-2 p-3 hover:bg-slate-50 rounded-lg transition-colors group"
-                    >
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left rounded-md focus-visible:outline focus-visible:ring-2 focus-visible:ring-indigo-500"
-                        onClick={() => void handlePortalDocumentActivate(doc)}
-                        disabled={Boolean(downloadingId)}
-                      >
-                        <FileText
-                          className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-indigo-600"
-                          aria-hidden
-                        />
-                        <div className="min-w-0 flex flex-col">
-                          <span className="text-sm font-medium truncate">{doc.title}</span>
-                          <span className="text-[10px] text-slate-400 truncate">
-                            {doc.fileName}
-                            {sizeLabel && sizeLabel !== '—' ? ` · ${sizeLabel}` : ''}
-                          </span>
-                        </div>
-                      </button>
+                <Button
+                  variant="outline"
+                  onClick={() => setMaintenanceOpen((v) => !v)}
+                  className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/40 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
+                >
+                  <Wrench className="mr-2 h-4 w-4" aria-hidden />
+                  {maintenanceOpen ? 'Close Form' : 'Request Maintenance'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {maintenanceOpen ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/80">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Title</Label>
+                      <Input value={maintenanceTitle} onChange={(e) => setMaintenanceTitle(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Details</Label>
+                      <Textarea value={maintenanceDetails} onChange={(e) => setMaintenanceDetails(e.target.value)} />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setMaintenanceOpen(false)} disabled={maintenanceSaving}>
+                        Cancel
+                      </Button>
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 text-slate-400 hover:text-indigo-600"
-                        disabled={Boolean(downloadingId)}
-                        aria-label={t('views.portal.downloadDocument')}
-                        onClick={() => void handlePortalDocumentActivate(doc)}
+                        className="bg-indigo-600 text-white hover:bg-indigo-700"
+                        onClick={() => void submitMaintenance()}
+                        disabled={maintenanceSaving}
                       >
-                        {busy ? (
-                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                        ) : (
-                          <Download className="h-4 w-4" aria-hidden />
-                        )}
+                        {maintenanceSaving ? 'Submitting…' : 'Submit'}
                       </Button>
                     </div>
-                  );
-                })
+                  </div>
+                </div>
+              ) : null}
+
+              {requestsLoading ? (
+                <div className="text-sm text-slate-500 dark:text-slate-400">Loading requests…</div>
+              ) : requests.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                  No maintenance requests yet.
+                </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-500 py-2">{t('views.portal.documentsEmpty')}</p>
-                  {contract ? (
-                    <Button type="button" variant="outline" size="sm" className="w-full" onClick={handlePreviewContract}>
-                      {t('views.portal.openLeasePreview')}
-                    </Button>
-                  ) : null}
+                  {requests.map((r) => (
+                    <div
+                      key={r.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-slate-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-slate-600"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate dark:text-slate-100">{r.title}</div>
+                          <div className="mt-1 text-sm text-slate-600 line-clamp-2 dark:text-slate-300">{r.details}</div>
+                          {r.createdAt ? <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{r.createdAt}</div> : null}
+                        </div>
+                        <div className="shrink-0">{requestStatusBadge(r.status)}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-md bg-amber-50 border-amber-100">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold text-amber-900 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-2" />
-                {t('views.portal.maintenanceTitle')}
+          <Card id="documents" className="border border-slate-200/80 shadow-sm scroll-mt-6 transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Download className="h-4 w-4 text-indigo-700" aria-hidden />
+                Documents
               </CardTitle>
+              <CardDescription>Contract and receipts.</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-amber-700 mb-4">{t('views.portal.maintenanceHint')}</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full border-amber-200 text-amber-900 hover:bg-amber-100"
-                onClick={() => setMaintenanceOpen((v) => !v)}
-              >
-                {t('views.portal.submitRequest')}
-              </Button>
-
-              {maintenanceOpen ? (
-                <div className="mt-4 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-amber-900">Title</Label>
-                    <Input
-                      value={maintenanceTitle}
-                      onChange={(e) => setMaintenanceTitle(e.target.value)}
-                      placeholder="e.g., Water heater not working"
-                      className="bg-white/70"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-amber-900">Details</Label>
-                    <Textarea
-                      value={maintenanceDetails}
-                      onChange={(e) => setMaintenanceDetails(e.target.value)}
-                      placeholder="Describe the issue (where/when/how)."
-                      className="bg-white/70"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-amber-900 hover:bg-amber-100"
-                      onClick={() => setMaintenanceOpen(false)}
-                      disabled={maintenanceSaving}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-amber-900 text-amber-50 hover:bg-amber-900/90"
-                      onClick={() => void submitMaintenance()}
-                      disabled={maintenanceSaving}
-                    >
-                      {maintenanceSaving ? 'Submitting…' : 'Submit'}
-                    </Button>
-                  </div>
+              {portalDocumentsLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" aria-hidden />
+                  Loading documents…
                 </div>
-              ) : null}
-
-              <div className="mt-4">
-                {requestsLoading ? (
-                  <div className="text-xs text-amber-800/80">Loading requests…</div>
-                ) : requests.length === 0 ? (
-                  <div className="text-xs text-amber-800/80">No requests yet.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {requests.slice(0, 3).map((r) => (
-                      <div key={r.id} className="rounded-lg border border-amber-200 bg-white/70 p-3">
-                        <div className="flex items-start justify-between gap-2">
+              ) : portalDocuments && portalDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {portalDocuments.map((doc) => {
+                    const busy = downloadingId === doc.id;
+                    const sizeLabel =
+                      doc.sizeLabel ?? (doc.kind === 'preview' ? t('views.portal.documentOpenPreview') : '—');
+                    return (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-slate-300 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-slate-600 dark:hover:bg-slate-900/50"
+                      >
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          onClick={() => void handlePortalDocumentActivate(doc)}
+                          disabled={Boolean(downloadingId)}
+                        >
+                          <FileText className="h-4 w-4 text-slate-400" aria-hidden />
                           <div className="min-w-0">
-                            <div className="text-xs font-semibold text-amber-900 truncate">{r.title}</div>
-                            <div className="text-[11px] text-amber-900/80 line-clamp-2">{r.details}</div>
+                            <div className="truncate text-sm font-semibold">{doc.title}</div>
+                            <div className="truncate text-[11px] text-slate-500">
+                              {doc.fileName}
+                              {sizeLabel && sizeLabel !== '—' ? ` · ${sizeLabel}` : ''}
+                            </div>
                           </div>
-                          <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-900">
-                            {r.status}
-                          </Badge>
-                        </div>
-                        {r.createdAt ? <div className="mt-1 text-[10px] text-amber-900/60">{r.createdAt}</div> : null}
+                        </button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handlePortalDocumentActivate(doc)}
+                          disabled={Boolean(downloadingId)}
+                        >
+                          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Download className="mr-2 h-4 w-4" aria-hidden />}
+                          Download
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                  No documents available yet.
+                  {contract ? (
+                    <div className="mt-3">
+                      <Button type="button" variant="outline" onClick={handlePreviewContract}>
+                        Open contract preview
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </CardContent>
           </Card>
+          </main>
+
+          {/* Two-way boundary: neutral rail with inner spine + paired borders (primary | rail | secondary) */}
+          <div
+            className="hidden shrink-0 lg:flex lg:w-[13px] lg:flex-col lg:justify-stretch lg:bg-gradient-to-b lg:from-slate-100/80 lg:via-slate-200/60 lg:to-slate-100/80 lg:border-x lg:border-slate-300/80 dark:lg:from-slate-900/95 dark:lg:via-slate-800/90 dark:lg:to-slate-900/95 dark:lg:border-slate-700/60"
+            aria-hidden
+          >
+            <div className="mx-auto my-10 w-px flex-1 rounded-full bg-gradient-to-b from-indigo-400/50 via-slate-500/70 to-violet-400/50 shadow-[0_0_0_1px_rgb(255_255_255/0.65)] dark:from-indigo-500/35 dark:via-slate-500/50 dark:to-violet-500/35 dark:shadow-[0_0_0_1px_rgb(255_255_255/0.08)]" />
+          </div>
+
+          <aside className="min-w-0 space-y-6 border-t border-slate-200/90 bg-gradient-to-b from-slate-50/95 via-slate-50/80 to-slate-100/50 p-6 sm:p-8 lg:w-[min(22rem,100%)] lg:shrink-0 lg:border-t-0 lg:bg-gradient-to-b lg:from-slate-50 lg:to-slate-100/40 lg:shadow-[inset_8px_0_24px_-20px_rgb(15_23_42/0.07)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900/95 dark:to-slate-950 dark:lg:from-slate-950 dark:lg:to-slate-900/90 dark:lg:shadow-[inset_8px_0_24px_-20px_rgb(0_0_0/0.35)] lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+            <Card className="border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-[2px] transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/60 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                Notifications
+              </CardTitle>
+              <CardDescription className="dark:text-slate-400">Recent updates and reminders.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {notificationsLoading ? (
+                <div className="text-sm text-slate-500 dark:text-slate-400">Loading…</div>
+              ) : notifications.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
+                  No notifications.
+                </div>
+              ) : (
+                notifications.slice(0, 6).map((n) => (
+                  <div
+                    key={n.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-slate-300 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/70 dark:hover:border-slate-600 dark:hover:bg-slate-900/80"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold dark:text-slate-100">{n.title}</div>
+                        <div className="mt-0.5 text-xs text-slate-600 line-clamp-2 dark:text-slate-300">{n.message}</div>
+                        <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{n.time}</div>
+                      </div>
+                      {n.unread ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600 dark:bg-indigo-400" /> : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-[2px] transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/60 dark:hover:border-slate-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+              <CardDescription className="dark:text-slate-400">Pay, request maintenance, contact support.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                className="w-full justify-start bg-indigo-600 text-white hover:bg-indigo-700"
+                onClick={() => {
+                  scrollToPayments();
+                  window.setTimeout(() => void handlePayNow(), 320);
+                }}
+                disabled={paySubmitting || currentBalance <= 0}
+                title={currentBalance <= 0 ? 'No balance due' : 'Pay the oldest unpaid installment'}
+              >
+                <CreditCard className="mr-2 h-4 w-4" aria-hidden />
+                {paySubmitting ? 'Processing…' : 'Pay Now'}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/40 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
+                onClick={() => {
+                  setMaintenanceOpen(true);
+                  scrollToMaintenance();
+                }}
+              >
+                <Wrench className="mr-2 h-4 w-4" aria-hidden />
+                Request Maintenance
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                onClick={handleViewDocumentsQuick}
+              >
+                <FileText className="mr-2 h-4 w-4" aria-hidden />
+                View Documents
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                onClick={handleContactSupport}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" aria-hidden />
+                Contact Support
+              </Button>
+            </CardContent>
+            </Card>
+          </aside>
         </div>
       </div>
-      </div>
+
+      <Modal
+        isOpen={supportContactOpen}
+        onClose={() => setSupportContactOpen(false)}
+        title="Contact support"
+        subtitle="Reach your property office or send a message to the team."
+        maxWidth="md"
+        variant="glass"
+      >
+        <div className="space-y-4 text-sm text-slate-700 dark:text-slate-200">
+          <p>
+            Billing and lease questions:{' '}
+            <a
+              className="font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+              href={`mailto:${supportInboxEmail}?subject=${encodeURIComponent('Tenant portal — inquiry')}`}
+            >
+              {supportInboxEmail}
+            </a>
+          </p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              On file for your account
+            </div>
+            <dl className="mt-3 space-y-2 text-slate-800 dark:text-slate-100">
+              {tenant.email ? (
+                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+                  <dt className="shrink-0 text-xs text-slate-500 dark:text-slate-400">Email</dt>
+                  <dd className="min-w-0">
+                    <a href={`mailto:${tenant.email}`} className="break-all text-indigo-700 hover:underline dark:text-indigo-400">
+                      {tenant.email}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {tenant.phone ? (
+                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+                  <dt className="shrink-0 text-xs text-slate-500 dark:text-slate-400">Phone</dt>
+                  <dd>
+                    <a
+                      href={`tel:${String(tenant.phone).replace(/[^\d+]/g, '')}`}
+                      className="text-indigo-700 hover:underline dark:text-indigo-400"
+                    >
+                      {tenant.phone}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {!tenant.email && !tenant.phone ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">No email or phone on file.</p>
+              ) : null}
+            </dl>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => {
+                void navigator.clipboard.writeText(supportInboxEmail).then(
+                  () => toast.success('Support email copied.'),
+                  () => toast.error('Could not copy.'),
+                );
+              }}
+            >
+              Copy support email
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              onClick={() => {
+                window.location.href = `mailto:${supportInboxEmail}?subject=${encodeURIComponent('Tenant portal — inquiry')}`;
+              }}
+            >
+              Open in email app
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

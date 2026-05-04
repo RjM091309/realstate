@@ -8,7 +8,7 @@ export function featureKeyToTabId(featureKey) {
 
 export async function loadSessionPayload(userId) {
   const [users] = await pool.query(
-    `SELECT u.IDNO, u.USERNAME, u.FIRSTNAME, u.LASTNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE,
+    `SELECT u.IDNO, u.USERNAME, u.FIRSTNAME, u.LASTNAME, u.AVATAR_URL, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE,
             r.ROLE AS roleName, r.ACTIVE AS roleActive
      FROM user_info u
      INNER JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -61,6 +61,10 @@ export async function loadSessionPayload(userId) {
       username: String(u.USERNAME),
       firstName: String(u.FIRSTNAME ?? ''),
       lastName: String(u.LASTNAME ?? ''),
+      avatarUrl:
+        u.AVATAR_URL != null && String(u.AVATAR_URL).trim() !== ''
+          ? String(u.AVATAR_URL)
+          : null,
     },
     role: {
       id: roleId,

@@ -1,4 +1,4 @@
-/** Must match `server/accessConfig.ts` SIDEBAR_FEATURE_KEYS. */
+/** Must match `server/accessConfig.js` SIDEBAR_FEATURE_KEYS. */
 export const SIDEBAR_FEATURE_KEYS = [
   'dashboard',
   'units',

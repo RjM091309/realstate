@@ -228,6 +228,27 @@ export async function ensureSchema() {
     }
   }
 
+  async function ensureUserAvatarColumn() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_info'
+        AND column_name = 'AVATAR_URL'
+      `,
+    );
+    if (rows.length === 0) {
+      try {
+        await pool.query(
+          `ALTER TABLE \`user_info\` ADD COLUMN \`AVATAR_URL\` VARCHAR(512) NULL DEFAULT NULL AFTER \`BRANCH_ID\``,
+        );
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
+  }
+
   async function ensureTenantDocumentCascade() {
     const [rows] = await pool.query(
       `
@@ -420,6 +441,8 @@ export async function ensureSchema() {
       )
   `);
 
+  await ensureUserAvatarColumn();
+
   await pool.query(`UPDATE \`user_role\` SET \`ENCODED_BY\` = 1 WHERE \`IDNo\` IN (1, 2, 3, 4, 5)`);
 
   await pool.query(`
@@ -541,6 +564,10 @@ export async function ensureSchema() {
       .map((v) => `${v.slice(0, -1)}, 1)`)
       .join(',')}`,
   );
+
+  await pool.query(`DELETE FROM \`role_sidebar_permissions\` WHERE \`feature_key\` = 'user_management'`);
+  await pool.query(`DELETE FROM \`branch_sidebar_permissions\` WHERE \`feature_key\` = 'user_management'`);
+  await pool.query(`DELETE FROM \`user_role_crud_permissions\` WHERE \`module_key\` = 'user_management'`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`area\` (

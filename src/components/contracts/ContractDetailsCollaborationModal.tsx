@@ -106,9 +106,13 @@ function inventoryCategoryLabel(value: string) {
 }
 
 function roleBadgeClass(role: CollaboratorRole) {
-  if (role === 'Owner') return 'bg-indigo-100 text-indigo-700';
-  if (role === 'Editor') return 'bg-emerald-100 text-emerald-700';
-  return 'bg-slate-100 text-slate-700';
+  if (role === 'Owner') {
+    return 'border border-indigo-200/90 bg-indigo-100 text-indigo-950 dark:border-indigo-600 dark:bg-indigo-950 dark:text-indigo-50';
+  }
+  if (role === 'Editor') {
+    return 'border border-emerald-200/90 bg-emerald-100 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-50';
+  }
+  return 'border border-slate-200/90 bg-slate-100 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 }
 
 export function ContractSummaryCard({
@@ -121,10 +125,10 @@ export function ContractSummaryCard({
   subValue?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{title}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-900">{value || '—'}</div>
-      {subValue ? <div className="mt-1 text-xs text-slate-500 break-all">{subValue}</div> : null}
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-300">{title}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{value || '—'}</div>
+      {subValue ? <div className="mt-1 text-xs text-slate-500 break-all dark:text-slate-400">{subValue}</div> : null}
     </div>
   );
 }
@@ -144,7 +148,7 @@ export function TabsNavigation({
     { value: 'notes', label: 'Notes' },
   ];
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-2 max-w-xs">
+    <div className="rounded-2xl border border-slate-100 bg-white p-2 max-w-xs dark:border-slate-600 dark:bg-slate-800/90">
       <Select2 options={items} value={tab} onChange={(v) => onChange(v as TabKey)} />
     </div>
   );
@@ -167,26 +171,35 @@ export function CollaboratorList({
       header: 'Collaborator',
       render: (c) => (
         <div>
-          <div className="font-semibold text-slate-900 truncate">{c.name || '—'}</div>
-          {c.email ? <div className="text-xs text-slate-500 break-all">{c.email}</div> : null}
+          <div className="font-semibold text-slate-900 truncate dark:text-slate-100">{c.name || '—'}</div>
+          {c.email ? <div className="text-xs text-slate-500 break-all dark:text-slate-400">{c.email}</div> : null}
         </div>
       ),
     },
     {
       header: 'Remarks',
-      render: (c) => <span className="text-sm text-slate-600 truncate block max-w-[150px]">{c.remarks || '—'}</span>,
+      render: (c) => (
+        <span className="block max-w-[min(22rem,100%)] truncate text-sm text-slate-600 dark:text-slate-300">
+          {c.remarks || '—'}
+        </span>
+      ),
     },
     {
       header: 'Role',
       render: (c) => (
-        <Badge variant="outline" className={cn('border-0', roleBadgeClass(c.role))}>
+        <span
+          className={cn(
+            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
+            roleBadgeClass(c.role),
+          )}
+        >
           {c.role}
-        </Badge>
+        </span>
       ),
     },
     {
       header: 'Added',
-      render: (c) => <span className="text-xs text-slate-400">{c.dateAdded || '—'}</span>,
+      render: (c) => <span className="text-xs text-slate-400 dark:text-slate-300">{c.dateAdded || '—'}</span>,
     },
     {
       header: 'Actions',
@@ -195,7 +208,7 @@ export function CollaboratorList({
           <select
             value={c.role}
             onChange={(e) => onRoleChange(c.id, e.target.value as CollaboratorRole)}
-            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           >
             <option value="Owner">Owner</option>
             <option value="Editor">Editor</option>
@@ -221,7 +234,7 @@ export function CollaboratorList({
         </div>
       ),
     },
-  ], [onRoleChange, onRemove]);
+  ], [onRoleChange, onRemove, onEdit]);
 
   return (
     <DataTable
@@ -238,14 +251,17 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
     <div className="space-y-2">
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
           No activity recorded.
         </div>
       ) : (
         items.map((it) => (
-          <div key={it.id} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <div className="text-[11px] text-slate-400 mb-1">{it.at}</div>
-            <div className="text-sm text-slate-700">{it.text}</div>
+          <div
+            key={it.id}
+            className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90"
+          >
+            <div className="text-[11px] text-slate-400 mb-1 dark:text-slate-400">{it.at}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">{it.text}</div>
           </div>
         ))
       )}
@@ -269,7 +285,7 @@ export function CommentSection({
   const [editingValue, setEditingValue] = useState('');
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-slate-100 bg-white p-4">
+      <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <Label>Add a comment / note</Label>
@@ -282,7 +298,7 @@ export function CommentSection({
           </div>
           <Button
             type="button"
-            className="bg-indigo-600 hover:bg-indigo-700"
+            className="bg-indigo-600 text-white hover:bg-indigo-700"
             onClick={() => {
               const t = value.trim();
               if (!t) return;
@@ -297,15 +313,18 @@ export function CommentSection({
 
       <div className="space-y-2">
         {comments.length === 0 ? (
-          <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
             No notes yet.
           </div>
         ) : (
           comments.map((c) => (
-            <div key={c.id} className="rounded-2xl border border-slate-100 bg-white p-4">
+            <div
+              key={c.id}
+              className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] text-slate-400">{c.at}</div>
+                  <div className="text-[11px] text-slate-400 dark:text-slate-400">{c.at}</div>
                   {editingId === c.id ? (
                     <div className="mt-2 space-y-2">
                       <Input
@@ -327,7 +346,7 @@ export function CommentSection({
                         </Button>
                         <Button
                           type="button"
-                          className="h-8 bg-indigo-600 hover:bg-indigo-700"
+                          className="h-8 bg-indigo-600 text-white hover:bg-indigo-700"
                           onClick={() => {
                             const next = editingValue.trim();
                             if (!next) return;
@@ -341,7 +360,7 @@ export function CommentSection({
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{c.text}</div>
+                    <div className="mt-1 text-sm text-slate-700 whitespace-pre-wrap dark:text-slate-200">{c.text}</div>
                   )}
                 </div>
 
@@ -351,7 +370,7 @@ export function CommentSection({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 text-slate-500 hover:text-indigo-600"
+                      className="h-9 w-9 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                       title="Edit"
                       onClick={() => {
                         setEditingId(c.id);
@@ -364,7 +383,7 @@ export function CommentSection({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 text-slate-500 hover:text-rose-600"
+                      className="h-9 w-9 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
                       title="Delete"
                       onClick={() => onDelete(c.id)}
                     >
@@ -717,80 +736,106 @@ export function ContractDetailsCollaborationModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={summary.title} maxWidth="5xl" variant="glass">
-      <div className="space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <Modal isOpen={isOpen} onClose={onClose} title={summary.title} maxWidth="7xl" variant="default">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <ContractSummaryCard title="Unit" value={summary.unitLabel} />
           <ContractSummaryCard title="Primary tenant" value={summary.primaryTenantLabel} />
           <ContractSummaryCard title="Period" value={summary.periodLabel} />
           <ContractSummaryCard title="Status" value={summary.statusLabel} />
-        </div>        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-2">
+        </div>
+        <div className="grid grid-cols-1 gap-8 pt-1 lg:grid-cols-[minmax(12rem,14rem)_1fr] lg:items-start">
           {/* ── Sidebar Nav ── */}
-          <div className="col-span-1 space-y-1 border-r border-slate-200 pr-4">
+          <div className="space-y-1 border-b border-slate-200 pb-4 dark:border-slate-600 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
             <button
               type="button"
               onClick={() => setTab('collaboration')}
               className={cn(
-                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
-                tab === 'collaboration' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left',
+                tab === 'collaboration'
+                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-200'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
               )}
             >
               Collaborators
-              <ChevronRight className={cn("h-4 w-4", tab === 'collaboration' ? "text-indigo-700" : "text-transparent")} />
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4',
+                  tab === 'collaboration' ? 'text-indigo-700 dark:text-indigo-300' : 'text-transparent',
+                )}
+              />
             </button>
             <button
               type="button"
               onClick={() => setTab('activity')}
               className={cn(
-                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
-                tab === 'activity' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left',
+                tab === 'activity'
+                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-200'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
               )}
             >
               Activity & Notes
-              <ChevronRight className={cn("h-4 w-4", tab === 'activity' ? "text-indigo-700" : "text-transparent")} />
+              <ChevronRight
+                className={cn('h-4 w-4', tab === 'activity' ? 'text-indigo-700 dark:text-indigo-300' : 'text-transparent')}
+              />
             </button>
             <button
               type="button"
               onClick={() => setTab('documents')}
               className={cn(
-                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
-                tab === 'documents' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left',
+                tab === 'documents'
+                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-200'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
               )}
             >
               Documents
-              <ChevronRight className={cn("h-4 w-4", tab === 'documents' ? "text-indigo-700" : "text-transparent")} />
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4',
+                  tab === 'documents' ? 'text-indigo-700 dark:text-indigo-300' : 'text-transparent',
+                )}
+              />
             </button>
             <button
               type="button"
               onClick={() => setTab('inventory')}
               className={cn(
-                "w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left",
-                tab === 'inventory' ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all text-left',
+                tab === 'inventory'
+                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-200'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
               )}
             >
               Inventory
-              <ChevronRight className={cn("h-4 w-4", tab === 'inventory' ? "text-indigo-700" : "text-transparent")} />
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4',
+                  tab === 'inventory' ? 'text-indigo-700 dark:text-indigo-300' : 'text-transparent',
+                )}
+              />
             </button>
           </div>
 
           {/* ── Main Content Area ── */}
-          <div className="col-span-1 md:col-span-3 min-w-0 pl-2">
+          <div className="min-w-0 lg:pl-2">
             {tab === 'collaboration' ? (
               <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-slate-900">Collaborators</div>
-                  <div className="text-xs text-slate-500">Manage access for this contract.</div>
+                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Collaborators</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Manage access for this contract.</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="button" className="h-9 bg-indigo-600 hover:bg-indigo-700" onClick={() => setInviteOpen(true)}>
+                  <Button type="button" className="h-9 bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => setInviteOpen(true)}>
                     Add collaborator
                   </Button>
                 </div>
               </div>
 
               {inviteOpen ? (
-                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm">
+                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Name</Label>
@@ -859,7 +904,7 @@ export function ContractDetailsCollaborationModal({
                     </Button>
                     <Button
                       type="button"
-                      className="bg-indigo-600 hover:bg-indigo-700"
+                      className="bg-indigo-600 text-white hover:bg-indigo-700"
                       onClick={submitInvite}
                       disabled={inviteSaving}
                     >
@@ -870,9 +915,9 @@ export function ContractDetailsCollaborationModal({
               ) : null}
 
               {editCollabId ? (
-                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm">
+                <div className="mb-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/40 p-5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-semibold text-slate-900">
+                    <h4 className="font-semibold text-slate-900 dark:text-slate-100">
                       Edit Collaborator — {collaborators.find((c) => c.id === editCollabId)?.name || 'Unknown'}
                     </h4>
                   </div>
@@ -930,8 +975,8 @@ export function ContractDetailsCollaborationModal({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Label className="text-slate-400">Role</Label>
-                        <div className="text-sm font-medium text-slate-700 py-2">Primary Tenant</div>
+                        <Label className="text-slate-400 dark:text-slate-300">Role</Label>
+                        <div className="text-sm font-medium text-slate-700 py-2 dark:text-slate-200">Primary Tenant</div>
                       </div>
                     )}
                     <div className="space-y-2">
@@ -951,7 +996,7 @@ export function ContractDetailsCollaborationModal({
                     <Button
                       onClick={submitEditCollab}
                       disabled={editCollabSaving}
-                      className="bg-indigo-600 hover:bg-indigo-700"
+                      className="bg-indigo-600 text-white hover:bg-indigo-700"
                     >
                       {editCollabSaving ? 'Saving…' : 'Save changes'}
                     </Button>
@@ -988,21 +1033,21 @@ export function ContractDetailsCollaborationModal({
             ) : tab === 'activity' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
-              <div className="text-sm font-bold text-slate-900 mb-2">Activity</div>
+              <div className="text-sm font-bold text-slate-900 mb-2 dark:text-slate-100">Activity</div>
               <ActivityFeed items={activity} />
             </div>
             <div>
-              <div className="text-sm font-bold text-slate-900 mb-2">Comments & Notes</div>
+              <div className="text-sm font-bold text-slate-900 mb-2 dark:text-slate-100">Comments & Notes</div>
               <CommentSection comments={comments} onAdd={addComment} onEdit={editComment} onDelete={deleteComment} />
             </div>
               </div>
             ) : tab === 'documents' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/60">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-slate-900">Repository documents</div>
-                  <div className="text-xs text-slate-500 mb-3">Files saved in `document_repository` for this contract.</div>
+                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Repository documents</div>
+                  <div className="text-xs text-slate-500 mb-3 dark:text-slate-400">Files saved in `document_repository` for this contract.</div>
                 </div>
                 {onUploadRepositoryDocument ? (
                   <Button
@@ -1016,7 +1061,7 @@ export function ContractDetailsCollaborationModal({
                 ) : null}
               </div>
               {repoUploadOpen ? (
-                <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Doc type</Label>
@@ -1046,7 +1091,7 @@ export function ContractDetailsCollaborationModal({
                     />
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                       <Checkbox
                         checked={repoUploadPortalVisible}
                         onCheckedChange={(v) => setRepoUploadPortalVisible(Boolean(v))}
@@ -1064,7 +1109,7 @@ export function ContractDetailsCollaborationModal({
                       </Button>
                       <Button
                         type="button"
-                        className="bg-indigo-600 hover:bg-indigo-700"
+                        className="bg-indigo-600 text-white hover:bg-indigo-700"
                         onClick={submitRepoUpload}
                         disabled={repoUploadSaving || !repoUploadFile}
                       >
@@ -1076,19 +1121,19 @@ export function ContractDetailsCollaborationModal({
               ) : null}
               <div className="space-y-2">
                 {documents.length === 0 ? (
-                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
                     No documents uploaded.
                   </div>
                 ) : (
                   documents.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
+                    <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-600 dark:bg-slate-800/80">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-                          <FileText className="h-5 w-5 text-indigo-600" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/50">
+                          <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 truncate">{d.title || 'Document'}</div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="font-semibold text-slate-900 truncate dark:text-slate-100">{d.title || 'Document'}</div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                             <span className="capitalize">{d.docType.replace(/_/g, ' ')}</span>
                             <span>•</span>
                             <span>{d.createdAt || '—'}</span>
@@ -1103,7 +1148,7 @@ export function ContractDetailsCollaborationModal({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                           onClick={() => {
                             if (d.docType === 'lease_contract' && d.contractId) {
                               const url = `${window.location.origin}/preview?type=contract&id=${encodeURIComponent(d.contractId)}`;
@@ -1122,17 +1167,17 @@ export function ContractDetailsCollaborationModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-slate-900">Templates</div>
-                  <div className="text-xs text-slate-500 mb-3">Active `document_template` grouped by `template_key`.</div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/60">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Templates</div>
+                  <div className="mb-3 text-xs text-slate-500 dark:text-slate-400">Active `document_template` grouped by `template_key`.</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full min-w-0 max-w-full flex-wrap items-center justify-end gap-2 lg:w-auto lg:flex-[1_1_auto] lg:min-w-0">
                   {onGenerateInvoice ? (
                     <Button
                       type="button"
-                      className="h-9 bg-indigo-600 hover:bg-indigo-700"
+                      className="h-9 shrink-0 bg-indigo-600 text-white hover:bg-indigo-700"
                       disabled={invoiceSaving}
                       onClick={async () => {
                         if (invoiceSaving) return;
@@ -1151,7 +1196,7 @@ export function ContractDetailsCollaborationModal({
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-9"
+                      className="h-9 shrink-0"
                       onClick={() => setTemplateUploadOpen((v) => !v)}
                     >
                       Upload
@@ -1160,7 +1205,7 @@ export function ContractDetailsCollaborationModal({
                 </div>
               </div>
               {templateUploadOpen ? (
-                <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Template key</Label>
@@ -1191,7 +1236,7 @@ export function ContractDetailsCollaborationModal({
                     />
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                       <Checkbox checked={templateActive} onCheckedChange={(v) => setTemplateActive(Boolean(v))} />
                       Active
                     </label>
@@ -1206,7 +1251,7 @@ export function ContractDetailsCollaborationModal({
                       </Button>
                       <Button
                         type="button"
-                        className="bg-indigo-600 hover:bg-indigo-700"
+                        className="bg-indigo-600 text-white hover:bg-indigo-700"
                         onClick={submitTemplateUpload}
                         disabled={templateSaving || !templateUploadFile || !templateKey.trim()}
                       >
@@ -1218,19 +1263,19 @@ export function ContractDetailsCollaborationModal({
               ) : null}
               <div className="space-y-2">
                 {templates.length === 0 ? (
-                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
                     No templates available.
                   </div>
                 ) : (
                   templates.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
+                    <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-600 dark:bg-slate-800/80">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-                          <FileText className="h-5 w-5 text-indigo-600" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/50">
+                          <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 truncate">{t.title || 'Template'}</div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="font-semibold text-slate-900 truncate dark:text-slate-100">{t.title || 'Template'}</div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                             <span>{t.templateKey}</span>
                             <span>•</span>
                             <span>v{t.versionNo}</span>
@@ -1244,7 +1289,7 @@ export function ContractDetailsCollaborationModal({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                          className="h-8 w-8 text-slate-400 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                           onClick={() => window.open(t.filePath.startsWith('/') ? t.filePath : `/${t.filePath}`, '_blank')}
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -1258,17 +1303,17 @@ export function ContractDetailsCollaborationModal({
               </div>
             ) : tab === 'inventory' ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-slate-900">Inventory snapshots</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Inventory snapshots</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     Move-in / move-out inspection snapshots from `inventory_snapshot` and items from `inventory_snapshot_item`.
                   </div>
                 </div>
                 <Button
                   type="button"
-                  className="h-9 bg-indigo-600 hover:bg-indigo-700"
+                  className="h-9 bg-indigo-600 text-white hover:bg-indigo-700"
                   onClick={() => setAddSnapshotOpen((v) => !v)}
                 >
                   Add snapshot
@@ -1276,14 +1321,14 @@ export function ContractDetailsCollaborationModal({
               </div>
 
               {addSnapshotOpen ? (
-                <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/60">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-2">
                       <Label>Snapshot type</Label>
                       <select
                         value={snapType}
                         onChange={(e) => setSnapType(e.target.value as InventorySnapshot['snapshotType'])}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                       >
                         <option value="move_in">Move in</option>
                         <option value="move_out">Move out</option>
@@ -1334,7 +1379,7 @@ export function ContractDetailsCollaborationModal({
                     </Button>
                     <Button
                       type="button"
-                      className="bg-indigo-600 hover:bg-indigo-700"
+                      className="bg-indigo-600 text-white hover:bg-indigo-700"
                       disabled={snapSaving}
                       onClick={async () => {
                         if (!snapDate) return;
@@ -1363,12 +1408,12 @@ export function ContractDetailsCollaborationModal({
 
             <div className="space-y-3">
               {inventory.length === 0 ? (
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
                   No inventory snapshots yet.
                 </div>
               ) : (
                 inventory.map((s) => (
-                  <div key={s.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div key={s.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/60">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1377,27 +1422,27 @@ export function ContractDetailsCollaborationModal({
                             className={cn(
                               'border-0',
                               s.snapshotType === 'move_in'
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200'
                                 : s.snapshotType === 'move_out'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-slate-100 text-slate-700',
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
                             )}
                           >
                             {s.snapshotType.replace('_', ' ')}
                           </Badge>
-                          <div className="text-sm font-semibold text-slate-900">{s.inspectionDate || '—'}</div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{s.inspectionDate || '—'}</div>
                         </div>
-                        {s.remarks ? <div className="mt-1 text-xs text-slate-600">{s.remarks}</div> : null}
+                        {s.remarks ? <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">{s.remarks}</div> : null}
                       </div>
                       <div className="shrink-0 flex items-center gap-2">
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           {s.items.length} item{s.items.length === 1 ? '' : 's'}
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-slate-500 hover:text-indigo-600"
+                          className="h-9 w-9 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                           title="Edit snapshot"
                           onClick={() => {
                             setEditSnapshotId(s.id);
@@ -1412,7 +1457,7 @@ export function ContractDetailsCollaborationModal({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-slate-500 hover:text-rose-600"
+                          className="h-9 w-9 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
                           title="Delete snapshot"
                           onClick={async () => {
                             if (!confirm('Delete this snapshot (and its items)?')) return;
@@ -1441,14 +1486,14 @@ export function ContractDetailsCollaborationModal({
                     </div>
 
                     {editSnapshotId === s.id ? (
-                      <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4">
+                      <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <Label>Snapshot type</Label>
                             <select
                               value={editSnapType}
                               onChange={(e) => setEditSnapType(e.target.value as any)}
-                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                             >
                               <option value="move_in">Move in</option>
                               <option value="move_out">Move out</option>
@@ -1494,7 +1539,7 @@ export function ContractDetailsCollaborationModal({
                           </Button>
                           <Button
                             type="button"
-                            className="bg-indigo-600 hover:bg-indigo-700"
+                            className="bg-indigo-600 text-white hover:bg-indigo-700"
                             disabled={editSnapSaving}
                             onClick={async () => {
                               if (!editSnapDate) return;
@@ -1518,7 +1563,7 @@ export function ContractDetailsCollaborationModal({
                     ) : null}
 
                     {itemOpenFor === s.id ? (
-                      <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4">
+                      <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <Label>Item name</Label>
@@ -1529,7 +1574,7 @@ export function ContractDetailsCollaborationModal({
                                     <select
                                       value={itemCategory}
                                       onChange={(e) => setItemCategory(e.target.value)}
-                                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                                     >
                                       <option value="">Select category (optional)</option>
                                       {INVENTORY_CATEGORIES.map((c) => (
@@ -1554,7 +1599,7 @@ export function ContractDetailsCollaborationModal({
                             <select
                               value={itemCondition}
                               onChange={(e) => setItemCondition(e.target.value as any)}
-                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                             >
                               <option value="excellent">excellent</option>
                               <option value="good">good</option>
@@ -1584,7 +1629,7 @@ export function ContractDetailsCollaborationModal({
                           </Button>
                           <Button
                             type="button"
-                            className="bg-indigo-600 hover:bg-indigo-700"
+                            className="bg-indigo-600 text-white hover:bg-indigo-700"
                             disabled={itemSaving}
                             onClick={async () => {
                               const qty = Number(itemQty);
@@ -1621,7 +1666,7 @@ export function ContractDetailsCollaborationModal({
                           s.items.map((it) => (
                             <div key={it.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3">
                               <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-slate-900 truncate">{it.itemName}</div>
+                                <div className="font-semibold text-slate-900 truncate dark:text-slate-100">{it.itemName}</div>
                                 {it.notes ? <div className="text-xs text-slate-500 truncate mb-1">{it.notes}</div> : null}
                                 <div className="flex items-center gap-2 text-xs text-slate-600">
                                   <span>{inventoryCategoryLabel(it.category) || 'Uncategorized'}</span>
@@ -1685,7 +1730,7 @@ export function ContractDetailsCollaborationModal({
                                 <select
                                   value={editItemCategory}
                                   onChange={(e) => setEditItemCategory(e.target.value)}
-                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                                 >
                                   <option value="">Select category (optional)</option>
                                   {INVENTORY_CATEGORIES.map((c) => (
@@ -1704,7 +1749,7 @@ export function ContractDetailsCollaborationModal({
                                 <select
                                   value={editItemCondition}
                                   onChange={(e) => setEditItemCondition(e.target.value as any)}
-                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                                 >
                                   <option value="excellent">excellent</option>
                                   <option value="good">good</option>
@@ -1724,7 +1769,7 @@ export function ContractDetailsCollaborationModal({
                               </Button>
                               <Button
                                 type="button"
-                                className="bg-indigo-600 hover:bg-indigo-700"
+                                className="bg-indigo-600 text-white hover:bg-indigo-700"
                                 disabled={editItemSaving}
                                 onClick={async () => {
                                   const qty = Number(editItemQty);
