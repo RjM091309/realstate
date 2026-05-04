@@ -16,6 +16,7 @@ import {
   listActiveRoles,
   listBranchesActive,
   listStaffUsersJoined,
+  setUserAvatarByUserId,
   updateUserAvatarUrl,
   updateUserPasswordById,
   updateUserPasswordHash,
@@ -264,6 +265,78 @@ export async function deleteProfilePhoto(req, res) {
   }
 }
 
+export async function uploadStaffUserPhoto(req, res) {
+  try {
+    const targetId = Number(req.params.userId);
+    if (!Number.isFinite(targetId) || targetId < 1) {
+      res.status(400).json({ error: 'Invalid user' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    const existing = await findUserRowById(targetId);
+    if (!existing) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const oldRaw = existing.AVATAR_URL;
+    const oldUrl =
+      oldRaw != null && String(oldRaw).trim() !== '' ? String(oldRaw) : null;
+
+    let publicUrl;
+    try {
+      ({ publicUrl } = await finalizeProfileAvatarUpload(req.file));
+    } catch (e) {
+      const status = e?.statusCode === 400 ? 400 : 500;
+      const msg =
+        status === 400 && e instanceof Error ? e.message : 'Could not process image';
+      res.status(status).json({ error: msg });
+      return;
+    }
+
+    await deletePublicAvatarFile(oldUrl);
+    await setUserAvatarByUserId(targetId, publicUrl);
+
+    const row = await getStaffUserJoined(targetId);
+    res.json({ user: row ? mapStaffUserRow(row) : null });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not upload photo' });
+  }
+}
+
+export async function deleteStaffUserPhoto(req, res) {
+  try {
+    const targetId = Number(req.params.userId);
+    if (!Number.isFinite(targetId) || targetId < 1) {
+      res.status(400).json({ error: 'Invalid user' });
+      return;
+    }
+
+    const existing = await findUserRowById(targetId);
+    if (!existing) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const oldRaw = existing.AVATAR_URL;
+    const oldUrl =
+      oldRaw != null && String(oldRaw).trim() !== '' ? String(oldRaw) : null;
+    await deletePublicAvatarFile(oldUrl);
+    await setUserAvatarByUserId(targetId, null);
+
+    const row = await getStaffUserJoined(targetId);
+    res.json({ user: row ? mapStaffUserRow(row) : null });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not remove photo' });
+  }
+}
+
 export async function updateProfile(req, res) {
   try {
     const userId = Number(req.userId);
@@ -345,6 +418,7 @@ export async function changePassword(req, res) {
 }
 
 function mapStaffUserRow(r) {
+  const rawAvatar = r.AVATAR_URL;
   return {
     id: Number(r.IDNO),
     firstName: String(r.FIRSTNAME ?? ''),
@@ -355,6 +429,8 @@ function mapStaffUserRow(r) {
     branchId: r.BRANCH_ID == null ? null : Number(r.BRANCH_ID),
     branchName: r.branchName != null ? String(r.branchName) : null,
     active: Boolean(Number(r.ACTIVE)),
+    avatarUrl:
+      rawAvatar != null && String(rawAvatar).trim() !== '' ? String(rawAvatar) : null,
   };
 }
 
@@ -459,7 +535,9 @@ export async function createStaffUser(req, res) {
 
     const row = await getStaffUserJoined(userId);
     if (!row) {
-      res.status(201).json({ user: { id: userId, firstName, lastName, username, roleId, active: true } });
+      res.status(201).json({
+        user: { id: userId, firstName, lastName, username, roleId, active: true, avatarUrl: null },
+      });
       return;
     }
     res.status(201).json({ user: mapStaffUserRow(row) });

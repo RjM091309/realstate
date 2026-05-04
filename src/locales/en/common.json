@@ -179,7 +179,12 @@
       "cannotDeactivateSelf": "You cannot deactivate your own account.",
       "accountAccessLabel": "Account access",
       "accountAccessHint": "Turn off to block sign-in. Credentials stay in the database and you can turn access back on anytime.",
-      "accountAccessLockedHint": "You cannot disable your own account here."
+      "accountAccessLockedHint": "You cannot disable your own account here.",
+      "avatarLabel": "Profile photo",
+      "avatarHint": "Any image type · max 2 MB · stored as WebP",
+      "avatarUpload": "Upload image",
+      "avatarRemove": "Remove photo",
+      "avatarInvalidType": "Please choose an image file."
     },
     "userRole": {
       "title": "User Role",

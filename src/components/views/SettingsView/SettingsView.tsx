@@ -261,7 +261,7 @@ export function SettingsView() {
                         <input
                           ref={profilePhotoInputRef}
                           type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          accept="image/*"
                           className="sr-only"
                           aria-label="Upload profile photo"
                           onChange={handleProfilePhotoChange}

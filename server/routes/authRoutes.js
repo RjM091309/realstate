@@ -7,6 +7,7 @@ import {
   createStaffUser,
   deactivateStaffUser,
   deleteProfilePhoto,
+  deleteStaffUserPhoto,
   getSession,
   getRoles,
   listStaffBranches,
@@ -17,6 +18,7 @@ import {
   updateProfile,
   updateStaffUser,
   uploadProfilePhoto,
+  uploadStaffUserPhoto,
 } from '../controllers/authController.js';
 import { requireAuth, requireAdministrator } from '../middlewares/authMiddleware.js';
 
@@ -45,6 +47,13 @@ router.post('/register', register);
 router.get('/staff/branches', requireAdministrator, listStaffBranches);
 router.get('/staff/users', requireAdministrator, listStaffUsers);
 router.post('/staff/users', requireAdministrator, createStaffUser);
+router.post(
+  '/staff/users/:userId/photo',
+  requireAdministrator,
+  profilePhotoUpload.single('file'),
+  uploadStaffUserPhoto,
+);
+router.delete('/staff/users/:userId/photo', requireAdministrator, deleteStaffUserPhoto);
 router.patch('/staff/users/:userId', requireAdministrator, updateStaffUser);
 router.delete('/staff/users/:userId', requireAdministrator, deactivateStaffUser);
 router.post('/login', login);

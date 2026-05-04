@@ -74,6 +74,14 @@ export async function updateUserAvatarUrl(userId, avatarUrl) {
   );
 }
 
+/** Admin staff UI: set avatar for any account (including inactive). */
+export async function setUserAvatarByUserId(userId, avatarUrl) {
+  await pool.execute(
+    `UPDATE user_info SET AVATAR_URL = ?, EDITED_DT = NOW() WHERE IDNO = ?`,
+    [avatarUrl ?? null, userId],
+  );
+}
+
 export async function usernameExists(username) {
   const [rows] = await pool.query('SELECT IDNO FROM user_info WHERE USERNAME = ? LIMIT 1', [
     username,
@@ -116,7 +124,7 @@ export async function getBranchByIdActive(branchId) {
 
 export async function listStaffUsersJoined() {
   const [rows] = await pool.query(
-    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE,
+    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.AVATAR_URL,
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -128,7 +136,7 @@ export async function listStaffUsersJoined() {
 
 export async function getStaffUserJoined(userId) {
   const [rows] = await pool.query(
-    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE,
+    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.AVATAR_URL,
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -142,7 +150,7 @@ export async function getStaffUserJoined(userId) {
 
 export async function findUserRowById(userId) {
   const [rows] = await pool.query(
-    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE
+    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE, AVATAR_URL
      FROM user_info WHERE IDNO = ? LIMIT 1`,
     [userId],
   );

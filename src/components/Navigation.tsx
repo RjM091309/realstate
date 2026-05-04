@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ProfileAvatarHoverPreview } from '@/components/ProfileAvatarHoverPreview';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -620,11 +620,10 @@ export function TopNav({
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
                 )}
               >
-                <ProfileAvatarHoverPreview
-                  avatarUrl={session?.user.avatarUrl}
-                  initials={initials}
-                  avatarClassName="h-8 w-8"
-                />
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={session?.user.avatarUrl ?? undefined} className="object-cover" />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
                 <div className="min-w-0 text-left hidden sm:block">
                   <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
                     {name || '—'}

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, Search, Pencil, Trash2, UserRoundCheck, XCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, ImagePlus, Plus, Search, Pencil, Trash2, UserRoundCheck, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Modal } from '@/components/modal';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { ProfileAvatarHoverPreview } from '@/components/ProfileAvatarHoverPreview';
 import { cn } from '@/lib/utils';
 
 type StaffUser = {
@@ -22,6 +23,7 @@ type StaffUser = {
   branchId: number | null;
   branchName: string | null;
   active: boolean;
+  avatarUrl?: string | null;
 };
 
 type RoleOption = { id: number; name: string };
@@ -32,6 +34,14 @@ const inputClass =
 /** Must match server `MIN_PASSWORD_LENGTH` in authController.js */
 const PASSWORD_MIN_LENGTH = 4;
 const ADMIN_ROLE_ID = 1;
+
+function staffInitials(firstName: string, lastName: string, username: string): string {
+  const a = firstName.trim().charAt(0);
+  const b = lastName.trim().charAt(0);
+  if (a && b) return (a + b).toUpperCase();
+  const u = username.trim();
+  return u.slice(0, 2).toUpperCase() || '?';
+}
 
 function StatusSwitch({
   checked,
@@ -74,9 +84,10 @@ function StatusSwitch({
 
 export function UserManagementView() {
   const { t } = useTranslation();
-  const { session } = useAuth();
+  const { session, refreshSession } = useAuth();
   const isAdmin = session?.role.id === ADMIN_ROLE_ID;
   const sessionUserId = session?.user.id;
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   const toastSaveErr = (e: unknown) =>
     toast.error(e instanceof Error ? e.message : t('views.userInfo.saveError'));
@@ -97,8 +108,21 @@ export function UserManagementView() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formActive, setFormActive] = useState(true);
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarDraftObjectUrl, setAvatarDraftObjectUrl] = useState<string | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
+
+  const clearAvatarDraftState = useCallback(() => {
+    setAvatarDraftObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setAvatarDraftFile(null);
+    setAvatarRemoved(false);
+  }, []);
 
   const resetForm = useCallback(() => {
+    clearAvatarDraftState();
     setEditing(null);
     setRoleId(roles[0]?.id ?? 1);
     setFirstName('');
@@ -107,7 +131,7 @@ export function UserManagementView() {
     setPassword('');
     setConfirmPassword('');
     setFormActive(true);
-  }, [roles]);
+  }, [roles, clearAvatarDraftState]);
 
   const openAdd = useCallback(() => {
     resetForm();
@@ -116,6 +140,7 @@ export function UserManagementView() {
 
   const openEdit = useCallback(
     (u: StaffUser) => {
+      clearAvatarDraftState();
       setEditing(u);
       setRoleId(u.roleId);
       setFirstName(u.firstName);
@@ -126,7 +151,7 @@ export function UserManagementView() {
       setFormActive(u.active);
       setModalOpen(true);
     },
-    [],
+    [clearAvatarDraftState],
   );
 
   const loadLists = useCallback(async () => {
@@ -222,8 +247,17 @@ export function UserManagementView() {
           body: JSON.stringify(body),
         });
         toast.success(t('views.userInfo.savedEdit'));
+        const targetId = editing.id;
+        if (avatarDraftFile) {
+          const fd = new FormData();
+          fd.append('file', avatarDraftFile);
+          await apiFetch(`/api/auth/staff/users/${targetId}/photo`, { method: 'POST', body: fd });
+        } else if (avatarRemoved && editing.avatarUrl) {
+          await apiFetch(`/api/auth/staff/users/${targetId}/photo`, { method: 'DELETE' });
+        }
+        if (targetId === sessionUserId) await refreshSession();
       } else {
-        await apiFetch('/api/auth/staff/users', {
+        const res = await apiFetch<{ user: StaffUser }>('/api/auth/staff/users', {
           method: 'POST',
           body: JSON.stringify({
             firstName,
@@ -234,6 +268,13 @@ export function UserManagementView() {
           }),
         });
         toast.success(t('views.userInfo.savedAdd'));
+        const newId = res.user?.id;
+        if (newId && avatarDraftFile) {
+          const fd = new FormData();
+          fd.append('file', avatarDraftFile);
+          await apiFetch(`/api/auth/staff/users/${newId}/photo`, { method: 'POST', body: fd });
+        }
+        if (newId === sessionUserId) await refreshSession();
       }
       closeModal();
       await loadLists();
@@ -242,6 +283,22 @@ export function UserManagementView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const onAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!f.type.startsWith('image/')) {
+      toast.error(t('views.userInfo.avatarInvalidType'));
+      return;
+    }
+    setAvatarDraftObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(f);
+    });
+    setAvatarDraftFile(f);
+    setAvatarRemoved(false);
   };
 
   const handleSetActive = async (u: StaffUser, nextActive: boolean) => {
@@ -277,8 +334,18 @@ export function UserManagementView() {
     {
       header: t('views.userInfo.columns.fullName'),
       render: (u) => (
-        <span className="font-medium">
-          {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.username}
+        <span className="flex items-center gap-3">
+          <ProfileAvatarHoverPreview
+            detachPreview
+            avatarUrl={u.avatarUrl}
+            initials={staffInitials(u.firstName, u.lastName, u.username)}
+            avatarClassName="h-9 w-9 border border-slate-200 dark:border-slate-600"
+            fallbackClassName="bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+            previewClassName="h-36 w-36 min-h-36 min-w-36 sm:h-40 sm:w-40 sm:min-h-40 sm:min-w-40"
+          />
+          <span className="font-medium">
+            {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.username}
+          </span>
         </span>
       ),
     },
@@ -449,6 +516,73 @@ export function UserManagementView() {
         }
       >
         <div className="space-y-4">
+          <input
+            ref={avatarFileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={onAvatarFileChange}
+          />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div
+              className={cn(
+                'flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed',
+                avatarDraftObjectUrl || (!avatarRemoved && editing?.avatarUrl)
+                  ? 'border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50'
+                  : 'border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/80',
+              )}
+            >
+              {avatarDraftObjectUrl || (!avatarRemoved && editing?.avatarUrl) ? (
+                <img
+                  src={avatarDraftObjectUrl ?? editing?.avatarUrl ?? ''}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-lg font-bold text-slate-400 dark:text-slate-500">
+                  {staffInitials(firstName, lastName, username)}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                {t('views.userInfo.avatarLabel')}
+              </Label>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{t('views.userInfo.avatarHint')}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  disabled={saving}
+                  onClick={() => avatarFileInputRef.current?.click()}
+                >
+                  <ImagePlus className="mr-2 h-4 w-4" />
+                  {t('views.userInfo.avatarUpload')}
+                </Button>
+                {(avatarDraftFile || (editing?.avatarUrl && !avatarRemoved)) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                    disabled={saving}
+                    onClick={() => {
+                      setAvatarDraftObjectUrl((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return null;
+                      });
+                      setAvatarDraftFile(null);
+                      setAvatarRemoved(true);
+                    }}
+                  >
+                    {t('views.userInfo.avatarRemove')}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
               {t('views.userInfo.labels.userRole')}

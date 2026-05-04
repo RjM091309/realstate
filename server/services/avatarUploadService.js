@@ -19,13 +19,7 @@ export async function finalizeProfileAvatarUpload(file) {
   const mime = String(file.mimetype ?? '').toLowerCase();
   if (!mime.startsWith('image/')) {
     await unlinkQuietly(file.path);
-    const err = new Error('Please upload an image (JPEG, PNG, WebP, or GIF).');
-    err.statusCode = 400;
-    throw err;
-  }
-  if (mime === 'image/svg+xml') {
-    await unlinkQuietly(file.path);
-    const err = new Error('SVG is not supported. Use PNG or JPEG.');
+    const err = new Error('Please upload an image file.');
     err.statusCode = 400;
     throw err;
   }
@@ -48,7 +42,9 @@ export async function finalizeProfileAvatarUpload(file) {
       error: e instanceof Error ? e.message : String(e),
     });
     await unlinkQuietly(file.path);
-    const err = new Error('Could not process this image. Try JPEG, PNG, or WebP (max 2MB).');
+    const err = new Error(
+      'Could not convert this image to WebP. Try another image format (max 2MB).',
+    );
     err.statusCode = 400;
     err.cause = e;
     throw err;
