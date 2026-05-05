@@ -40,8 +40,8 @@ import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import { applyTheme, type AppThemeMode } from '@/lib/theme';
 import { animateThemeRippleFromElement } from '@/lib/themeRipple';
-import { apiFetch } from '@/lib/api';
-import { getToken } from '@/lib/api';
+import { apiFetch, getToken } from '@/lib/api';
+import { getSocketApiOrigin } from '@/lib/socketOrigin';
 import {
   effectiveUnreadCount,
   filterNotificationsByPreferences,
@@ -49,13 +49,19 @@ import {
   subscribeNotificationPreferences,
 } from '@/lib/notificationPreferences';
 import { toast } from 'sonner';
-import { io, type Socket } from 'socket.io-client';
 import { Modal } from '@/components/modal';
 import {
   NotificationPanel,
   createDefaultNotifications,
   type Notification,
 } from '@/components/NotificationPanel';
+
+/** Socket surface used by TopNav only — avoids top-level `socket.io-client` import (Vite dev resolution). */
+type IoNotifySocket = {
+  on(ev: string, fn: (...args: unknown[]) => void): void;
+  off(ev: string, fn?: (...args: unknown[]) => void): void;
+  disconnect(): void;
+};
 
 interface SidebarProps {
   activeTab: string;
@@ -338,7 +344,7 @@ export function TopNav({
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
   const { session, refreshSession } = useAuth();
   const { dateRange, setDateRange } = useDateRange();
-  const socketRef = React.useRef<Socket | null>(null);
+  const socketRef = React.useRef<IoNotifySocket | null>(null);
   const refreshTimeoutRef = React.useRef<number | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [themeLoading, setThemeLoading] = useState<AppThemeMode | null>(null);
@@ -382,35 +388,51 @@ export function TopNav({
 
   useEffect(() => {
     if (!session) return;
+    let cancelled = false;
     const token = getToken();
     const devUserId = localStorage.getItem('realstate_dev_user_id');
-    const socket = io('http://localhost:2550', {
-      transports: ['websocket'],
-      auth: { token, devUserId },
-    });
-    socketRef.current = socket;
+    let active: IoNotifySocket | null = null;
 
-    socket.on('notifications:changed', () => {
-      void refreshNotifications();
-    });
+    void (async () => {
+      const { io } = await import('socket.io-client');
+      if (cancelled) return;
+      const socket = io(getSocketApiOrigin(), {
+        transports: ['websocket'],
+        auth: { token, devUserId },
+      }) as IoNotifySocket;
+      if (cancelled) {
+        socket.disconnect();
+        return;
+      }
+      active = socket;
+      socketRef.current = socket;
 
-    socket.on('access:changed', (payload: { roleId?: number } | undefined) => {
-      const changedRoleId = Number(payload?.roleId);
-      const myRoleId = Number(session.role?.id);
-      if (!Number.isFinite(changedRoleId) || changedRoleId < 1) return;
-      if (changedRoleId !== myRoleId) return;
-      if (refreshTimeoutRef.current != null) window.clearTimeout(refreshTimeoutRef.current);
-      refreshTimeoutRef.current = window.setTimeout(() => {
-        void refreshSession();
-        refreshTimeoutRef.current = null;
-      }, 250);
-    });
+      socket.on('notifications:changed', () => {
+        void refreshNotifications();
+      });
+
+      socket.on('access:changed', (payload: { roleId?: number } | undefined) => {
+        const changedRoleId = Number(payload?.roleId);
+        const myRoleId = Number(session.role?.id);
+        if (!Number.isFinite(changedRoleId) || changedRoleId < 1) return;
+        if (changedRoleId !== myRoleId) return;
+        if (refreshTimeoutRef.current != null) window.clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = window.setTimeout(() => {
+          void refreshSession();
+          refreshTimeoutRef.current = null;
+        }, 250);
+      });
+    })();
 
     return () => {
-      socket.off('notifications:changed');
-      socket.off('access:changed');
-      socket.disconnect();
+      cancelled = true;
+      const s = active ?? socketRef.current;
       socketRef.current = null;
+      if (s) {
+        s.off('notifications:changed');
+        s.off('access:changed');
+        s.disconnect();
+      }
       if (refreshTimeoutRef.current != null) window.clearTimeout(refreshTimeoutRef.current);
       refreshTimeoutRef.current = null;
     };

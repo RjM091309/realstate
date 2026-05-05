@@ -27,12 +27,21 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    /** Avoid dev-server "Failed to resolve import socket.io-client" when deps cache is stale or incomplete. */
+    optimizeDeps: {
+      include: ['socket.io-client', 'engine.io-client'],
+    },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(configDir, './src'),
+        /** Pin ESM entry — fixes dev-server normalizeUrl failures when package exports resolve oddly. */
+        'socket.io-client': path.resolve(
+          configDir,
+          'node_modules/socket.io-client/build/esm/index.js',
+        ),
       },
     },
     server: {
