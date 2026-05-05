@@ -8,6 +8,7 @@ import {
   listContractCollaborationsView,
   listContractTenantsView,
   listContracts,
+  renewContract,
   updateContract,
   updateContractCollaborationController,
 } from '../controllers/contractsController.js';
@@ -20,6 +21,7 @@ router.get('/:id/tenants', listContractTenantsView);
 router.get('/:id/collaborations', listContractCollaborationsView);
 router.post('/:id/collaborations', createContractCollaborationInvite);
 router.patch('/:id/collaborations/:collabId', updateContractCollaborationController);
+router.post('/:id/renew', renewContract);
 router.post('/', createContract);
 router.patch('/:id', updateContract);
 router.delete('/:id', deleteContract);

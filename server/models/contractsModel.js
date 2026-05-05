@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { moveUnpaidSchedulesToContract, sumUnpaidBalanceForContract } from './paymentsModel.js';
 
 /** Display name: "First Last", or USERNAME if names empty. */
 const AGENT_NAME_SQL = `(
@@ -286,6 +287,151 @@ export async function deleteContractById(id, branchId) {
   return result.affectedRows;
 }
 
+/**
+ * Renew an active lease: insert a new contract row, close the previous one (status completed),
+ * optionally move unpaid payment_schedule rows to the new contract.
+ */
+export async function renewLeaseContract(branchId, oldContractId, payload) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [oldRows] = await conn.query(
+      `
+      SELECT
+        c.id,
+        c.contract_no,
+        c.unit_id,
+        c.agent_id,
+        c.contract_type,
+        c.status,
+        c.start_date,
+        c.end_date,
+        c.monthly_rent,
+        c.security_deposit,
+        c.advance_rent,
+        c.special_remarks,
+        ct.tenant_id
+      FROM lease_contract c
+      LEFT JOIN contract_tenant ct
+        ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
+      WHERE c.id = ? AND c.branch_id = ? AND c.active = 1
+      LIMIT 1
+      `,
+      [oldContractId, branchId],
+    );
+    const old = oldRows[0];
+    if (!old) {
+      await conn.rollback();
+      return { ok: false, code: 'NOT_FOUND' };
+    }
+    if (String(old.status).toLowerCase() !== 'active') {
+      await conn.rollback();
+      return { ok: false, code: 'NOT_ACTIVE' };
+    }
+    if (old.tenant_id == null) {
+      await conn.rollback();
+      return { ok: false, code: 'NO_TENANT' };
+    }
+
+    const unpaid = await sumUnpaidBalanceForContract(branchId, oldContractId, conn);
+    if (payload.balanceHandling === 'require_payment' && unpaid > 0) {
+      await conn.rollback();
+      return { ok: false, code: 'BALANCE_DUE' };
+    }
+
+    const startDate = String(payload.startDate ?? '').trim().slice(0, 10);
+    const endDate = String(payload.endDate ?? '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      await conn.rollback();
+      return { ok: false, code: 'INVALID_DATES' };
+    }
+    if (endDate <= startDate) {
+      await conn.rollback();
+      return { ok: false, code: 'DATE_ORDER' };
+    }
+
+    const monthlyRent = Number(payload.monthlyRent);
+    if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) {
+      await conn.rollback();
+      return { ok: false, code: 'INVALID_RENT' };
+    }
+
+    const userNotes = payload.notes == null ? '' : String(payload.notes).trim();
+    const keepHistory = Boolean(payload.keepHistory);
+    const carryOver = payload.balanceHandling === 'carry_over';
+
+    const parts = [];
+    if (keepHistory) {
+      parts.push(`[Renewed from contract #${old.contract_no ?? oldContractId}]`);
+    }
+    if (carryOver && unpaid > 0) {
+      parts.push(`[Carried unpaid balance: ₱${unpaid.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}]`);
+    }
+    if (userNotes) parts.push(userNotes);
+    const remarks = parts.length ? parts.join('\n\n') : null;
+
+    const contractNo = await generateNextContractNo(conn, branchId, startDate);
+    const deposit = Number(old.security_deposit ?? 0);
+    const advance = Number(old.advance_rent ?? 0);
+
+    const [ins] = await conn.query(
+      `INSERT INTO lease_contract (
+        branch_id, contract_no, unit_id, agent_id, start_date, end_date,
+        monthly_rent, security_deposit, advance_rent, contract_type, status, special_remarks
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      [
+        branchId,
+        contractNo,
+        old.unit_id,
+        old.agent_id,
+        startDate,
+        endDate,
+        monthlyRent,
+        deposit,
+        advance,
+        old.contract_type,
+        remarks,
+      ],
+    );
+
+    const newId = ins.insertId;
+    await conn.query(
+      `INSERT INTO contract_tenant (contract_id, tenant_id, is_primary, active) VALUES (?, ?, 1, 1)
+       ON DUPLICATE KEY UPDATE is_primary = VALUES(is_primary), active = 1`,
+      [newId, old.tenant_id],
+    );
+
+    await conn.query(
+      `UPDATE unit u
+       JOIN property pr ON pr.id = u.property_id
+       SET u.status = 'occupied'
+       WHERE u.id = ? AND pr.branch_id = ?`,
+      [old.unit_id, branchId],
+    );
+
+    if (carryOver && unpaid > 0) {
+      await moveUnpaidSchedulesToContract(conn, branchId, oldContractId, newId);
+    }
+
+    await conn.query(
+      `UPDATE lease_contract
+       SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND branch_id = ? AND active = 1`,
+      [oldContractId, branchId],
+    );
+
+    await conn.commit();
+    const row = await getContractById(newId, branchId);
+    return { ok: true, contract: row, previousContractId: String(oldContractId), unpaidMoved: carryOver && unpaid > 0 };
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function listContractTenants(contractId, branchId) {
   const [rows] = await pool.query(
     `
@@ -318,8 +464,6 @@ export async function listContractCollaborations(contractId, branchId) {
       cc.contract_id,
       cc.partner_agency_id,
       pa.agency_name AS partner_agency_name,
-      pa.contact_person AS partner_contact_person,
-      pa.contact_number AS partner_contact_number,
       pa.email AS partner_email,
       cc.commission_terms,
       cc.remarks,

@@ -10,6 +10,7 @@ import {
   listContractCollaborations,
   listContractTenants,
   listContractsByBranch,
+  renewLeaseContract,
   updateContractById,
   updateContractCollaboration,
   updateContractTenantRemarks,
@@ -110,6 +111,33 @@ function rowToContract(row) {
     type: mapDbTypeToUi(row.contract_type),
     status: mapDbStatusToUi(row.status),
     remarks: row.remarks ? String(row.remarks) : undefined,
+  };
+}
+
+function collaborationRowToDto(r) {
+  return {
+    id: String(r.id),
+    contractId: String(r.contract_id),
+    partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
+    partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
+    email: r.partner_email ? String(r.partner_email) : '',
+    commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
+    remarks: r.remarks ? String(r.remarks) : '',
+    createdBy: r.created_by != null ? String(r.created_by) : '',
+    createdAt: r.created_at ? fmtDate(r.created_at) : '',
+  };
+}
+
+function tenantRowToDto(r) {
+  return {
+    contractId: String(r.contract_id),
+    tenantId: String(r.tenant_id),
+    isPrimary: Boolean(Number(r.is_primary)),
+    remarks: r.remarks ? String(r.remarks) : '',
+    createdAt: r.created_at ? fmtDate(r.created_at) : '',
+    name: r.tenant_name ? String(r.tenant_name) : '—',
+    email: r.tenant_email ? String(r.tenant_email) : '',
+    phone: r.tenant_phone ? String(r.tenant_phone) : '',
   };
 }
 
@@ -284,6 +312,92 @@ export async function updateContract(req, res) {
   }
 }
 
+function validateRenewPayload(body) {
+  const startDate = String(body?.startDate ?? '').trim().slice(0, 10);
+  const endDate = String(body?.endDate ?? '').trim().slice(0, 10);
+  const monthlyRent = Number(body?.monthlyRent);
+  const rawHandling = String(body?.balanceHandling ?? 'carry_over').trim().toLowerCase();
+  const balanceHandling = rawHandling === 'require_payment' ? 'require_payment' : 'carry_over';
+  const keepHistory = Boolean(body?.keepHistory);
+  const notes = body?.notes == null ? null : String(body.notes);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return null;
+  if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) return null;
+
+  return { startDate, endDate, monthlyRent, balanceHandling, keepHistory, notes };
+}
+
+export async function renewContract(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const canRenew =
+    canCrud(ctx.session, 'create') || canCrud(ctx.session, 'update');
+  if (!canRenew) {
+    res.status(403).json({ error: 'No permission to renew contracts' });
+    return;
+  }
+  const oldId = String(req.params.id ?? '').trim();
+  if (!oldId) {
+    res.status(400).json({ error: 'Invalid contract id' });
+    return;
+  }
+  const parsed = validateRenewPayload(req.body ?? {});
+  if (!parsed) {
+    res.status(400).json({ error: 'Invalid renewal payload' });
+    return;
+  }
+
+  try {
+    const result = await renewLeaseContract(ctx.session.branchId, oldId, parsed);
+    if (!result.ok) {
+      if (result.code === 'NOT_FOUND') {
+        res.status(404).json({ error: 'Contract not found' });
+        return;
+      }
+      if (result.code === 'NOT_ACTIVE') {
+        res.status(400).json({ error: 'Only active contracts can be renewed' });
+        return;
+      }
+      if (result.code === 'NO_TENANT') {
+        res.status(400).json({ error: 'Contract has no primary tenant' });
+        return;
+      }
+      if (result.code === 'BALANCE_DUE') {
+        res.status(400).json({ error: 'Tenant must settle balance before renewal' });
+        return;
+      }
+      if (result.code === 'DATE_ORDER') {
+        res.status(400).json({ error: 'Lease end date must be after start date' });
+        return;
+      }
+      if (result.code === 'INVALID_RENT') {
+        res.status(400).json({ error: 'Monthly rent must be greater than zero' });
+        return;
+      }
+      res.status(400).json({ error: 'Invalid renewal request' });
+      return;
+    }
+
+    const contractDto = rowToContract(result.contract);
+    const actorId = ctx.session.user?.id ?? ctx.session.userId;
+    const summary = `Contract renewed — new lease ${contractDto.contractNo ?? contractDto.id} (previous ${result.previousContractId} closed)`;
+    void logAudit({
+      branchId: ctx.session.branchId,
+      actorUserId: actorId,
+      moduleName: 'contracts',
+      recordTable: 'lease_contract',
+      recordId: contractDto.id,
+      action: 'renew',
+      changeSummary: summary,
+    });
+
+    res.status(201).json({ contract: contractDto });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to renew contract' });
+  }
+}
+
 export async function deleteContract(req, res) {
   const ctx = await getAuthContext(req, res);
   if (!ctx) return;
@@ -319,16 +433,7 @@ export async function listContractTenantsView(req, res) {
   }
   try {
     const rows = await listContractTenants(id, ctx.session.branchId);
-    const tenants = rows.map((r) => ({
-      contractId: String(r.contract_id),
-      tenantId: String(r.tenant_id),
-      isPrimary: Boolean(Number(r.is_primary)),
-      remarks: r.remarks ? String(r.remarks) : '',
-      createdAt: r.created_at ? fmtDate(r.created_at) : '',
-      name: r.tenant_name ? String(r.tenant_name) : '—',
-      email: r.tenant_email ? String(r.tenant_email) : '',
-      phone: r.tenant_phone ? String(r.tenant_phone) : '',
-    }));
+    const tenants = rows.map(tenantRowToDto);
     res.json({ tenants });
   } catch (e) {
     console.error(e);
@@ -346,17 +451,7 @@ export async function listContractCollaborationsView(req, res) {
   }
   try {
     const rows = await listContractCollaborations(id, ctx.session.branchId);
-    const collaborations = rows.map((r) => ({
-      id: String(r.id),
-      contractId: String(r.contract_id),
-      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
-      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
-      email: r.partner_email ? String(r.partner_email) : '',
-      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
-      remarks: r.remarks ? String(r.remarks) : '',
-      createdBy: r.created_by != null ? String(r.created_by) : '',
-      createdAt: r.created_at ? fmtDate(r.created_at) : '',
-    }));
+    const collaborations = rows.map(collaborationRowToDto);
     res.json({ collaborations });
   } catch (e) {
     console.error(e);
@@ -414,17 +509,7 @@ export async function createContractCollaborationInvite(req, res) {
     });
 
     const rows = await listContractCollaborations(contractId, ctx.session.branchId);
-    const collaborations = rows.map((r) => ({
-      id: String(r.id),
-      contractId: String(r.contract_id),
-      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
-      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
-      email: r.partner_email ? String(r.partner_email) : '',
-      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
-      remarks: r.remarks ? String(r.remarks) : '',
-      createdBy: r.created_by != null ? String(r.created_by) : '',
-      createdAt: r.created_at ? fmtDate(r.created_at) : '',
-    }));
+    const collaborations = rows.map(collaborationRowToDto);
     res.status(201).json({ collaborations });
   } catch (e) {
     console.error(e);
@@ -492,29 +577,10 @@ export async function updateContractCollaborationController(req, res) {
     });
 
     const rows = await listContractCollaborations(contractId, ctx.session.branchId);
-    const collaborations = rows.map((r) => ({
-      id: String(r.id),
-      contractId: String(r.contract_id),
-      partnerAgencyId: r.partner_agency_id != null ? String(r.partner_agency_id) : undefined,
-      partnerAgencyName: r.partner_agency_name ? String(r.partner_agency_name) : '—',
-      email: r.partner_email ? String(r.partner_email) : '',
-      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
-      remarks: r.remarks ? String(r.remarks) : '',
-      createdBy: r.created_by != null ? String(r.created_by) : '',
-      createdAt: r.created_at ? fmtDate(r.created_at) : '',
-    }));
-    
+    const collaborations = rows.map(collaborationRowToDto);
+
     const tenantRows = await listContractTenants(contractId, ctx.session.branchId);
-    const tenants = tenantRows.map((r) => ({
-      contractId: String(r.contract_id),
-      tenantId: String(r.tenant_id),
-      isPrimary: Boolean(Number(r.is_primary)),
-      remarks: r.remarks ? String(r.remarks) : '',
-      createdAt: r.created_at ? fmtDate(r.created_at) : '',
-      name: r.tenant_name ? String(r.tenant_name) : '—',
-      email: r.tenant_email ? String(r.tenant_email) : '',
-      phone: r.tenant_phone ? String(r.tenant_phone) : '',
-    }));
+    const tenants = tenantRows.map(tenantRowToDto);
 
     res.json({ collaborations, tenants });
   } catch (e) {

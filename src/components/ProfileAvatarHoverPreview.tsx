@@ -1,7 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+const FLOAT_GAP = 8;
+const VIEWPORT_PAD = 12;
+/** Matches default `previewClassName` (h-44 / sm:h-48) + frame padding before the node is measured */
+const PREVIEW_ESTIMATE_PX = 220;
+
+function computeFloatingPosition(trigger: DOMRect, floatW: number, floatH: number): { top: number; left: number } {
+  const ih = window.innerHeight;
+  const iw = window.innerWidth;
+
+  const belowTop = trigger.bottom + FLOAT_GAP;
+  const belowBottom = belowTop + floatH;
+  const aboveTop = trigger.top - FLOAT_GAP - floatH;
+
+  let top = belowTop;
+  if (belowBottom > ih - VIEWPORT_PAD) {
+    if (aboveTop >= VIEWPORT_PAD) {
+      top = aboveTop;
+    } else {
+      top = Math.max(VIEWPORT_PAD, Math.min(belowTop, ih - VIEWPORT_PAD - floatH));
+    }
+  }
+
+  let left = trigger.left + trigger.width / 2;
+  left = Math.min(iw - VIEWPORT_PAD - floatW / 2, Math.max(VIEWPORT_PAD + floatW / 2, left));
+
+  return { top, left };
+}
 
 type ProfileAvatarHoverPreviewProps = {
   /** Public path e.g. `/uploads/avatars/…` */
@@ -24,7 +52,9 @@ type ProfileAvatarHoverPreviewProps = {
 /**
  * Hover the avatar to see a larger preview (image or initials).
  * Default: preview is positioned below the avatar (CSS group hover).
- * With `detachPreview`: preview is fixed to the viewport via a portal (for dense layouts).
+ * With `detachPreview`: preview is fixed to the viewport via a portal (for dense layouts)
+ * and automatically flips above the avatar (or clamps vertically) when there is not
+ * enough room below, so it stays on-screen.
  */
 export function ProfileAvatarHoverPreview({
   avatarUrl,
@@ -36,6 +66,7 @@ export function ProfileAvatarHoverPreview({
   detachPreview = false,
 }: ProfileAvatarHoverPreviewProps) {
   const wrapRef = useRef<HTMLSpanElement>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portalOpen, setPortalOpen] = useState(false);
   const [portalPos, setPortalPos] = useState({ top: 0, left: 0 });
@@ -63,30 +94,42 @@ export function ProfileAvatarHoverPreview({
     }, 140);
   }, [cancelHide]);
 
-  const updatePortalPosition = useCallback(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPortalPos({ top: r.bottom + 8, left: r.left + r.width / 2 });
+  const positionFloating = useCallback(() => {
+    const trigger = wrapRef.current;
+    if (!trigger) return;
+    const tr = trigger.getBoundingClientRect();
+    const fr = floatRef.current?.getBoundingClientRect();
+    const floatH = fr?.height ?? PREVIEW_ESTIMATE_PX;
+    const floatW = fr?.width ?? PREVIEW_ESTIMATE_PX;
+    setPortalPos(computeFloatingPosition(tr, floatW, floatH));
   }, []);
 
   const onWrapEnter = useCallback(() => {
     if (!detachPreview) return;
     cancelHide();
-    updatePortalPosition();
+    const el = wrapRef.current;
+    if (el) {
+      const tr = el.getBoundingClientRect();
+      setPortalPos(computeFloatingPosition(tr, PREVIEW_ESTIMATE_PX, PREVIEW_ESTIMATE_PX));
+    }
     setPortalOpen(true);
-  }, [detachPreview, cancelHide, updatePortalPosition]);
+  }, [detachPreview, cancelHide]);
+
+  useLayoutEffect(() => {
+    if (!detachPreview || !portalOpen) return;
+    positionFloating();
+  }, [detachPreview, portalOpen, positionFloating, avatarUrl, initials, previewClassName]);
 
   useEffect(() => {
     if (!detachPreview || !portalOpen) return;
-    const onMove = () => updatePortalPosition();
+    const onMove = () => positionFloating();
     window.addEventListener('scroll', onMove, true);
     window.addEventListener('resize', onMove);
     return () => {
       window.removeEventListener('scroll', onMove, true);
       window.removeEventListener('resize', onMove);
     };
-  }, [detachPreview, portalOpen, updatePortalPosition]);
+  }, [detachPreview, portalOpen, positionFloating]);
 
   useEffect(() => () => cancelHide(), [cancelHide]);
 
@@ -104,6 +147,7 @@ export function ProfileAvatarHoverPreview({
           alt=""
           className={cn('rounded-xl object-cover', previewClassName)}
           draggable={false}
+          onLoad={detachPreview ? () => positionFloating() : undefined}
         />
       ) : (
         <div
@@ -137,6 +181,7 @@ export function ProfileAvatarHoverPreview({
         {portalOpen && typeof document !== 'undefined'
           ? createPortal(
               <div
+                ref={floatRef}
                 role="presentation"
                 className="pointer-events-auto"
                 style={{

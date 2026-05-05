@@ -1,6 +1,37 @@
 import { pool } from '../config/db.js';
 import { emitBranchNotificationsChanged } from '../realtime/io.js';
 
+/** Sum of unpaid payment_schedule rows for a contract (pending + overdue). */
+export async function sumUnpaidBalanceForContract(branchId, contractId, conn = pool) {
+  const [rows] = await conn.query(
+    `
+    SELECT COALESCE(SUM(amount_due), 0) AS total
+    FROM payment_schedule
+    WHERE branch_id = ?
+      AND contract_id = ?
+      AND active = 1
+      AND status <> 'paid'
+    `,
+    [branchId, contractId],
+  );
+  return Number(rows[0]?.total ?? 0);
+}
+
+export async function moveUnpaidSchedulesToContract(conn, branchId, fromContractId, toContractId) {
+  const [result] = await conn.query(
+    `
+    UPDATE payment_schedule
+    SET contract_id = ?
+    WHERE branch_id = ?
+      AND contract_id = ?
+      AND active = 1
+      AND status <> 'paid'
+    `,
+    [toContractId, branchId, fromContractId],
+  );
+  return result.affectedRows ?? 0;
+}
+
 const STATUS_MAP_TO_SCHEDULE = {
   Paid: 'paid',
   Overdue: 'overdue',

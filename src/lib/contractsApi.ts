@@ -42,6 +42,26 @@ export async function deleteContract(id: string): Promise<void> {
   });
 }
 
+export type RenewContractBody = {
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  balanceHandling: 'carry_over' | 'require_payment';
+  keepHistory: boolean;
+  notes?: string | null;
+};
+
+export async function renewContract(contractId: string, body: RenewContractBody): Promise<Contract> {
+  const { contract } = await apiFetch<{ contract: Contract }>(
+    `/api/contracts/${encodeURIComponent(contractId)}/renew`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+  return contract;
+}
+
 export async function fetchContractTenants(contractId: string): Promise<ContractTenantRow[]> {
   const { tenants } = await apiFetch<{ tenants: ContractTenantRow[] }>(
     `/api/contracts/${encodeURIComponent(contractId)}/tenants`,
@@ -75,16 +95,19 @@ export async function fetchContractDocumentDetails(contractId: string): Promise<
   return await apiFetch<ContractDocumentDetails>(`/api/contracts/${encodeURIComponent(contractId)}/document-details`);
 }
 
-export type ContractCollaborationInviteBody = {
+/** POST invite and PATCH collaborator use the same field set */
+export type ContractCollaboratorMutationBody = {
   name?: string;
   email?: string;
   commissionTerms?: string;
   remarks?: string;
 };
 
+export type ContractCollaborationInviteBody = ContractCollaboratorMutationBody;
+
 export async function inviteContractCollaborator(
   contractId: string,
-  body: ContractCollaborationInviteBody,
+  body: ContractCollaboratorMutationBody,
 ): Promise<ContractCollaborationRow[]> {
   const { collaborations } = await apiFetch<{ collaborations: ContractCollaborationRow[] }>(
     `/api/contracts/${encodeURIComponent(contractId)}/collaborations`,
@@ -99,8 +122,8 @@ export async function inviteContractCollaborator(
 export async function updateContractCollaborator(
   contractId: string,
   collabId: string,
-  body: { name?: string; email?: string; commissionTerms?: string; remarks?: string }
-): Promise<{ collaborations: ContractCollaborationRow[], tenants: ContractTenantRow[] }> {
+  body: ContractCollaboratorMutationBody,
+): Promise<{ collaborations: ContractCollaborationRow[]; tenants: ContractTenantRow[] }> {
   const result = await apiFetch<{ collaborations: ContractCollaborationRow[], tenants: ContractTenantRow[] }>(
     `/api/contracts/${encodeURIComponent(contractId)}/collaborations/${encodeURIComponent(collabId)}`,
     {

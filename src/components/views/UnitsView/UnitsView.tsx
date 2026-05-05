@@ -1183,7 +1183,7 @@ export function UnitsView() {
           </div>
           <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                 {t('views.units.filters.property')}
               </Label>
               <Select2
@@ -1195,7 +1195,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                 {t('views.units.filters.floor')}
               </Label>
               <Select2
@@ -1207,7 +1207,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                 {t('views.units.filters.type')}
               </Label>
               <Select2
@@ -1219,7 +1219,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                 {t('views.units.filters.status')}
               </Label>
               <Select2
@@ -1231,7 +1231,7 @@ export function UnitsView() {
               />
             </div>
             <div className="min-w-0">
-              <Label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                 {t('views.units.sort.label')}
               </Label>
               <Select2
@@ -1354,10 +1354,13 @@ export function UnitsView() {
                 );
               }
               return (
-                <span className="font-semibold text-sky-500 dark:text-sky-300">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
                   {endLabel}
                   {daysToEnd !== null ? (
-                    <span className="whitespace-nowrap"> ({t('views.units.card.daysLeft', { count: daysToEnd })})</span>
+                    <span className="whitespace-nowrap font-medium text-slate-600 dark:text-slate-400">
+                      {' '}
+                      ({t('views.units.card.daysLeft', { count: daysToEnd })})
+                    </span>
                   ) : null}
                 </span>
               );
@@ -1375,8 +1378,8 @@ export function UnitsView() {
                 );
               }
               return (
-                <span className="inline-flex items-center gap-1 font-semibold text-emerald-500 dark:text-emerald-400">
-                  <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+                  <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
                   {t('views.units.card.rentCurrent')}
                 </span>
               );
@@ -1407,7 +1410,7 @@ export function UnitsView() {
                   <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-end gap-2">
                     <span
                       className={cn(
-                        'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-md backdrop-blur-md',
+                        'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold shadow-md backdrop-blur-md',
                         unit.status === 'Available' && 'bg-emerald-600 text-white',
                         unit.status === 'Occupied' && 'bg-red-600 text-white',
                         unit.status === 'Maintenance' && 'bg-amber-500 text-amber-950',
@@ -1419,7 +1422,7 @@ export function UnitsView() {
                     {secondaryPill ? (
                       <span
                         className={cn(
-                          'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-md',
+                          'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold shadow-md',
                           secondaryPill.cls,
                         )}
                       >
@@ -1434,70 +1437,75 @@ export function UnitsView() {
                       <h3 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                         {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
                       </h3>
-                      <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{locationSubtitle}</p>
+                      <p
+                        className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-600 dark:text-slate-300"
+                        title={locationSubtitle}
+                      >
+                        {locationSubtitle}
+                      </p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-white">
                         ₱{unit.monthlyRate.toLocaleString()}
                       </p>
-                      <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                         {t('views.units.card.perMonth')}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <BedDouble className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    <span className="inline-flex items-center gap-1.5 tabular-nums">
+                      <BedDouble className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                       {unit.type}
                     </span>
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Maximize2 className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                    <span className="inline-flex items-center gap-1.5 tabular-nums">
+                      <Maximize2 className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                       {metrics.sqm} {t('views.units.card.sqm')}
                     </span>
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Bath className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                    <span className="inline-flex items-center gap-1.5 tabular-nums">
+                      <Bath className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                       {metrics.baths}
                     </span>
                   </div>
 
                   <div className="my-4 border-t border-slate-100 dark:border-slate-800" />
 
-                  <div className="space-y-3 text-xs">
+                  <div className="space-y-3.5 text-sm leading-snug">
                     <div className="flex items-start justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-                        <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                        <User className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                         {t('views.units.card.tenant')}
                       </span>
-                      <span className="max-w-[58%] text-right font-semibold text-slate-900 dark:text-slate-100">
+                      <span className="min-w-0 flex-1 text-right font-semibold text-slate-900 dark:text-slate-100">
                         {tenantName === '—' ? (
-                          <span className="font-medium text-slate-400 dark:text-slate-500">—</span>
+                          <span className="font-medium text-slate-500 dark:text-slate-400">—</span>
                         ) : (
-                          <span className="truncate">{tenantName}</span>
+                          <span className="break-words">{tenantName}</span>
                         )}
                       </span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-                        <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                        <Calendar className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                         {t('views.units.card.leaseEnds')}
                       </span>
-                      <div className="max-w-[58%] text-right text-[11px] leading-snug sm:text-xs">{leaseEndsNode}</div>
+                      <div className="min-w-0 flex-1 text-right text-sm leading-snug">{leaseEndsNode}</div>
                     </div>
                     <div className="flex items-start justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-                        <CircleDollarSign className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                        <CircleDollarSign className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                         {t('views.units.card.rentStatus')}
                       </span>
-                      <div className="max-w-[58%] text-right">{rentStatusNode}</div>
+                      <div className="min-w-0 flex-1 text-right text-sm">{rentStatusNode}</div>
                     </div>
                     {unit.status === 'Available' ? (
                       <div className="flex items-start justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-                          <Home className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                          <Home className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                           {t('views.units.card.vacantSince')}
                         </span>
-                        <span className="max-w-[58%] text-right font-medium text-slate-400 dark:text-slate-500">—</span>
+                        <span className="min-w-0 flex-1 text-right font-medium text-slate-500 dark:text-slate-400">—</span>
                       </div>
                     ) : null}
                   </div>

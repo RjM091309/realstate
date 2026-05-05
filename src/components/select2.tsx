@@ -113,6 +113,21 @@ export const Select2: React.FC<Select2Props> = ({
             boxShadow: 'none',
           }),
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+          valueContainer: (base) => ({
+            ...base,
+            flexWrap: 'wrap',
+          }),
+          singleValue: (base) => ({
+            ...base,
+            position: 'relative',
+            top: 'auto',
+            transform: 'none',
+            maxWidth: '100%',
+            overflow: 'visible',
+            textOverflow: 'clip',
+            whiteSpace: 'normal',
+            lineHeight: 1.35,
+          }),
         }}
         // Custom prop consumed by Control / SingleValue (not a react-select standard prop)
         // @ts-expect-error — forwarded via selectProps

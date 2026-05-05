@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -6,6 +6,7 @@ import {
   FileText,
   History,
   MoreVertical,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -34,18 +35,31 @@ import {
   updateContract,
   updateContractCollaborator,
 } from '@/lib/contractsApi';
+import { fetchPayments } from '@/lib/paymentsApi';
 import { createContractInvoice } from '@/lib/invoicesApi';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { Contract, ContractCollaborationRow, ContractTenantRow, Tenant, Unit, DocumentTemplateRow, RepositoryDocumentRow, InventorySnapshotItemRow, InventorySnapshotRow } from '@/types';
+import type {
+  Contract,
+  ContractCollaborationRow,
+  ContractTenantRow,
+  Tenant,
+  Unit,
+  DocumentTemplateRow,
+  RepositoryDocumentRow,
+  InventorySnapshotItemRow,
+  InventorySnapshotRow,
+  Payment,
+} from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import {
   ContractDetailsCollaborationModal,
   type ActivityItem,
   type Collaborator,
 } from '@/components/contracts/ContractDetailsCollaborationModal';
+import { RenewLeaseModal } from '@/components/contracts/RenewLeaseModal';
 import {
   fetchContractRepositoryDocuments,
   fetchDocumentTemplates,
@@ -63,12 +77,24 @@ import {
   patchInventorySnapshotItem,
 } from '@/lib/inventoryApi';
 
+async function loadItemsMapForSnapshots(
+  snapRows: InventorySnapshotRow[],
+): Promise<Record<string, InventorySnapshotItemRow[]>> {
+  const itemPairs = await Promise.all(
+    snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
+  );
+  const map: Record<string, InventorySnapshotItemRow[]> = {};
+  for (const [sid, items] of itemPairs) map[sid] = items;
+  return map;
+}
+
 export function ContractsView() {
   const { t } = useTranslation();
   const { session } = useAuth();
   const canCreate = session?.crud?.contracts?.create ?? false;
   const canUpdate = session?.crud?.contracts?.update ?? false;
   const canDelete = session?.crud?.contracts?.delete ?? false;
+  const canRenewLease = canCreate || canUpdate;
   const [contractsLoading, setContractsLoading] = useState(true);
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,6 +115,9 @@ export function ContractsView() {
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [renewTarget, setRenewTarget] = useState<Contract | null>(null);
+  const [isRenewOpen, setIsRenewOpen] = useState(false);
 
   const [contractTenants, setContractTenants] = useState<ContractTenantRow[]>([]);
   const [contractCollaborations, setContractCollaborations] = useState<ContractCollaborationRow[]>([]);
@@ -136,19 +165,32 @@ export function ContractsView() {
     resetNewContractForm();
   };
 
+  const reloadContracts = useCallback(async () => {
+    try {
+      const list = await fetchContracts();
+      setContractList(list);
+    } catch {
+      setContractList([]);
+      toast.warning(t('views.contracts.loadError'));
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void (async () => {
+      await reloadContracts();
+      setContractsLoading(false);
+    })();
+  }, [reloadContracts]);
+
   useEffect(() => {
     void (async () => {
       try {
-        const list = await fetchContracts();
-        setContractList(list);
+        setPayments(await fetchPayments());
       } catch {
-        setContractList([]);
-        toast.warning(t('views.contracts.loadError'));
-      } finally {
-        setContractsLoading(false);
+        setPayments([]);
       }
     })();
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -203,6 +245,15 @@ export function ContractsView() {
     window.open(url, '_blank');
   };
 
+  const resetDetailsPanelData = useCallback(() => {
+    setContractTenants([]);
+    setContractCollaborations([]);
+    setRepoDocs([]);
+    setTemplates([]);
+    setInventorySnapshots([]);
+    setInventoryItemsBySnapshot({});
+  }, []);
+
   const handleDeleteContract = async (contract: Contract) => {
     if (!window.confirm(`Delete contract ${contract.id}?`)) return;
     try {
@@ -217,12 +268,7 @@ export function ContractsView() {
   const openContractDetails = (contract: Contract) => {
     setSelectedContract(contract);
     setIsDetailsOpen(true);
-    setContractTenants([]);
-    setContractCollaborations([]);
-    setRepoDocs([]);
-    setTemplates([]);
-    setInventorySnapshots([]);
-    setInventoryItemsBySnapshot({});
+    resetDetailsPanelData();
 
     void (async () => {
       try {
@@ -238,13 +284,7 @@ export function ContractsView() {
         setRepoDocs(docsRows);
         setTemplates(templateRows);
         setInventorySnapshots(snapRows);
-
-        const itemPairs = await Promise.all(
-          snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
-        );
-        const map: Record<string, InventorySnapshotItemRow[]> = {};
-        for (const [sid, items] of itemPairs) map[sid] = items;
-        setInventoryItemsBySnapshot(map);
+        setInventoryItemsBySnapshot(await loadItemsMapForSnapshots(snapRows));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to load contract details');
       }
@@ -254,23 +294,38 @@ export function ContractsView() {
   const reloadInventory = async (contractId: string) => {
     const snapRows = await fetchContractInventorySnapshots(contractId);
     setInventorySnapshots(snapRows);
-    const itemPairs = await Promise.all(
-      snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
-    );
-    const map: Record<string, InventorySnapshotItemRow[]> = {};
-    for (const [sid, items] of itemPairs) map[sid] = items;
-    setInventoryItemsBySnapshot(map);
+    setInventoryItemsBySnapshot(await loadItemsMapForSnapshots(snapRows));
   };
 
   const closeContractDetails = () => {
     setIsDetailsOpen(false);
     setSelectedContract(null);
-    setContractTenants([]);
-    setContractCollaborations([]);
-    setRepoDocs([]);
-    setTemplates([]);
-    setInventorySnapshots([]);
-    setInventoryItemsBySnapshot({});
+    resetDetailsPanelData();
+  };
+
+  const unpaidBalanceForContract = useCallback(
+    (contractId: string) =>
+      payments
+        .filter((p) => String(p.contractId) === String(contractId) && p.status !== 'Paid')
+        .reduce((sum, p) => sum + Number(p.amount ?? 0), 0),
+    [payments],
+  );
+
+  const openRenewLease = (contract: Contract) => {
+    setRenewTarget(contract);
+    setIsRenewOpen(true);
+    void (async () => {
+      try {
+        setPayments(await fetchPayments());
+      } catch {
+        /* keep existing payments */
+      }
+    })();
+  };
+
+  const closeRenewLease = () => {
+    setIsRenewOpen(false);
+    setRenewTarget(null);
   };
 
   const buildCollaborators = (tenantsRows: ContractTenantRow[], collabRows: ContractCollaborationRow[]): Collaborator[] => {
@@ -415,6 +470,17 @@ export function ContractsView() {
                     Edit Contract
                   </DropdownMenuItem>
                 )}
+                {canRenewLease && contract.status === 'Active' && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRenewLease(contract);
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2 inline opacity-70" />
+                    Renew lease
+                  </DropdownMenuItem>
+                )}
                 {canDelete && (
                   <DropdownMenuItem
                     className="text-rose-600"
@@ -432,7 +498,7 @@ export function ContractsView() {
         ),
       },
     ],
-    [t, tenantList, unitList, canUpdate, canDelete]
+    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease]
   );
 
   const handleGenerate = () => {
@@ -603,6 +669,28 @@ export function ContractsView() {
         </div>
       </Modal>
 
+      <RenewLeaseModal
+        isOpen={isRenewOpen}
+        onClose={closeRenewLease}
+        unitNumber={
+          renewTarget ? unitList.find((u) => u.id === renewTarget.unitId)?.unitNumber ?? renewTarget.unitId : ''
+        }
+        tenantName={
+          renewTarget ? tenantList.find((ten) => ten.id === renewTarget.tenantId)?.name ?? '—' : ''
+        }
+        contract={renewTarget}
+        unpaidBalance={renewTarget ? unpaidBalanceForContract(renewTarget.id) : 0}
+        onRenewed={async () => {
+          toast.success('Lease renewed.');
+          await reloadContracts();
+          try {
+            setPayments(await fetchPayments());
+          } catch {
+            /* ignore */
+          }
+        }}
+      />
+
       <ContractDetailsCollaborationModal
         isOpen={isDetailsOpen}
         onClose={closeContractDetails}
@@ -731,13 +819,11 @@ export function ContractsView() {
             const now = new Date();
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
             const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            const toYmd = (d: Date) =>
-              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
             const created = await createContractInvoice(selectedContract.id, {
-              billingPeriodStart: toYmd(start),
-              billingPeriodEnd: toYmd(end),
-              dueDate: toYmd(end),
+              billingPeriodStart: format(start, 'yyyy-MM-dd'),
+              billingPeriodEnd: format(end, 'yyyy-MM-dd'),
+              dueDate: format(end, 'yyyy-MM-dd'),
               baseAmount: Number(selectedContract.monthlyRent ?? 0),
               otherCharges: 0,
               discountAmount: 0,
