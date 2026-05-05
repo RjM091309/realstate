@@ -4,6 +4,21 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Bell, Building2, DollarSign, Wrench, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+
+function formatTimeAgo(timeStr: string) {
+  if (!timeStr) return '';
+  try {
+    // If timeStr is already localized like "2 mins ago", Date parsing might return Invalid Date
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    // Basic sanity check to avoid weird parses
+    if (d.getFullYear() < 2000) return timeStr;
+    return formatDistanceToNow(d, { addSuffix: true });
+  } catch {
+    return timeStr;
+  }
+}
 
 export type NotificationType = 'lease' | 'payment' | 'maintenance' | 'success';
 
@@ -164,11 +179,11 @@ export function NotificationPanel({
                       'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60',
                       notification.unread
                         ? [
-                            'bg-indigo-50/70 border-indigo-200/70',
-                            'shadow-[0_10px_22px_-14px_rgba(79,70,229,0.35)]',
-                            'dark:bg-slate-800/55 dark:border-slate-700/70 dark:shadow-none',
+                            'bg-indigo-50/90 border-indigo-200/80',
+                            'shadow-[0_4px_20px_-10px_rgba(79,70,229,0.3)]',
+                            'dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:shadow-none',
                           ].join(' ')
-                        : 'bg-white/60 dark:bg-slate-950/30',
+                        : 'bg-white/40 border-transparent dark:bg-slate-950/20 opacity-80',
                     )}
                   >
                     <div className="flex gap-3">
@@ -182,8 +197,8 @@ export function NotificationPanel({
                         <div className="mb-0.5 flex items-start justify-between gap-2">
                           <h4
                             className={cn(
-                              'truncate text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100',
-                              notification.unread ? 'font-bold' : undefined,
+                              'truncate text-sm leading-snug text-slate-900 dark:text-slate-100',
+                              notification.unread ? 'font-bold' : 'font-semibold',
                             )}
                           >
                             {notification.title}
@@ -195,8 +210,8 @@ export function NotificationPanel({
                         <p className="text-xs leading-relaxed text-brand-muted dark:text-slate-300/80 line-clamp-2">
                           {notification.message}
                         </p>
-                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide text-brand-muted/70 dark:text-slate-400/80">
-                          {notification.time}
+                        <span className="mt-1.5 inline-block text-[10px] font-medium uppercase tracking-wider text-brand-muted/70 dark:text-slate-400/80">
+                          {formatTimeAgo(notification.time)}
                         </span>
                       </div>
                     </div>

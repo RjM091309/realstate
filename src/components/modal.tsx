@@ -96,7 +96,7 @@ export const Modal: React.FC<ModalProps> = ({
               {/* Header */}
               <div
                 className={cn(
-                  'flex items-start justify-between px-6 py-5 shrink-0 gap-4',
+                  'flex items-start justify-between px-6 py-5 shrink-0 gap-4 rounded-t-3xl',
                   isGlass
                     ? 'border-b border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900'
                     : 'border-b border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900',
@@ -141,6 +141,7 @@ export const Modal: React.FC<ModalProps> = ({
               <div
                 className={cn(
                   'px-6 py-6 overflow-y-auto custom-scrollbar flex-1',
+                  !footer && 'rounded-b-3xl',
                   isGlass
                     ? 'bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100'
                     : 'bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-200',

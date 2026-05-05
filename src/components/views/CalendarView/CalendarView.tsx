@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
   Calendar as CalendarIcon,
   Info,
   ArrowRight,
@@ -17,18 +18,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { 
-  format, 
-  addDays, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameDay, 
-  addMonths, 
+import {
+  format,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  addMonths,
   subMonths,
   isToday,
   startOfDay,
-  parseISO
+  parseISO,
+  startOfWeek,
+  endOfWeek,
+  isSameMonth
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -179,6 +183,12 @@ export function CalendarView() {
   const daysInMonth = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
+
+  const calendarGridDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentMonth));
+    const end = endOfWeek(endOfMonth(currentMonth));
     return eachDayOfInterval({ start, end });
   }, [currentMonth]);
 
@@ -424,160 +434,169 @@ export function CalendarView() {
   }, [selectedDay, events]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{t('views.calendar.title')}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">{t('views.calendar.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.calendar.title')}</h1>
+          <p className="text-slate-500 mt-1">{t('views.calendar.subtitle')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           {canCreate ? (
-            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openCreateEvent} disabled={loading}>
+            <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/25 transition-all hover:shadow-lg hover:shadow-indigo-500/40" onClick={openCreateEvent} disabled={loading}>
               <Plus className="w-4 h-4 mr-2" />
               {t('views.calendar.addEvent')}
             </Button>
           ) : null}
-          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <div className="px-4 font-bold text-sm min-w-[140px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
-          </div>
-          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                const today = new Date();
+                setCurrentMonth(today);
+                setSelectedDay(today);
+              }} 
+              className="h-8 px-3 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            >
+              {t('views.calendar.today')}
+            </Button>
+            <div className="w-px h-4 bg-slate-200 mx-1" />
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 text-slate-500 hover:text-indigo-600">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="px-4 font-bold text-sm min-w-[140px] text-center text-slate-700">
+              {format(currentMonth, 'MMMM yyyy')}
+            </div>
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 text-slate-500 hover:text-indigo-600">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </div>
 
-      <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md overflow-hidden">
+      <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden bg-white/80 backdrop-blur-sm">
         <CardContent className="p-0">
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="inline-block min-w-full">
-              {/* Timeline Header */}
-              <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/60">
-                <div className="sticky left-0 z-20 w-48 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 font-bold text-xs text-slate-500 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <Home className="w-3 h-3" />
-                  {t('views.calendar.units')}
-                </div>
-                {daysInMonth.map((day) => (
-                  <div 
-                    key={day.toString()} 
-                    onClick={() => setSelectedDay(day)}
-                    className={cn(
-                      "flex-shrink-0 w-12 h-16 flex flex-col items-center justify-center border-r border-slate-100 dark:border-slate-800 cursor-pointer transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/15",
-                      isToday(day) && "bg-indigo-50/50 dark:bg-indigo-500/10",
-                      selectedDay && isSameDay(day, selectedDay) && "bg-indigo-600 text-white hover:bg-indigo-600"
-                    )}
-                  >
-                    <span className={cn("text-[10px] uppercase font-bold", selectedDay && isSameDay(day, selectedDay) ? "text-indigo-100" : "text-slate-400 dark:text-slate-500")}>
-                      {format(day, 'EEE')}
-                    </span>
-                    <span className="text-sm font-bold">
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="p-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 border-b border-slate-100">
+            {calendarGridDays.map((day) => {
+              const dayEvents = events.filter((e) => isSameDay(e.date, day));
+              const isSelected = selectedDay && isSameDay(day, selectedDay);
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isTday = isToday(day);
+
+              return (
+                <div
+                  key={day.toString()}
+                  onClick={() => setSelectedDay(day)}
+                  className={cn(
+                    "min-h-[100px] p-2 cursor-pointer transition-all duration-200 relative group",
+                    !isCurrentMonth ? "bg-slate-50/30 text-slate-300" : "bg-white text-slate-600",
+                    isSelected ? "bg-indigo-50/40 ring-1 ring-inset ring-indigo-500/20 z-10" : "hover:bg-slate-50/50"
+                  )}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className={cn(
+                      "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
+                      isTday ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : 
+                      isSelected ? "text-indigo-600 bg-indigo-50" : "text-slate-500 group-hover:text-indigo-600"
+                    )}>
                       {format(day, 'd')}
                     </span>
+                    {dayEvents.length > 0 && (
+                      <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-slate-100 text-slate-500 font-bold border-none">
+                        {dayEvents.length}
+                      </Badge>
+                    )}
                   </div>
-                ))}
-              </div>
-
-              {/* Timeline Rows */}
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {units.map((unit) => (
-                  <div key={unit.id} className="flex group">
-                    <div className="sticky left-0 z-20 w-48 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold text-xs">
-                        {unit.unitNumber}
+                  <div className="space-y-1 mt-2">
+                    {dayEvents.slice(0, 3).map((ev) => (
+                      <div
+                        key={ev.id}
+                        className={cn(
+                          "text-[9px] px-2 py-0.5 rounded-md border-l-2 truncate flex items-center gap-1 shadow-sm",
+                          !ev.colorHex && (ev.color || 'bg-slate-100 text-slate-600')
+                        )}
+                        style={ev.colorHex ? { 
+                          backgroundColor: `${ev.colorHex}15`, 
+                          color: ev.colorHex, 
+                          borderLeftColor: ev.colorHex,
+                        } : { borderLeftColor: 'currentColor' }}
+                      >
+                        <div className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
+                        <span className="truncate font-medium">{ev.typeLabel}</span>
                       </div>
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{t('views.calendar.unitLabel', { unitNumber: unit.unitNumber })}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{unit.buildingName}</span>
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <div className="text-[9px] text-slate-400 font-bold pl-1">
+                        +{dayEvents.length - 3} {t('views.calendar.more', 'more')}
                       </div>
-                    </div>
-                    {daysInMonth.map((day) => {
-                      const dayEvents = events.filter((e) => e.unitId === unit.id && isSameDay(e.date, day));
-                      return (
-                        <div 
-                          key={`${unit.id}-${day}`} 
-                          onClick={() => setSelectedDay(day)}
-                          className={cn(
-                            "flex-shrink-0 w-12 h-16 border-r border-slate-100 dark:border-slate-800 flex items-center justify-center gap-0.5 p-1 relative cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors",
-                            isToday(day) && "bg-indigo-50/20 dark:bg-indigo-500/10"
-                          )}
-                        >
-                          {dayEvents.map((event) => (
-                            <div 
-                              key={event.id}
-                              className={cn(
-                                "w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm",
-                                !event.colorHex && (event.color || '')
-                              )}
-                              style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
-                              title={event.typeLabel}
-                            />
-                          ))}
-                        </div>
-                      );
-                    })}
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md">
+        <Card className="lg:col-span-2 border-none shadow-md">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>{t('views.calendar.dailySchedule')}</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg font-bold text-slate-800">{t('views.calendar.dailySchedule')}</CardTitle>
+                <CardDescription className="text-xs font-medium mt-0.5 text-slate-500">
                   {selectedDay ? format(selectedDay, 'MMMM dd, yyyy') : t('views.calendar.selectDate')}
                 </CardDescription>
               </div>
               {selectedDay && isToday(selectedDay) && (
-                <Badge className="bg-indigo-600">{t('views.calendar.today')}</Badge>
+                <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 shadow-sm border-none px-3 py-1 text-xs font-bold uppercase tracking-wider">{t('views.calendar.today')}</Badge>
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="space-y-3">
               {selectedDayEvents.length > 0 ? (
                 selectedDayEvents.map((event) => {
                   const unit = units.find((u) => u.id === event.unitId);
                   return (
-                    <div 
-                      key={event.id} 
-                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 group hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all"
+                    <div
+                      key={event.id}
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <div
                           className={cn(
-                            "w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm",
+                            "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-inner",
                             !event.colorHex && (event.color || 'bg-indigo-600'),
                           )}
                           style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
                         >
-                          {event.icon}
+                          {React.isValidElement(event.icon)
+                            ? React.cloneElement(event.icon as React.ReactElement<any>, { className: "w-3 h-3 drop-shadow-sm" })
+                            : event.icon}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-slate-100">{event.typeLabel}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{t('views.calendar.unitLabel', { unitNumber: unit?.unitNumber })} • {unit?.buildingName}</p>
+                          <p className="font-bold text-slate-900">{event.typeLabel}</p>
+                          <p className="text-xs text-slate-500">{t('views.calendar.unitLabel', { unitNumber: unit?.unitNumber })} • {unit?.buildingName}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 transition-opacity">
                         {event.source === 'custom' && canUpdate ? (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="text-indigo-600"
+                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium"
                             onClick={() => openEditEvent(event)}
                           >
-                            <Pencil className="w-4 h-4 mr-1" />
+                            <Pencil className="w-4 h-4 mr-1.5" />
                             {t('views.calendar.edit')}
                           </Button>
                         ) : null}
@@ -586,18 +605,18 @@ export function CalendarView() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="text-rose-600"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium"
                             onClick={() => void removeEvent(event)}
                           >
-                            <Trash2 className="w-4 h-4 mr-1" />
+                            <Trash2 className="w-4 h-4 mr-1.5" />
                             {t('views.calendar.delete')}
                           </Button>
                         ) : null}
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
-                          className="text-indigo-600"
+                          className="font-medium bg-slate-100 hover:bg-slate-200 text-slate-700"
                           onClick={() => openDetails(event)}
                         >
                           {t('views.calendar.viewDetails')}
@@ -616,7 +635,7 @@ export function CalendarView() {
           </CardContent>
         </Card>
 
-        <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md">
+        <Card className="border-none shadow-md">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Info className="w-4 h-4 text-indigo-600" />
@@ -625,38 +644,38 @@ export function CalendarView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveIn')}</span>
+                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.moveIn')}</span>
                 </div>
-                <ArrowRight className="w-3 h-3 text-slate-300 dark:text-slate-500" />
+                <ArrowRight className="w-3 h-3 text-slate-300" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveOut')}</span>
+                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.moveOut')}</span>
                 </div>
-                <ArrowLeft className="w-3 h-3 text-slate-300 dark:text-slate-500" />
+                <ArrowLeft className="w-3 h-3 text-slate-300" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPaid')}</span>
+                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.paymentPaid')}</span>
                 </div>
-                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-500" />
+                <DollarSign className="w-3 h-3 text-slate-300" />
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPending')}</span>
+                  <span className="text-xs font-medium text-slate-700">{t('views.calendar.paymentPending')}</span>
                 </div>
-                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-500" />
+                <DollarSign className="w-3 h-3 text-slate-300" />
               </div>
             </div>
-            
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400 leading-relaxed">
                 {t('views.calendar.infoText')}
               </p>
             </div>

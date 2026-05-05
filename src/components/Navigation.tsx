@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { parseISO } from 'date-fns';
+import { parseISO, formatDistanceToNow } from 'date-fns';
 import {
   LayoutDashboard,
   Building2,
@@ -104,9 +104,9 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   const hasAllowedTabs = Array.isArray(allowedTabIds);
   const visibleOperational = hasAllowedTabs
     ? operationalItems.filter((item) => {
-        if (item.id === 'userManagement') return Boolean(isAdmin);
-        return allowedTabIds.includes(item.id);
-      })
+      if (item.id === 'userManagement') return Boolean(isAdmin);
+      return allowedTabIds.includes(item.id);
+    })
     : operationalItems.filter((item) => item.id !== 'userManagement' || Boolean(isAdmin));
 
   const navItems = visibleOperational;
@@ -340,6 +340,7 @@ export function TopNav({
   onOpenSettings?: () => void;
   onLogout?: () => void;
 }) {
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
   const { session, refreshSession } = useAuth();
@@ -446,22 +447,37 @@ export function TopNav({
   function formatNotificationTime(value: string) {
     const v = String(value ?? '').trim();
     if (!v) return '';
-    const dt = new Date(v);
-    if (Number.isNaN(dt.getTime())) return v;
-    return dt.toLocaleString();
+    try {
+      const dt = new Date(v);
+      if (Number.isNaN(dt.getTime())) return v;
+      if (dt.getFullYear() < 2000) return v;
+      return formatDistanceToNow(dt, { addSuffix: true });
+    } catch {
+      return v;
+    }
   }
 
   async function openNotificationDetails(n: Notification) {
-    setSelectedNotification(n);
-    setNotificationDetailOpen(true);
     setNotificationOpen(false);
-    if (!n.unread) return;
 
-    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, unread: false } : x)));
-    try {
-      await apiFetch(`/api/notifications/${encodeURIComponent(n.id)}/read`, { method: 'POST' });
-    } catch {
-      // ignore
+    if (n.unread) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, unread: false } : x)));
+      try {
+        await apiFetch(`/api/notifications/${encodeURIComponent(n.id)}/read`, { method: 'POST' });
+      } catch {
+        // ignore
+      }
+    }
+
+    if (n.type === 'lease') {
+      navigate('/contracts');
+    } else if (n.type === 'payment') {
+      navigate('/ledger');
+    } else if (n.type === 'maintenance') {
+      navigate('/units');
+    } else {
+      setSelectedNotification(n);
+      setNotificationDetailOpen(true);
     }
   }
   const [pickerRange, setPickerRange] = useState<[Date | null, Date | null]>(() => [
@@ -528,7 +544,7 @@ export function TopNav({
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input 
+          <Input
             placeholder={t('header.searchPlaceholder')}
             className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
             style={{
