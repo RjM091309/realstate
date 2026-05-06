@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import type { Contract, Tenant, Unit } from '@/types';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
@@ -92,6 +93,17 @@ export function AgentPortalView() {
     ],
     [t, units, tenants]
   );
+
+  const openResource = (docKey: 'contractTemplates' | 'rateCards' | 'policyGuide') => {
+    const map: Record<typeof docKey, string> = {
+      contractTemplates: '/resources/contract-templates.html',
+      rateCards: '/resources/rate-cards.html',
+      policyGuide: '/resources/policy-guide.html',
+    };
+    const url = `${window.location.origin}${map[docKey]}`;
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!w) toast.error('Popup blocked. Please allow popups then try again.');
+  };
 
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 animate-in fade-in duration-500 dark:bg-slate-950 dark:text-slate-100">
@@ -237,7 +249,13 @@ export function AgentPortalView() {
                       <FileText className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
                       <span className="truncate">{t(`views.agentPortal.docs.${docKey}`)}</span>
                     </div>
-                    <Button variant="ghost" size="sm" className="shrink-0 dark:text-indigo-300 dark:hover:bg-slate-800">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 dark:text-indigo-300 dark:hover:bg-slate-800"
+                      onClick={() => openResource(docKey as 'contractTemplates' | 'rateCards' | 'policyGuide')}
+                    >
                       {t('views.agentPortal.docs.open')}
                     </Button>
                   </div>

@@ -199,7 +199,7 @@
       "loadError": "Could not load roles.",
       "savedAdd": "Role created.",
       "savedEdit": "Role updated.",
-      "removed": "Role deactivated.",
+      "removed": "Role deleted.",
       "duplicateName": "A role with this name already exists.",
       "hasUsers": "Reassign or deactivate users before removing this role.",
       "cannotRemoveAdmin": "The Administrator role cannot be removed.",
@@ -213,11 +213,11 @@
       "activeHint": "Inactive roles cannot be assigned to new users.",
       "cancel": "Cancel",
       "saveRole": "Save Role",
-      "confirmRemoveTitle": "Deactivate role?",
-      "confirmRemoveBody": "This role will be hidden from new assignments. You can reactivate it later if no users are using it.",
-      "confirmRemoveAction": "Deactivate",
+      "confirmRemoveTitle": "Delete role?",
+      "confirmRemoveBody": "This role will be permanently deleted. This action cannot be undone.",
+      "confirmRemoveAction": "Delete",
       "edit": "Edit",
-      "remove": "Deactivate"
+      "remove": "Delete"
     },
     "dashboard": {
       "title": "Executive Dashboard",

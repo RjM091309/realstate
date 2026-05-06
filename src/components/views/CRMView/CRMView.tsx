@@ -19,9 +19,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Calendar,
-  CalendarRange,
-  FileText,
-  FileImage,
   Eye,
   Upload,
   Loader2,
@@ -42,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SkeletonTable } from '@/components/skeleton';
 import { Modal } from '@/components/modal';
+import { TenantDetailsModal } from '@/components/tenants/TenantDetailsModal';
 import { Select2 } from '@/components/select2';
 import {
   createTenant,
@@ -1382,265 +1380,79 @@ export function CRMView() {
         )}
       </div>
 
-      <Modal
+      <TenantDetailsModal
         isOpen={isDetailsOpen && !isFormOpen}
         onClose={() => setIsDetailsOpen(false)}
-        title={selectedTenant ? selectedTenant.name : ''}
-        maxWidth="2xl"
-        variant="default"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
-              {t('views.crm.details.close')}
-            </Button>
-            {canUpdate && selectedTenant && (
-              <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => openEdit(selectedTenant)}>
-                {t('views.crm.details.editTenant')}
-              </Button>
-            )}
-            {canUpdate && selectedTenant?.isBlacklisted ? (
-              <Button
-                type="button"
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => openActivateTenant(selectedTenant)}
-              >
-                {t('views.crm.table.activateTenant')}
-              </Button>
-            ) : null}
-          </div>
+        tenant={
+          selectedTenant
+            ? {
+                name: selectedTenant.name,
+                email: selectedTenant.email,
+                phone: selectedTenant.phone,
+                nationality: nationalityLabel(selectedTenant.nationality),
+                verified: selectedTenant.kycVerified !== false,
+                active: !selectedTenant.isBlacklisted,
+                idType: selectedTenant.idType,
+                idNumber: selectedTenant.idNumber,
+                idExpiry: selectedTenant.idExpiry || undefined,
+              }
+            : null
         }
-      >
-        {selectedTenant && (
-          <div className="flex flex-col">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {selectedTenant.kycVerified !== false ? (
-                <Badge variant="outline" className="border-0 bg-emerald-100 text-emerald-700">
-                  {t('views.crm.table.verified')}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="border-0 bg-amber-100 text-amber-800">
-                  {t('views.crm.table.kycPending')}
-                </Badge>
-              )}
-              {selectedTenant.isBlacklisted ? (
-                <Badge variant="outline" className="border-0 bg-rose-100 text-rose-700">
-                  {t('views.crm.table.blacklisted')}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="border-0 bg-indigo-100 text-indigo-700">
-                  {t('views.crm.table.active')}
-                </Badge>
-              )}
-            </div>
-
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6">
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                    {t('views.crm.details.contact')}
-                  </h4>
-                  <div className="divide-y divide-slate-100">
-                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {t('views.crm.tenantModal.email')}
-                      </span>
-                      <span className="flex min-w-0 items-start gap-1.5 text-slate-900">
-                        <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span className="break-all">{selectedTenant.email}</span>
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {t('views.crm.tenantModal.phone')}
-                      </span>
-                      <span className="flex items-center gap-1.5 text-slate-900">
-                        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        {selectedTenant.phone}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {t('views.crm.tenantModal.nationality')}
-                      </span>
-                      <span className="text-slate-900">{nationalityLabel(selectedTenant.nationality)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-1.5 border-t border-slate-200 pt-3 md:border-t-0 md:border-l md:border-slate-200 md:pt-0 md:pl-6">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                    {t('views.crm.details.leaseInfo')}
-                  </h4>
-                  {tenantLeaseContext.contract && tenantLeaseContext.unit ? (
-                    <div className="divide-y divide-slate-100">
-                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {t('views.crm.details.leaseUnit')}
-                        </span>
-                        <span className="font-medium text-slate-900">
-                          {tenantLeaseContext.unit.unitNumber} · {tenantLeaseContext.unit.buildingName}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {t('views.crm.details.leasePeriod')}
-                        </span>
-                        <span className="flex min-w-0 items-start gap-1.5 text-slate-900">
-                          <CalendarRange className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                          <span>
-                            {format(parseISO(tenantLeaseContext.contract.startDate), 'MMM d, yyyy')} —{' '}
-                            {format(parseISO(tenantLeaseContext.contract.endDate), 'MMM d, yyyy')}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {t('views.crm.details.leaseMonthlyRent')}
-                        </span>
-                        <span className="font-semibold text-slate-900">
-                          ₱{tenantLeaseContext.contract.monthlyRent.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {t('views.ledger.table.status')}
-                        </span>
-                        <span>
-                          <Badge
-                            variant="outline"
-                            className="border-slate-200 capitalize text-slate-700"
-                          >
-                            {tenantLeaseContext.contract.status}
-                          </Badge>
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="py-1.5 text-sm leading-snug text-slate-500">
-                      {t('views.crm.details.leaseNoContract')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <div className="flex flex-col gap-1.5">
-                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {t('views.crm.details.identification')}
-                </h4>
-                <div className="divide-y divide-slate-100">
-                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {t('views.crm.tenantModal.idType')}
-                    </span>
-                    <span className="text-slate-900">{selectedTenant.idType}</span>
-                  </div>
-                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {t('views.crm.tenantModal.idNumber')}
-                    </span>
-                    <span className="text-slate-900">{selectedTenant.idNumber}</span>
-                  </div>
-                  <div className="grid grid-cols-[minmax(6rem,7.5rem)_1fr] items-start gap-x-3 py-2 text-sm">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {t('views.crm.tenantModal.idExpiry')}
-                    </span>
-                    <span className="text-slate-900">{selectedTenant.idExpiry || '—'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <div className="flex flex-col gap-1.5">
-                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {t('views.crm.details.documents')}
-                </h4>
-                <div className="divide-y divide-slate-100">
-                  <button
-                    type="button"
-                    className={cn(
-                      'grid w-full grid-cols-[minmax(6rem,7.5rem)_1fr] items-center gap-x-3 py-2 text-left text-sm transition-colors',
-                      tenantLeaseContext.contract
-                        ? 'cursor-pointer hover:bg-slate-50/80'
-                        : 'cursor-default opacity-70',
-                    )}
-                    onClick={() => {
-                      if (!tenantLeaseContext.contract) {
-                        toast.info(t('views.crm.details.documentLeaseUnavailable'));
-                        return;
-                      }
-                      const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
-                      window.open(url, '_blank');
-                    }}
-                  >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">PDF</span>
-                    <span className="flex min-w-0 items-center gap-1.5 text-slate-900">
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={1.75} />
-                      <span className="truncate font-medium">{t('views.crm.details.documentLeasePdf')}</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'grid w-full grid-cols-[minmax(6rem,7.5rem)_1fr] items-center gap-x-3 py-2 text-left text-sm transition-colors',
-                      selectedTenant.idImageUrl
-                        ? 'cursor-pointer hover:bg-slate-50/80'
-                        : 'cursor-default opacity-70',
-                    )}
-                    onClick={() => {
-                      if (!selectedTenant.idImageUrl) {
-                        toast.info(t('views.crm.details.documentIdUnavailable'));
-                        return;
-                      }
-                      window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank');
-                    }}
-                  >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">WEBP</span>
-                    <span className="flex min-w-0 items-center gap-1.5 text-slate-900">
-                      <FileImage className="h-3.5 w-3.5 shrink-0 text-slate-400" strokeWidth={1.75} />
-                      <span className="truncate font-medium">{t('views.crm.details.documentTenantIdJpg')}</span>
-                    </span>
-                  </button>
-                </div>
-
-                {selectedTenant.idImageUrl ? (
-                  <div className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
-                      Preview
-                    </div>
-                    <button
-                      type="button"
-                      className="w-full"
-                      onClick={() => window.open(resolveUploadUrl(selectedTenant.idImageUrl!), '_blank')}
-                      title="Open full image"
-                    >
-                      <img
-                        src={resolveUploadUrl(selectedTenant.idImageUrl)}
-                        alt="Tenant ID"
-                        className="w-full max-h-56 object-contain rounded-lg bg-white"
-                        loading="lazy"
-                      />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {selectedTenant.blacklistReason ? (
-              <div className="mt-3 border-t border-slate-200 pt-3">
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                    {t('views.crm.details.notes')}
-                  </h4>
-                  <p className="text-sm leading-snug text-slate-600">{selectedTenant.blacklistReason}</p>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </Modal>
+        lease={
+          tenantLeaseContext.contract && tenantLeaseContext.unit
+            ? {
+                unitLabel: `${tenantLeaseContext.unit.unitNumber} - ${tenantLeaseContext.unit.buildingName}`,
+                leaseStart: tenantLeaseContext.contract.startDate,
+                leaseEnd: tenantLeaseContext.contract.endDate,
+                monthlyRent: Number(tenantLeaseContext.contract.monthlyRent),
+                statusLabel: String(tenantLeaseContext.contract.status || ''),
+              }
+            : undefined
+        }
+        documents={[
+          {
+            id: 'lease-pdf',
+            name: t('views.crm.details.documentLeasePdf'),
+            fileType: 'PDF',
+            sizeLabel: '—',
+            kind: 'pdf',
+            onPreview: tenantLeaseContext.contract
+              ? () => {
+                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }
+              : undefined,
+            onDownload: tenantLeaseContext.contract
+              ? () => {
+                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }
+              : undefined,
+          },
+          {
+            id: 'tenant-id',
+            name: t('views.crm.details.documentTenantIdJpg'),
+            fileType: 'WEBP',
+            sizeLabel: '—',
+            kind: 'image',
+            onPreview: selectedTenant?.idImageUrl
+              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank', 'noopener,noreferrer')
+              : undefined,
+            onDownload: selectedTenant?.idImageUrl
+              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank', 'noopener,noreferrer')
+              : undefined,
+          },
+        ]}
+        closeLabel={t('views.crm.details.close')}
+        editLabel={t('views.crm.details.editTenant')}
+        onEditTenant={
+          canUpdate && selectedTenant
+            ? () => {
+                openEdit(selectedTenant);
+              }
+            : undefined
+        }
+      />
 
       <Modal
         isOpen={isBrokerDeleteOpen}
@@ -2665,20 +2477,19 @@ export function CRMView() {
         ) : null}
       </Modal>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <Input
-            placeholder={t('views.crm.searchPlaceholder')}
-            className="h-10 rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-900/40"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 grid h-12 w-full max-w-3xl grid-cols-4 gap-1 rounded-2xl border border-slate-200/90 bg-slate-100 p-1.5 shadow-inner dark:border-slate-700 dark:bg-slate-800/90">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder={t('views.crm.searchPlaceholder')}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-900/40"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <TabsList className="grid h-12 w-full grid-cols-4 gap-1 rounded-2xl border border-slate-200/90 bg-slate-100 p-1.5 shadow-inner dark:border-slate-700 dark:bg-slate-800/90 sm:w-auto sm:min-w-[34rem]">
           <TabsTrigger
             value="tenants"
             className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
@@ -2708,8 +2519,9 @@ export function CRMView() {
             <span className="truncate">{t('views.crm.tabs.blacklist')}</span>
           </TabsTrigger>
         </TabsList>
+        </div>
 
-        <TabsContent value="tenants" className="space-y-6">
+        <TabsContent value="tenants" className="mt-2 space-y-6">
           {crmLoading ? (
             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
               <SkeletonTable rows={6} columns={6} />
@@ -2724,7 +2536,7 @@ export function CRMView() {
           )}
         </TabsContent>
 
-        <TabsContent value="landlords" className="space-y-6">
+        <TabsContent value="landlords" className="mt-2 space-y-6">
           {landlordsLoading ? (
             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
               <SkeletonTable rows={6} columns={4} />
@@ -2734,7 +2546,7 @@ export function CRMView() {
           )}
         </TabsContent>
 
-        <TabsContent value="brokers" className="space-y-6">
+        <TabsContent value="brokers" className="mt-2 space-y-6">
           {brokersLoading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
@@ -3094,7 +2906,7 @@ export function CRMView() {
             </div>
           )}
         </TabsContent>
-        <TabsContent value="blacklist" className="space-y-6">
+        <TabsContent value="blacklist" className="mt-2 space-y-6">
           <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white px-4 py-4 shadow-sm dark:border-rose-900/50 dark:from-rose-950/35 dark:via-slate-900 dark:to-slate-900">
             <div className="flex gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/80">

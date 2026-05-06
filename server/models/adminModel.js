@@ -103,6 +103,31 @@ export async function countActiveUsersForRole(roleId) {
   return Number(rows[0]?.c ?? 0);
 }
 
+export async function countUsersForRole(roleId) {
+  const [rows] = await pool.query('SELECT COUNT(*) AS c FROM user_info WHERE PERMISSIONS = ?', [roleId]);
+  return Number(rows[0]?.c ?? 0);
+}
+
+export async function hardDeleteRole(roleId) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT IDNo FROM user_role WHERE IDNo = ? FOR UPDATE', [roleId]);
+    if (!rows[0]) {
+      throw new Error('ROLE_NOT_FOUND');
+    }
+    await conn.query('DELETE FROM user_role_crud_permissions WHERE role_id = ?', [roleId]);
+    await conn.query('DELETE FROM role_sidebar_permissions WHERE role_id = ?', [roleId]);
+    await conn.query('DELETE FROM user_role WHERE IDNo = ?', [roleId]);
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function activeRoleNameTaken(trimmedName, excludeRoleId) {
   const sql = excludeRoleId
     ? `SELECT IDNo FROM user_role

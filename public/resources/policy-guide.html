@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Policy Guide</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #0b1220;
+        --card: #0f172a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #f59e0b;
+        --border: rgba(148, 163, 184, 0.18);
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          Apple Color Emoji,
+          Segoe UI Emoji;
+        background: radial-gradient(1100px 650px at 70% -10%, rgba(245, 158, 11, 0.22), transparent 60%),
+          radial-gradient(900px 500px at 0% 0%, rgba(99, 102, 241, 0.16), transparent 55%),
+          var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px 22px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(8px);
+      }
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .section {
+        margin-top: 18px;
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(2, 6, 23, 0.4);
+      }
+      .section h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .section ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+      .section li {
+        margin: 6px 0;
+      }
+      a.btn {
+        display: inline-block;
+        margin-top: 18px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #ef4444);
+        box-shadow: 0 10px 25px rgba(245, 158, 11, 0.16);
+        font-weight: 700;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Policy Guide</h1>
+        <p>Placeholder page for internal policies (KYC, blacklist handling, tenant comms, renewals). Replace with your real guide PDF.</p>
+        <div class="section">
+          <h2>Suggested sections</h2>
+          <ul>
+            <li>KYC verification checklist</li>
+            <li>Blacklist criteria and approval steps</li>
+            <li>Renewal and termination workflow</li>
+            <li>Standard messaging templates</li>
+          </ul>
+        </div>
+        <a class="btn" href="javascript:window.close()">Close tab</a>
+      </div>
+    </div>
+  </body>
+</html>

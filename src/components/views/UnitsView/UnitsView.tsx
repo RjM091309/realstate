@@ -1135,7 +1135,7 @@ export function UnitsView() {
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
               className={cn(
-                'h-9 rounded-lg px-3 gap-1.5 dark:text-slate-200',
+                'h-10 rounded-lg px-3 gap-1.5 dark:text-slate-200',
                 viewMode === 'grid' && 'bg-slate-100 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:shadow-none',
               )}
               onClick={() => setViewMode('grid')}
@@ -1148,7 +1148,7 @@ export function UnitsView() {
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
               className={cn(
-                'h-9 rounded-lg px-3 gap-1.5 dark:text-slate-200',
+                'h-10 rounded-lg px-3 gap-1.5 dark:text-slate-200',
                 viewMode === 'list' && 'bg-slate-100 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:shadow-none',
               )}
               onClick={() => setViewMode('list')}
@@ -1171,15 +1171,20 @@ export function UnitsView() {
       </div>
 
       <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm dark:border-slate-700/90 dark:bg-slate-900/85 dark:shadow-lg dark:shadow-black/30 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-          <div className="relative min-w-0 flex-1 lg:max-w-md">
-            <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />
-            <Input
-              placeholder={t('views.units.searchPlaceholder')}
-              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus-visible:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+          <div className="min-w-0 flex-1 lg:max-w-md">
+            <Label className="mb-1.5 block text-sm font-medium text-transparent select-none dark:text-transparent">
+              &nbsp;
+            </Label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />
+              <Input
+                placeholder={t('views.units.searchPlaceholder')}
+                className="h-10 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus-visible:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
           <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="min-w-0">

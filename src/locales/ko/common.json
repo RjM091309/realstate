@@ -199,7 +199,7 @@
       "loadError": "역할을 불러올 수 없습니다.",
       "savedAdd": "역할이 생성되었습니다.",
       "savedEdit": "역할이 수정되었습니다.",
-      "removed": "역할이 비활성화되었습니다.",
+      "removed": "역할이 삭제되었습니다.",
       "duplicateName": "이미 같은 이름의 역할이 있습니다.",
       "hasUsers": "역할을 제거하기 전에 사용자를 다른 역할로 옮기거나 비활성화하세요.",
       "cannotRemoveAdmin": "관리자 역할은 제거할 수 없습니다.",
@@ -213,11 +213,11 @@
       "activeHint": "비활성 역할은 신규 사용자에게 부여할 수 없습니다.",
       "cancel": "취소",
       "saveRole": "역할 저장",
-      "confirmRemoveTitle": "역할을 비활성화할까요?",
-      "confirmRemoveBody": "비활성화된 역할은 신규 배정에서 숨겨집니다. 사용자가 없으면 나중에 다시 활성화할 수 있습니다.",
-      "confirmRemoveAction": "비활성화",
+      "confirmRemoveTitle": "역할을 삭제할까요?",
+      "confirmRemoveBody": "이 역할은 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+      "confirmRemoveAction": "삭제",
       "edit": "수정",
-      "remove": "비활성화"
+      "remove": "삭제"
     },
     "dashboard": {
       "title": "경영 대시보드",

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contract Templates</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #0b1220;
+        --card: #0f172a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #6366f1;
+        --border: rgba(148, 163, 184, 0.18);
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          Apple Color Emoji,
+          Segoe UI Emoji;
+        background: radial-gradient(1200px 700px at 70% -10%, rgba(99, 102, 241, 0.35), transparent 60%),
+          radial-gradient(900px 500px at 0% 0%, rgba(168, 85, 247, 0.25), transparent 55%),
+          var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px 22px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(8px);
+      }
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .tile {
+        background: rgba(2, 6, 23, 0.4);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .tile h2 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(226, 232, 240, 0.9);
+      }
+      .tile ul {
+        margin: 10px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+      .tile li {
+        margin: 6px 0;
+      }
+      a.btn {
+        display: inline-block;
+        margin-top: 18px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #8b5cf6);
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.25);
+        font-weight: 700;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Contract Templates</h1>
+        <p>
+          This is a placeholder resource page. You can replace this with your actual PDF/Doc templates later (e.g. lease contract
+          template, addendum, receipt template).
+        </p>
+        <div class="grid">
+          <div class="tile">
+            <h2>Included</h2>
+            <ul>
+              <li>Lease agreement (residential)</li>
+              <li>Security deposit addendum</li>
+              <li>Move-in / move-out checklist</li>
+            </ul>
+          </div>
+          <div class="tile">
+            <h2>Next step</h2>
+            <ul>
+              <li>Drop PDFs into <code>public/resources/</code></li>
+              <li>Update Agent Portal links to point to your files</li>
+            </ul>
+          </div>
+        </div>
+        <a class="btn" href="javascript:window.close()">Close tab</a>
+      </div>
+    </div>
+  </body>
+</html>

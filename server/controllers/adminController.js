@@ -5,6 +5,8 @@ import {
   PROTECTED_SYSTEM_ROLE_ID,
   activeRoleNameTaken,
   countActiveUsersForRole,
+  countUsersForRole,
+  hardDeleteRole,
   insertRoleWithCopiedPermissions,
   listActiveRoles,
   listActiveStaffUsersForRoleAvatars,
@@ -173,13 +175,8 @@ export async function patchRole(req, res) {
       return;
     }
 
-    if (hasActive && active === false) {
-      const n = await countActiveUsersForRole(roleId);
-      if (n > 0) {
-        res.status(400).json({ error: 'Reassign or deactivate users before deactivating this role' });
-        return;
-      }
-    }
+    // Allow deactivation even when users are still assigned to the role.
+    // The UI intentionally lets admins disable sign-in/assignment progressively.
 
     await updateUserRoleRow(
       roleId,
@@ -225,19 +222,18 @@ export async function deleteRole(req, res) {
       res.status(404).json({ error: 'Role not found' });
       return;
     }
-    if (!Number(existing.active)) {
-      res.json({ ok: true, roleId, alreadyInactive: true });
-      return;
-    }
-    const n = await countActiveUsersForRole(roleId);
+    const n = await countUsersForRole(roleId);
     if (n > 0) {
       res.status(400).json({ error: 'Reassign or deactivate users before removing this role' });
       return;
     }
-    await updateUserRoleRow(roleId, { active: false }, req.userId);
-    emitRoleAccessChanged(roleId);
+    await hardDeleteRole(roleId);
     res.json({ ok: true, roleId });
   } catch (e) {
+    if (e instanceof Error && e.message === 'ROLE_NOT_FOUND') {
+      res.status(404).json({ error: 'Role not found' });
+      return;
+    }
     console.error(e);
     res.status(500).json({ error: 'Failed to remove role' });
   }
