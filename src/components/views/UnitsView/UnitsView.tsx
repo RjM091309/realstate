@@ -771,7 +771,24 @@ export function UnitsView() {
     const q = searchTerm.trim().toLowerCase();
     const rows = unitList.filter((u) => {
       if (q) {
-        const hay = `${u.unitNumber} ${u.buildingName} ${u.area} ${u.type}`.toLowerCase();
+        const active = activeContractForUnit(u.id, branchContracts);
+        const tenantName = active
+          ? (tenantsList.find((x) => x.id === active.tenantId)?.name ?? '')
+          : '';
+        const hay = [
+          u.unitNumber,
+          u.buildingName,
+          u.tower,
+          u.floor,
+          u.area,
+          u.type,
+          u.status,
+          tenantName,
+          u.monthlyRate ? String(u.monthlyRate) : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (filterBuilding && u.buildingName !== filterBuilding) return false;
@@ -798,7 +815,17 @@ export function UnitsView() {
           return a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
       }
     });
-  }, [unitList, searchTerm, filterBuilding, filterFloor, filterType, filterStatus, sortBy]);
+  }, [
+    unitList,
+    searchTerm,
+    filterBuilding,
+    filterFloor,
+    filterType,
+    filterStatus,
+    sortBy,
+    branchContracts,
+    tenantsList,
+  ]);
 
   const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);

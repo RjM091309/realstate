@@ -180,19 +180,6 @@ export function DashboardView() {
     year: 'numeric',
   });
 
-  const rangeLabel =
-    dateRange.start && dateRange.end
-      ? `${new Date(dateRange.start + 'T12:00:00').toLocaleDateString(i18n.language === 'ko' ? 'ko-KR' : 'en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })} – ${new Date(dateRange.end + 'T12:00:00').toLocaleDateString(i18n.language === 'ko' ? 'ko-KR' : 'en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}`
-      : t('views.dashboard.last30Days');
-
   const periodTotals = useMemo(() => {
     if (!dateRange.start || !dateRange.end) {
       return { current: 0, previous: 0, prevStart: '', prevEnd: '' };
@@ -504,10 +491,6 @@ export function DashboardView() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{firstName} 👋</h1>
           <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">{today}</p>
         </div>
-        <Badge variant="outline" className="px-3 py-1.5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 self-start sm:self-auto">
-          <CalendarIcon className="w-3 h-3 mr-2 shrink-0" />
-          <span className="truncate text-xs">{rangeLabel}</span>
-        </Badge>
       </div>
 
       {/* Stats Grid */}

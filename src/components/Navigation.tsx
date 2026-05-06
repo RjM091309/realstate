@@ -10,7 +10,6 @@ import {
   Calendar,
   Settings,
   LogOut,
-  Search,
   Bell,
   UserCircle,
   Briefcase,
@@ -23,7 +22,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -542,18 +540,6 @@ export function TopNav({
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder={t('header.searchPlaceholder')}
-            className="h-9 rounded-full pl-10 pr-3 border border-[var(--border)] hover:border-slate-300 focus:border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-300 transition-all"
-            style={{
-              backgroundColor: 'color-mix(in oklab, var(--control-bg) 70%, transparent)',
-              borderColor: 'color-mix(in oklab, var(--border) 88%, #cbd5e1)',
-            }}
-          />
-        </div>
-
         {showDateRangePicker && (
           <div className="shrink-0 min-w-[240px] max-w-[320px] w-full sm:w-auto">
             <AppDatePicker
