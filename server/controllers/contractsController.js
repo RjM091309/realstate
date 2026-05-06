@@ -9,6 +9,7 @@ import {
   insertContractCollaboration,
   listContractCollaborations,
   listContractTenants,
+  listArchivedContractsByBranch,
   listContractsByBranch,
   renewLeaseContract,
   updateContractById,
@@ -215,8 +216,15 @@ async function getAuthContext(req, res) {
 export async function listContracts(req, res) {
   const ctx = await getAuthContext(req, res);
   if (!ctx) return;
+  const archivedRaw = req.query?.archived;
+  const archived =
+    archivedRaw === '1' ||
+    archivedRaw === 'true' ||
+    String(archivedRaw ?? '').toLowerCase() === 'yes';
   try {
-    const rows = await listContractsByBranch(ctx.session.branchId);
+    const rows = archived
+      ? await listArchivedContractsByBranch(ctx.session.branchId)
+      : await listContractsByBranch(ctx.session.branchId);
     res.json({ contracts: rows.map(rowToContract) });
   } catch (e) {
     console.error(e);

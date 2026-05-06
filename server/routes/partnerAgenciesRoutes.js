@@ -4,6 +4,7 @@ import {
   createPartnerAgency,
   deletePartnerAgency,
   listPartnerAgencies,
+  listPartnerAgencyCollaborations,
   uploadPartnerAgencyKycDocument,
   updatePartnerAgency,
 } from '../controllers/partnerAgenciesController.js';
@@ -33,6 +34,7 @@ const upload = multer({
 const router = Router();
 router.use(requireAuth);
 router.get('/', listPartnerAgencies);
+router.get('/:id/collaborations', listPartnerAgencyCollaborations);
 router.post('/', createPartnerAgency);
 router.post('/:id/kyc-document', upload.single('file'), uploadPartnerAgencyKycDocument);
 router.patch('/:id', updatePartnerAgency);

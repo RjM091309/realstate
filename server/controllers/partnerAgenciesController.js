@@ -7,10 +7,55 @@ import {
   updatePartnerAgencyById,
   updatePartnerAgencyDocumentPathById,
 } from '../models/partnerAgenciesModel.js';
+import { listCollaborationsByPartnerAgency } from '../models/contractsModel.js';
 import { deactivateBlacklistForPartnerAgency, upsertActiveBrokerBlacklistRecord } from '../models/blacklistModel.js';
 import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
 
+function fmtDate(d) {
+  if (d == null) return '';
+  if (typeof d === 'string') return d.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function fmtDateTime(val) {
+  if (val == null) return '';
+  if (typeof val === 'string') {
+    const s = val.slice(0, 19);
+    return s.includes('T') ? s.replace('T', ' ') : s;
+  }
+  if (val instanceof Date) {
+    return val.toISOString().slice(0, 19).replace('T', ' ');
+  }
+  return '';
+}
+
+const DB_TO_UI_STATUS = {
+  draft: 'Active',
+  active: 'Active',
+  completed: 'Expired',
+  terminated: 'Terminated',
+  cancelled: 'Terminated',
+};
+
+function mapDbStatusToUi(status) {
+  const s = String(status ?? '').trim().toLowerCase();
+  return DB_TO_UI_STATUS[s] ?? 'Active';
+}
+
 function rowToAgency(row) {
+  const lastCollabRaw = row.last_collaboration_at;
+  let lastCollaborationAt;
+  if (lastCollabRaw != null) {
+    if (lastCollabRaw instanceof Date) {
+      lastCollaborationAt = lastCollabRaw.toISOString();
+    } else {
+      const s = String(lastCollabRaw);
+      lastCollaborationAt = s.includes('T') ? s.slice(0, 19) : `${s.slice(0, 10)}T${s.slice(11, 19)}`;
+    }
+  }
   return {
     id: String(row.id),
     name: String(row.agency_name),
@@ -33,6 +78,8 @@ function rowToAgency(row) {
         ? String(row.blacklist_reason)
         : undefined,
     active: Boolean(Number(row.active)),
+    collaborationCount: row.collaboration_count != null ? Number(row.collaboration_count) || 0 : undefined,
+    lastCollaborationAt,
   };
 }
 
@@ -242,6 +289,42 @@ export async function listPartnerAgencies(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load partner agencies' });
+  }
+}
+
+export async function listPartnerAgencyCollaborations(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  try {
+    const existing = await getPartnerAgencyById(id, ctx.session.branchId);
+    if (!existing) {
+      res.status(404).json({ error: 'Partner agency not found' });
+      return;
+    }
+    const rows = await listCollaborationsByPartnerAgency(id, ctx.session.branchId);
+    const logs = rows.map((r) => ({
+      id: String(r.id),
+      contractId: String(r.contract_id),
+      contractNo: r.contract_no != null ? String(r.contract_no) : undefined,
+      unitNumber: r.unit_number != null ? String(r.unit_number) : undefined,
+      buildingName: r.building_name != null ? String(r.building_name) : undefined,
+      contractStart: fmtDate(r.start_date),
+      contractEnd: fmtDate(r.end_date),
+      contractStatus: mapDbStatusToUi(r.contract_status),
+      commissionTerms: r.commission_terms ? String(r.commission_terms) : '',
+      remarks: r.remarks ? String(r.remarks) : '',
+      createdBy: r.created_by != null ? String(r.created_by) : '',
+      createdAt: fmtDateTime(r.created_at),
+    }));
+    res.json({ logs });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load collaboration logs' });
   }
 }
 

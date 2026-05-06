@@ -1,6 +1,21 @@
 import { apiFetch } from '@/lib/api';
 import type { BrokerAgency } from '@/types';
 
+export type PartnerAgencyCollaborationLog = {
+  id: string;
+  contractId: string;
+  contractNo?: string;
+  unitNumber?: string;
+  buildingName?: string;
+  contractStart: string;
+  contractEnd: string;
+  contractStatus: string;
+  commissionTerms: string;
+  remarks: string;
+  createdBy: string;
+  createdAt: string;
+};
+
 export type PartnerAgencyCreateBody = {
   name: string;
   contactPerson: string;
@@ -19,6 +34,13 @@ export type PartnerAgencyCreateBody = {
 export async function fetchPartnerAgencies(): Promise<BrokerAgency[]> {
   const { agencies } = await apiFetch<{ agencies: BrokerAgency[] }>('/api/partner-agencies');
   return agencies;
+}
+
+export async function fetchPartnerAgencyCollaborations(id: string): Promise<PartnerAgencyCollaborationLog[]> {
+  const { logs } = await apiFetch<{ logs: PartnerAgencyCollaborationLog[] }>(
+    `/api/partner-agencies/${encodeURIComponent(id)}/collaborations`,
+  );
+  return logs;
 }
 
 export async function createPartnerAgency(body: PartnerAgencyCreateBody): Promise<BrokerAgency> {

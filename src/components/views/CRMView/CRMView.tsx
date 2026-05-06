@@ -25,8 +25,9 @@ import {
   Eye,
   Upload,
   Loader2,
+  Copy,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -56,8 +57,10 @@ import {
   createPartnerAgency,
   deletePartnerAgency,
   fetchPartnerAgencies,
+  fetchPartnerAgencyCollaborations,
   uploadPartnerAgencyKycDocument,
   updatePartnerAgency,
+  type PartnerAgencyCollaborationLog,
 } from '@/lib/partnerAgenciesApi';
 import {
   createLandlord,
@@ -231,10 +234,18 @@ function brokerExpiryInsight(expiryDate?: string): BrokerExpiryInsight {
 }
 
 function brokerCollaborationStats(
-  agencyId: string,
+  agency: BrokerAgency,
   contracts: Contract[],
 ): { count: number; lastAt: Date | null } {
-  const relevant = contracts.filter((c) => c.brokerAgencyId === agencyId);
+  if (agency.collaborationCount != null) {
+    let lastAt: Date | null = null;
+    if (agency.lastCollaborationAt) {
+      const d = new Date(agency.lastCollaborationAt);
+      if (!Number.isNaN(d.getTime())) lastAt = d;
+    }
+    return { count: agency.collaborationCount, lastAt };
+  }
+  const relevant = contracts.filter((c) => c.brokerAgencyId === agency.id);
   let lastAt: Date | null = null;
   for (const c of relevant) {
     try {
@@ -316,6 +327,12 @@ export function CRMView() {
   const [brokerBlacklistReason, setBrokerBlacklistReason] = useState('');
   const [isBrokerActivateOpen, setIsBrokerActivateOpen] = useState(false);
   const [pendingActivateBroker, setPendingActivateBroker] = useState<BrokerAgency | null>(null);
+  const [isBrokerMessageOpen, setIsBrokerMessageOpen] = useState(false);
+  const [brokerMessageAgency, setBrokerMessageAgency] = useState<BrokerAgency | null>(null);
+  const [isBrokerLogsOpen, setIsBrokerLogsOpen] = useState(false);
+  const [brokerLogsAgency, setBrokerLogsAgency] = useState<BrokerAgency | null>(null);
+  const [brokerLogs, setBrokerLogs] = useState<PartnerAgencyCollaborationLog[]>([]);
+  const [brokerLogsLoading, setBrokerLogsLoading] = useState(false);
   const [isTenantActivateOpen, setIsTenantActivateOpen] = useState(false);
   const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
 
@@ -460,6 +477,28 @@ export function CRMView() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!isBrokerLogsOpen || !brokerLogsAgency) return;
+    setBrokerLogsLoading(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const logs = await fetchPartnerAgencyCollaborations(brokerLogsAgency.id);
+        if (!cancelled) setBrokerLogs(logs);
+      } catch {
+        if (!cancelled) {
+          setBrokerLogs([]);
+          toast.error(t('views.crm.brokers.logsLoadError'));
+        }
+      } finally {
+        if (!cancelled) setBrokerLogsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBrokerLogsOpen, brokerLogsAgency?.id, t]);
 
   const filteredTenants = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
@@ -800,8 +839,26 @@ export function CRMView() {
     }
   };
 
-  const handleViewBrokerLogs = () => {
-    toast.info(t('views.crm.brokers.logsSoon'));
+  const openBrokerMessage = (agency: BrokerAgency) => {
+    setBrokerMessageAgency(agency);
+    setIsBrokerMessageOpen(true);
+  };
+
+  const closeBrokerMessage = () => {
+    setIsBrokerMessageOpen(false);
+    setBrokerMessageAgency(null);
+  };
+
+  const openBrokerLogs = (agency: BrokerAgency) => {
+    setBrokerLogsAgency(agency);
+    setBrokerLogs([]);
+    setIsBrokerLogsOpen(true);
+  };
+
+  const closeBrokerLogs = () => {
+    setIsBrokerLogsOpen(false);
+    setBrokerLogsAgency(null);
+    setBrokerLogs([]);
   };
 
   const openBlacklistBroker = (agency: BrokerAgency) => {
@@ -1611,6 +1668,200 @@ export function CRMView() {
             ? t('views.crm.brokers.deleteConfirm', { name: pendingDeleteBroker.name })
             : ''}
         </p>
+      </Modal>
+
+      <Modal
+        isOpen={isBrokerMessageOpen}
+        onClose={closeBrokerMessage}
+        title={
+          brokerMessageAgency
+            ? t('views.crm.brokers.messageModalTitle', { name: brokerMessageAgency.name })
+            : t('views.crm.brokers.messageButton')
+        }
+        maxWidth="md"
+        footer={
+          <div className="flex justify-end w-full">
+            <Button type="button" variant="outline" onClick={closeBrokerMessage}>
+              {t('views.crm.brokers.cancel')}
+            </Button>
+          </div>
+        }
+      >
+        {brokerMessageAgency ? (
+          (() => {
+            const email = brokerMessageAgency.email?.trim();
+            const phone = brokerMessageAgency.phone?.trim();
+            const telDigits = phone ? phone.replace(/\D/g, '') : '';
+            const telHref = phone ? (telDigits ? `tel:${telDigits}` : `tel:${phone}`) : '';
+            if (!email && !phone) {
+              return <p className="text-sm text-slate-600">{t('views.crm.brokers.noContactForMessage')}</p>;
+            }
+            const copyText = async (label: string, value: string) => {
+              try {
+                await navigator.clipboard.writeText(value);
+                toast.success(t('views.crm.brokers.copied', { label }));
+              } catch {
+                toast.error(t('views.crm.brokers.copyFailed'));
+              }
+            };
+            const gmailComposeUrl = email
+              ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`
+              : '';
+            return (
+              <div className="space-y-4">
+                {email ? (
+                  <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                    <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      {t('views.crm.brokers.emailShort')}
+                    </div>
+                    <p className="mt-1 break-all text-sm font-semibold text-slate-900 dark:text-slate-100">{email}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="rounded-lg bg-red-600 text-white hover:bg-red-700"
+                        onClick={() => {
+                          window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <ExternalLink className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.openInGmail')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                        onClick={() => {
+                          window.location.href = `mailto:${email}`;
+                        }}
+                      >
+                        <Mail className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.openEmailApp')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg"
+                        onClick={() => void copyText(t('views.crm.brokers.emailShort'), email)}
+                      >
+                        <Copy className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.copyEmail')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {phone ? (
+                  <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                    <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      {t('views.crm.brokers.phone')}
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{phone}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <a
+                        href={telHref}
+                        className={cn(
+                          buttonVariants({ variant: 'secondary', size: 'sm' }),
+                          'rounded-lg no-underline',
+                        )}
+                      >
+                        {t('views.crm.brokers.callPhone')}
+                      </a>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg"
+                        onClick={() => void copyText(t('views.crm.brokers.phone'), phone)}
+                      >
+                        <Copy className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                        {t('views.crm.brokers.copyPhone')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={isBrokerLogsOpen}
+        onClose={closeBrokerLogs}
+        title={
+          brokerLogsAgency
+            ? t('views.crm.brokers.logsModalTitle', { name: brokerLogsAgency.name })
+            : t('views.crm.brokers.viewLogs')
+        }
+        maxWidth="3xl"
+        footer={
+          <div className="flex justify-end w-full">
+            <Button type="button" variant="outline" onClick={closeBrokerLogs}>
+              {t('views.crm.blacklist.close')}
+            </Button>
+          </div>
+        }
+      >
+        {brokerLogsLoading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-9 w-9 animate-spin text-indigo-600" aria-hidden />
+          </div>
+        ) : brokerLogs.length === 0 ? (
+          <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            {t('views.crm.brokers.logsEmpty')}
+          </p>
+        ) : (
+          <div className="max-h-[min(60vh,28rem)] space-y-3 overflow-y-auto pr-1">
+            {brokerLogs.map((log) => (
+              <div
+                key={log.id}
+                className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/40"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-700">
+                  <div className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">
+                    {log.contractNo || `#${log.contractId}`}
+                    {log.unitNumber || log.buildingName ? (
+                      <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                        {[log.unitNumber, log.buildingName].filter(Boolean).join(' · ')}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Badge variant="outline" className="shrink-0 border-slate-200 text-xs dark:border-slate-600">
+                    {log.contractStatus}
+                  </Badge>
+                </div>
+                <div className="mt-2 grid gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                  <div>
+                    <span className="font-semibold text-slate-500 dark:text-slate-500">
+                      {t('views.crm.brokers.logsPeriod')}:{' '}
+                    </span>
+                    {log.contractStart && log.contractEnd ? `${log.contractStart} → ${log.contractEnd}` : '—'}
+                  </div>
+                  {log.commissionTerms ? (
+                    <div>
+                      <span className="font-semibold text-slate-500 dark:text-slate-500">
+                        {t('views.crm.brokers.logsCommission')}:{' '}
+                      </span>
+                      {log.commissionTerms}
+                    </div>
+                  ) : null}
+                  {log.remarks ? (
+                    <div>
+                      <span className="font-semibold text-slate-500 dark:text-slate-500">
+                        {t('views.crm.brokers.logsRemarks')}:{' '}
+                      </span>
+                      <span className="whitespace-pre-wrap">{log.remarks}</span>
+                    </div>
+                  ) : null}
+                  <div className="text-[11px] text-slate-500 dark:text-slate-500">
+                    {t('views.crm.brokers.logsLoggedAt')}: {log.createdAt || '—'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -2526,7 +2777,7 @@ export function CRMView() {
                   Boolean(agency.isBlacklisted) ||
                   blacklistList.some((r) => r.entityType === 'broker' && r.partnerAgencyId === agency.id);
                 const expInsight = brokerExpiryInsight(agency.expiryDate);
-                const collab = brokerCollaborationStats(agency.id, contractList);
+                const collab = brokerCollaborationStats(agency, contractList);
 
                 const passportValue =
                   agency.documentType || agency.documentNo
@@ -2626,11 +2877,7 @@ export function CRMView() {
                     <Button
                       type="button"
                       className="h-10 w-full min-w-0 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                      onClick={() => {
-                        const em = agency.email?.trim();
-                        if (em) window.location.href = `mailto:${encodeURIComponent(em)}`;
-                        else toast.info(t('views.crm.brokers.noEmailForMessage'));
-                      }}
+                      onClick={() => openBrokerMessage(agency)}
                     >
                       <Mail className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
                       {t('views.crm.brokers.messageButton')}
@@ -2834,7 +3081,7 @@ export function CRMView() {
                           type="button"
                           variant="outline"
                           className="h-auto min-h-10 w-full min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 whitespace-normal rounded-lg border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-snug text-blue-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800 [&_svg]:shrink-0"
-                          onClick={handleViewBrokerLogs}
+                          onClick={() => openBrokerLogs(agency)}
                         >
                           <span className="max-w-full text-center">{t('views.crm.brokers.viewLogs')}</span>
                           <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />

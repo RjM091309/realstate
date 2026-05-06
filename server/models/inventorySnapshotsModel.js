@@ -13,7 +13,7 @@ export async function listInventorySnapshotsByContract(contractId, branchId) {
       s.remarks,
       s.created_at
     FROM inventory_snapshot s
-    INNER JOIN lease_contract lc ON lc.id = s.contract_id AND lc.branch_id = ? AND lc.active = 1
+    INNER JOIN lease_contract lc ON lc.id = s.contract_id AND lc.branch_id = ?
     WHERE s.contract_id = ? AND s.branch_id = ? AND s.active = 1
     ORDER BY s.inspection_date DESC, s.id DESC
     `,

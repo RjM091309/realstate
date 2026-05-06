@@ -74,6 +74,36 @@ export async function listContractsByBranch(branchId) {
   return rows;
 }
 
+/** Soft-deleted leases (`active = 0`), e.g. removed from the main operations list. */
+export async function listArchivedContractsByBranch(branchId) {
+  const [rows] = await pool.query(
+    `SELECT
+        c.id,
+        c.branch_id,
+        c.contract_no,
+        c.unit_id,
+        ct.tenant_id,
+        c.agent_id,
+        ${AGENT_NAME_SQL},
+        c.start_date,
+        c.end_date,
+        c.monthly_rent,
+        c.security_deposit,
+        c.advance_rent,
+        c.contract_type,
+        c.status,
+        c.special_remarks AS remarks
+     FROM lease_contract c
+     LEFT JOIN contract_tenant ct
+       ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
+     LEFT JOIN user_info u ON u.IDNO = c.agent_id
+     WHERE c.branch_id = ? AND c.active = 0
+     ORDER BY COALESCE(c.updated_at, c.created_at) DESC`,
+    [branchId],
+  );
+  return rows;
+}
+
 export async function insertContract(branchId, payload) {
   const conn = await pool.getConnection();
   try {
@@ -219,7 +249,7 @@ export async function getContractById(id, branchId) {
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
      LEFT JOIN user_info u ON u.IDNO = c.agent_id
-     WHERE c.id = ? AND c.branch_id = ? AND c.active = 1
+     WHERE c.id = ? AND c.branch_id = ?
      LIMIT 1`,
     [id, branchId],
   );
@@ -269,7 +299,7 @@ export async function getContractDocumentDetails(contractId, branchId) {
     LEFT JOIN contract_tenant ct ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
     LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
     LEFT JOIN landlord_profile ll ON ll.id = c.landlord_id
-    WHERE c.id = ? AND c.branch_id = ? AND c.active = 1
+    WHERE c.id = ? AND c.branch_id = ?
     LIMIT 1
     `,
     [contractId, branchId],
@@ -445,12 +475,41 @@ export async function listContractTenants(contractId, branchId) {
       t.email AS tenant_email,
       t.mobile_no AS tenant_phone
     FROM contract_tenant ct
-    INNER JOIN lease_contract lc ON lc.id = ct.contract_id AND lc.branch_id = ? AND lc.active = 1
+    INNER JOIN lease_contract lc ON lc.id = ct.contract_id AND lc.branch_id = ?
     INNER JOIN tenant_profile t ON t.id = ct.tenant_id AND t.active = 1
     WHERE ct.contract_id = ? AND ct.active = 1
     ORDER BY ct.is_primary DESC, ct.created_at DESC
     `,
     [branchId, contractId],
+  );
+  return rows;
+}
+
+export async function listCollaborationsByPartnerAgency(partnerAgencyId, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      cc.id,
+      cc.contract_id,
+      cc.partner_agency_id,
+      cc.commission_terms,
+      cc.remarks,
+      cc.created_by,
+      cc.created_at,
+      lc.contract_no,
+      lc.start_date,
+      lc.end_date,
+      lc.status AS contract_status,
+      u.unit_no AS unit_number,
+      pr.name AS building_name
+    FROM contract_collaboration cc
+    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ?
+    LEFT JOIN unit u ON u.id = lc.unit_id
+    LEFT JOIN property pr ON pr.id = u.property_id AND pr.branch_id = lc.branch_id
+    WHERE cc.branch_id = ? AND cc.partner_agency_id = ?
+    ORDER BY cc.created_at DESC, cc.id DESC
+    `,
+    [branchId, branchId, partnerAgencyId],
   );
   return rows;
 }
@@ -470,7 +529,7 @@ export async function listContractCollaborations(contractId, branchId) {
       cc.created_by,
       cc.created_at
     FROM contract_collaboration cc
-    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ? AND lc.active = 1
+    INNER JOIN lease_contract lc ON lc.id = cc.contract_id AND lc.branch_id = ?
     LEFT JOIN partner_agency pa ON pa.id = cc.partner_agency_id
     WHERE cc.contract_id = ? AND cc.branch_id = ?
     ORDER BY cc.created_at DESC, cc.id DESC

@@ -15,8 +15,9 @@ export type ContractWriteBody = {
   remarks?: string;
 };
 
-export async function fetchContracts(): Promise<Contract[]> {
-  const { contracts } = await apiFetch<{ contracts: Contract[] }>('/api/contracts');
+export async function fetchContracts(options?: { archived?: boolean }): Promise<Contract[]> {
+  const q = options?.archived ? '?archived=1' : '';
+  const { contracts } = await apiFetch<{ contracts: Contract[] }>(`/api/contracts${q}`);
   return contracts;
 }
 

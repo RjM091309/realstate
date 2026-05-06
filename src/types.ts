@@ -191,6 +191,9 @@ export interface BrokerAgency {
   isBlacklisted: boolean;
   blacklistReason?: string;
   active: boolean;
+  /** Count of `contract_collaboration` rows for this agency (from API list). */
+  collaborationCount?: number;
+  lastCollaborationAt?: string;
 }
 
 export interface DashboardStats {

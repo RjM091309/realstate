@@ -52,6 +52,7 @@ import type {
   InventorySnapshotItemRow,
   InventorySnapshotRow,
   Payment,
+  TransactionType,
 } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import {
@@ -97,6 +98,11 @@ export function ContractsView() {
   const canRenewLease = canCreate || canUpdate;
   const [contractsLoading, setContractsLoading] = useState(true);
   const [contractList, setContractList] = useState<Contract[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [contractFiltersOpen, setContractFiltersOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | Contract['status']>('all');
+  const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
+  const [filterBuilding, setFilterBuilding] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewContractOpen, setIsNewContractOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -165,22 +171,40 @@ export function ContractsView() {
     resetNewContractForm();
   };
 
-  const reloadContracts = useCallback(async () => {
-    try {
-      const list = await fetchContracts();
-      setContractList(list);
-    } catch {
-      setContractList([]);
-      toast.warning(t('views.contracts.loadError'));
-    }
-  }, [t]);
+  const reloadContracts = useCallback(
+    async (override?: { archived?: boolean }) => {
+      try {
+        const archived = override?.archived ?? showArchived;
+        const list = await fetchContracts({ archived });
+        setContractList(list);
+      } catch {
+        setContractList([]);
+        toast.warning(t('views.contracts.loadError'));
+      }
+    },
+    [showArchived, t],
+  );
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      await reloadContracts();
-      setContractsLoading(false);
+      setContractsLoading(true);
+      try {
+        const list = await fetchContracts({ archived: showArchived });
+        if (!cancelled) setContractList(list);
+      } catch {
+        if (!cancelled) {
+          setContractList([]);
+          toast.warning(t('views.contracts.loadError'));
+        }
+      } finally {
+        if (!cancelled) setContractsLoading(false);
+      }
     })();
-  }, [reloadContracts]);
+    return () => {
+      cancelled = true;
+    };
+  }, [showArchived, t]);
 
   useEffect(() => {
     void (async () => {
@@ -224,6 +248,46 @@ export function ContractsView() {
   const tenantOptions = useMemo(
     () => tenantList.map((ten) => ({ value: ten.id, label: ten.name })),
     [tenantList],
+  );
+
+  const contractBuildingNames = useMemo(() => {
+    const names = [...new Set(unitList.map((u) => u.buildingName).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    return names;
+  }, [unitList]);
+
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('views.contracts.filterAll') },
+      { value: 'Active', label: t('views.contracts.statuses.active') },
+      { value: 'Expired', label: t('views.contracts.statuses.expired') },
+      { value: 'Terminated', label: t('views.contracts.statuses.terminated') },
+    ],
+    [t],
+  );
+
+  const typeFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('views.contracts.filterAll') },
+      { value: 'Monthly Rental', label: t('views.contracts.types.monthly') },
+      { value: 'Sales', label: t('views.contracts.types.sales') },
+      { value: 'Short-term Rental', label: t('views.contracts.types.shortTerm') },
+    ],
+    [t],
+  );
+
+  const buildingFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('views.contracts.filterAllBuildings') },
+      ...contractBuildingNames.map((name) => ({ value: name, label: name })),
+    ],
+    [contractBuildingNames, t],
+  );
+
+  const activeContractFilterCount = useMemo(
+    () => [filterStatus !== 'all', filterType !== 'all', filterBuilding !== 'all'].filter(Boolean).length,
+    [filterStatus, filterType, filterBuilding],
   );
 
   const applyUnitDefaults = (pickedUnitId: string | null) => {
@@ -460,7 +524,7 @@ export function ContractsView() {
                 <MoreVertical className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {canUpdate && (
+                {canUpdate && !showArchived && (
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -470,7 +534,7 @@ export function ContractsView() {
                     Edit Contract
                   </DropdownMenuItem>
                 )}
-                {canRenewLease && contract.status === 'Active' && (
+                {canRenewLease && !showArchived && contract.status === 'Active' && (
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -481,7 +545,7 @@ export function ContractsView() {
                     Renew lease
                   </DropdownMenuItem>
                 )}
-                {canDelete && (
+                {canDelete && !showArchived && (
                   <DropdownMenuItem
                     className="text-rose-600"
                     onClick={(e) => {
@@ -498,7 +562,7 @@ export function ContractsView() {
         ),
       },
     ],
-    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease]
+    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease, showArchived]
   );
 
   const handleGenerate = () => {
@@ -534,12 +598,13 @@ export function ContractsView() {
     void (async () => {
       try {
         if (formMode === 'edit' && editingContractId) {
-          const updated = await updateContract(editingContractId, newContractPayload);
-          setContractList((prev) => prev.map((c) => (c.id === editingContractId ? updated : c)));
+          await updateContract(editingContractId, newContractPayload);
+          await reloadContracts();
           toast.success('Contract updated.');
         } else {
-          const created = await createContract(newContractPayload);
-          setContractList((prev) => [created, ...prev]);
+          await createContract(newContractPayload);
+          if (showArchived) setShowArchived(false);
+          else await reloadContracts({ archived: false });
           toast.success(t('views.contracts.generateActivate'));
         }
         closeContractModal();
@@ -551,18 +616,24 @@ export function ContractsView() {
 
   const filteredContracts = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    if (!q) return contractList;
     return contractList.filter((c) => {
+      if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+      if (filterType !== 'all' && c.type !== filterType) return false;
+      if (filterBuilding !== 'all') {
+        const unit = unitList.find((u) => u.id === c.unitId);
+        if (!unit || unit.buildingName !== filterBuilding) return false;
+      }
+      if (!q) return true;
       const unit = unitList.find((u) => u.id === c.unitId);
       const tenant = tenantList.find((ten) => ten.id === c.tenantId);
       const agentLabel = (c.agentName && c.agentName.trim()) || '';
-      const hay = [c.id, unit?.unitNumber, unit?.buildingName, tenant?.name, agentLabel]
+      const hay = [c.id, c.contractNo, unit?.unitNumber, unit?.buildingName, tenant?.name, agentLabel]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [searchTerm, contractList, tenantList, unitList]);
+  }, [searchTerm, contractList, tenantList, unitList, filterStatus, filterType, filterBuilding]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -935,26 +1006,101 @@ export function ContractsView() {
         }}
       />
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <Input
-            placeholder={t('views.contracts.searchPlaceholder')}
-            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="space-y-3">
+        {showArchived ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            {t('views.contracts.archiveBanner')}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder={t('views.contracts.searchPlaceholder')}
+              className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button
+              type="button"
+              variant={contractFiltersOpen || activeContractFilterCount > 0 ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-10 rounded-xl border-slate-200 shadow-sm',
+                contractFiltersOpen || activeContractFilterCount > 0
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600'
+                  : 'text-slate-600 hover:bg-slate-50',
+              )}
+              onClick={() => setContractFiltersOpen((o) => !o)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {t('views.contracts.filter')}
+              {activeContractFilterCount > 0 ? (
+                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1 text-[11px] font-bold tabular-nums">
+                  {activeContractFilterCount}
+                </span>
+              ) : null}
+            </Button>
+            <Button
+              type="button"
+              variant={showArchived ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-10 rounded-xl border-slate-200 shadow-sm',
+                showArchived
+                  ? 'border-slate-700 bg-slate-800 text-white hover:bg-slate-900'
+                  : 'text-slate-600 hover:bg-slate-50',
+              )}
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              <History className="w-4 h-4 mr-2" />
+              {showArchived ? t('views.contracts.backToActive') : t('views.contracts.archive')}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
-            <Filter className="w-4 h-4 mr-2" />
-            {t('views.contracts.filter')}
-          </Button>
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
-            <History className="w-4 h-4 mr-2" />
-            {t('views.contracts.archive')}
-          </Button>
-        </div>
+        {contractFiltersOpen ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-[10rem] flex-1 space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterStatus')}</Label>
+              <Select2
+                options={statusFilterOptions}
+                value={filterStatus}
+                onChange={(v) => setFilterStatus((v as Contract['status'] | 'all') ?? 'all')}
+              />
+            </div>
+            <div className="min-w-[10rem] flex-1 space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterType')}</Label>
+              <Select2
+                options={typeFilterOptions}
+                value={filterType}
+                onChange={(v) => setFilterType((v as TransactionType | 'all') ?? 'all')}
+              />
+            </div>
+            <div className="min-w-[10rem] flex-1 space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterBuilding')}</Label>
+              <Select2
+                options={buildingFilterOptions}
+                value={filterBuilding}
+                onChange={(v) => setFilterBuilding((v as string) ?? 'all')}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 rounded-lg"
+              onClick={() => {
+                setFilterStatus('all');
+                setFilterType('all');
+                setFilterBuilding('all');
+              }}
+            >
+              {t('views.contracts.resetFilters')}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {contractsLoading ? (
