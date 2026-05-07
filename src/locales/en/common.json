@@ -525,6 +525,7 @@
         "leaseUnit": "Unit",
         "leasePeriod": "Lease period",
         "leaseMonthlyRent": "Monthly rent",
+        "leaseContractStatus": "Contract status",
         "leaseNoContract": "No lease contract on file for this tenant.",
         "identification": "Identification",
         "documents": "Documents",
@@ -690,6 +691,11 @@
       "outstandingBalance": "Outstanding Balance",
       "searchPlaceholder": "Search by unit, tenant, or invoice #...",
       "filter": "Filter",
+      "filterStatus": "Payment status",
+      "filterUnit": "Unit",
+      "filterAllUnits": "All units",
+      "filterClear": "Clear filters",
+      "filterActiveHint": "Filters are applied",
       "upcomingTitle": "Upcoming Payments (Next 7 Days)",
       "upcomingDescription": "Priority list for rent due within the next week.",
       "collectionTitle": "Collection Ledger",
@@ -830,7 +836,9 @@
         "tenant": "Tenant",
         "endDate": "End Date",
         "status": "Status",
-        "active": "Active"
+        "active": "Active",
+        "expired": "Expired",
+        "terminated": "Terminated"
       },
       "tasks": {
         "title": "Today Tasks",

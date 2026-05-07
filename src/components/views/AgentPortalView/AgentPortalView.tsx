@@ -12,6 +12,7 @@ import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { useAuth } from '@/context/AuthContext';
+import { cn } from '@/lib/utils';
 
 export function AgentPortalView() {
   const { t } = useTranslation();
@@ -84,11 +85,29 @@ export function AgentPortalView() {
       },
       {
         header: t('views.agentPortal.contracts.status'),
-        render: (contract) => (
-          <Badge variant={contract.status === 'Active' ? 'default' : 'outline'}>
-            {contract.status === 'Active' ? t('views.agentPortal.contracts.active') : contract.status}
-          </Badge>
-        ),
+        render: (contract) => {
+          const { status } = contract;
+          const label =
+            status === 'Active'
+              ? t('views.agentPortal.contracts.active')
+              : status === 'Expired'
+                ? t('views.agentPortal.contracts.expired')
+                : status === 'Terminated'
+                  ? t('views.agentPortal.contracts.terminated')
+                  : status;
+          const badgeClass =
+            status === 'Active'
+              ? 'border-emerald-300/80 bg-emerald-100 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/25'
+              : status === 'Expired'
+                ? 'border-rose-300/80 bg-rose-100 text-rose-800 shadow-none hover:bg-rose-100 dark:border-rose-500/45 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/25'
+                : 'border-slate-300/80 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
+
+          return (
+            <Badge variant="outline" className={cn('h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide', badgeClass)}>
+              {label}
+            </Badge>
+          );
+        },
       },
     ],
     [t, units, tenants]

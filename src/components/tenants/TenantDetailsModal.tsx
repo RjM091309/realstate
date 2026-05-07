@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format, isValid, parseISO } from 'date-fns';
 import {
@@ -93,6 +94,21 @@ function docIcon(kind?: TenantDetailsDocument['kind']) {
   return FileText;
 }
 
+/** Contract / lease status (Active, Expired, …) — matches contract detail modals. */
+function leaseContractStatusPillClass(statusLabel: string): string {
+  const s = statusLabel.trim().toLowerCase();
+  if (s === 'active') {
+    return 'border-emerald-300/80 bg-emerald-100 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/25';
+  }
+  if (s === 'expired') {
+    return 'border-rose-300/80 bg-rose-100 text-rose-800 shadow-none hover:bg-rose-100 dark:border-rose-500/45 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/25';
+  }
+  if (s === 'terminated') {
+    return 'border-slate-300/80 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
+  }
+  return 'border-slate-200/90 bg-slate-50 text-slate-800 shadow-none dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100';
+}
+
 export function TenantDetailsModal({
   isOpen,
   onClose,
@@ -103,6 +119,8 @@ export function TenantDetailsModal({
   editLabel = 'Edit Tenant',
   closeLabel = 'Close',
 }: TenantDetailsModalProps) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = 'unset';
@@ -176,18 +194,21 @@ export function TenantDetailsModal({
                         <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 truncate">
                           {tenant?.name || 'Tenant'}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {tenant?.verified ? (
                             <Badge
                               variant="outline"
                               className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200"
                             >
-                              Verified
+                              {t('views.crm.tenantModal.kycVerified')}
                             </Badge>
                           ) : null}
-                          {tenant?.active ? (
-                            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 dark:bg-emerald-600">
-                              Active
+                          {tenant?.active === false ? (
+                            <Badge
+                              variant="outline"
+                              className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/50 dark:text-rose-200"
+                            >
+                              {t('views.crm.table.blacklisted')}
                             </Badge>
                           ) : null}
                         </div>
@@ -277,14 +298,23 @@ export function TenantDetailsModal({
                         </div>
                       </div>
                       <div className="flex items-start justify-between gap-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Status</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {t('views.crm.details.leaseContractStatus')}
+                        </div>
                         <div>
-                          <Badge
-                            variant="outline"
-                            className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200"
-                          >
-                            {lease?.statusLabel || '—'}
-                          </Badge>
+                          {lease?.statusLabel ? (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide',
+                                leaseContractStatusPillClass(lease.statusLabel),
+                              )}
+                            >
+                              {lease.statusLabel}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">—</span>
+                          )}
                         </div>
                       </div>
                     </div>

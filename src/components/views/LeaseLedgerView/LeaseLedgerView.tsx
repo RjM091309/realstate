@@ -24,7 +24,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SkeletonTable } from '@/components/skeleton';
+import { cn } from '@/lib/utils';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
@@ -33,7 +36,22 @@ import { addDays, endOfMonth, format, isAfter, isBefore, isWithinInterval, start
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
-import type { Contract, Payment, Tenant, Unit } from '@/types';
+import type { Contract, Payment, PaymentStatus, Tenant, Unit } from '@/types';
+
+const LEDGER_STATUS_FILTERS: PaymentStatus[] = ['Paid', 'Pending', 'Overdue'];
+
+function defaultLedgerStatusFilters(): Set<PaymentStatus> {
+  return new Set(LEDGER_STATUS_FILTERS);
+}
+
+function paymentMatchesLedgerFilters(
+  p: Payment,
+  statuses: Set<PaymentStatus>,
+  unitId: string | null,
+): boolean {
+  if (unitId && p.unitId !== unitId) return false;
+  return statuses.has(p.status);
+}
 
 type PaymentForm = {
   contractId: string | null;
@@ -78,7 +96,15 @@ function paymentMatchesQuery(
   const unit = units.find((u) => u.id === p.unitId);
   const contract = contracts.find((c) => c.id === p.contractId);
   const tenant = contract ? tenants.find((ten) => ten.id === contract.tenantId) : null;
-  const hay = [p.id, unit?.unitNumber, unit?.buildingName, tenant?.name, String(p.amount), p.status]
+  const hay = [
+    p.id,
+    p.contractId,
+    unit?.unitNumber,
+    unit?.buildingName,
+    tenant?.name,
+    String(p.amount),
+    p.status,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -104,6 +130,8 @@ export function LeaseLedgerView() {
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [form, setForm] = useState<PaymentForm>(emptyForm);
   const [refLoading, setRefLoading] = useState(false);
+  const [ledgerFilterStatuses, setLedgerFilterStatuses] = useState<Set<PaymentStatus>>(defaultLedgerStatusFilters);
+  const [ledgerFilterUnitId, setLedgerFilterUnitId] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -213,14 +241,62 @@ export function LeaseLedgerView() {
   );
 
   const filteredUpcoming = useMemo(
-    () => upcomingPayments.filter((p) => paymentMatchesQuery(p, searchTerm, units, contracts, tenants)),
-    [upcomingPayments, searchTerm, units, contracts, tenants],
+    () =>
+      upcomingPayments.filter(
+        (p) =>
+          paymentMatchesQuery(p, searchTerm, units, contracts, tenants) &&
+          paymentMatchesLedgerFilters(p, ledgerFilterStatuses, ledgerFilterUnitId),
+      ),
+    [upcomingPayments, searchTerm, units, contracts, tenants, ledgerFilterStatuses, ledgerFilterUnitId],
   );
 
   const filteredPayments = useMemo(
-    () => payments.filter((p) => paymentMatchesQuery(p, searchTerm, units, contracts, tenants)),
-    [payments, searchTerm, units, contracts, tenants],
+    () =>
+      payments.filter(
+        (p) =>
+          paymentMatchesQuery(p, searchTerm, units, contracts, tenants) &&
+          paymentMatchesLedgerFilters(p, ledgerFilterStatuses, ledgerFilterUnitId),
+      ),
+    [payments, searchTerm, units, contracts, tenants, ledgerFilterStatuses, ledgerFilterUnitId],
   );
+
+  const ledgerFilterActive = useMemo(() => {
+    if (ledgerFilterUnitId) return true;
+    return LEDGER_STATUS_FILTERS.some((s) => !ledgerFilterStatuses.has(s));
+  }, [ledgerFilterStatuses, ledgerFilterUnitId]);
+
+  const unitFilterOptions = useMemo(
+    () => [
+      { value: '', label: t('views.ledger.filterAllUnits') },
+      ...[...units]
+        .sort((a, b) =>
+          String(a.unitNumber ?? '').localeCompare(String(b.unitNumber ?? ''), undefined, { numeric: true }),
+        )
+        .map((u) => ({
+          value: u.id,
+          label: u.buildingName ? `${u.unitNumber} · ${u.buildingName}` : String(u.unitNumber ?? u.id),
+        })),
+    ],
+    [units, t],
+  );
+
+  const toggleLedgerFilterStatus = useCallback((status: PaymentStatus) => {
+    setLedgerFilterStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        if (next.size <= 1) return prev;
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearLedgerFilters = useCallback(() => {
+    setLedgerFilterStatuses(defaultLedgerStatusFilters());
+    setLedgerFilterUnitId(null);
+  }, []);
 
   const contractOptions = useMemo(
     () =>
@@ -735,10 +811,79 @@ export function LeaseLedgerView() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm">
-          <Filter className="w-4 h-4 mr-2" />
-          {t('views.ledger.filter')}
-        </Button>
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  'h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm',
+                  ledgerFilterActive && 'border-indigo-300 bg-indigo-50/60 text-indigo-900 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100',
+                )}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                {t('views.ledger.filter')}
+                {ledgerFilterActive ? (
+                  <span
+                    className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600"
+                    title={t('views.ledger.filterActiveHint')}
+                  />
+                ) : null}
+              </Button>
+            }
+          />
+          <PopoverContent align="start" className="w-80 gap-3 p-4">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {t('views.ledger.filterStatus')}
+              </p>
+              <div className="flex flex-col gap-2 pt-1">
+                {LEDGER_STATUS_FILTERS.map((status) => (
+                  <label
+                    key={status}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80"
+                  >
+                    <Checkbox
+                      checked={ledgerFilterStatuses.has(status)}
+                      onCheckedChange={() => toggleLedgerFilterStatus(status)}
+                    />
+                    <span>
+                      {status === 'Paid'
+                        ? t('views.ledger.table.paid')
+                        : status === 'Overdue'
+                          ? t('views.ledger.table.overdue')
+                          : t('views.ledger.table.pending')}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {t('views.ledger.filterUnit')}
+              </p>
+              <Select2
+                options={unitFilterOptions}
+                value={ledgerFilterUnitId ?? ''}
+                onChange={(v) => setLedgerFilterUnitId(v ? String(v) : null)}
+                placeholder={t('views.ledger.filterAllUnits')}
+              />
+            </div>
+            <div className="flex justify-end border-t border-slate-100 pt-3 dark:border-slate-700">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-slate-600 dark:text-slate-300"
+                disabled={!ledgerFilterActive}
+                onClick={clearLedgerFilters}
+              >
+                {t('views.ledger.filterClear')}
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {loading ? (

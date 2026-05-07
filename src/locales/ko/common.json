@@ -525,6 +525,7 @@
         "leaseUnit": "유닛",
         "leasePeriod": "계약 기간",
         "leaseMonthlyRent": "월 임대료",
+        "leaseContractStatus": "계약 상태",
         "leaseNoContract": "이 임차인에 연결된 임대 계약이 없습니다.",
         "identification": "신원 확인",
         "documents": "문서",
@@ -690,6 +691,11 @@
       "outstandingBalance": "미수 잔액",
       "searchPlaceholder": "유닛, 임차인 또는 청구서 번호로 검색...",
       "filter": "필터",
+      "filterStatus": "납부 상태",
+      "filterUnit": "유닛",
+      "filterAllUnits": "전체 유닛",
+      "filterClear": "필터 초기화",
+      "filterActiveHint": "필터가 적용됨",
       "upcomingTitle": "다가오는 납부(7일 이내)",
       "upcomingDescription": "다음 주 내 임대료 납부 우선 목록입니다.",
       "collectionTitle": "수납 원장",
@@ -826,7 +832,9 @@
         "tenant": "임차인",
         "endDate": "종료일",
         "status": "상태",
-        "active": "활성"
+        "active": "활성",
+        "expired": "만료",
+        "terminated": "해지"
       },
       "tasks": {
         "title": "오늘의 업무",

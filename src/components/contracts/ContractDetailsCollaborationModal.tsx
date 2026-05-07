@@ -105,29 +105,52 @@ function inventoryCategoryLabel(value: string) {
   return hit ? hit.label : v;
 }
 
+function contractStatusPillClass(statusLabel: string): string {
+  const s = statusLabel.trim().toLowerCase();
+  if (s === 'active') {
+    return 'border-emerald-300/80 bg-emerald-100 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/25';
+  }
+  if (s === 'expired') {
+    return 'border-rose-300/80 bg-rose-100 text-rose-800 shadow-none hover:bg-rose-100 dark:border-rose-500/45 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/25';
+  }
+  if (s === 'terminated') {
+    return 'border-slate-300/80 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
+  }
+  return 'border-slate-200/90 bg-slate-50 text-slate-800 shadow-none dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100';
+}
+
 function roleBadgeClass(role: CollaboratorRole) {
   if (role === 'Owner') {
-    return 'border border-indigo-200/90 bg-indigo-100 text-indigo-950 dark:border-indigo-600 dark:bg-indigo-950 dark:text-indigo-50';
+    return 'border-violet-300/80 bg-violet-100 text-violet-900 shadow-none hover:bg-violet-100 dark:border-violet-500/45 dark:bg-violet-500/20 dark:text-violet-100 dark:hover:bg-violet-500/25';
   }
   if (role === 'Editor') {
-    return 'border border-emerald-200/90 bg-emerald-100 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-50';
+    return 'border-sky-300/80 bg-sky-100 text-sky-900 shadow-none hover:bg-sky-100 dark:border-sky-500/45 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/25';
   }
-  return 'border border-slate-200/90 bg-slate-100 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
+  return 'border-slate-300/80 bg-slate-100 text-slate-800 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
 }
 
 export function ContractSummaryCard({
   title,
   value,
   subValue,
+  valueTone,
 }: {
   title: string;
   value: string;
   subValue?: string;
+  /** Renders the value as a colored status pill (matches ledger / agent portal). */
+  valueTone?: 'status';
 }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
       <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-300">{title}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{value || '—'}</div>
+      {valueTone === 'status' && value ? (
+        <Badge variant="outline" className={cn('mt-1.5 h-auto w-fit rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide', contractStatusPillClass(value))}>
+          {value}
+        </Badge>
+      ) : (
+        <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{value || '—'}</div>
+      )}
       {subValue ? <div className="mt-1 text-xs text-slate-500 break-all dark:text-slate-400">{subValue}</div> : null}
     </div>
   );
@@ -187,14 +210,12 @@ export function CollaboratorList({
     {
       header: 'Role',
       render: (c) => (
-        <span
-          className={cn(
-            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
-            roleBadgeClass(c.role),
-          )}
+        <Badge
+          variant="outline"
+          className={cn('h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide', roleBadgeClass(c.role))}
         >
           {c.role}
-        </span>
+        </Badge>
       ),
     },
     {
@@ -742,7 +763,7 @@ export function ContractDetailsCollaborationModal({
           <ContractSummaryCard title="Unit" value={summary.unitLabel} />
           <ContractSummaryCard title="Primary tenant" value={summary.primaryTenantLabel} />
           <ContractSummaryCard title="Period" value={summary.periodLabel} />
-          <ContractSummaryCard title="Status" value={summary.statusLabel} />
+          <ContractSummaryCard title="Status" value={summary.statusLabel} valueTone="status" />
         </div>
         <div className="grid grid-cols-1 gap-8 pt-1 lg:grid-cols-[minmax(12rem,14rem)_1fr] lg:items-start">
           {/* ── Sidebar Nav ── */}
