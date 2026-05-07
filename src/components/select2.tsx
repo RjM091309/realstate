@@ -115,7 +115,8 @@ export const Select2: React.FC<Select2Props> = ({
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
           valueContainer: (base) => ({
             ...base,
-            flexWrap: 'wrap',
+            flexWrap: 'nowrap',
+            overflow: 'hidden',
           }),
           singleValue: (base) => ({
             ...base,
@@ -123,10 +124,10 @@ export const Select2: React.FC<Select2Props> = ({
             top: 'auto',
             transform: 'none',
             maxWidth: '100%',
-            overflow: 'visible',
-            textOverflow: 'clip',
-            whiteSpace: 'normal',
-            lineHeight: 1.35,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            lineHeight: 1.25,
           }),
         }}
         // Custom prop consumed by Control / SingleValue (not a react-select standard prop)
