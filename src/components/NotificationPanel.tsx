@@ -20,6 +20,24 @@ function formatTimeAgo(timeStr: string) {
   }
 }
 
+function formatAbsoluteTime(timeStr: string, locale: string) {
+  if (!timeStr) return '';
+  try {
+    const d = new Date(timeStr);
+    if (Number.isNaN(d.getTime())) return '';
+    if (d.getFullYear() < 2000) return '';
+    return new Intl.DateTimeFormat(locale || undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
 export type NotificationType = 'lease' | 'payment' | 'maintenance' | 'success';
 
 export type Notification = {
@@ -85,7 +103,8 @@ export function NotificationPanel({
   onMarkAllRead,
   onNotificationClick,
 }: NotificationPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en';
   const defaults = React.useMemo(() => createDefaultNotifications(t), [t]);
 
   const [internalList, setInternalList] = React.useState<Notification[]>(defaults);
@@ -210,8 +229,12 @@ export function NotificationPanel({
                         <p className="text-xs leading-relaxed text-brand-muted dark:text-slate-300/80 line-clamp-2">
                           {notification.message}
                         </p>
-                        <span className="mt-1.5 inline-block text-[10px] font-medium uppercase tracking-wider text-brand-muted/70 dark:text-slate-400/80">
-                          {formatTimeAgo(notification.time)}
+                        <span className="mt-1.5 inline-block text-[10px] font-medium tracking-wide text-brand-muted/70 dark:text-slate-400/80">
+                          {(() => {
+                            const ago = formatTimeAgo(notification.time);
+                            const abs = formatAbsoluteTime(notification.time, locale);
+                            return abs ? `${ago} • ${abs}` : ago;
+                          })()}
                         </span>
                       </div>
                     </div>

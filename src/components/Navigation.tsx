@@ -442,6 +442,25 @@ export function TopNav({
   );
   const unreadCount = effectiveUnreadCount(notifications, notifyPrefs);
 
+  function formatAbsoluteNotificationTime(value: string, locale: string) {
+    const v = String(value ?? '').trim();
+    if (!v) return '';
+    try {
+      const dt = new Date(v);
+      if (Number.isNaN(dt.getTime())) return '';
+      if (dt.getFullYear() < 2000) return '';
+      return new Intl.DateTimeFormat(locale || undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(dt);
+    } catch {
+      return '';
+    }
+  }
+
   function formatNotificationTime(value: string) {
     const v = String(value ?? '').trim();
     if (!v) return '';
@@ -449,7 +468,9 @@ export function TopNav({
       const dt = new Date(v);
       if (Number.isNaN(dt.getTime())) return v;
       if (dt.getFullYear() < 2000) return v;
-      return formatDistanceToNow(dt, { addSuffix: true });
+      const ago = formatDistanceToNow(dt, { addSuffix: true });
+      const abs = formatAbsoluteNotificationTime(value, currentLanguage);
+      return abs ? `${ago} • ${abs}` : ago;
     } catch {
       return v;
     }
