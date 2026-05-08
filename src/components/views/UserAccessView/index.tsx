@@ -247,7 +247,7 @@ export function UserAccessView() {
             ) : null}
             <Button
               type="button"
-              className="shrink-0 rounded-lg bg-indigo-600 px-5 hover:bg-indigo-700"
+              className="shrink-0 rounded-xl bg-indigo-600 px-5 hover:bg-indigo-700"
               disabled={!roleSectionDirty || savingRole || roleId === null || initialLoading}
               onClick={() => void saveRole()}
             >

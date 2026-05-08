@@ -635,7 +635,6 @@ export function ContractsView() {
                       openRenewLease(contract);
                     }}
                   >
-                    <RefreshCw className="w-4 h-4 mr-2 inline opacity-70" />
                     Renew lease
                   </DropdownMenuItem>
                 )}

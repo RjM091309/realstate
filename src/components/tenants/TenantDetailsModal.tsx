@@ -407,7 +407,7 @@ export function TenantDetailsModal({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="rounded-xl text-slate-500 hover:text-purple-700 dark:text-slate-300 dark:hover:text-purple-200"
+                                className="rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400"
                                 title="Preview"
                                 onClick={() => {
                                   if (d.onPreview) d.onPreview();
@@ -434,7 +434,7 @@ export function TenantDetailsModal({
                   </Button>
                   <Button
                     type="button"
-                    className="rounded-xl bg-purple-600 text-white hover:bg-purple-700"
+                    className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
                     onClick={onEditTenant}
                     disabled={!onEditTenant}
                   >

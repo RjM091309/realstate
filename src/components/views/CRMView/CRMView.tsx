@@ -1783,7 +1783,7 @@ export function CRMView() {
             <Button type="button" variant="outline" onClick={closeForm}>
               {t('views.crm.tenantModal.cancel')}
             </Button>
-            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
+            <Button type="button" className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
               {t('views.crm.tenantModal.save')}
             </Button>
           </div>
@@ -2128,7 +2128,7 @@ export function CRMView() {
             <Button type="button" variant="outline" onClick={closeLandlordForm}>
               Cancel
             </Button>
-            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
+            <Button type="button" className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
               Save
             </Button>
           </div>

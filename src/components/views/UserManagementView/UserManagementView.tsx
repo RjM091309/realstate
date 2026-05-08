@@ -382,7 +382,7 @@ export function UserManagementView() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-slate-600 hover:text-indigo-600 dark:text-slate-400"
+              className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
               title={t('views.userInfo.edit')}
               disabled={busy}
               onClick={(e) => {
@@ -397,7 +397,7 @@ export function UserManagementView() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
+                className="h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
                 disabled={busy || isSelf}
                 title={isSelf ? t('views.userInfo.cannotDeactivateSelf') : t('views.userInfo.delete')}
                 onClick={(e) => {
@@ -412,7 +412,7 @@ export function UserManagementView() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-slate-600 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
+                className="h-9 w-9 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
                 disabled={busy}
                 title={t('views.userInfo.activateUser')}
                 onClick={(e) => {
@@ -449,7 +449,7 @@ export function UserManagementView() {
         <Button
           type="button"
           onClick={openAdd}
-          className="rounded-full bg-indigo-600 px-5 text-white shadow-md shadow-indigo-900/20 hover:bg-indigo-700"
+          className="rounded-xl bg-indigo-600 px-5 text-white shadow-sm hover:bg-indigo-700"
         >
           <Plus className="mr-2 h-4 w-4" />
           {t('views.userInfo.addUser')}
@@ -508,7 +508,7 @@ export function UserManagementView() {
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="rounded-xl bg-indigo-400 px-6 text-white shadow-md hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              className="rounded-xl bg-indigo-600 px-6 text-white shadow-sm hover:bg-indigo-700"
             >
               {saving ? '…' : t('views.userInfo.saveUser')}
             </Button>

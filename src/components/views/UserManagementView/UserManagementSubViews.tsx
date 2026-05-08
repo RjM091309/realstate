@@ -152,7 +152,7 @@ export function UserRoleManagementView() {
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
                 aria-label={t('views.userRole.edit')}
                 onClick={() => openEdit(r)}
               >
@@ -284,7 +284,7 @@ export function UserRoleManagementView() {
         <Button
           type="button"
           onClick={openAdd}
-          className="rounded-full bg-violet-600 px-5 text-white shadow-md shadow-violet-900/20 hover:bg-violet-700"
+          className="rounded-xl bg-indigo-600 px-5 text-white shadow-sm hover:bg-indigo-700"
         >
           <Plus className="mr-2 h-4 w-4" />
           {t('views.userRole.addRole')}
@@ -378,7 +378,7 @@ export function UserRoleManagementView() {
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="h-9 w-9 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                          className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
                           aria-label={t('views.userRole.edit')}
                           onClick={() => openEdit(r)}
                         >
@@ -436,7 +436,7 @@ export function UserRoleManagementView() {
               type="button"
               disabled={saving}
               onClick={() => void handleSaveForm()}
-              className="rounded-xl bg-violet-500 px-6 text-white shadow-md hover:bg-violet-600 dark:bg-violet-500 dark:hover:bg-violet-400"
+              className="rounded-xl bg-indigo-600 px-6 text-white shadow-sm hover:bg-indigo-700"
             >
               {saving ? '…' : t('views.userRole.saveRole')}
             </Button>

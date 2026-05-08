@@ -442,7 +442,7 @@ export function CalendarView() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {canCreate ? (
-            <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/25 transition-all hover:shadow-lg hover:shadow-indigo-500/40" onClick={openCreateEvent} disabled={loading}>
+            <Button className="rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openCreateEvent} disabled={loading}>
               <Plus className="w-4 h-4 mr-2" />
               {t('views.calendar.addEvent')}
             </Button>

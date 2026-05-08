@@ -1187,7 +1187,7 @@ export function UnitsView() {
           {canCreate && (
             <Button
               type="button"
-              className="h-10 rounded-xl bg-slate-900 shadow-md shadow-slate-900/15 hover:bg-slate-800 dark:bg-indigo-600 dark:shadow-indigo-950/40 dark:hover:bg-indigo-500"
+              className="h-10 rounded-xl bg-indigo-600 shadow-sm hover:bg-indigo-700"
               onClick={openAddUnitModal}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -1552,7 +1552,7 @@ export function UnitsView() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                      className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                       onClick={() => handleViewDetails(unit)}
                     >
                       <Eye className="mr-1.5 h-4 w-4" />
@@ -1561,9 +1561,8 @@ export function UnitsView() {
                     {canUpdate ? (
                       <Button
                         type="button"
-                        variant="outline"
                         size="sm"
-                        className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                        className="h-10 flex-1 rounded-lg bg-indigo-600 font-medium text-white shadow-sm hover:bg-indigo-700"
                         onClick={() => openEditUnitModal(unit)}
                       >
                         <Pencil className="mr-1.5 h-4 w-4" />

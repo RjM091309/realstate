@@ -345,7 +345,7 @@ export function SettingsView() {
                       <Button
                         type="submit"
                         disabled={profileSaving || !profileDirty}
-                        className="bg-indigo-600 hover:bg-indigo-700 rounded-lg px-5"
+                        className="bg-indigo-600 hover:bg-indigo-700 rounded-xl px-5"
                       >
                         {profileSaving ? 'Saving…' : 'Save changes'}
                       </Button>
@@ -534,7 +534,7 @@ export function SettingsView() {
                     <Button
                       type="submit"
                       disabled={passwordSaving}
-                      className="rounded-lg bg-indigo-600 hover:bg-indigo-700"
+                      className="rounded-xl bg-indigo-600 hover:bg-indigo-700"
                     >
                       {passwordSaving ? 'Updating…' : 'Update password'}
                     </Button>
