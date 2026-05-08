@@ -472,10 +472,12 @@
         "viewInvoice": "View Invoice"
       },
       "statuses": {
+        "pendingInspection": "Pending inspection",
         "active": "Active",
         "expired": "Completed",
         "terminated": "Terminated"
-      }
+      },
+      "inspectionGateHint": "Inspection required before activation. Create an inventory inspection (Inventory Snapshot) then click Release / Activate."
     },
     "crm": {
       "title": "CRM & Tenants",

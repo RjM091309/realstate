@@ -140,11 +140,20 @@ export async function insertContract(branchId, payload) {
 
     // When a lease becomes active, the unit should no longer be available.
     // Keep drafts from affecting inventory, but treat active leases as occupied.
-    if (String(payload.status).toLowerCase() === 'active') {
+    const status = String(payload.status).toLowerCase();
+    if (status === 'active') {
       await conn.query(
         `UPDATE unit u
          JOIN property pr ON pr.id = u.property_id
          SET u.status = 'occupied'
+         WHERE u.id = ? AND pr.branch_id = ?`,
+        [payload.unitId, branchId],
+      );
+    } else if (status === 'draft') {
+      await conn.query(
+        `UPDATE unit u
+         JOIN property pr ON pr.id = u.property_id
+         SET u.status = 'reserved'
          WHERE u.id = ? AND pr.branch_id = ?`,
         [payload.unitId, branchId],
       );
@@ -205,9 +214,11 @@ export async function updateContractById(id, branchId, payload) {
       );
 
       // Keep unit inventory status in sync.
-      // If the contract is active -> occupied, otherwise free it up (vacant).
-      const isActive = String(payload.status).toLowerCase() === 'active';
-      const unitStatus = isActive ? 'occupied' : 'vacant';
+      // If the contract is active -> occupied.
+      // If pending inspection (draft) -> reserved.
+      // Otherwise -> vacant.
+      const status = String(payload.status).toLowerCase();
+      const unitStatus = status === 'active' ? 'occupied' : status === 'draft' ? 'reserved' : 'vacant';
       await conn.query(
         `UPDATE unit u
          JOIN property pr ON pr.id = u.property_id

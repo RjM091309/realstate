@@ -41,6 +41,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from '@/lib/api';
 import type {
   Contract,
   ContractCollaborationRow,
@@ -89,6 +90,17 @@ async function loadItemsMapForSnapshots(
   return map;
 }
 
+type StaffUserOption = { value: string; label: string };
+
+function normalizeAgentIdForWrite(raw: string | null | undefined): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^a(\d+)$/i);
+  if (m) return m[1];
+  if (/^\d+$/.test(s)) return s;
+  return s.replace(/\D/g, '');
+}
+
 export function ContractsView() {
   const { t } = useTranslation();
   const { session } = useAuth();
@@ -109,6 +121,7 @@ export function ContractsView() {
   const [editingContractId, setEditingContractId] = useState<string | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string>(() => (session?.user?.id != null ? String(session.user.id) : ''));
   const [monthlyRent, setMonthlyRent] = useState('');
   const [securityDeposit, setSecurityDeposit] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(new Date());
@@ -133,10 +146,12 @@ export function ContractsView() {
   const [inventoryItemsBySnapshot, setInventoryItemsBySnapshot] = useState<
     Record<string, InventorySnapshotItemRow[]>
   >({});
+  const [staffOptions, setStaffOptions] = useState<StaffUserOption[]>([]);
 
   const resetNewContractForm = () => {
     setUnitId(null);
     setTenantId(null);
+    setAgentId(session?.user?.id != null ? String(session.user.id) : '');
     setMonthlyRent('');
     setSecurityDeposit('');
     setStartDate(new Date());
@@ -157,6 +172,7 @@ export function ContractsView() {
     setEditingContractId(contract.id);
     setUnitId(contract.unitId);
     setTenantId(contract.tenantId);
+    setAgentId(normalizeAgentIdForWrite(contract.agentId));
     setMonthlyRent(String(contract.monthlyRent));
     setSecurityDeposit(String(contract.securityDeposit));
     setStartDate(new Date(contract.startDate));
@@ -238,6 +254,47 @@ export function ContractsView() {
     })();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const currentUserId = session?.user?.id != null ? String(session.user.id) : '';
+    const currentUserName =
+      session?.user != null
+        ? `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username
+        : '';
+
+    // Always ensure a usable default agent id.
+    setAgentId((prev) => (String(prev ?? '').trim() ? prev : currentUserId));
+
+    void (async () => {
+      // Try to load staff list for agent selection. If forbidden (non-admin),
+      // keep a minimal list containing only the current user.
+      try {
+        const res = await apiFetch<{
+          users: { id: number; firstName: string; lastName: string; username: string; active: boolean }[];
+        }>('/api/auth/staff/users');
+        if (cancelled) return;
+        const opts: StaffUserOption[] = (Array.isArray(res.users) ? res.users : [])
+          .filter((u) => u && u.active !== false)
+          .map((u) => {
+            const name = `${String(u.firstName ?? '').trim()} ${String(u.lastName ?? '').trim()}`.trim();
+            return {
+              value: String(u.id),
+              label: name || String(u.username ?? `User ${u.id}`),
+            };
+          })
+          .sort((a, b) => a.label.localeCompare(b.label));
+        setStaffOptions(opts);
+      } catch {
+        if (cancelled) return;
+        setStaffOptions(currentUserId ? [{ value: currentUserId, label: currentUserName || `Agent ${currentUserId}` }] : []);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, session?.user?.firstName, session?.user?.lastName, session?.user?.username]);
+
   const unitOptions = useMemo(
     () =>
       unitList
@@ -249,6 +306,17 @@ export function ContractsView() {
     () => tenantList.map((ten) => ({ value: ten.id, label: ten.name })),
     [tenantList],
   );
+  const agentOptions = useMemo(() => {
+    const currentUserId = session?.user?.id != null ? String(session.user.id) : '';
+    const currentUserName =
+      session?.user != null
+        ? `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.username
+        : '';
+    const base = Array.isArray(staffOptions) ? staffOptions : [];
+    if (!currentUserId) return base;
+    if (base.some((o) => o.value === currentUserId)) return base;
+    return [{ value: currentUserId, label: currentUserName || `Agent ${currentUserId}` }, ...base];
+  }, [staffOptions, session?.user]);
 
   const contractBuildingNames = useMemo(() => {
     const names = [...new Set(unitList.map((u) => u.buildingName).filter(Boolean))].sort((a, b) =>
@@ -260,6 +328,7 @@ export function ContractsView() {
   const statusFilterOptions = useMemo(
     () => [
       { value: 'all', label: t('views.contracts.filterAll') },
+      { value: 'Pending Inspection', label: t('views.contracts.statuses.pendingInspection') },
       { value: 'Active', label: t('views.contracts.statuses.active') },
       { value: 'Expired', label: t('views.contracts.statuses.expired') },
       { value: 'Terminated', label: t('views.contracts.statuses.terminated') },
@@ -326,6 +395,31 @@ export function ContractsView() {
       toast.success('Contract deleted.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to delete contract');
+    }
+  };
+
+  const handleActivateContract = async (contract: Contract) => {
+    if (!window.confirm('Release / Activate this lease? Make sure inspection (inventory snapshot) is completed.')) return;
+    try {
+      const body: Parameters<typeof updateContract>[1] = {
+        unitId: contract.unitId,
+        tenantId: contract.tenantId,
+        agentId: normalizeAgentIdForWrite(contract.agentId),
+        startDate: String(contract.startDate).slice(0, 10),
+        endDate: String(contract.endDate).slice(0, 10),
+        monthlyRent: Number(contract.monthlyRent),
+        securityDeposit: Number(contract.securityDeposit),
+        advanceRent: Number(contract.advanceRent),
+        type: contract.type,
+        status: 'Active',
+        remarks: contract.remarks ?? '',
+      };
+      const updated = await updateContract(contract.id, body);
+      setContractList((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      if (selectedContract?.id === updated.id) setSelectedContract(updated);
+      toast.success('Lease activated.');
+    } catch (e: any) {
+      toast.error(e instanceof Error ? e.message : e?.error ? String(e.error) : 'Failed to activate lease');
     }
   };
 
@@ -545,6 +639,16 @@ export function ContractsView() {
                     Renew lease
                   </DropdownMenuItem>
                 )}
+                {canUpdate && !showArchived && contract.status === 'Pending Inspection' && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleActivateContract(contract);
+                    }}
+                  >
+                    Release / Activate
+                  </DropdownMenuItem>
+                )}
                 {canDelete && !showArchived && (
                   <DropdownMenuItem
                     className="text-rose-600"
@@ -562,14 +666,15 @@ export function ContractsView() {
         ),
       },
     ],
-    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease, showArchived]
+    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease, showArchived, selectedContract]
   );
 
   const handleGenerate = () => {
     const rent = Number(monthlyRent);
     const deposit = Number(securityDeposit);
-    if (!unitId || !tenantId || !startDate || !endDate) {
-      toast.error('Please select unit, tenant, and lease dates.');
+    const agentDigits = normalizeAgentIdForWrite(agentId);
+    if (!unitId || !tenantId || !agentDigits || !startDate || !endDate) {
+      toast.error('Please select unit, tenant, agent, and lease dates.');
       return;
     }
     if (!Number.isFinite(rent) || rent <= 0 || !Number.isFinite(deposit) || deposit < 0) {
@@ -581,18 +686,17 @@ export function ContractsView() {
       return;
     }
 
-    const agentId = session?.user?.id ? String(session.user.id) : '';
     const newContractPayload: Parameters<typeof createContract>[0] = {
       unitId,
       tenantId,
-      agentId,
+      agentId: agentDigits,
       startDate: format(startDate, 'yyyy-MM-dd'),
       endDate: format(endDate, 'yyyy-MM-dd'),
       monthlyRent: rent,
       securityDeposit: deposit,
       advanceRent: rent,
       type: 'Monthly Rental',
-      status: 'Active',
+      status: 'Pending Inspection',
       remarks: '',
     };
     void (async () => {
@@ -677,7 +781,8 @@ export function ContractsView() {
           </div>
         }
       >
-        <p className="text-sm text-brand-muted mb-4">{t('views.contracts.newLeaseDescription')}</p>
+        <p className="text-sm text-brand-muted mb-2">{t('views.contracts.newLeaseDescription')}</p>
+        <p className="text-xs text-slate-600 mb-4">{t('views.contracts.inspectionGateHint')}</p>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t('views.contracts.selectUnit')}</Label>
@@ -694,6 +799,14 @@ export function ContractsView() {
           <div className="space-y-2">
             <Label>{t('views.contracts.selectTenant')}</Label>
             <Select2 options={tenantOptions} value={tenantId} onChange={(v) => setTenantId(v as string | null)} />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('views.dashboard.agents.agentName')}</Label>
+            <Select2
+              options={agentOptions}
+              value={agentId}
+              onChange={(v) => setAgentId(String(v as string | null ?? ''))}
+            />
           </div>
           <div className="space-y-2">
             <Label>{t('views.contracts.startDate')}</Label>

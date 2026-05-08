@@ -73,7 +73,7 @@ export interface Contract {
   securityDeposit: number;
   advanceRent: number;
   type: TransactionType;
-  status: 'Active' | 'Expired' | 'Terminated';
+  status: 'Pending Inspection' | 'Active' | 'Expired' | 'Terminated';
   brokerAgencyId?: string;
   remarks?: string;
 }

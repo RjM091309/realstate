@@ -472,10 +472,12 @@
         "viewInvoice": "청구서 보기"
       },
       "statuses": {
+        "pendingInspection": "점검 대기",
         "active": "활성",
         "expired": "완료",
         "terminated": "해지"
-      }
+      },
+      "inspectionGateHint": "활성화 전에 점검이 필요합니다. 재고 점검(Inventory Snapshot)을 만든 뒤 ‘Release / Activate’를 누르세요."
     },
     "crm": {
       "title": "CRM 및 임차인",

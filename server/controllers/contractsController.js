@@ -16,6 +16,7 @@ import {
   updateContractCollaboration,
   updateContractTenantRemarks,
 } from '../models/contractsModel.js';
+import { listInventorySnapshotsByContract } from '../models/inventorySnapshotsModel.js';
 
 function fmtDate(d) {
   if (d == null) return '';
@@ -44,13 +45,14 @@ const DB_TO_UI_TYPE = {
 };
 
 const UI_STATUS_TO_DB = {
+  'Pending Inspection': 'draft',
   Active: 'active',
   Expired: 'completed',
   Terminated: 'terminated',
 };
 
 const DB_TO_UI_STATUS = {
-  draft: 'Active',
+  draft: 'Pending Inspection',
   active: 'Active',
   completed: 'Expired',
   terminated: 'Terminated',
@@ -245,6 +247,13 @@ export async function createContract(req, res) {
     return;
   }
   const dbPayload = payloadForDatabase(parsed);
+  if (String(dbPayload.status).toLowerCase() === 'active') {
+    res.status(409).json({
+      error:
+        'Inspection required before activation. Create the contract as Pending Inspection, complete an inventory inspection, then activate.',
+    });
+    return;
+  }
   try {
     const row = await insertContract(ctx.session.branchId, dbPayload);
     if (!row) {
@@ -302,6 +311,22 @@ export async function updateContract(req, res) {
     return;
   }
   const dbPayload = payloadForDatabase(parsed);
+  if (String(dbPayload.status).toLowerCase() === 'active') {
+    try {
+      const snaps = await listInventorySnapshotsByContract(id, ctx.session.branchId);
+      if (!snaps || snaps.length === 0) {
+        res.status(409).json({
+          error:
+            'Inspection required before activation. Please create an Inventory Snapshot (inspection) for this contract, then activate.',
+        });
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Failed to validate inspection requirement' });
+      return;
+    }
+  }
   try {
     const affectedRows = await updateContractById(id, ctx.session.branchId, dbPayload);
     if (affectedRows === 0) {
