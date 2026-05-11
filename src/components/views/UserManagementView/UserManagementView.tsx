@@ -501,14 +501,14 @@ export function UserManagementView() {
         maxWidth="lg"
         footer={
           <div className="flex w-full items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={closeModal} disabled={saving}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeModal} disabled={saving}>
               {t('views.userInfo.cancel')}
             </Button>
             <Button
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="rounded-xl bg-indigo-600 px-6 text-white shadow-sm hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
             >
               {saving ? '…' : t('views.userInfo.saveUser')}
             </Button>

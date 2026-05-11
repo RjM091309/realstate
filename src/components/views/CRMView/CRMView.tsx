@@ -1462,12 +1462,12 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeDeleteBroker}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeDeleteBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-rose-600 hover:bg-rose-700"
+              className="h-11 min-w-[120px] rounded-xl bg-rose-600 hover:bg-rose-700"
               onClick={() => void confirmDeleteBroker()}
             >
               {t('views.crm.brokers.delete')}
@@ -1684,12 +1684,12 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeBlacklistBroker}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeBlacklistBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-rose-600 hover:bg-rose-700"
+              className="h-11 min-w-[120px] rounded-xl bg-rose-600 hover:bg-rose-700"
               onClick={() => void confirmBlacklistBroker()}
             >
               {t('views.crm.table.blacklisted')}
@@ -1720,12 +1720,12 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeActivateBroker}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeActivateBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="h-11 min-w-[120px] rounded-xl bg-emerald-600 hover:bg-emerald-700"
               onClick={() => void confirmActivateBroker()}
             >
               {t('views.crm.brokers.activate')}
@@ -1750,12 +1750,12 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeActivateTenant}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeActivateTenant}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="h-11 min-w-[120px] rounded-xl bg-emerald-600 hover:bg-emerald-700"
               onClick={() => void confirmActivateTenant()}
             >
               {t('views.crm.table.activateTenant')}
@@ -1780,10 +1780,10 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeForm}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeForm}>
               {t('views.crm.tenantModal.cancel')}
             </Button>
-            <Button type="button" className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
+            <Button type="button" className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
               {t('views.crm.tenantModal.save')}
             </Button>
           </div>
@@ -2125,10 +2125,10 @@ export function CRMView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeLandlordForm}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeLandlordForm}>
               Cancel
             </Button>
-            <Button type="button" className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
+            <Button type="button" className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
               Save
             </Button>
           </div>

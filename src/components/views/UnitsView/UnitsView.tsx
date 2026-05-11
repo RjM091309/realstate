@@ -1664,7 +1664,7 @@ export function UnitsView() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                  className="h-11 min-w-[120px] rounded-xl text-rose-600 border-rose-200 hover:bg-rose-50"
                   onClick={() => void handleDeleteUnit(selectedUnit)}
                 >
                   {t('views.units.table.delete')}
@@ -1874,9 +1874,8 @@ export function UnitsView() {
             {canUpdate ? (
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
-                className="h-9 rounded-lg border-slate-300 bg-white px-4 font-medium text-slate-800 shadow-none hover:bg-slate-50"
+                className="h-9 rounded-lg border-indigo-200 bg-indigo-50 px-4 font-medium text-indigo-700 shadow-none hover:bg-indigo-100"
                 onClick={openInventoryAddModal}
               >
                 <Plus className="w-4 h-4 mr-1.5" aria-hidden />
@@ -2013,12 +2012,12 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleAddInventoryItemSubmit()}
             >
@@ -2072,12 +2071,12 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={resetInventoryForm} disabled={inventorySaving}>
+            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleEditInventoryItemSubmit()}
             >

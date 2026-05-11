@@ -710,8 +710,8 @@ export function LeaseLedgerView() {
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" onClick={closeModal}>Cancel</Button>
-            <Button className="rounded-xl bg-indigo-600 hover:bg-indigo-700" onClick={() => void savePayment()}>
+            <Button variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeModal}>Cancel</Button>
+            <Button className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700" onClick={() => void savePayment()}>
               {formMode === 'edit' ? 'Save Changes' : t('views.ledger.recordPayment')}
             </Button>
           </div>
