@@ -85,10 +85,39 @@
     "userMgmt": {
       "userInfo": "User Info",
       "userRole": "User Role",
+      "auditLogs": "Audit Logs",
       "controlPanel": "Control Panel"
     }
   },
   "views": {
+    "auditLogs": {
+      "title": "Audit Logs",
+      "subtitle": "Review system activity for compliance, troubleshooting, and accountability.",
+      "badge": "Administrator activity trail",
+      "refresh": "Refresh",
+      "loadError": "Could not load audit logs.",
+      "searchPlaceholder": "Search actor, module, record, action, or summary...",
+      "allModules": "All modules",
+      "allActions": "All actions",
+      "activityTitle": "Recent activity",
+      "activityDesc": "Showing the latest 200 audit entries for your branch.",
+      "actorLabel": "User #{{id}}",
+      "systemActor": "System",
+      "noSummary": "No summary recorded.",
+      "stats": {
+        "total": "Total events",
+        "modules": "Modules touched",
+        "actors": "Actors"
+      },
+      "columns": {
+        "time": "Time",
+        "actor": "Actor",
+        "module": "Module",
+        "record": "Record",
+        "action": "Action",
+        "summary": "Summary"
+      }
+    },
     "userAccess": {
       "title": "User Access",
       "subtitle": "Configure sidebar menus and CRUD rights per role. Administrators only.",

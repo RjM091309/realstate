@@ -85,10 +85,39 @@
     "userMgmt": {
       "userInfo": "사용자 정보",
       "userRole": "사용자 역할",
+      "auditLogs": "감사 로그",
       "controlPanel": "제어 패널"
     }
   },
   "views": {
+    "auditLogs": {
+      "title": "감사 로그",
+      "subtitle": "규정 준수, 문제 해결, 책임 추적을 위해 시스템 활동을 확인합니다.",
+      "badge": "관리자 활동 기록",
+      "refresh": "새로고침",
+      "loadError": "감사 로그를 불러올 수 없습니다.",
+      "searchPlaceholder": "사용자, 모듈, 기록, 작업 또는 요약 검색...",
+      "allModules": "전체 모듈",
+      "allActions": "전체 작업",
+      "activityTitle": "최근 활동",
+      "activityDesc": "현재 지점의 최신 감사 항목 200개를 표시합니다.",
+      "actorLabel": "사용자 #{{id}}",
+      "systemActor": "시스템",
+      "noSummary": "기록된 요약이 없습니다.",
+      "stats": {
+        "total": "전체 이벤트",
+        "modules": "변경된 모듈",
+        "actors": "작업자"
+      },
+      "columns": {
+        "time": "시간",
+        "actor": "작업자",
+        "module": "모듈",
+        "record": "기록",
+        "action": "작업",
+        "summary": "요약"
+      }
+    },
     "userAccess": {
       "title": "사용자 접근",
       "subtitle": "역할별 사이드바 메뉴와 CRUD 권한을 설정합니다. 관리자만 사용할 수 있습니다.",

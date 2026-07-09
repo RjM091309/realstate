@@ -27,6 +27,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { DataTable, type ColumnDef } from '@/components/data-table';
@@ -1139,15 +1140,15 @@ export function CRMView() {
         header: t('views.crm.table.kycStatus'),
         render: (tenant) =>
           tenant.kycVerified !== false ? (
-            <Badge variant="outline" className="border-0 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-              <ShieldCheck className="w-3 h-3 mr-1" />
+            <StatusBadge tone="success">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
               {t('views.crm.table.verified')}
-            </Badge>
+            </StatusBadge>
           ) : (
-            <Badge variant="outline" className="border-0 bg-amber-100 text-amber-800 hover:bg-amber-100">
-              <ShieldQuestion className="w-3 h-3 mr-1" />
+            <StatusBadge tone="warning">
+              <ShieldQuestion className="w-3.5 h-3.5 mr-1" />
               {t('views.crm.table.kycPending')}
-            </Badge>
+            </StatusBadge>
           ),
       },
       {
@@ -1171,13 +1172,9 @@ export function CRMView() {
         header: t('views.crm.table.status'),
         render: (tenant) =>
           tenant.isBlacklisted ? (
-            <Badge variant="outline" className="border-0 bg-rose-100 text-rose-700 hover:bg-rose-100">
-              {t('views.crm.table.blacklisted')}
-            </Badge>
+            <StatusBadge tone="danger">{t('views.crm.table.blacklisted')}</StatusBadge>
           ) : (
-            <Badge variant="outline" className="border-0 bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
-              {t('views.crm.table.active')}
-            </Badge>
+            <StatusBadge tone="info">{t('views.crm.table.active')}</StatusBadge>
           ),
       },
       {
@@ -2532,6 +2529,7 @@ export function CRMView() {
               columns={tenantColumns}
               keyExtractor={(tenant) => tenant.id}
               onRowClick={(tenant) => openViewDetails(tenant)}
+              highlightFirstColumn={false}
             />
           )}
         </TabsContent>
@@ -2542,7 +2540,7 @@ export function CRMView() {
               <SkeletonTable rows={6} columns={4} />
             </div>
           ) : (
-            <DataTable data={filteredLandlords} columns={landlordColumns} keyExtractor={(l) => l.id} />
+            <DataTable data={filteredLandlords} columns={landlordColumns} keyExtractor={(l) => l.id} highlightFirstColumn={false} />
           )}
         </TabsContent>
 

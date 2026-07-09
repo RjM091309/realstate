@@ -181,6 +181,12 @@
   border-color: rgb(51 65 85) !important;
 }
 
+/* Indigo CTA buttons: white label in dark mode (Button default uses dark primary-foreground) */
+.dark button.bg-indigo-600,
+.dark [data-slot="button"].bg-indigo-600 {
+  color: #ffffff !important;
+}
+
 /* Lease / invoice preview: always light “paper” + dark ink (overrides .dark .bg-white / slate text hacks above). */
 .dark .lease-document-sheet {
   background-color: #ffffff !important;

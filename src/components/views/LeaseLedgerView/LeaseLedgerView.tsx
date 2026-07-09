@@ -13,7 +13,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
+import { paymentStatusVariant } from '@/lib/statusBadge';
 import { Label } from '@/components/ui/label';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Modal } from '@/components/modal';
@@ -558,20 +559,20 @@ export function LeaseLedgerView() {
         render: (payment) => (
           <div className="flex items-center gap-2">
             {payment.status === 'Paid' ? (
-              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300/80 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/40 hover:bg-emerald-100">
+              <StatusBadge tone={paymentStatusVariant(payment.status)}>
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.paid')}
-              </Badge>
+              </StatusBadge>
             ) : payment.status === 'Overdue' ? (
-              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-rose-100 text-rose-800 border border-rose-300/80 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/45 hover:bg-rose-100">
+              <StatusBadge tone={paymentStatusVariant(payment.status)}>
                 <AlertCircle className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.overdue')}
-              </Badge>
+              </StatusBadge>
             ) : (
-              <Badge className="h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-amber-100 text-amber-800 border border-amber-300/80 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/45 hover:bg-amber-100">
+              <StatusBadge tone={paymentStatusVariant(payment.status)}>
                 <Clock className="w-3.5 h-3.5 mr-1" />
                 {t('views.ledger.table.pending')}
-              </Badge>
+              </StatusBadge>
             )}
           </div>
         ),
@@ -694,7 +695,7 @@ export function LeaseLedgerView() {
             {t('views.ledger.exportReport')}
           </Button>
           {canCreate && (
-            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openCreateModal}>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openCreateModal}>
               <Plus className="w-4 h-4 mr-2" />
               {t('views.ledger.recordPayment')}
             </Button>
@@ -711,7 +712,7 @@ export function LeaseLedgerView() {
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeModal}>Cancel</Button>
-            <Button className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700" onClick={() => void savePayment()}>
+            <Button className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => void savePayment()}>
               {formMode === 'edit' ? 'Save Changes' : t('views.ledger.recordPayment')}
             </Button>
           </div>

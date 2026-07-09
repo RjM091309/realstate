@@ -93,7 +93,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className = '', style }) => 
   <div
     role="presentation"
     aria-hidden
-    className={`bg-slate-200 overflow-hidden rounded-lg ${shimmerClass} ${className}`.trim()}
+    className={`bg-slate-200 dark:bg-slate-800/80 overflow-hidden rounded-lg ${shimmerClass} ${className}`.trim()}
     style={style}
   />
 );
@@ -112,7 +112,10 @@ export const SkeletonText: React.FC<SkeletonProps & { width?: string | number }>
 
 /** Card-shaped skeleton (e.g. stat card). */
 export const SkeletonCard: React.FC<SkeletonProps> = ({ className = '', style }) => (
-  <div className={`rounded-3xl border border-slate-200 bg-white p-6 ${className}`.trim()} style={style}>
+  <div
+    className={`rounded-3xl border border-slate-200 bg-white dark:border-slate-700/80 dark:bg-slate-900/60 p-6 ${className}`.trim()}
+    style={style}
+  >
     <Skeleton className="h-3 w-20 mb-3" />
     <Skeleton className="h-8 w-24" />
   </div>
@@ -144,7 +147,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
         <table className="w-full text-sm" aria-label={t('common.loading')}>
           <caption className="sr-only">{t('common.loading')}</caption>
           <thead>
-          <tr className="text-left border-b border-slate-200">
+          <tr className="text-left border-b border-slate-200 dark:border-slate-700/80">
             {Array.from({ length: columns }).map((_, i) => (
               <th key={i} className="pb-3 pr-4">
                 <Skeleton className="h-4 w-24" />
@@ -154,7 +157,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
         </thead>
         <tbody>
           {Array.from({ length: rows }).map((_, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-slate-100">
+            <tr key={rowIndex} className="border-b border-slate-100 dark:border-slate-800/80">
               {Array.from({ length: columns }).map((_, colIndex) => (
                 <td key={colIndex} className="py-3 pr-4">
                   <Skeleton className="h-4 w-full max-w-[8rem]" />
@@ -165,7 +168,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
         </tbody>
       </table>
     </div>
-    <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-200">
+    <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/80">
       <Skeleton className="h-4 w-48" />
       <div className="flex gap-2">
         <Skeleton className="h-9 w-20 rounded-lg" />
@@ -190,7 +193,7 @@ export const SkeletonStatCards: React.FC<SkeletonProps & { count?: number }> = (
 
 /** Chart placeholder (title + block). */
 export const SkeletonChart: React.FC<SkeletonProps> = ({ className = '' }) => (
-  <div className={`rounded-3xl border border-slate-200 bg-white p-6 ${className}`.trim()}>
+  <div className={`rounded-3xl border border-slate-200 bg-white dark:border-slate-700/80 dark:bg-slate-900/60 p-6 ${className}`.trim()}>
     <Skeleton className="h-5 w-48 mb-4" />
     <Skeleton className="h-72 w-full rounded-2xl" />
   </div>
@@ -218,7 +221,7 @@ export const SkeletonPage: React.FC<{ showStats?: boolean; tableRows?: number }>
   <div className="space-y-8 animate-in fade-in duration-300">
     <SkeletonPageHeader />
     {showStats && <SkeletonStatCards />}
-    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+    <div className="bg-white dark:bg-slate-900/60 rounded-[2rem] border border-slate-200 dark:border-slate-700/80 shadow-sm overflow-hidden p-6 md:p-8">
       <SkeletonTable rows={tableRows} columns={5} />
     </div>
   </div>

@@ -11,7 +11,8 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
+import { contractStatusVariant } from '@/lib/statusBadge';
 import { Label } from '@/components/ui/label';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Modal } from '@/components/modal';
@@ -523,7 +524,7 @@ export function ContractsView() {
           const tenant = tenantList.find((ten) => ten.id === contract.tenantId);
           return (
             <div className="flex flex-col">
-              <span className="font-bold text-slate-900">
+              <span className="font-bold text-slate-900 dark:text-slate-100">
                 {unit?.unitNumber ?? contract.unitId}
               </span>
               <span className="text-xs text-slate-500">{tenant?.name}</span>
@@ -535,8 +536,8 @@ export function ContractsView() {
         header: t('views.contracts.table.period'),
         render: (contract) => (
           <div className="flex flex-col text-xs">
-            <span className="text-slate-700">{format(new Date(contract.startDate), 'MMM dd, yyyy')}</span>
-            <span className="text-slate-400">
+            <span className="text-slate-700 dark:text-slate-300">{format(new Date(contract.startDate), 'MMM dd, yyyy')}</span>
+            <span className="text-slate-400 dark:text-slate-500">
               {t('views.contracts.table.to')} {format(new Date(contract.endDate), 'MMM dd, yyyy')}
             </span>
           </div>
@@ -552,17 +553,9 @@ export function ContractsView() {
       {
         header: t('views.contracts.table.status'),
         render: (contract) => (
-          <Badge
-            variant="outline"
-            className={cn(
-              'font-medium border-0',
-              contract.status === 'Active'
-                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-100'
-            )}
-          >
+          <StatusBadge tone={contract.status === 'Active' ? 'success' : contractStatusVariant(contract.status)}>
             {contract.status === 'Active' ? t('views.contracts.statuses.active') : contract.status}
-          </Badge>
+          </StatusBadge>
         ),
       },
       {
@@ -575,7 +568,7 @@ export function ContractsView() {
             <Button
               variant="secondary"
               size="sm"
-              className="h-8 px-3 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 whitespace-nowrap"
+              className="h-8 px-3 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-200 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 dark:border dark:border-indigo-500/30 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'contract');
@@ -587,7 +580,7 @@ export function ContractsView() {
             <Button
               variant="secondary"
               size="sm"
-              className="h-8 px-3 text-slate-600 bg-slate-100 hover:bg-slate-200 whitespace-nowrap"
+              className="h-8 px-3 text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-700/60 dark:hover:bg-slate-700/80 dark:border dark:border-slate-600 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'invoice');
@@ -742,12 +735,12 @@ export function ContractsView() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('views.contracts.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('views.contracts.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t('views.contracts.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{t('views.contracts.subtitle')}</p>
         </div>
         {canCreate && (
           <Button
-            className="bg-indigo-600 hover:bg-indigo-700"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={openCreateModal}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -772,7 +765,7 @@ export function ContractsView() {
               {t('views.contracts.cancel')}
             </Button>
             <Button
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
               onClick={handleGenerate}
             >
               {formMode === 'edit' ? 'Save Changes' : t('views.contracts.generateActivate')}
@@ -1129,7 +1122,7 @@ export function ContractsView() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <Input
               placeholder={t('views.contracts.searchPlaceholder')}
-              className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
+              className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -1143,7 +1136,7 @@ export function ContractsView() {
                 'h-10 rounded-xl border-slate-200 shadow-sm',
                 contractFiltersOpen || activeContractFilterCount > 0
                   ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600'
-                  : 'text-slate-600 hover:bg-slate-50',
+                  : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700',
               )}
               onClick={() => setContractFiltersOpen((o) => !o)}
             >
@@ -1163,7 +1156,7 @@ export function ContractsView() {
                 'h-10 rounded-xl border-slate-200 shadow-sm',
                 showArchived
                   ? 'border-slate-700 bg-slate-800 text-white hover:bg-slate-900'
-                  : 'text-slate-600 hover:bg-slate-50',
+                  : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700',
               )}
               onClick={() => setShowArchived((v) => !v)}
             >
@@ -1216,7 +1209,7 @@ export function ContractsView() {
       </div>
 
       {contractsLoading ? (
-        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+        <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden p-6 md:p-8">
           <SkeletonTable rows={8} columns={6} />
         </div>
       ) : (
@@ -1225,6 +1218,7 @@ export function ContractsView() {
           columns={columns}
           keyExtractor={(c) => c.id}
           onRowClick={(c) => openContractDetails(c)}
+          highlightFirstColumn={false}
         />
       )}
     </div>

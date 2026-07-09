@@ -129,14 +129,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   return (
     <div
       className={cn(
-        'relative flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800/60 transition-all duration-300 ease-in-out shrink-0',
+        'relative flex flex-col h-full bg-white text-slate-600 border-r border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800/60 transition-all duration-300 ease-in-out shrink-0',
         isCollapsed ? 'w-[72px]' : 'w-64'
       )}
     >
       {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-all z-50 shadow-lg"
+        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white dark:hover:border-slate-600 transition-all z-50 shadow-lg"
       >
         {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
@@ -145,14 +145,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       <div className={cn('transition-all duration-300', isCollapsed ? 'px-4 pt-5 pb-4' : 'px-5 pt-6 pb-4')}>
         <div className={cn('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-950/50 ring-1 ring-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 dark:shadow-emerald-950/50 ring-1 ring-black/5 dark:ring-white/10"
             aria-hidden
           >
             <Building2 className="h-[18px] w-[18px]" strokeWidth={2} />
           </div>
           <span
             className={cn(
-              'text-lg font-bold text-white tracking-tight overflow-hidden transition-all duration-300',
+              'text-lg font-bold text-slate-900 dark:text-white tracking-tight overflow-hidden transition-all duration-300',
               isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
             )}
           >
@@ -162,7 +162,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       </div>
 
       {/* Divider */}
-      <div className="mx-4 border-t border-slate-800/80" />
+      <div className="mx-4 border-t border-slate-200 dark:border-slate-800/80" />
 
       {/* Nav items */}
       <div className="flex-1 overflow-y-auto transition-all duration-300 py-3 px-3">
@@ -174,6 +174,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
               const subLinks: { path: string; label: string }[] = [
                 { path: USER_MGMT_PATHS.info, label: t('nav.userMgmt.userInfo') },
                 { path: USER_MGMT_PATHS.role, label: t('nav.userMgmt.userRole') },
+                ...(isAdmin ? [{ path: '/user-management/audit-logs', label: t('nav.userMgmt.auditLogs') }] : []),
                 ...(isAdmin ? [{ path: USER_MGMT_PATHS.control, label: t('nav.userMgmt.controlPanel') }] : []),
               ];
 
@@ -187,14 +188,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                     className={cn(
                       'relative w-full flex items-center justify-center rounded-lg p-2.5 text-sm font-medium transition-all duration-150',
                       umActive
-                        ? 'bg-indigo-500/15 text-indigo-300'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
+                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
                     )}
                   >
                     {umActive ? (
-                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                     ) : null}
-                    <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-indigo-400' : '')} />
+                    <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-indigo-600 dark:text-indigo-400' : '')} />
                   </button>
                 );
               }
@@ -207,25 +208,25 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                     className={cn(
                       'relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-all duration-150',
                       umActive
-                        ? 'bg-indigo-500/15 text-indigo-300'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
+                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
                     )}
                   >
                     {umActive ? (
-                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                     ) : null}
-                    <Icon className={cn('h-[17px] w-[17px] shrink-0', umActive ? 'text-indigo-400' : '')} />
+                    <Icon className={cn('h-[17px] w-[17px] shrink-0', umActive ? 'text-indigo-600 dark:text-indigo-400' : '')} />
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200',
+                        'h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200',
                         userMgmtOpen ? 'rotate-180' : '',
                       )}
                       aria-hidden
                     />
                   </button>
                   {userMgmtOpen ? (
-                    <div className="ml-3 space-y-0.5 border-l border-slate-700/80 pl-2.5 pt-0.5">
+                    <div className="ml-3 space-y-0.5 border-l border-slate-200 dark:border-slate-700/80 pl-2.5 pt-0.5">
                       {subLinks.map(({ path, label }) => {
                         const subActive = location.pathname === path;
                         return (
@@ -235,7 +236,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                             onClick={() => void navigate(path)}
                             className={cn(
                               'relative flex w-full items-center gap-2 rounded-md py-1.5 pl-1 pr-2 text-left text-[13px] transition-colors',
-                              subActive ? 'text-indigo-200' : 'text-slate-500 hover:text-slate-200',
+                              subActive ? 'text-indigo-700 dark:text-indigo-200' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200',
                             )}
                           >
                             <span
@@ -280,18 +281,18 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                   'relative w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150',
                   isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
                   isActive
-                    ? 'bg-indigo-500/15 text-indigo-300'
-                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
                 )}
               >
                 {isActive && !isCollapsed && (
-                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400" />
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                 )}
                 <item.icon
                   className={cn(
                     'shrink-0 transition-colors',
                     isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
-                    isActive ? 'text-indigo-400' : '',
+                    isActive ? 'text-indigo-600 dark:text-indigo-400' : '',
                   )}
                 />
                 <span
@@ -309,20 +310,20 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       </div>
 
       {/* Bottom section */}
-      <div className="border-t border-slate-800/80">
+      <div className="border-t border-slate-200 dark:border-slate-800/80">
         {/* User profile card */}
         <div className={cn(
           'flex items-center gap-3 transition-all duration-300',
           isCollapsed ? 'justify-center p-3' : 'px-4 py-3.5'
         )}>
-          <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold">
+          <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 text-xs font-bold dark:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300">
             {userInitials}
           </div>
           <div className={cn(
             'min-w-0 overflow-hidden transition-all duration-300',
             isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
           )}>
-            <p className="text-xs font-semibold text-slate-200 truncate">{userName}</p>
+            <p className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate">{userName}</p>
             <p className="text-[10px] text-slate-500 truncate">{userRole}</p>
           </div>
         </div>
@@ -579,17 +580,25 @@ export function TopNav({
         <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 p-1">
           <span className="sr-only">{t('header.languageLabel')}</span>
           <Button
-            variant={currentLanguage === 'en' ? 'default' : 'ghost'}
+            variant="ghost"
             size="sm"
-            className="h-8 px-2"
+            className={cn(
+              'h-8 px-2',
+              currentLanguage === 'en' &&
+                'bg-indigo-600 text-white hover:bg-indigo-700 hover:text-white dark:bg-indigo-500 dark:hover:bg-indigo-600',
+            )}
             onClick={() => i18n.changeLanguage('en')}
           >
             EN
           </Button>
           <Button
-            variant={currentLanguage === 'ko' ? 'default' : 'ghost'}
+            variant="ghost"
             size="sm"
-            className="h-8 px-2"
+            className={cn(
+              'h-8 px-2',
+              currentLanguage === 'ko' &&
+                'bg-indigo-600 text-white hover:bg-indigo-700 hover:text-white dark:bg-indigo-500 dark:hover:bg-indigo-600',
+            )}
             onClick={() => i18n.changeLanguage('ko')}
           >
             KO

@@ -1683,7 +1683,7 @@ export function UnitsView() {
               {canUpdate && selectedUnit ? (
                 <Button
                   type="button"
-                  className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+                  className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
                   onClick={() => openEditUnitModal(selectedUnit)}
                 >
                   {t('views.units.details.editUnitInfo')}
@@ -2017,7 +2017,7 @@ export function UnitsView() {
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleAddInventoryItemSubmit()}
             >
@@ -2076,7 +2076,7 @@ export function UnitsView() {
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleEditInventoryItemSubmit()}
             >
@@ -2140,7 +2140,7 @@ export function UnitsView() {
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700"
+              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
               onClick={() => void handleSaveUnit()}
             >
               {formMode === 'edit' ? t('views.units.editModal.save') : t('views.units.addModal.save')}

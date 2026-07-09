@@ -16,6 +16,7 @@ import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
 import { UserManagementView, UserRoleManagementView } from './components/views/UserManagementView/index';
 import { UserAccessView } from './components/views/UserAccessView/index';
+import { AuditLogsView } from './components/views/AuditLogsView/index';
 import { SettingsView } from './components/views/SettingsView/index';
 import { TenantPortalView } from './components/views/TenantPortalView/index';
 import { AgentPortalView } from './components/views/AgentPortalView/index';
@@ -148,6 +149,12 @@ function MainApp() {
       if (location.pathname === '/user-management/user-role') {
         return <UserRoleManagementView />;
       }
+      if (location.pathname === '/user-management/audit-logs') {
+        if (!isAdmin) {
+          return <Navigate to="/user-management/user-info" replace />;
+        }
+        return <AuditLogsView />;
+      }
       return <UserManagementView />;
     }
 
@@ -188,7 +195,7 @@ function MainApp() {
         <TopNav onOpenSettings={() => setActiveTab('settings')} onLogout={() => logout()} />
         
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50 dark:bg-slate-950">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-screen-2xl mx-auto">
             {renderView()}
           </div>
         </main>

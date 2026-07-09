@@ -17,6 +17,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
+import { contractStatusVariant, statusBadgeClass } from '@/lib/statusBadge';
 import { Button } from '@/components/ui/button';
 
 export type TenantDetailsDocument = {
@@ -96,17 +98,7 @@ function docIcon(kind?: TenantDetailsDocument['kind']) {
 
 /** Contract / lease status (Active, Expired, …) — matches contract detail modals. */
 function leaseContractStatusPillClass(statusLabel: string): string {
-  const s = statusLabel.trim().toLowerCase();
-  if (s === 'active') {
-    return 'border-emerald-300/80 bg-emerald-100 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/25';
-  }
-  if (s === 'expired') {
-    return 'border-rose-300/80 bg-rose-100 text-rose-800 shadow-none hover:bg-rose-100 dark:border-rose-500/45 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/25';
-  }
-  if (s === 'terminated') {
-    return 'border-slate-300/80 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
-  }
-  return 'border-slate-200/90 bg-slate-50 text-slate-800 shadow-none dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100';
+  return statusBadgeClass(contractStatusVariant(statusLabel));
 }
 
 export function TenantDetailsModal({
@@ -196,20 +188,14 @@ export function TenantDetailsModal({
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           {tenant?.verified ? (
-                            <Badge
-                              variant="outline"
-                              className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200"
-                            >
+                            <StatusBadge tone="success">
                               {t('views.crm.tenantModal.kycVerified')}
-                            </Badge>
+                            </StatusBadge>
                           ) : null}
                           {tenant?.active === false ? (
-                            <Badge
-                              variant="outline"
-                              className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-950/50 dark:text-rose-200"
-                            >
+                            <StatusBadge tone="danger">
                               {t('views.crm.table.blacklisted')}
-                            </Badge>
+                            </StatusBadge>
                           ) : null}
                         </div>
                       </div>

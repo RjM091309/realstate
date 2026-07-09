@@ -36,6 +36,7 @@ import {
   Cell,
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
 import { DataTable, type ColumnDef } from '@/components/data-table';
 import {
   format,
@@ -360,16 +361,9 @@ export function DashboardView() {
         render: (c) => {
           const daysLeft = Math.ceil((new Date(c.endDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
           return (
-            <Badge
-              className={cn(
-                'h-auto rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide border',
-                daysLeft <= 30
-                  ? 'bg-rose-100 text-rose-800 border-rose-300/80 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/45'
-                  : 'bg-amber-100 text-amber-800 border-amber-300/80 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/45',
-              )}
-            >
+            <StatusBadge tone={daysLeft <= 30 ? 'danger' : 'warning'}>
               {daysLeft <= 30 ? t('views.dashboard.vacancies.oneMonth') : t('views.dashboard.vacancies.twoMonth')}
-            </Badge>
+            </StatusBadge>
           );
         },
       },

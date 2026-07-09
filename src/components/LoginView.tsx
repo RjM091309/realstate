@@ -25,7 +25,7 @@ export function LoginView() {
   };
 
   return (
-    <div className="min-h-screen font-sans text-slate-900 selection:bg-indigo-500/30 selection:text-indigo-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen font-sans text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="fixed inset-0 z-0">
         <motion.img
           initial={{ scale: 1.1 }}
@@ -44,7 +44,7 @@ export function LoginView() {
         />
       </div>
 
-      <div className="w-full max-w-4xl grid lg:grid-cols-10 bg-white/95 dark:bg-slate-950/45 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/40 overflow-hidden relative z-10 border border-white/10">
+      <div className="w-full max-w-4xl grid lg:grid-cols-10 bg-slate-950/55 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 overflow-hidden relative z-10 border border-white/10">
         <div className="hidden lg:flex lg:col-span-4 flex-col justify-between p-10 bg-[#0d121f]">
           <div>
             <div className="flex items-center gap-3 mb-12">
@@ -89,7 +89,7 @@ export function LoginView() {
           </div>
         </div>
 
-        <div className="col-span-full lg:col-span-6 p-8 md:p-14 bg-white dark:bg-slate-950/30 flex flex-col justify-center">
+        <div className="col-span-full lg:col-span-6 p-8 md:p-14 bg-slate-950/35 flex flex-col justify-center">
           <div className="lg:hidden flex items-center gap-3 mb-10">
             <div className="w-10 h-10 bg-[#10b981] rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
               <Building size={22} />
@@ -98,29 +98,29 @@ export function LoginView() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">System Admin Login</h2>
-            <p className="text-slate-500 dark:text-slate-300/80 text-sm">
+            <h2 className="text-2xl font-bold text-slate-100 mb-2">System Admin Login</h2>
+            <p className="text-slate-300/80 text-sm">
               Please sign in to access your administrative dashboard. New staff accounts are created from{' '}
-              <span className="font-semibold text-slate-700 dark:text-slate-200">User Management → User Info</span> after
+              <span className="font-semibold text-slate-200">User Management → User Info</span> after
               you sign in.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label htmlFor="username" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider ml-1">
+              <label htmlFor="username" className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">
                 Username
               </label>
               <div className="relative group">
                 <Mail
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
                   size={18}
                 />
                 <input
                   id="username"
                   autoComplete="username"
                   required
-                  className="w-full bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/80 rounded-xl py-4 pl-12 pr-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-400/15 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-500 text-sm"
+                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-4 text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-400/15 focus:border-indigo-400 transition-all placeholder:text-slate-500 text-sm"
                   placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -130,13 +130,13 @@ export function LoginView() {
 
             <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
-                <label htmlFor="password" className="text-xs font-bold text-slate-400 dark:text-slate-300 uppercase tracking-wider">
+                <label htmlFor="password" className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Password
                 </label>
               </div>
               <div className="relative group">
                 <Lock
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
                   size={18}
                 />
                 <input
@@ -144,7 +144,7 @@ export function LoginView() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/80 rounded-xl py-4 pl-12 pr-12 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-400/15 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-500 text-sm"
+                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-12 text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-400/15 focus:border-indigo-400 transition-all placeholder:text-slate-500 text-sm"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -152,7 +152,7 @@ export function LoginView() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -185,13 +185,13 @@ export function LoginView() {
 
           <div className="mt-12 flex flex-col items-center gap-6">
             <div className="flex items-center gap-3 w-full">
-              <span className="h-px grow bg-slate-100" />
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] whitespace-nowrap">Regional Support</span>
-              <span className="h-px grow bg-slate-100" />
+              <span className="h-px grow bg-slate-800/80" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Regional Support</span>
+              <span className="h-px grow bg-slate-800/80" />
             </div>
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
               {['Manila', 'Cebu', 'Davao'].map((city) => (
-                <div key={city} className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                <div key={city} className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>{city}</span>
                 </div>

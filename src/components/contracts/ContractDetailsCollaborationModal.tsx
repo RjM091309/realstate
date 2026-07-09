@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MoreVertical, Pencil, Trash2, FileText, ExternalLink, ChevronRight } from 'lucide-react';
 import { Modal } from '@/components/modal';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge';
+import { contractStatusVariant, statusBadgeClass } from '@/lib/statusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,27 +108,13 @@ function inventoryCategoryLabel(value: string) {
 }
 
 function contractStatusPillClass(statusLabel: string): string {
-  const s = statusLabel.trim().toLowerCase();
-  if (s === 'active') {
-    return 'border-emerald-300/80 bg-emerald-100 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/25';
-  }
-  if (s === 'expired') {
-    return 'border-rose-300/80 bg-rose-100 text-rose-800 shadow-none hover:bg-rose-100 dark:border-rose-500/45 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/25';
-  }
-  if (s === 'terminated') {
-    return 'border-slate-300/80 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
-  }
-  return 'border-slate-200/90 bg-slate-50 text-slate-800 shadow-none dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100';
+  return statusBadgeClass(contractStatusVariant(statusLabel));
 }
 
 function roleBadgeClass(role: CollaboratorRole) {
-  if (role === 'Owner') {
-    return 'border-violet-300/80 bg-violet-100 text-violet-900 shadow-none hover:bg-violet-100 dark:border-violet-500/45 dark:bg-violet-500/20 dark:text-violet-100 dark:hover:bg-violet-500/25';
-  }
-  if (role === 'Editor') {
-    return 'border-sky-300/80 bg-sky-100 text-sky-900 shadow-none hover:bg-sky-100 dark:border-sky-500/45 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/25';
-  }
-  return 'border-slate-300/80 bg-slate-100 text-slate-800 shadow-none hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800/80';
+  if (role === 'Owner') return statusBadgeClass('violet');
+  if (role === 'Editor') return statusBadgeClass('sky');
+  return statusBadgeClass('neutral');
 }
 
 export function ContractSummaryCard({
@@ -145,9 +133,9 @@ export function ContractSummaryCard({
     <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-600 dark:bg-slate-800/90">
       <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-300">{title}</div>
       {valueTone === 'status' && value ? (
-        <Badge variant="outline" className={cn('mt-1.5 h-auto w-fit rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide', contractStatusPillClass(value))}>
+        <StatusBadge tone={contractStatusVariant(value)} className="mt-1.5 w-fit">
           {value}
-        </Badge>
+        </StatusBadge>
       ) : (
         <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50">{value || '—'}</div>
       )}
