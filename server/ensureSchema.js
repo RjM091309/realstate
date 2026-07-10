@@ -226,6 +226,47 @@ export async function ensureSchema() {
         `ALTER TABLE \`unit\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
       );
     }
+
+    const [remarksRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'special_remarks'
+      `,
+    );
+    if (remarksRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`special_remarks\` TEXT NULL AFTER \`inventory_json\``,
+      );
+    }
+
+    const [metricRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name IN ('area_sqm', 'bedrooms', 'bathrooms')
+      `,
+    );
+    const existingMetrics = new Set(metricRows.map((r) => String(r.column_name)));
+    if (!existingMetrics.has('area_sqm')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`area_sqm\` DECIMAL(8,2) NULL DEFAULT NULL AFTER \`unit_type\``,
+      );
+    }
+    if (!existingMetrics.has('bedrooms')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`bedrooms\` TINYINT UNSIGNED NULL DEFAULT NULL AFTER \`area_sqm\``,
+      );
+    }
+    if (!existingMetrics.has('bathrooms')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`bathrooms\` TINYINT UNSIGNED NULL DEFAULT NULL AFTER \`bedrooms\``,
+      );
+    }
   }
 
   async function ensureUserAvatarColumn() {
@@ -292,6 +333,16 @@ export async function ensureSchema() {
     if (!(await hasColumn('lease_contract', 'active'))) {
       await pool.query(
         `ALTER TABLE \`lease_contract\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
+      );
+    }
+    if (!(await hasColumn('lease_contract', 'created_at'))) {
+      await pool.query(
+        `ALTER TABLE \`lease_contract\` ADD COLUMN \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER \`created_by\``,
+      );
+    }
+    if (!(await hasColumn('tenant_profile', 'created_at'))) {
+      await pool.query(
+        `ALTER TABLE \`tenant_profile\` ADD COLUMN \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER \`active\``,
       );
     }
     if (!(await hasColumn('inventory_snapshot', 'active'))) {
@@ -1119,6 +1170,103 @@ export async function ensureSchema() {
   await ensureRoleAndContractMappingActiveColumns();
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`unit_inspection\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`contract_id\` BIGINT UNSIGNED NOT NULL,
+      \`unit_id\` BIGINT UNSIGNED NOT NULL,
+      \`status\` ENUM('vacant','under_inspection','pending_approval','ready_for_occupancy','move_in_scheduled','occupied','failed') NOT NULL DEFAULT 'vacant',
+      \`workflow_step\` ENUM('overview','checklist','inventory','photos','approval','ready','logs') NOT NULL DEFAULT 'overview',
+      \`scheduled_move_in\` DATE NULL DEFAULT NULL,
+      \`inspector_remarks\` TEXT NULL,
+      \`checklist_score\` DECIMAL(5,2) NOT NULL DEFAULT 0,
+      \`inventory_completion\` DECIMAL(5,2) NOT NULL DEFAULT 0,
+      \`photos_complete\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`started_at\` DATETIME NULL DEFAULT NULL,
+      \`approved_at\` DATETIME NULL DEFAULT NULL,
+      \`approved_by\` INT UNSIGNED NULL DEFAULT NULL,
+      \`failed_at\` DATETIME NULL DEFAULT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_unit_inspection_contract\` (\`contract_id\`),
+      KEY \`idx_unit_inspection_branch\` (\`branch_id\`),
+      KEY \`idx_unit_inspection_unit\` (\`unit_id\`),
+      CONSTRAINT \`fk_unit_inspection_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+      CONSTRAINT \`fk_unit_inspection_contract\` FOREIGN KEY (\`contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
+      CONSTRAINT \`fk_unit_inspection_unit\` FOREIGN KEY (\`unit_id\`) REFERENCES \`unit\` (\`id\`),
+      CONSTRAINT \`fk_unit_inspection_approved_by\` FOREIGN KEY (\`approved_by\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`inspection_checklist\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`inspection_id\` BIGINT UNSIGNED NOT NULL,
+      \`item_key\` VARCHAR(80) NOT NULL,
+      \`item_label\` VARCHAR(180) NOT NULL,
+      \`result\` ENUM('pending','pass','fail') NOT NULL DEFAULT 'pending',
+      \`remarks\` TEXT NULL,
+      \`photo_data_url\` LONGTEXT NULL,
+      \`sort_order\` INT UNSIGNED NOT NULL DEFAULT 0,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_inspection_checklist_item\` (\`inspection_id\`, \`item_key\`),
+      KEY \`idx_inspection_checklist_inspection\` (\`inspection_id\`),
+      CONSTRAINT \`fk_inspection_checklist_inspection\` FOREIGN KEY (\`inspection_id\`) REFERENCES \`unit_inspection\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`inspection_photo\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`inspection_id\` BIGINT UNSIGNED NOT NULL,
+      \`section\` ENUM('living_room','bedroom','kitchen','bathroom','damages','meter_reading') NOT NULL,
+      \`photo_data_url\` LONGTEXT NOT NULL,
+      \`caption\` VARCHAR(255) NULL DEFAULT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_inspection_photo_inspection\` (\`inspection_id\`, \`section\`),
+      CONSTRAINT \`fk_inspection_photo_inspection\` FOREIGN KEY (\`inspection_id\`) REFERENCES \`unit_inspection\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`inventory_verification\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`inspection_id\` BIGINT UNSIGNED NOT NULL,
+      \`item_key\` VARCHAR(80) NOT NULL,
+      \`item_label\` VARCHAR(180) NOT NULL,
+      \`condition_state\` ENUM('pending','good','damaged','missing') NOT NULL DEFAULT 'pending',
+      \`quantity\` INT UNSIGNED NOT NULL DEFAULT 1,
+      \`remarks\` TEXT NULL,
+      \`sort_order\` INT UNSIGNED NOT NULL DEFAULT 0,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_inventory_verification_item\` (\`inspection_id\`, \`item_key\`),
+      KEY \`idx_inventory_verification_inspection\` (\`inspection_id\`),
+      CONSTRAINT \`fk_inventory_verification_inspection\` FOREIGN KEY (\`inspection_id\`) REFERENCES \`unit_inspection\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`inspection_log\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`inspection_id\` BIGINT UNSIGNED NOT NULL,
+      \`event_type\` VARCHAR(80) NOT NULL,
+      \`message\` TEXT NOT NULL,
+      \`actor_user_id\` INT UNSIGNED NULL DEFAULT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_inspection_log_inspection\` (\`inspection_id\`, \`created_at\`),
+      CONSTRAINT \`fk_inspection_log_inspection\` FOREIGN KEY (\`inspection_id\`) REFERENCES \`unit_inspection\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_inspection_log_actor\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS \`audit_log\` (
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`branch_id\` INT UNSIGNED NULL DEFAULT NULL,
@@ -1134,6 +1282,78 @@ export async function ensureSchema() {
       KEY \`idx_audit_module_date\` (\`module_name\`, \`created_at\`),
       CONSTRAINT \`fk_audit_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
       CONSTRAINT \`fk_audit_actor_user\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`lease_renewals\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`old_contract_id\` BIGINT UNSIGNED NOT NULL,
+      \`new_contract_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`tenant_id\` BIGINT UNSIGNED NOT NULL,
+      \`unit_id\` BIGINT UNSIGNED NOT NULL,
+      \`renewal_status\` ENUM('pending_renewal','awaiting_payment','pending_signature','ready_to_activate','active','declined') NOT NULL DEFAULT 'pending_renewal',
+      \`workflow_step\` ENUM('summary','balance','terms','agreement','approval','activation') NOT NULL DEFAULT 'summary',
+      \`outstanding_balance\` DECIMAL(12,2) NOT NULL DEFAULT 0,
+      \`balance_breakdown_json\` JSON NULL,
+      \`carry_over_balance\` TINYINT(1) NOT NULL DEFAULT 0,
+      \`carry_over_reason\` TEXT NULL,
+      \`internal_notes\` TEXT NULL,
+      \`terms_json\` JSON NULL,
+      \`rent_increase_percentage\` DECIMAL(6,2) NULL DEFAULT NULL,
+      \`approval_status\` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      \`tenant_signature_status\` ENUM('pending','signed','rejected') NOT NULL DEFAULT 'pending',
+      \`manager_approval_notes\` TEXT NULL,
+      \`signed_at\` DATETIME NULL DEFAULT NULL,
+      \`activation_date\` DATE NULL DEFAULT NULL,
+      \`created_by\` INT UNSIGNED NULL DEFAULT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_lease_renewals_branch\` (\`branch_id\`),
+      KEY \`idx_lease_renewals_old_contract\` (\`old_contract_id\`),
+      KEY \`idx_lease_renewals_tenant\` (\`tenant_id\`),
+      KEY \`idx_lease_renewals_status\` (\`renewal_status\`),
+      CONSTRAINT \`fk_lease_renewals_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+      CONSTRAINT \`fk_lease_renewals_old_contract\` FOREIGN KEY (\`old_contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
+      CONSTRAINT \`fk_lease_renewals_new_contract\` FOREIGN KEY (\`new_contract_id\`) REFERENCES \`lease_contract\` (\`id\`),
+      CONSTRAINT \`fk_lease_renewals_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
+      CONSTRAINT \`fk_lease_renewals_unit\` FOREIGN KEY (\`unit_id\`) REFERENCES \`unit\` (\`id\`),
+      CONSTRAINT \`fk_lease_renewals_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`lease_renewal_approvals\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`renewal_id\` BIGINT UNSIGNED NOT NULL,
+      \`approver_role\` VARCHAR(64) NOT NULL DEFAULT 'manager',
+      \`approver_user_id\` INT UNSIGNED NULL DEFAULT NULL,
+      \`status\` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      \`notes\` TEXT NULL,
+      \`decided_at\` DATETIME NULL DEFAULT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_lease_renewal_approvals_renewal\` (\`renewal_id\`),
+      CONSTRAINT \`fk_lease_renewal_approvals_renewal\` FOREIGN KEY (\`renewal_id\`) REFERENCES \`lease_renewals\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_lease_renewal_approvals_user\` FOREIGN KEY (\`approver_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`lease_renewal_logs\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`renewal_id\` BIGINT UNSIGNED NOT NULL,
+      \`event_type\` VARCHAR(64) NOT NULL,
+      \`message\` TEXT NOT NULL,
+      \`actor_user_id\` INT UNSIGNED NULL DEFAULT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_lease_renewal_logs_renewal\` (\`renewal_id\`, \`created_at\`),
+      CONSTRAINT \`fk_lease_renewal_logs_renewal\` FOREIGN KEY (\`renewal_id\`) REFERENCES \`lease_renewals\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_lease_renewal_logs_actor\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 

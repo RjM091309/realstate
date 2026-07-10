@@ -23,6 +23,8 @@ import { blacklistRouter } from './routes/blacklistRoutes.js';
 import { calendarEventsRouter } from './routes/calendarEventsRoutes.js';
 import { documentsRouter } from './routes/documentsRoutes.js';
 import { inventorySnapshotsRouter } from './routes/inventorySnapshotsRoutes.js';
+import { unitInspectionsRouter } from './routes/unitInspectionsRoutes.js';
+import { leaseRenewalsRouter } from './routes/leaseRenewalsRoutes.js';
 import { specialRequestsRouter } from './routes/specialRequestsRoutes.js';
 import { landlordsRouter } from './routes/landlordsRoutes.js';
 import { invoicesRouter } from './routes/invoicesRoutes.js';
@@ -116,6 +118,8 @@ app.use('/api/partner-agencies', partnerAgenciesRouter);
 app.use('/api/blacklist', blacklistRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/inventory', inventorySnapshotsRouter);
+app.use('/api/unit-inspections', unitInspectionsRouter);
+app.use('/api/lease-renewals', leaseRenewalsRouter);
 app.use('/api/special-requests', specialRequestsRouter);
 app.use('/api/landlords', landlordsRouter);
 app.use('/api/invoices', invoicesRouter);
@@ -199,7 +203,7 @@ void (async () => {
   server.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/auth/change-password  PATCH /api/auth/profile  POST /api/auth/profile-photo  DELETE /api/auth/profile-photo  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/special-requests',
+      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/auth/change-password  PATCH /api/auth/profile  POST /api/auth/profile-photo  DELETE /api/auth/profile-photo  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/unit-inspections  /api/special-requests',
     );
   });
 

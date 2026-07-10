@@ -17,6 +17,18 @@ function fmtDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+function fmtDateTime(d) {
+  if (d == null) return '';
+  if (typeof d === 'string') return d.slice(0, 19).replace('T', ' ');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+}
+
 function rowToLandlord(row) {
   return {
     id: String(row.id),
@@ -25,7 +37,7 @@ function rowToLandlord(row) {
     email: row.email ? String(row.email) : '',
     govIdNo: row.gov_id_no ? String(row.gov_id_no) : '',
     active: Boolean(Number(row.active)),
-    createdAt: row.created_at ? fmtDate(row.created_at) : '',
+    createdAt: row.created_at != null ? fmtDateTime(row.created_at) : '',
   };
 }
 

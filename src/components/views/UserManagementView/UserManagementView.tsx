@@ -3,7 +3,7 @@ import { CheckCircle2, ImagePlus, Plus, Search, Pencil, Trash2, UserRoundCheck, 
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/modal';
@@ -501,14 +501,14 @@ export function UserManagementView() {
         maxWidth="lg"
         footer={
           <div className="flex w-full items-center justify-end gap-3">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeModal} disabled={saving}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeModal} disabled={saving}>
               {t('views.userInfo.cancel')}
             </Button>
             <Button
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+              className={modalPrimaryButtonClass}
             >
               {saving ? '…' : t('views.userInfo.saveUser')}
             </Button>

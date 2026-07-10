@@ -11,7 +11,7 @@ import { Sidebar, TopNav } from './components/Navigation';
 import { DashboardView } from './components/views/DashboardView/index';
 import { UnitsView } from './components/views/UnitsView/index';
 import { ContractsView } from './components/views/ContractsView/index';
-import { CRMView } from './components/views/CRMView/index';
+import { CRMView } from './components/views/CRMView/CRMView';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
 import { UserManagementView, UserRoleManagementView } from './components/views/UserManagementView/index';

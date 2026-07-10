@@ -26,6 +26,9 @@ export async function listUnitsByBranch(branchId) {
       pr.common_address AS common_address,
       pr.legal_address AS legal_address,
       u.unit_type AS unit_type,
+      u.area_sqm AS area_sqm,
+      u.bedrooms AS bedrooms,
+      u.bathrooms AS bathrooms,
       CASE u.status
         WHEN 'vacant' THEN 'Available'
         WHEN 'occupied' THEN 'Occupied'
@@ -36,7 +39,8 @@ export async function listUnitsByBranch(branchId) {
       a.name AS area,
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
-      COALESCE(u.inventory_json, '[]') AS inventory_json
+      COALESCE(u.inventory_json, '[]') AS inventory_json,
+      u.special_remarks AS special_remarks
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
@@ -100,12 +104,16 @@ export async function insertUnit(branchId, payload) {
       floor_no,
       tower,
       unit_type,
+      area_sqm,
+      bedrooms,
+      bathrooms,
       listing_type,
       monthly_rent,
       photo_data,
       status,
-      inventory_json
-    ) VALUES (?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?)
+      inventory_json,
+      special_remarks
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?)
     `,
     [
       propertyId,
@@ -114,10 +122,14 @@ export async function insertUnit(branchId, payload) {
       payload.floor,
       payload.tower,
       payload.unitType,
+      payload.areaSqm ?? null,
+      payload.bedrooms ?? null,
+      payload.bathrooms ?? null,
       payload.monthlyRate,
       payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
+      payload.specialRemarks ?? null,
     ],
   );
 
@@ -151,10 +163,14 @@ export async function updateUnitById(id, branchId, payload) {
       floor_no = ?,
       tower = ?,
       unit_type = ?,
+      area_sqm = ?,
+      bedrooms = ?,
+      bathrooms = ?,
       monthly_rent = ?,
       photo_data = ?,
       status = ?,
-      inventory_json = ?
+      inventory_json = ?,
+      special_remarks = ?
     WHERE id = ? AND active = 1
     `,
     [
@@ -164,10 +180,14 @@ export async function updateUnitById(id, branchId, payload) {
       payload.floor,
       payload.tower,
       payload.unitType,
+      payload.areaSqm ?? null,
+      payload.bedrooms ?? null,
+      payload.bathrooms ?? null,
       payload.monthlyRate,
       payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
+      payload.specialRemarks ?? null,
       id,
     ],
   );
@@ -187,6 +207,9 @@ export async function getUnitById(id, branchId) {
       pr.common_address AS common_address,
       pr.legal_address AS legal_address,
       u.unit_type AS unit_type,
+      u.area_sqm AS area_sqm,
+      u.bedrooms AS bedrooms,
+      u.bathrooms AS bathrooms,
       CASE u.status
         WHEN 'vacant' THEN 'Available'
         WHEN 'occupied' THEN 'Occupied'
@@ -197,7 +220,8 @@ export async function getUnitById(id, branchId) {
       a.name AS area,
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
-      COALESCE(u.inventory_json, '[]') AS inventory_json
+      COALESCE(u.inventory_json, '[]') AS inventory_json,
+      u.special_remarks AS special_remarks
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
@@ -221,5 +245,24 @@ export async function deleteUnitById(id, branchId) {
     `,
     [id, branchId],
   );
+  return result.affectedRows;
+}
+
+export async function updateUnitStatusById(id, branchId, status) {
+  const [existingRows] = await pool.query(
+    `
+    SELECT u.id
+    FROM unit u
+    JOIN property pr ON pr.id = u.property_id
+    WHERE u.id = ? AND pr.branch_id = ? AND u.active = 1
+    LIMIT 1
+    `,
+    [id, branchId],
+  );
+  if (!existingRows[0]?.id) return 0;
+  const [result] = await pool.query(`UPDATE unit SET status = ? WHERE id = ? AND active = 1`, [
+    mapToUnitStatus(status),
+    id,
+  ]);
   return result.affectedRows;
 }

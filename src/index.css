@@ -1,11 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   /* shared UI tokens (DataTable, Select2, Modal, react-datepicker) */
   --color-brand-primary: #4f46e5;
@@ -23,6 +22,7 @@
 @layer base {
   body {
     @apply font-sans text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
@@ -47,7 +47,7 @@
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-sans: "Inter", "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -104,8 +104,8 @@
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
+    --border: transparent;
+    --input: transparent;
     --ring: oklch(0.708 0 0);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -139,8 +139,8 @@
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
+    --border: transparent;
+    --input: transparent;
     --ring: oklch(0.556 0 0);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -176,9 +176,229 @@
   color: rgb(148 163 184) !important;
 }
 
+/* Borderless UI: neutral structural borders across the app */
+#root [class*="border-slate-"],
+#root [class*="border-gray-"],
+#root [class*="border-input"],
+#root [class*="border-white/"],
+#root [class*="divide-slate-"],
+#root [class*="divide-gray-"],
+#root [data-slot="card"],
+#root [data-slot="table-row"],
+#root [data-slot="table-header"] tr,
+#root [data-slot="table-footer"] {
+  border-color: transparent !important;
+}
+
+/* Data table row separators (scoped override for borderless UI) */
+#root .data-table .data-table-head-row {
+  border-bottom: 1px solid rgb(226 232 240) !important;
+}
+
+#root .data-table .data-table-row {
+  border-bottom: 1px solid rgb(241 245 249) !important;
+}
+
+#root .data-table .data-table-row:last-child {
+  border-bottom: 1px solid rgb(241 245 249) !important;
+}
+
+#root .data-table .data-table-footer {
+  border-top: 1px solid rgb(226 232 240) !important;
+}
+
+.dark #root .data-table .data-table-head-row {
+  border-bottom-color: rgb(51 65 85) !important;
+}
+
+.dark #root .data-table .data-table-row,
+.dark #root .data-table .data-table-row:last-child {
+  border-bottom-color: rgb(30 41 59) !important;
+}
+
+.dark #root .data-table .data-table-footer {
+  border-top-color: rgb(51 65 85) !important;
+}
+
+/* Re-apply borders inside unit add/edit form (overrides borderless rules above) */
+#root .unit-form-fields [class*="border-slate-"],
+#root .unit-form-fields [class*="border-input"],
+#root .unit-form-fields [data-slot="input"],
+#root .unit-form-fields [data-slot="textarea"],
+#root .unit-form-fields .unit-form-select-control,
+#root .unit-form-fields .unit-form-bordered,
+#root .unit-form-fields .unit-form-datepicker-input {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
 .dark .border-slate-200,
-.dark .border-slate-100 {
+.dark .border-slate-100,
+.dark .border-slate-700,
+.dark .border-slate-800,
+.dark .border-slate-600 {
+  border-color: transparent !important;
+}
+
+.dark #root .unit-form-fields [class*="border-slate-"],
+.dark #root .unit-form-fields [class*="border-input"],
+.dark #root .unit-form-fields [data-slot="input"],
+.dark #root .unit-form-fields [data-slot="textarea"],
+.dark #root .unit-form-fields .unit-form-select-control,
+.dark #root .unit-form-fields .unit-form-bordered,
+.dark #root .unit-form-fields .unit-form-datepicker-input {
+  border-color: rgb(71 85 105) !important;
+}
+
+#root .unit-form-fields [data-slot="input"]:focus-visible,
+#root .unit-form-fields [data-slot="textarea"]:focus-visible,
+#root .unit-form-fields .unit-form-select-control:focus-within,
+#root .unit-form-fields .unit-form-datepicker-input:focus {
+  border-color: rgb(99 102 241) !important;
+}
+
+/* Re-apply borders inside unit inspection workflow modal */
+#root .unit-inspection-modal [class*="border-slate-"],
+#root .unit-inspection-modal [class*="border-input"],
+#root .unit-inspection-modal [data-slot="input"],
+#root .unit-inspection-modal [data-slot="textarea"],
+#root .unit-inspection-modal .inspection-summary-card,
+#root .unit-inspection-modal .inspection-shell,
+#root .unit-inspection-modal .inspection-sidebar,
+#root .unit-inspection-modal .inspection-list,
+#root .unit-inspection-modal .inspection-icon-btn {
+  border-style: solid !important;
+}
+
+#root .unit-inspection-modal [class*="border-slate-"],
+#root .unit-inspection-modal [class*="border-input"],
+#root .unit-inspection-modal [data-slot="input"],
+#root .unit-inspection-modal [data-slot="textarea"],
+#root .unit-inspection-modal .inspection-icon-btn,
+#root .unit-inspection-modal .inspection-summary-card,
+#root .unit-inspection-modal .inspection-shell,
+#root .unit-inspection-modal .inspection-list {
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+#root .unit-inspection-modal .inspection-sidebar {
+  border-color: rgb(226 232 240) !important;
+}
+
+#root .unit-inspection-modal .inspection-list-row + .inspection-list-row,
+#root .unit-inspection-modal .inspection-list-row:not(:first-child) {
+  border-top-width: 1px !important;
+  border-top-style: solid !important;
+  border-top-color: rgb(241 245 249) !important;
+}
+
+#root .unit-inspection-modal .inspection-remarks-row {
+  border-top-width: 1px !important;
+  border-top-style: solid !important;
+  border-top-color: rgb(241 245 249) !important;
+}
+
+.dark #root .unit-inspection-modal [class*="border-slate-"],
+.dark #root .unit-inspection-modal [class*="border-input"],
+.dark #root .unit-inspection-modal [data-slot="input"],
+.dark #root .unit-inspection-modal [data-slot="textarea"],
+.dark #root .unit-inspection-modal .inspection-icon-btn,
+.dark #root .unit-inspection-modal .inspection-summary-card,
+.dark #root .unit-inspection-modal .inspection-shell,
+.dark #root .unit-inspection-modal .inspection-list {
+  border-color: rgb(71 85 105) !important;
+}
+
+.dark #root .unit-inspection-modal .inspection-sidebar {
+  border-color: rgb(71 85 105) !important;
+}
+
+.dark #root .unit-inspection-modal .inspection-list-row + .inspection-list-row,
+.dark #root .unit-inspection-modal .inspection-list-row:not(:first-child),
+.dark #root .unit-inspection-modal .inspection-remarks-row {
+  border-top-color: rgb(51 65 85) !important;
+}
+
+/* Re-apply minimalist borders inside renew lease modal */
+#root .renew-lease-modal [class*="border-slate-"],
+#root .renew-lease-modal [class*="border-input"],
+#root .renew-lease-modal [data-slot="input"],
+#root .renew-lease-modal [data-slot="textarea"],
+#root .renew-lease-modal .renew-lease-summary,
+#root .renew-lease-modal .renew-lease-shell,
+#root .renew-lease-modal .renew-lease-option {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+#root .renew-lease-modal .renew-lease-section {
+  border-top-width: 1px !important;
+  border-top-style: solid !important;
+  border-top-color: rgb(241 245 249) !important;
+}
+
+.dark #root .renew-lease-modal [class*="border-slate-"],
+.dark #root .renew-lease-modal [class*="border-input"],
+.dark #root .renew-lease-modal [data-slot="input"],
+.dark #root .renew-lease-modal [data-slot="textarea"],
+.dark #root .renew-lease-modal .renew-lease-summary,
+.dark #root .renew-lease-modal .renew-lease-shell,
+.dark #root .renew-lease-modal .renew-lease-option {
+  border-color: rgb(71 85 105) !important;
+}
+
+.dark #root .renew-lease-modal .renew-lease-section {
+  border-top-color: rgb(51 65 85) !important;
+}
+
+/* Modal shell + inner cards: restore visible borders (borderless UI override) */
+#root .app-modal-shell {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+#root .app-modal-shell .app-modal-header {
+  border-bottom: 1px solid rgb(241 245 249) !important;
+}
+
+#root .app-modal-shell .app-modal-footer {
+  border-top: 1px solid rgb(241 245 249) !important;
+}
+
+#root .app-modal-shell [class*="border-slate-"] {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+.dark #root .app-modal-shell {
+  border-color: rgb(71 85 105) !important;
+}
+
+.dark #root .app-modal-shell .app-modal-header,
+.dark #root .app-modal-shell .app-modal-footer {
   border-color: rgb(51 65 85) !important;
+}
+
+.dark #root .app-modal-shell [class*="border-slate-"] {
+  border-color: rgb(71 85 105) !important;
+}
+
+/* Tenant history: keep inner content borderless (surface-on-surface) */
+#root .tenant-history-modal [class*="border-slate-"],
+#root .tenant-history-modal [class*="divide-slate-"] {
+  border-color: transparent !important;
+  border-width: 0 !important;
+}
+
+#root .renew-lease-modal [data-slot="input"]:focus-visible,
+#root .renew-lease-modal [data-slot="textarea"]:focus-visible,
+#root .renew-lease-modal .unit-form-datepicker-input:focus {
+  border-color: rgb(99 102 241) !important;
 }
 
 /* Indigo CTA buttons: white label in dark mode (Button default uses dark primary-foreground) */

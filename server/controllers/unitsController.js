@@ -7,7 +7,22 @@ import {
   updateUnitById,
 } from '../models/unitsModel.js';
 
-const UNIT_TYPES = new Set(['Studio', '1BR', '2BR', '3BR', 'Loft', 'Penthouse']);
+const UNIT_TYPES = new Set([
+  'House and Lot',
+  'Condominium',
+  'Apartment',
+  'Commercial Building',
+  'Warehouse',
+  'Hotel',
+  'Office Space',
+  // Legacy types (kept for existing saved units)
+  'Studio',
+  '1BR',
+  '2BR',
+  '3BR',
+  'Loft',
+  'Penthouse',
+]);
 const UNIT_STATUSES = new Set(['Available', 'Occupied', 'Maintenance', 'Reserved']);
 
 function rowToUnit(row) {
@@ -31,8 +46,12 @@ function rowToUnit(row) {
     type: row.unit_type,
     status: row.status,
     area: row.area,
+    areaSqm: row.area_sqm == null ? undefined : Number(row.area_sqm),
+    bedrooms: row.bedrooms == null ? undefined : Number(row.bedrooms),
+    bathrooms: row.bathrooms == null ? undefined : Number(row.bathrooms),
     monthlyRate: Number(row.monthly_rate),
     photoDataUrl: row.photo_data ? String(row.photo_data) : null,
+    specialRemarks: row.special_remarks ? String(row.special_remarks) : undefined,
     inventory,
   };
 }
@@ -49,15 +68,54 @@ function payloadToUnit(id, parsed) {
     type: parsed.unitType,
     status: parsed.status,
     area: parsed.area,
+    areaSqm: parsed.areaSqm,
+    bedrooms: parsed.bedrooms,
+    bathrooms: parsed.bathrooms,
     monthlyRate: parsed.monthlyRate,
     photoDataUrl: parsed.photoDataUrl,
+    specialRemarks: parsed.specialRemarks,
     inventory: parsed.inventory ?? [],
   };
 }
 
+function deriveBuildingName(addressOrBuilding, fallbackBuilding = '') {
+  const raw = String(addressOrBuilding ?? '').trim();
+  const fallback = String(fallbackBuilding ?? '').trim();
+  if (!raw) return fallback;
+
+  const first = raw
+    .split(/[,\u00B7-]/)
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+
+  return first || fallback || raw;
+}
+
+function normalizePhotoDataUrl(photoRaw) {
+  if (photoRaw === undefined || photoRaw === null || String(photoRaw).trim() === '') return null;
+  const value = String(photoRaw).trim();
+
+  // Accept data URLs for common image formats (legacy rows may not be WEBP).
+  if (value.startsWith('data:image/') && value.includes(';base64,')) {
+    if (value.length > 20 * 1024 * 1024) return null;
+    return value;
+  }
+
+  // Accept http(s) URLs used by older seed/demo rows.
+  if (/^https?:\/\/.+/i.test(value) && value.length <= 2048) {
+    return value;
+  }
+
+  return null;
+}
+
 function validatePayload(body) {
   const unitNumber = String(body.unitNumber ?? '').trim();
-  const buildingName = String(body.buildingName ?? '').trim();
+  const legalAddress = String(body.legalAddress ?? '').trim();
+  const commonAddress = String(body.commonAddress ?? '').trim();
+  const buildingName =
+    String(body.buildingName ?? '').trim() ||
+    deriveBuildingName(legalAddress, commonAddress);
   if (!unitNumber || !buildingName) return null;
 
   const unitType = String(body.type ?? '');
@@ -69,30 +127,50 @@ function validatePayload(body) {
   if (!Number.isFinite(monthlyRate) || monthlyRate < 0) return null;
 
   const photoRaw = body.photoDataUrl;
-  let photoDataUrl = null;
-  if (photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '') {
-    const value = String(photoRaw).trim();
-    if (!value.startsWith('data:image/webp;base64,')) return null;
-    if (value.length > 20 * 1024 * 1024) return null;
-    photoDataUrl = value;
+  const photoDataUrl = normalizePhotoDataUrl(photoRaw);
+  // If client sent a non-empty photo but we could not normalize it, reject payload.
+  if (photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '' && !photoDataUrl) {
+    return null;
   }
 
   const inventory = body.inventory;
   if (inventory !== undefined && !Array.isArray(inventory)) return null;
+
+  const specialRemarksRaw = body.specialRemarks;
+  const specialRemarks =
+    specialRemarksRaw === null || specialRemarksRaw === undefined
+      ? null
+      : String(specialRemarksRaw).trim() || null;
+
+  const parseMetric = (raw, { max, allowDecimal }) => {
+    if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    const value = allowDecimal ? Math.round(n * 100) / 100 : Math.floor(n);
+    return max != null ? Math.min(value, max) : value;
+  };
+
+  const areaSqm = parseMetric(body.areaSqm, { max: 99999, allowDecimal: true });
+  const bedrooms = parseMetric(body.bedrooms, { max: 255, allowDecimal: false });
+  const bathrooms = parseMetric(body.bathrooms, { max: 255, allowDecimal: false });
 
   return {
     unitNumber,
     floor: String(body.floor ?? '').trim() || '—',
     tower: String(body.tower ?? '').trim() || '—',
     buildingName,
-    commonAddress: String(body.commonAddress ?? '').trim() || buildingName,
-    legalAddress: String(body.legalAddress ?? '').trim() || String(body.commonAddress ?? '').trim() || '—',
+    commonAddress: commonAddress || legalAddress || buildingName,
+    legalAddress: legalAddress || commonAddress || '—',
     unitType,
     status,
     area,
+    areaSqm,
+    bedrooms,
+    bathrooms,
     monthlyRate,
     photoDataUrl,
     inventory,
+    specialRemarks,
   };
 }
 
@@ -157,9 +235,13 @@ export async function createUnit(req, res) {
       unitType: parsed.unitType,
       status: parsed.status,
       area: parsed.area,
+      areaSqm: parsed.areaSqm,
+      bedrooms: parsed.bedrooms,
+      bathrooms: parsed.bathrooms,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
+      specialRemarks: parsed.specialRemarks,
     });
     if (!row) {
       res.status(500).json({ error: 'Failed to create unit' });
@@ -204,9 +286,13 @@ export async function updateUnit(req, res) {
       unitType: parsed.unitType,
       status: parsed.status,
       area: parsed.area,
+      areaSqm: parsed.areaSqm,
+      bedrooms: parsed.bedrooms,
+      bathrooms: parsed.bathrooms,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
+      specialRemarks: parsed.specialRemarks,
     });
     if (affectedRows === 0) {
       res.status(404).json({ error: 'Unit not found' });

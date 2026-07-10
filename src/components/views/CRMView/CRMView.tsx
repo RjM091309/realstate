@@ -8,13 +8,11 @@ import {
   Search,
   Plus,
   Mail,
-  Phone,
   ShieldCheck,
   History,
   MoreVertical,
   ExternalLink,
   ShieldAlert,
-  ShieldQuestion,
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
@@ -23,14 +21,17 @@ import {
   Upload,
   Loader2,
   Copy,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants, modalDangerButtonClass, modalDismissButtonClass, modalPrimaryButtonClass, modalSuccessButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/status-badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { contractStatusVariant } from '@/lib/statusBadge';
 import { Label } from '@/components/ui/label';
-import { DataTable, type ColumnDef } from '@/components/data-table';
+import { DataTable } from '@/components/data-table';
+import type { ColumnDef } from '@/components/data-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ import {
 import { SkeletonTable } from '@/components/skeleton';
 import { Modal } from '@/components/modal';
 import { TenantDetailsModal } from '@/components/tenants/TenantDetailsModal';
+import { TenantHistoryModal } from '@/components/tenants/TenantHistoryModal';
 import { Select2 } from '@/components/select2';
 import {
   createTenant,
@@ -92,6 +94,49 @@ import {
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 
 type BlacklistRow = BlacklistRowDto;
+
+const CRM_TABLE_ACTION_BTN =
+  'h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5';
+
+const CRM_TABLE_ID_CELL = 'font-mono text-xs text-slate-500 uppercase dark:text-slate-400';
+const CRM_TABLE_NAME_CELL = 'block min-w-[7rem] font-medium text-slate-700 dark:text-slate-200';
+const CRM_TABLE_TEXT_CELL = 'text-sm text-slate-600 dark:text-slate-300';
+const CRM_TABLE_UNIT_CELL = 'block min-w-[5rem] font-semibold text-slate-900 dark:text-slate-100';
+
+function parseCrmDateTime(value?: string): Date | null {
+  if (!value?.trim()) return null;
+  const normalized = value.trim().includes('T') ? value.trim() : value.trim().replace(' ', 'T');
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function renderCrmDateTimeCell(value?: string) {
+  const dt = parseCrmDateTime(value);
+  return dt ? (
+    <div className="flex min-w-[8rem] flex-col gap-0.5">
+      <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">{format(dt, 'MMM dd, yyyy')}</span>
+      <span className="whitespace-nowrap text-xs text-slate-500">{format(dt, 'h:mm a')}</span>
+    </div>
+  ) : (
+    <span className="text-sm text-slate-400">—</span>
+  );
+}
+
+function formatCrmDateTimeLabel(value?: string) {
+  const dt = parseCrmDateTime(value);
+  return dt ? format(dt, 'MMM dd, yyyy · h:mm a') : '—';
+}
+
+const CRM_FORM_INPUT =
+  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+const CRM_FORM_DATEPICKER =
+  'unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+const CRM_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
+
+const CRM_TAB_TRIGGER =
+  'flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
 
 const ID_TYPES = ['Passport', 'UMID', "Driver's License", 'Other'] as const;
 const GOV_DOC_TYPES = ['Passport', 'National ID', 'Visa', 'Other'] as const;
@@ -334,6 +379,8 @@ export function CRMView() {
   const [brokerLogsLoading, setBrokerLogsLoading] = useState(false);
   const [isTenantActivateOpen, setIsTenantActivateOpen] = useState(false);
   const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
+  const [isTenantHistoryOpen, setIsTenantHistoryOpen] = useState(false);
+  const [tenantHistoryTarget, setTenantHistoryTarget] = useState<Tenant | null>(null);
 
   const [isLandlordFormOpen, setIsLandlordFormOpen] = useState(false);
   const [landlordFormMode, setLandlordFormMode] = useState<'create' | 'edit'>('create');
@@ -860,6 +907,16 @@ export function CRMView() {
     setBrokerLogs([]);
   };
 
+  const openTenantHistory = (tenant: Tenant) => {
+    setTenantHistoryTarget(tenant);
+    setIsTenantHistoryOpen(true);
+  };
+
+  const closeTenantHistory = () => {
+    setIsTenantHistoryOpen(false);
+    setTenantHistoryTarget(null);
+  };
+
   const openBlacklistBroker = (agency: BrokerAgency) => {
     setPendingBlacklistBroker(agency);
     setBrokerBlacklistReason('');
@@ -1108,273 +1165,282 @@ export function CRMView() {
   const tenantColumns: ColumnDef<Tenant>[] = useMemo(
     () => [
       {
+        id: 'createdAt',
+        header: t('views.crm.table.dateTime'),
+        sortable: true,
+        sortValue: (tenant) => tenant.createdAt ?? '',
+        render: (tenant) => renderCrmDateTimeCell(tenant.createdAt),
+      },
+      {
+        id: 'idNumber',
+        header: t('views.crm.table.idNumber'),
+        sortable: true,
+        sortValue: (tenant) => tenant.idNumber,
+        render: (tenant) => (
+          <span className={CRM_TABLE_ID_CELL}>{tenant.idNumber || '—'}</span>
+        ),
+      },
+      {
+        id: 'tenant',
         header: t('views.crm.table.tenant'),
+        sortable: true,
+        sortValue: (tenant) => tenant.name,
         render: (tenant) => (
-          <div className="flex items-center gap-3">
-            <Avatar>
-              <AvatarFallback>{tenant.name.split(' ').map((n) => n[0]).join('')}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="font-bold text-slate-900">{tenant.name}</span>
-              <span className="text-xs text-slate-500">{t('views.crm.table.idLabel', { id: tenant.idNumber })}</span>
-            </div>
-          </div>
+          <span className={CRM_TABLE_NAME_CELL}>{tenant.name}</span>
         ),
       },
       {
+        id: 'contact',
         header: t('views.crm.table.contactInfo'),
+        sortable: true,
+        sortValue: (tenant) => tenant.email,
         render: (tenant) => (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Mail className="w-3 h-3" />
-              {tenant.email}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Phone className="w-3 h-3" />
-              {tenant.phone}
-            </div>
+          <div className="flex min-w-[10rem] flex-col gap-0.5">
+            <span className={CRM_TABLE_TEXT_CELL}>{tenant.email}</span>
+            <span className={cn(CRM_TABLE_TEXT_CELL, 'whitespace-nowrap')}>{tenant.phone}</span>
           </div>
         ),
       },
       {
+        id: 'kyc',
         header: t('views.crm.table.kycStatus'),
+        sortable: true,
+        sortValue: (tenant) => (tenant.kycVerified !== false ? 'verified' : 'pending'),
         render: (tenant) =>
           tenant.kycVerified !== false ? (
-            <StatusBadge tone="success">
-              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-              {t('views.crm.table.verified')}
-            </StatusBadge>
+            <StatusBadge tone="success">{t('views.crm.table.verified')}</StatusBadge>
           ) : (
-            <StatusBadge tone="warning">
-              <ShieldQuestion className="w-3.5 h-3.5 mr-1" />
-              {t('views.crm.table.kycPending')}
-            </StatusBadge>
+            <StatusBadge tone="warning">{t('views.crm.table.kycPending')}</StatusBadge>
           ),
       },
       {
+        id: 'unit',
         header: t('views.crm.table.currentUnit'),
+        sortable: true,
+        sortValue: (tenant) => {
+          const activeContract = contractList.find(
+            (c) => c.tenantId === tenant.id && String(c.status).toLowerCase() === 'active',
+          );
+          const unit = activeContract ? unitList.find((u) => u.id === activeContract.unitId) : null;
+          return unit?.unitNumber ?? '';
+        },
         render: (tenant) => {
           const activeContract = contractList.find(
             (c) => c.tenantId === tenant.id && String(c.status).toLowerCase() === 'active',
           );
           const unit = activeContract ? unitList.find((u) => u.id === activeContract.unitId) : null;
           return unit ? (
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-slate-700">{t('views.crm.table.unitLabel', { unitNumber: unit.unitNumber })}</span>
+            <div className="flex min-w-[5rem] flex-col">
+              <span className={CRM_TABLE_UNIT_CELL}>
+                {t('views.crm.table.unitLabel', { unitNumber: unit.unitNumber })}
+              </span>
               <span className="text-xs text-slate-500">{unit.buildingName}</span>
             </div>
           ) : (
-            <span className="text-xs text-slate-400 italic">{t('views.crm.table.noActiveLease')}</span>
+            <span className="text-sm italic text-slate-400">{t('views.crm.table.noActiveLease')}</span>
           );
         },
       },
       {
+        id: 'status',
         header: t('views.crm.table.status'),
+        sortable: true,
+        sortValue: (tenant) => (tenant.isBlacklisted ? 'blacklisted' : 'active'),
         render: (tenant) =>
           tenant.isBlacklisted ? (
             <StatusBadge tone="danger">{t('views.crm.table.blacklisted')}</StatusBadge>
           ) : (
-            <StatusBadge tone="info">{t('views.crm.table.active')}</StatusBadge>
+            <StatusBadge tone="success">{t('views.crm.table.active')}</StatusBadge>
           ),
       },
       {
+        id: 'actions',
         header: t('views.crm.table.actions'),
-        className: 'text-right',
-        headerClassName: 'text-right',
-        cellClassName: 'text-right',
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
         render: (tenant) => (
           <div
-            className="inline-flex items-center justify-end gap-0.5"
+            className="flex items-center justify-center gap-1"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
+            {canUpdate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.crm.table.editTenant')}
+                className={CRM_TABLE_ACTION_BTN}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(tenant);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+            {canUpdate && tenant.isBlacklisted ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.crm.table.activateTenant')}
+                aria-label={t('views.crm.table.activateTenant')}
+                className={CRM_TABLE_ACTION_BTN}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openActivateTenant(tenant);
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-indigo-600"
-              title={t('views.crm.table.viewDetails')}
-              aria-label={t('views.crm.table.viewDetails')}
+              title={t('views.crm.table.viewPortal')}
+              aria-label={t('views.crm.table.viewPortal')}
+              className={CRM_TABLE_ACTION_BTN}
               onClick={(e) => {
                 e.stopPropagation();
-                openViewDetails(tenant);
+                try {
+                  localStorage.setItem('realstate_portal_tenant_id', String(tenant.id));
+                } catch {
+                  // ignore
+                }
+                const url = `${window.location.origin}/portal?tenantId=${encodeURIComponent(tenant.id)}`;
+                window.open(url, '_blank');
               }}
             >
-              <Eye className="h-4 w-4" strokeWidth={1.75} />
+              <ExternalLink className="h-3.5 w-3.5" />
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()} />
-                }
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title={t('views.crm.table.history')}
+              aria-label={t('views.crm.table.history')}
+              className={CRM_TABLE_ACTION_BTN}
+              onClick={(e) => {
+                e.stopPropagation();
+                openTenantHistory(tenant);
+              }}
+            >
+              <History className="h-3.5 w-3.5" />
+            </Button>
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.crm.table.deleteTenant')}
+                className={CRM_TABLE_ACTION_BTN}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDeleteTenant(tenant);
+                }}
               >
-                <MoreVertical className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canUpdate && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEdit(tenant);
-                    }}
-                  >
-                    {t('views.crm.table.editTenant')}
-                  </DropdownMenuItem>
-                )}
-                {canUpdate && tenant.isBlacklisted ? (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openActivateTenant(tenant);
-                    }}
-                  >
-                    {t('views.crm.table.activateTenant')}
-                  </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    try {
-                      localStorage.setItem('realstate_portal_tenant_id', String(tenant.id));
-                    } catch {
-                      // ignore storage failures (private mode, etc.)
-                    }
-                    const url = `${window.location.origin}/portal?tenantId=${encodeURIComponent(tenant.id)}`;
-                    window.open(url, '_blank');
-                  }}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  {t('views.crm.table.viewPortal')}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <History className="w-4 h-4 mr-2" />
-                  {t('views.crm.table.history')}
-                </DropdownMenuItem>
-                {canDelete && (
-                  <DropdownMenuItem
-                    className="text-rose-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteTenant(tenant);
-                    }}
-                  >
-                    {t('views.crm.table.deleteTenant')}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [t, canUpdate, canDelete, openViewDetails, openEdit, openActivateTenant, handleDeleteTenant, contractList, unitList],
+    [t, canUpdate, canDelete, openEdit, openActivateTenant, openTenantHistory, handleDeleteTenant, contractList, unitList],
   );
 
   const landlordColumns: ColumnDef<Landlord>[] = useMemo(
     () => [
       {
+        id: 'createdAt',
+        header: t('views.crm.table.dateTime'),
+        sortable: true,
+        sortValue: (l) => l.createdAt ?? '',
+        render: (l) => renderCrmDateTimeCell(l.createdAt),
+      },
+      {
+        id: 'landlord',
         header: 'Landlord',
+        sortable: true,
+        sortValue: (l) => l.fullName,
         render: (l) => (
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-900">{l.fullName}</span>
+          <div className="flex min-w-[7rem] flex-col">
+            <span className={CRM_TABLE_NAME_CELL}>{l.fullName}</span>
             <span className="text-xs text-slate-500">{l.govIdNo || '—'}</span>
           </div>
         ),
       },
       {
+        id: 'contact',
         header: 'Contact',
+        sortable: true,
+        sortValue: (l) => l.email || l.mobileNo || '',
         render: (l) => (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Phone className="w-3 h-3" />
-              {l.mobileNo || '—'}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Mail className="w-3 h-3" />
-              <span className="break-all">{l.email || '—'}</span>
-            </div>
+          <div className="flex min-w-[10rem] flex-col gap-0.5">
+            <span className={cn(CRM_TABLE_TEXT_CELL, 'whitespace-nowrap')}>{l.mobileNo || '—'}</span>
+            <span className={cn(CRM_TABLE_TEXT_CELL, 'break-all')}>{l.email || '—'}</span>
           </div>
         ),
       },
       {
-        header: 'Created',
-        render: (l) => <span className="text-xs text-slate-500">{l.createdAt || '—'}</span>,
-      },
-      {
+        id: 'actions',
         header: 'Actions',
-        className: 'text-right',
-        headerClassName: 'text-right',
-        cellClassName: 'text-right',
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
         render: (l) => (
           <div
-            className="inline-flex items-center justify-end"
+            className="flex items-center justify-center gap-1"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()} />}
+            {canUpdate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Edit landlord"
+                className={CRM_TABLE_ACTION_BTN}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEditLandlord(l);
+                }}
               >
-                <MoreVertical className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canUpdate ? (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditLandlord(l);
-                    }}
-                  >
-                    Edit
-                  </DropdownMenuItem>
-                ) : null}
-                {canDelete ? (
-                  <DropdownMenuItem
-                    className="text-rose-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteLandlord(l);
-                    }}
-                  >
-                    Deactivate
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Deactivate landlord"
+                className={CRM_TABLE_ACTION_BTN}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDeleteLandlord(l);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [canDelete, canUpdate],
+    [canDelete, canUpdate, t],
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{t('views.crm.title')}</h1>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">{t('views.crm.subtitle')}</p>
-        </div>
-        {canCreate && activeTab === 'tenants' && (
-          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openRegister}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t('views.crm.registerTenant')}
-          </Button>
-        )}
-        {canCreate && activeTab === 'brokers' && (
-          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openAddBroker}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t('views.crm.brokers.addAgency')}
-          </Button>
-        )}
-        {canCreate && activeTab === 'landlords' && (
-          <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={openAddLandlord}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Landlord
-          </Button>
-        )}
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t('views.crm.title')}</h1>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">{t('views.crm.subtitle')}</p>
       </div>
 
       <TenantDetailsModal
@@ -1456,15 +1522,15 @@ export function CRMView() {
         onClose={closeDeleteBroker}
         title={t('views.crm.brokers.delete')}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeDeleteBroker}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeDeleteBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-rose-600 hover:bg-rose-700"
+              className={modalDangerButtonClass}
               onClick={() => void confirmDeleteBroker()}
             >
               {t('views.crm.brokers.delete')}
@@ -1490,7 +1556,7 @@ export function CRMView() {
         maxWidth="md"
         footer={
           <div className="flex justify-end w-full">
-            <Button type="button" variant="outline" onClick={closeBrokerMessage}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeBrokerMessage}>
               {t('views.crm.brokers.cancel')}
             </Button>
           </div>
@@ -1606,7 +1672,7 @@ export function CRMView() {
         maxWidth="3xl"
         footer={
           <div className="flex justify-end w-full">
-            <Button type="button" variant="outline" onClick={closeBrokerLogs}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeBrokerLogs}>
               {t('views.crm.blacklist.close')}
             </Button>
           </div>
@@ -1673,20 +1739,28 @@ export function CRMView() {
         )}
       </Modal>
 
+      <TenantHistoryModal
+        isOpen={isTenantHistoryOpen}
+        onClose={closeTenantHistory}
+        tenant={tenantHistoryTarget}
+        contracts={contractList}
+        units={unitList}
+      />
+
       <Modal
         isOpen={isBrokerBlacklistOpen}
         onClose={closeBlacklistBroker}
         title={t('views.crm.table.blacklisted')}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeBlacklistBroker}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeBlacklistBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-rose-600 hover:bg-rose-700"
+              className={modalDangerButtonClass}
               onClick={() => void confirmBlacklistBroker()}
             >
               {t('views.crm.table.blacklisted')}
@@ -1694,7 +1768,7 @@ export function CRMView() {
           </div>
         }
       >
-        <div className="space-y-3">
+        <div className="space-y-3 unit-form-fields">
           <p className="text-sm text-slate-600">{pendingBlacklistBroker ? pendingBlacklistBroker.name : ''}</p>
           <div className="space-y-2">
             <Label htmlFor="crm-broker-blacklist-reason">{t('views.crm.blacklist.reason')}</Label>
@@ -1702,7 +1776,7 @@ export function CRMView() {
               id="crm-broker-blacklist-reason"
               value={brokerBlacklistReason}
               onChange={(e) => setBrokerBlacklistReason(e.target.value)}
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
               placeholder={t('views.crm.blacklist.reason')}
             />
           </div>
@@ -1714,15 +1788,15 @@ export function CRMView() {
         onClose={closeActivateBroker}
         title={t('views.crm.brokers.activateTitle')}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeActivateBroker}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeActivateBroker}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-emerald-600 hover:bg-emerald-700"
+              className={modalSuccessButtonClass}
               onClick={() => void confirmActivateBroker()}
             >
               {t('views.crm.brokers.activate')}
@@ -1744,15 +1818,15 @@ export function CRMView() {
         onClose={closeActivateTenant}
         title={t('views.crm.table.activateTenantTitle')}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeActivateTenant}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeActivateTenant}>
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-emerald-600 hover:bg-emerald-700"
+              className={modalSuccessButtonClass}
               onClick={() => void confirmActivateTenant()}
             >
               {t('views.crm.table.activateTenant')}
@@ -1774,27 +1848,27 @@ export function CRMView() {
         onClose={closeForm}
         title={formMode === 'edit' ? t('views.crm.tenantModal.editTitle') : t('views.crm.tenantModal.createTitle')}
         maxWidth="2xl"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeForm}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeForm}>
               {t('views.crm.tenantModal.cancel')}
             </Button>
-            <Button type="button" className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveTenant()}>
+            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void handleSaveTenant()}>
               {t('views.crm.tenantModal.save')}
             </Button>
           </div>
         }
       >
-        <p className="text-sm text-slate-500 mb-6">{t('views.crm.tenantModal.description')}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p className="mb-4 text-sm text-brand-muted">{t('views.crm.tenantModal.description')}</p>
+        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="crm-name">{t('views.crm.tenantModal.name')}</Label>
             <Input
               id="crm-name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2">
@@ -1804,7 +1878,7 @@ export function CRMView() {
               type="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2">
@@ -1813,7 +1887,7 @@ export function CRMView() {
               id="crm-phone"
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2">
@@ -1821,6 +1895,8 @@ export function CRMView() {
             <Select2
               options={nationalityOptions}
               value={form.nationality}
+              borderless={false}
+              className={CRM_SELECT_CLASS}
               onChange={(v) => setForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
               placeholder="Select nationality"
             />
@@ -1831,6 +1907,7 @@ export function CRMView() {
               mode="single"
               placeholder="MM/DD/YYYY"
               fullWidth
+              inputClassName={CRM_FORM_DATEPICKER}
               value={form.birthDate ? parseISO(form.birthDate) : null}
               onChange={(picked) =>
                 setForm((f) => ({
@@ -1845,6 +1922,8 @@ export function CRMView() {
             <Select2
               options={idTypeOptions}
               value={form.idType}
+              borderless={false}
+              className={CRM_SELECT_CLASS}
               onChange={(v) => setForm((f) => ({ ...f, idType: (v ?? 'Passport') as string }))}
             />
           </div>
@@ -1854,7 +1933,7 @@ export function CRMView() {
               id="crm-id-number"
               value={form.idNumber}
               onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))}
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -1863,6 +1942,7 @@ export function CRMView() {
               mode="single"
               placeholder="MM/DD/YYYY"
               fullWidth
+              inputClassName={CRM_FORM_DATEPICKER}
               value={form.idExpiry ? parseISO(form.idExpiry) : null}
               onChange={(picked) =>
                 setForm((f) => ({
@@ -1903,7 +1983,7 @@ export function CRMView() {
                 id="crm-bl-reason"
                 value={form.blacklistReason}
                 onChange={(e) => setForm((f) => ({ ...f, blacklistReason: e.target.value }))}
-                className="rounded-xl border-slate-200"
+                className={CRM_FORM_INPUT}
               />
             </div>
           ) : null}
@@ -2119,23 +2199,23 @@ export function CRMView() {
         onClose={closeLandlordForm}
         title={landlordFormMode === 'edit' ? 'Edit landlord' : 'Add landlord'}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeLandlordForm}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeLandlordForm}>
               Cancel
             </Button>
-            <Button type="button" className="h-11 min-w-[120px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void handleSaveLandlord()}>
+            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void handleSaveLandlord()}>
               Save
             </Button>
           </div>
         }
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label>Full name</Label>
             <Input
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
               value={landlordForm.fullName}
               onChange={(e) => setLandlordForm((f) => ({ ...f, fullName: e.target.value }))}
             />
@@ -2143,7 +2223,7 @@ export function CRMView() {
           <div className="space-y-2">
             <Label>Mobile no</Label>
             <Input
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
               value={landlordForm.mobileNo}
               onChange={(e) => setLandlordForm((f) => ({ ...f, mobileNo: e.target.value }))}
             />
@@ -2152,7 +2232,7 @@ export function CRMView() {
             <Label>Email</Label>
             <Input
               type="email"
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
               value={landlordForm.email}
               onChange={(e) => setLandlordForm((f) => ({ ...f, email: e.target.value }))}
             />
@@ -2160,7 +2240,7 @@ export function CRMView() {
           <div className="space-y-2 sm:col-span-2">
             <Label>Government ID no</Label>
             <Input
-              className="rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
               value={landlordForm.govIdNo}
               onChange={(e) => setLandlordForm((f) => ({ ...f, govIdNo: e.target.value }))}
             />
@@ -2173,20 +2253,19 @@ export function CRMView() {
         onClose={closeBrokerForm}
         title={brokerFormMode === 'edit' ? t('views.crm.brokers.editTitle') : t('views.crm.brokers.addTitle')}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button
               type="button"
-              variant="outline"
-              className="h-11 min-w-[100px] rounded-xl"
+              className={modalDismissButtonClass}
               onClick={closeBrokerForm}
             >
               {t('views.crm.brokers.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[100px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+              className={modalPrimaryButtonClass}
               onClick={() => void handleSaveBroker()}
             >
               {t('views.crm.brokers.save')}
@@ -2194,17 +2273,17 @@ export function CRMView() {
           </div>
         }
       >
-        <p className="text-sm text-slate-500 mb-6">
+        <p className="mb-4 text-sm text-brand-muted">
           {brokerFormMode === 'edit' ? t('views.crm.brokers.editDescription') : t('views.crm.brokers.addDescription')}
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="crm-broker-name">{t('views.crm.brokers.agencyName')}</Label>
             <Input
               id="crm-broker-name"
               value={brokerForm.name}
               onChange={(e) => setBrokerForm((f) => ({ ...f, name: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2">
@@ -2213,7 +2292,7 @@ export function CRMView() {
               id="crm-broker-contact"
               value={brokerForm.contactPerson}
               onChange={(e) => setBrokerForm((f) => ({ ...f, contactPerson: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2">
@@ -2222,7 +2301,7 @@ export function CRMView() {
               id="crm-broker-phone"
               value={brokerForm.phone}
               onChange={(e) => setBrokerForm((f) => ({ ...f, phone: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -2232,7 +2311,7 @@ export function CRMView() {
               type="email"
               value={brokerForm.email}
               onChange={(e) => setBrokerForm((f) => ({ ...f, email: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
 
@@ -2241,6 +2320,8 @@ export function CRMView() {
             <Select2
               options={nationalityOptions}
               value={brokerForm.nationality}
+              borderless={false}
+              className={CRM_SELECT_CLASS}
               onChange={(v) => setBrokerForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
               placeholder="Select nationality"
             />
@@ -2251,6 +2332,8 @@ export function CRMView() {
             <Select2
               options={brokerGovDocTypeOptions}
               value={brokerForm.documentType}
+              borderless={false}
+              className={CRM_SELECT_CLASS}
               onChange={(v) => setBrokerForm((f) => ({ ...f, documentType: (v ?? '') as string }))}
             />
           </div>
@@ -2260,7 +2343,7 @@ export function CRMView() {
               id="crm-broker-doc-no"
               value={brokerForm.documentNo}
               onChange={(e) => setBrokerForm((f) => ({ ...f, documentNo: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className={CRM_FORM_INPUT}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -2269,7 +2352,7 @@ export function CRMView() {
               mode="single"
               placeholder="MM/DD/YYYY"
               fullWidth
-              inputClassName="h-12 rounded-xl text-sm"
+              inputClassName={CRM_FORM_DATEPICKER}
               value={brokerForm.expiryDate ? parseISO(brokerForm.expiryDate) : null}
               onChange={(picked) =>
                 setBrokerForm((f) => ({
@@ -2395,15 +2478,15 @@ export function CRMView() {
         onClose={closeBlacklistDetails}
         title={selectedBlacklist ? t('views.crm.blacklist.detailsTitle') : ''}
         maxWidth="lg"
-        variant="default"
+        variant="glass"
         footer={
           <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
             {selectedBlacklist?.entityType === 'tenant' && selectedBlacklist.tenantId ? (
-              <Button type="button" className="sm:mr-auto bg-indigo-600 text-white hover:bg-indigo-700" onClick={openTenantFromBlacklist}>
+              <Button type="button" className={cn('sm:mr-auto', modalPrimaryButtonClass)} onClick={openTenantFromBlacklist}>
                 {t('views.crm.blacklist.viewTenantProfile')}
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={closeBlacklistDetails}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closeBlacklistDetails}>
               {t('views.crm.blacklist.close')}
             </Button>
           </div>
@@ -2475,53 +2558,61 @@ export function CRMView() {
       </Modal>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <Input
-              placeholder={t('views.crm.searchPlaceholder')}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-900/40"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <TabsList className="h-9 w-fit max-w-full shrink-0 gap-0.5 overflow-x-auto rounded-lg border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-800/90">
+            <TabsTrigger value="tenants" className={CRM_TAB_TRIGGER}>
+              <Users className="size-3.5 shrink-0 opacity-90" aria-hidden />
+              <span className="truncate">{t('views.crm.tabs.tenants')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="landlords" className={CRM_TAB_TRIGGER}>
+              <Home className="size-3.5 shrink-0 opacity-90" aria-hidden />
+              <span className="truncate">{t('views.crm.tabs.landlords')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="brokers" className={CRM_TAB_TRIGGER}>
+              <Building2 className="size-3.5 shrink-0 opacity-90" aria-hidden />
+              <span className="truncate">{t('views.crm.tabs.brokers')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="blacklist" className={CRM_TAB_TRIGGER}>
+              <Ban className="size-3.5 shrink-0 opacity-90" aria-hidden />
+              <span className="truncate">{t('views.crm.tabs.blacklist')}</span>
+            </TabsTrigger>
+          </TabsList>
 
-          <TabsList className="grid h-12 w-full grid-cols-4 gap-1 rounded-2xl border border-slate-200/90 bg-slate-100 p-1.5 shadow-inner dark:border-slate-700 dark:bg-slate-800/90 sm:w-auto sm:min-w-[34rem]">
-          <TabsTrigger
-            value="tenants"
-            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
-          >
-            <Users className="size-4 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{t('views.crm.tabs.tenants')}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="landlords"
-            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
-          >
-            <Home className="size-4 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{t('views.crm.tabs.landlords')}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="brokers"
-            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
-          >
-            <Building2 className="size-4 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{t('views.crm.tabs.brokers')}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="blacklist"
-            className="gap-2 rounded-xl border-0 px-2 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white sm:px-3 sm:text-sm"
-          >
-            <Ban className="size-4 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{t('views.crm.tabs.blacklist')}</span>
-          </TabsTrigger>
-        </TabsList>
+          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+            <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <Input
+                placeholder={t('views.crm.searchPlaceholder')}
+                className="h-9 rounded-xl border-transparent bg-white pl-9 pr-3 text-sm shadow-sm dark:border-transparent dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {canCreate && activeTab === 'tenants' ? (
+              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openRegister}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('views.crm.registerTenant')}
+              </Button>
+            ) : null}
+            {canCreate && activeTab === 'brokers' ? (
+              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openAddBroker}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('views.crm.brokers.addAgency')}
+              </Button>
+            ) : null}
+            {canCreate && activeTab === 'landlords' ? (
+              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openAddLandlord}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Landlord
+              </Button>
+            ) : null}
+          </div>
         </div>
 
-        <TabsContent value="tenants" className="mt-2 space-y-6">
+        <TabsContent value="tenants" className="mt-4 w-full outline-none">
           {crmLoading ? (
-            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
-              <SkeletonTable rows={6} columns={6} />
+            <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
+              <SkeletonTable rows={6} columns={8} />
             </div>
           ) : (
             <DataTable
@@ -2534,9 +2625,9 @@ export function CRMView() {
           )}
         </TabsContent>
 
-        <TabsContent value="landlords" className="mt-2 space-y-6">
+        <TabsContent value="landlords" className="mt-4 w-full outline-none">
           {landlordsLoading ? (
-            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+            <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
               <SkeletonTable rows={6} columns={4} />
             </div>
           ) : (
@@ -2544,7 +2635,7 @@ export function CRMView() {
           )}
         </TabsContent>
 
-        <TabsContent value="brokers" className="mt-2 space-y-6">
+        <TabsContent value="brokers" className="mt-4 w-full outline-none">
           {brokersLoading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
@@ -2904,7 +2995,7 @@ export function CRMView() {
             </div>
           )}
         </TabsContent>
-        <TabsContent value="blacklist" className="mt-2 space-y-6">
+        <TabsContent value="blacklist" className="mt-4 w-full outline-none">
           <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white px-4 py-4 shadow-sm dark:border-rose-900/50 dark:from-rose-950/35 dark:via-slate-900 dark:to-slate-900">
             <div className="flex gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/80">
@@ -3100,3 +3191,5 @@ export function CRMView() {
     </div>
   );
 }
+
+export default CRMView;

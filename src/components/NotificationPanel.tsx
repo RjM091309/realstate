@@ -153,12 +153,11 @@ export function NotificationPanel({
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
             className={cn(
               "absolute right-0 top-full z-50 mt-2 flex max-h-[min(28rem,calc(100vh-5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl",
-              "border border-slate-200/80 dark:border-slate-700/70",
               "bg-white/80 dark:bg-slate-950/60 backdrop-blur-md supports-[backdrop-filter]:backdrop-blur-md",
-              "shadow-xl ring-1 ring-black/5 dark:ring-white/10",
+              "shadow-xl",
             )}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between px-4 py-3">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200">
                   <Bell size={18} />
@@ -249,13 +248,12 @@ export function NotificationPanel({
             </div>
 
             {showMarkAll && (
-              <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-3">
+              <div className="shrink-0 p-3">
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
                   className={cn(
-                    "w-full cursor-pointer rounded-lg border py-2.5 text-sm font-medium shadow-sm transition-colors",
-                    "border-slate-200 dark:border-slate-700",
+                    "w-full cursor-pointer rounded-lg py-2.5 text-sm font-medium shadow-sm transition-colors",
                     "bg-white/70 dark:bg-slate-900/40 backdrop-blur",
                     "text-slate-700 dark:text-slate-100",
                     "hover:bg-slate-50 dark:hover:bg-slate-800/60",

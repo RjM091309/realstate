@@ -62,7 +62,8 @@ export async function listContractsByBranch(branchId) {
         c.advance_rent,
         c.contract_type,
         c.status,
-        c.special_remarks AS remarks
+        c.special_remarks AS remarks,
+        c.created_at
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
@@ -92,7 +93,8 @@ export async function listArchivedContractsByBranch(branchId) {
         c.advance_rent,
         c.contract_type,
         c.status,
-        c.special_remarks AS remarks
+        c.special_remarks AS remarks,
+        c.created_at
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
@@ -255,7 +257,8 @@ export async function getContractById(id, branchId) {
         c.advance_rent,
         c.contract_type,
         c.status,
-        c.special_remarks AS remarks
+        c.special_remarks AS remarks,
+        c.created_at
      FROM lease_contract c
      LEFT JOIN contract_tenant ct
        ON ct.contract_id = c.id AND ct.is_primary = 1 AND ct.active = 1
@@ -413,8 +416,14 @@ export async function renewLeaseContract(branchId, oldContractId, payload) {
     const remarks = parts.length ? parts.join('\n\n') : null;
 
     const contractNo = await generateNextContractNo(conn, branchId, startDate);
-    const deposit = Number(old.security_deposit ?? 0);
-    const advance = Number(old.advance_rent ?? 0);
+    const deposit =
+      payload.securityDeposit != null && Number.isFinite(Number(payload.securityDeposit))
+        ? Number(payload.securityDeposit)
+        : Number(old.security_deposit ?? 0);
+    const advance =
+      payload.advanceRent != null && Number.isFinite(Number(payload.advanceRent))
+        ? Number(payload.advanceRent)
+        : Number(old.advance_rent ?? 0);
 
     const [ins] = await conn.query(
       `INSERT INTO lease_contract (

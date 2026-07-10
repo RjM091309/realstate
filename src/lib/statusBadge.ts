@@ -39,5 +39,27 @@ export function contractStatusVariant(status: string): StatusBadgeVariant {
   if (s === 'active') return 'success';
   if (s === 'expired') return 'danger';
   if (s === 'terminated') return 'neutral';
+  if (s.includes('pending')) return 'info';
+  return 'neutral';
+}
+
+export function inspectionStatusVariant(status: string): StatusBadgeVariant {
+  const s = status.trim().toLowerCase();
+  if (s === 'ready_for_occupancy' || s === 'occupied') return 'success';
+  if (s === 'under_inspection' || s === 'pending_approval') return 'info';
+  if (s === 'move_in_scheduled') return 'violet';
+  if (s === 'failed') return 'danger';
+  if (s === 'vacant') return 'warning';
+  return 'neutral';
+}
+
+export function leaseRenewalStatusVariant(status: string): StatusBadgeVariant {
+  const s = status.trim().toLowerCase();
+  if (s === 'active') return 'success';
+  if (s === 'ready_to_activate') return 'success';
+  if (s === 'awaiting_payment') return 'danger';
+  if (s === 'declined') return 'danger';
+  if (s === 'pending_signature') return 'violet';
+  if (s === 'pending_renewal') return 'info';
   return 'neutral';
 }

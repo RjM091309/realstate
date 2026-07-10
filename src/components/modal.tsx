@@ -13,6 +13,8 @@ export interface ModalProps {
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl';
   variant?: 'default' | 'glass';
+  /** Tighter header/body padding and smaller title — for data-heavy modals. */
+  compact?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -24,6 +26,7 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   maxWidth = 'md',
   variant = 'default',
+  compact = false,
 }) => {
   const { t } = useTranslation();
   // Prevent body scroll when modal is open
@@ -76,19 +79,18 @@ export const Modal: React.FC<ModalProps> = ({
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className={cn(
-                'w-full flex flex-col max-h-[90vh] pointer-events-auto',
+                'app-modal-shell w-full flex flex-col pointer-events-auto',
+                compact ? 'max-h-[85vh]' : 'max-h-[90vh]',
                 isGlass
                   ? [
                       'rounded-3xl',
                       'bg-white dark:bg-slate-900',
-                      'border border-slate-200/90 dark:border-slate-700/80',
                       'shadow-[0_25px_60px_-20px_rgba(15,23,42,0.18)]',
-                      'ring-1 ring-black/[0.04] dark:ring-white/10',
                       'text-slate-900 dark:text-slate-50',
                     ].join(' ')
                   : [
-                      'rounded-3xl border border-slate-200/90 bg-white text-slate-900 shadow-2xl',
-                      'dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-50',
+                      'rounded-3xl bg-white text-slate-900 shadow-2xl',
+                      'dark:bg-slate-900 dark:text-slate-50',
                     ].join(' '),
                 maxWidthClass,
               )}
@@ -96,16 +98,18 @@ export const Modal: React.FC<ModalProps> = ({
               {/* Header */}
               <div
                 className={cn(
-                  'flex items-start justify-between px-6 py-5 shrink-0 gap-4 rounded-t-3xl',
+                  'app-modal-header flex items-start justify-between shrink-0 gap-3 rounded-t-3xl',
+                  compact ? 'px-4 py-3' : 'px-6 py-5',
                   isGlass
-                    ? 'border-b border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900'
-                    : 'border-b border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900',
+                    ? 'bg-white dark:bg-slate-900'
+                    : 'bg-white dark:bg-slate-900',
                 )}
               >
                 <div className="min-w-0">
                   <h3
                     className={cn(
-                      'text-xl font-bold',
+                      'font-bold',
+                      compact ? 'text-base' : 'text-xl',
                       isGlass ? 'text-slate-900 dark:text-slate-50' : 'text-slate-900 dark:text-slate-50',
                     )}
                   >
@@ -129,8 +133,8 @@ export const Modal: React.FC<ModalProps> = ({
                   className={cn(
                     'w-8 h-8 flex items-center justify-center rounded-xl transition-colors',
                     isGlass
-                      ? 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                      : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+                      ? 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                      : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
                   )}
                 >
                   <X size={18} />
@@ -140,7 +144,8 @@ export const Modal: React.FC<ModalProps> = ({
               {/* Body */}
               <div
                 className={cn(
-                  'px-6 py-6 overflow-y-auto custom-scrollbar flex-1',
+                  'overflow-y-auto custom-scrollbar flex-1',
+                  compact ? 'px-4 py-3' : 'px-6 py-6',
                   !footer && 'rounded-b-3xl',
                   isGlass
                     ? 'bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100'
@@ -154,10 +159,10 @@ export const Modal: React.FC<ModalProps> = ({
               {footer && (
                 <div
                   className={cn(
-                    'px-6 py-5 rounded-b-3xl shrink-0',
+                    'app-modal-footer px-6 py-5 rounded-b-3xl shrink-0',
                     isGlass
-                      ? 'border-t border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900'
-                      : 'border-t border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-900',
+                      ? 'bg-white dark:bg-slate-900'
+                      : 'bg-white dark:bg-slate-900',
                   )}
                 >
                   {footer}

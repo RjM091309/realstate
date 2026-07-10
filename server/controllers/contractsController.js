@@ -17,6 +17,12 @@ import {
   updateContractTenantRemarks,
 } from '../models/contractsModel.js';
 import { listInventorySnapshotsByContract } from '../models/inventorySnapshotsModel.js';
+import {
+  getInspectionByContractId,
+  insertInspectionLog,
+  isContractInspectionApproved,
+  updateInspectionFields,
+} from '../models/unitInspectionsModel.js';
 
 function fmtDate(d) {
   if (d == null) return '';
@@ -25,6 +31,18 @@ function fmtDate(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function fmtDateTime(d) {
+  if (d == null) return '';
+  if (typeof d === 'string') return d.slice(0, 19).replace('T', ' ');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
 /** DB ENUM contract_type (see lease_contract in realstate_init.sql) */
@@ -114,6 +132,7 @@ function rowToContract(row) {
     type: mapDbTypeToUi(row.contract_type),
     status: mapDbStatusToUi(row.status),
     remarks: row.remarks ? String(row.remarks) : undefined,
+    createdAt: row.created_at != null ? fmtDateTime(row.created_at) : '',
   };
 }
 
@@ -199,6 +218,30 @@ function canCrud(session, op) {
   if (op === 'create') return Boolean(permissions.create);
   if (op === 'update') return Boolean(permissions.update);
   return Boolean(permissions.delete);
+}
+
+async function assertCanActivateContract(contractId, branchId) {
+  if (await isContractInspectionApproved(contractId, branchId)) {
+    return true;
+  }
+  const snaps = await listInventorySnapshotsByContract(contractId, branchId);
+  return Boolean(snaps && snaps.length > 0);
+}
+
+function contractRowToActivatePayload(row) {
+  return {
+    unitId: String(row.unit_id),
+    tenantId: String(row.tenant_id ?? ''),
+    agentId: String(row.agent_id ?? ''),
+    startDate: fmtDate(row.start_date),
+    endDate: fmtDate(row.end_date),
+    monthlyRent: Number(row.monthly_rent),
+    securityDeposit: Number(row.security_deposit),
+    advanceRent: Number(row.advance_rent),
+    type: mapDbTypeToUi(row.contract_type),
+    status: 'Active',
+    remarks: row.remarks ? String(row.remarks) : null,
+  };
 }
 
 async function getAuthContext(req, res) {
@@ -313,11 +356,11 @@ export async function updateContract(req, res) {
   const dbPayload = payloadForDatabase(parsed);
   if (String(dbPayload.status).toLowerCase() === 'active') {
     try {
-      const snaps = await listInventorySnapshotsByContract(id, ctx.session.branchId);
-      if (!snaps || snaps.length === 0) {
+      const canActivate = await assertCanActivateContract(id, ctx.session.branchId);
+      if (!canActivate) {
         res.status(409).json({
           error:
-            'Inspection required before activation. Please create an Inventory Snapshot (inspection) for this contract, then activate.',
+            'Complete the unit inspection workflow before activating this lease.',
         });
         return;
       }
@@ -342,6 +385,64 @@ export async function updateContract(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to update contract' });
+  }
+}
+
+export async function activateContract(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to update contracts' });
+    return;
+  }
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  const row = await getContractById(id, ctx.session.branchId);
+  if (!row) {
+    res.status(404).json({ error: 'Contract not found' });
+    return;
+  }
+  if (mapDbStatusToUi(row.status) !== 'Pending Inspection') {
+    res.status(400).json({ error: 'Only pending inspection leases can be activated.' });
+    return;
+  }
+  try {
+    const canActivate = await assertCanActivateContract(id, ctx.session.branchId);
+    if (!canActivate) {
+      res.status(409).json({
+        error: 'Complete the unit inspection workflow before activating this lease.',
+      });
+      return;
+    }
+    const parsed = contractRowToActivatePayload(row);
+    if (!parsed.tenantId || !parsed.agentId) {
+      res.status(400).json({ error: 'Contract is missing tenant or agent details.' });
+      return;
+    }
+    const dbPayload = payloadForDatabase(parsed);
+    const affectedRows = await updateContractById(id, ctx.session.branchId, dbPayload);
+    if (affectedRows === 0) {
+      res.status(404).json({ error: 'Contract not found' });
+      return;
+    }
+    const inspection = await getInspectionByContractId(id, ctx.session.branchId);
+    if (inspection) {
+      await updateInspectionFields(String(inspection.id), ctx.session.branchId, { status: 'occupied' });
+      await insertInspectionLog(
+        String(inspection.id),
+        'lease_activated',
+        'Lease activated. Unit marked as occupied.',
+        ctx.userId,
+      );
+    }
+    const updated = await getContractById(id, ctx.session.branchId);
+    res.json({ contract: rowToContract(updated) });
+  } catch (e) {
+    console.error('[contracts] activateContract', e);
+    res.status(500).json({ error: 'Failed to activate lease' });
   }
 }
 

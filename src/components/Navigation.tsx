@@ -129,14 +129,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   return (
     <div
       className={cn(
-        'relative flex flex-col h-full bg-white text-slate-600 border-r border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800/60 transition-all duration-300 ease-in-out shrink-0',
+        'relative flex flex-col h-full bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-300 transition-all duration-300 ease-in-out shrink-0',
         isCollapsed ? 'w-[72px]' : 'w-64'
       )}
     >
       {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white dark:hover:border-slate-600 transition-all z-50 shadow-lg"
+        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-white text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white transition-all z-50 shadow-lg"
       >
         {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
@@ -162,7 +162,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       </div>
 
       {/* Divider */}
-      <div className="mx-4 border-t border-slate-200 dark:border-slate-800/80" />
+      <div className="mx-4 h-px bg-slate-200/70 dark:bg-slate-800/60" />
 
       {/* Nav items */}
       <div className="flex-1 overflow-y-auto transition-all duration-300 py-3 px-3">
@@ -226,7 +226,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                     />
                   </button>
                   {userMgmtOpen ? (
-                    <div className="ml-3 space-y-0.5 border-l border-slate-200 dark:border-slate-700/80 pl-2.5 pt-0.5">
+                    <div className="ml-3 space-y-0.5 border-l border-transparent pl-2.5 pt-0.5">
                       {subLinks.map(({ path, label }) => {
                         const subActive = location.pathname === path;
                         return (
@@ -310,7 +310,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       </div>
 
       {/* Bottom section */}
-      <div className="border-t border-slate-200 dark:border-slate-800/80">
+      <div className="h-px bg-slate-200/70 dark:bg-slate-800/60">
         {/* User profile card */}
         <div className={cn(
           'flex items-center gap-3 transition-all duration-300',
@@ -560,7 +560,7 @@ export function TopNav({
   const nextThemeLabel = nextTheme === 'dark' ? 'Dark' : 'Light';
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+    <header className="h-16 bg-white dark:bg-slate-900 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         {showDateRangePicker && (
           <div className="shrink-0 min-w-[240px] max-w-[320px] w-full sm:w-auto">
@@ -577,7 +577,7 @@ export function TopNav({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-        <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 p-1">
+        <div className="hidden sm:flex items-center gap-1 rounded-md p-1">
           <span className="sr-only">{t('header.languageLabel')}</span>
           <Button
             variant="ghost"
@@ -604,7 +604,7 @@ export function TopNav({
             KO
           </Button>
         </div>
-        <div className="hidden sm:flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 p-1">
+        <div className="hidden sm:flex items-center gap-1 rounded-md p-1">
           <Button
             variant="ghost"
             size="sm"

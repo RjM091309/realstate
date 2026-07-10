@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/status-badge';
 import { contractStatusVariant, statusBadgeClass } from '@/lib/statusBadge';
-import { Button } from '@/components/ui/button';
+import { Button, modalActionButtonClass } from '@/components/ui/button';
 
 export type TenantDetailsDocument = {
   id: string;
@@ -415,12 +415,12 @@ export function TenantDetailsModal({
               {/* Footer */}
               <div className="px-6 py-5 bg-white/70 ring-1 ring-slate-200/70 border-t border-slate-100 dark:bg-slate-900/60 dark:ring-slate-700/70 dark:border-slate-800">
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                  <Button type="button" variant="outline" className="rounded-xl" onClick={onClose}>
+                  <Button type="button" className={modalActionButtonClass} onClick={onClose}>
                     {closeLabel}
                   </Button>
                   <Button
                     type="button"
-                    className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+                    className={modalActionButtonClass}
                     onClick={onEditTenant}
                     disabled={!onEditTenant}
                   >

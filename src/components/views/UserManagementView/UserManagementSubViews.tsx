@@ -3,7 +3,7 @@ import { LayoutGrid, List, Pencil, Plus, Search, Shield, Trash2 } from 'lucide-r
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, modalDismissButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/modal';
@@ -429,7 +429,7 @@ export function UserRoleManagementView() {
         maxWidth="md"
         footer={
           <div className="flex w-full items-center justify-between gap-3">
-            <Button type="button" variant="ghost" onClick={dismissForm} disabled={saving}>
+            <Button type="button" className={modalDismissButtonClass} onClick={dismissForm} disabled={saving}>
               {t('views.userRole.cancel')}
             </Button>
             <Button
@@ -483,7 +483,7 @@ export function UserRoleManagementView() {
         maxWidth="md"
         footer={
           <div className="flex w-full items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setRemoveTarget(null)} disabled={removing}>
+            <Button type="button" className={modalDismissButtonClass} onClick={() => setRemoveTarget(null)} disabled={removing}>
               {t('views.userRole.cancel')}
             </Button>
             <Button

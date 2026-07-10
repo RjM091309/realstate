@@ -37,6 +37,14 @@ export async function updateContract(id: string, body: ContractWriteBody): Promi
   return contract;
 }
 
+export async function activateContract(id: string): Promise<Contract> {
+  const { contract } = await apiFetch<{ contract: Contract }>(
+    `/api/contracts/${encodeURIComponent(id)}/activate`,
+    { method: 'POST' },
+  );
+  return contract;
+}
+
 export async function deleteContract(id: string): Promise<void> {
   await apiFetch<{ ok: boolean }>(`/api/contracts/${encodeURIComponent(id)}`, {
     method: 'DELETE',

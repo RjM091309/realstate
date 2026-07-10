@@ -11,7 +11,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/status-badge';
 import { paymentStatusVariant } from '@/lib/statusBadge';
@@ -40,6 +40,11 @@ import { useAuth } from '@/context/AuthContext';
 import type { Contract, Payment, PaymentStatus, Tenant, Unit } from '@/types';
 
 const LEDGER_STATUS_FILTERS: PaymentStatus[] = ['Paid', 'Pending', 'Overdue'];
+
+const LEDGER_FORM_INPUT =
+  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+const LEDGER_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 
 function defaultLedgerStatusFilters(): Set<PaymentStatus> {
   return new Set(LEDGER_STATUS_FILTERS);
@@ -711,19 +716,23 @@ export function LeaseLedgerView() {
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={closeModal}>Cancel</Button>
-            <Button className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => void savePayment()}>
+            <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={closeModal}>
+              Cancel
+            </Button>
+            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void savePayment()}>
               {formMode === 'edit' ? 'Save Changes' : t('views.ledger.recordPayment')}
             </Button>
           </div>
         }
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label>Contract</Label>
             <Select2
               options={contractOptions}
               value={form.contractId}
+              borderless={false}
+              className={LEDGER_SELECT_CLASS}
               onChange={(v) => {
                 const cid = (v ?? null) as string | null;
                 const c = contracts.find((x) => x.id === cid);
@@ -740,6 +749,7 @@ export function LeaseLedgerView() {
             <Label>Amount</Label>
             <Input
               type="number"
+              className={LEDGER_FORM_INPUT}
               value={form.amount}
               onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
             />
@@ -747,6 +757,8 @@ export function LeaseLedgerView() {
           <div className="space-y-2">
             <Label>Status</Label>
             <Select2
+              borderless={false}
+              className={LEDGER_SELECT_CLASS}
               options={[
                 { value: 'Pending', label: t('views.ledger.table.pending') },
                 { value: 'Overdue', label: t('views.ledger.table.overdue') },
@@ -760,6 +772,7 @@ export function LeaseLedgerView() {
             <Label>{t('views.ledger.table.dueDate')}</Label>
             <Input
               type="date"
+              className={LEDGER_FORM_INPUT}
               value={form.dueDate}
               onChange={(e) => setForm((prev) => ({ ...prev, dueDate: e.target.value }))}
             />
@@ -768,6 +781,7 @@ export function LeaseLedgerView() {
             <Label>{t('views.ledger.table.paidDate')}</Label>
             <Input
               type="date"
+              className={LEDGER_FORM_INPUT}
               value={form.paidDate}
               onChange={(e) => setForm((prev) => ({ ...prev, paidDate: e.target.value }))}
             />

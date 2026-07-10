@@ -89,6 +89,18 @@ function attachmentTitle(docType) {
   return 'Supporting document';
 }
 
+function logTenantAudit(ctx, tenantId, action, changeSummary) {
+  void logAudit({
+    branchId: ctx.session.branchId,
+    actorUserId: ctx.session.user.id,
+    moduleName: 'crm',
+    recordTable: 'tenant_profile',
+    recordId: tenantId,
+    action,
+    changeSummary,
+  });
+}
+
 function fmtDate(d) {
   if (d == null) return '';
   if (typeof d === 'string') return d.slice(0, 10);
@@ -96,6 +108,18 @@ function fmtDate(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function fmtDateTime(d) {
+  if (d == null) return '';
+  if (typeof d === 'string') return d.slice(0, 19).replace('T', ' ');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
 function rowToTenant(row) {
@@ -116,6 +140,7 @@ function rowToTenant(row) {
     kycVerified: Boolean(Number(row.kyc_verified)),
     isBlacklisted: Boolean(Number(row.is_blacklisted)),
     blacklistReason: row.blacklist_reason ? String(row.blacklist_reason) : undefined,
+    createdAt: row.created_at != null ? fmtDateTime(row.created_at) : '',
   };
 }
 
@@ -376,6 +401,7 @@ export async function createTenant(req, res) {
         ctx.session.user.id,
       );
     }
+    logTenantAudit(ctx, row.id, 'create', `Registered tenant: ${parsed.name}`);
     res.status(201).json({ tenant: rowToTenant(row) });
   } catch (e) {
     console.error(e);
@@ -436,6 +462,7 @@ export async function updateTenant(req, res) {
       res.status(404).json({ error: 'Tenant not found' });
       return;
     }
+    logTenantAudit(ctx, id, 'update', `Updated tenant profile: ${parsed.name}`);
     res.json({ tenant: rowToTenant(row) });
   } catch (e) {
     console.error(e);
@@ -461,6 +488,7 @@ export async function deleteTenant(req, res) {
       res.status(404).json({ error: 'Tenant not found' });
       return;
     }
+    logTenantAudit(ctx, id, 'delete', `Deactivated tenant #${id}`);
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
@@ -524,6 +552,7 @@ export async function uploadTenantKycDocument(req, res) {
       res.status(404).json({ error: 'Tenant not found' });
       return;
     }
+    logTenantAudit(ctx, id, 'update', 'Uploaded KYC identity document');
     res.json({ tenant: rowToTenant(row) });
   } catch (e) {
     console.error(e);

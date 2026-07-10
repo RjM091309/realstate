@@ -10,7 +10,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-transparent bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
@@ -56,3 +56,22 @@ function Button({
 }
 
 export { Button, buttonVariants }
+
+/** Standard indigo modal footer button — auto width, consistent height. */
+export const modalActionButtonClass =
+  'h-10 min-w-[7.5rem] px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700';
+
+/** Outline companion for multi-action modal footers. */
+export const modalOutlineButtonClass =
+  'h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-none hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+
+export const modalDangerButtonClass =
+  'h-10 min-w-[7.5rem] px-4 rounded-xl bg-rose-600 text-white hover:bg-rose-700';
+
+export const modalSuccessButtonClass =
+  'h-10 min-w-[7.5rem] px-4 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700';
+
+/** @deprecated Use modalActionButtonClass */
+export const modalDismissButtonClass = modalActionButtonClass;
+
+export const modalPrimaryButtonClass = modalActionButtonClass;

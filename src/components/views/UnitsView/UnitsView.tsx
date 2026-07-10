@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import {
   Search,
   Plus,
@@ -22,11 +24,14 @@ import {
   CircleDollarSign,
   Home,
   Check,
+  MessageSquare,
+  Ruler,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, modalActionButtonClass, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -44,12 +49,28 @@ import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
+import { toWebpDataUrl } from '@/lib/imageWebp';
 import { cn } from '@/lib/utils';
 import type { Contract, InventoryItem, Tenant, Unit, UnitStatus, UnitType } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
-const UNIT_TYPES: UnitType[] = ['Studio', '1BR', '2BR', '3BR', 'Loft', 'Penthouse'];
+const UNIT_TYPES: UnitType[] = [
+  'House and Lot',
+  'Condominium',
+  'Apartment',
+  'Commercial Building',
+  'Warehouse',
+  'Hotel',
+  'Office Space',
+  // Legacy types (kept for existing saved units)
+  'Studio',
+  '1BR',
+  '2BR',
+  '3BR',
+  'Loft',
+  'Penthouse',
+];
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 const AREA_CITIES_LUZON: string[] = [
   'Manila',
@@ -154,20 +175,29 @@ type AddUnitForm = {
   type: UnitType;
   status: UnitStatus;
   area: string;
+  areaSqm: string;
+  bedrooms: string;
+  bathrooms: string;
   monthlyRate: string;
+  specialRemarks: string;
 };
 
 function defaultAddForm(): AddUnitForm {
+  const metrics = unitDisplayMetrics('Condominium');
   return {
     unitNumber: '',
     floor: '',
     tower: '',
     buildingName: '',
     legalAddress: '',
-    type: '1BR',
+    type: 'Condominium',
     status: 'Available',
     area: '',
+    areaSqm: String(metrics.sqm),
+    bedrooms: String(metrics.beds),
+    bathrooms: String(metrics.baths),
     monthlyRate: '',
+    specialRemarks: '',
   };
 }
 
@@ -202,58 +232,67 @@ function areaDisplayLabel(rawArea: string): string {
   return normalizeAreaForForm(rawArea) || '—';
 }
 
-async function toWebpDataUrl(file: File): Promise<string> {
-  if (!file.type || !file.type.startsWith('image/')) {
-    throw new Error('Not an image');
+function isPlaceholderField(value: string | undefined | null): boolean {
+  const v = String(value ?? '').trim();
+  return !v || v === '—' || v === '-';
+}
+
+function resolveUnitAddressBase(unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName'>): string {
+  for (const candidate of [unit.legalAddress, unit.commonAddress, unit.buildingName]) {
+    const value = String(candidate ?? '').trim();
+    if (!isPlaceholderField(value)) return value;
+  }
+  return '';
+}
+
+function addressContainsPart(address: string, part: string): boolean {
+  const needle = String(part ?? '').trim().toLowerCase();
+  if (!needle) return true;
+  return address.toLowerCase().includes(needle);
+}
+
+function resolveUnitFullAddress(
+  unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName' | 'tower' | 'floor' | 'area'>,
+  floorWord = 'Floor',
+): string {
+  const base = resolveUnitAddressBase(unit);
+  if (!base) return '—';
+
+  const parts = [base];
+  const tower = String(unit.tower ?? '').trim();
+  if (!isPlaceholderField(tower) && !addressContainsPart(base, tower)) {
+    parts.push(tower);
   }
 
-  // Convert any image type to WEBP using canvas.
-  // We also downscale large images to keep payload size reasonable for API transport.
-  const maxSide = 1600;
-  const quality = 0.82;
-
-  const bitmap = await createImageBitmap(file);
-  const srcW = bitmap.width;
-  const srcH = bitmap.height;
-  const scale = Math.min(1, maxSide / Math.max(srcW, srcH));
-  const outW = Math.max(1, Math.round(srcW * scale));
-  const outH = Math.max(1, Math.round(srcH * scale));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = outW;
-  canvas.height = outH;
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas unsupported');
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, 0, 0, outW, outH);
-  bitmap.close();
-
-  const blob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (b) => {
-        if (!b) reject(new Error('WEBP conversion failed'));
-        else resolve(b);
-      },
-      'image/webp',
-      quality,
-    );
-  });
-
-  const dataUrl: string = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read converted image'));
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.readAsDataURL(blob);
-  });
-
-  if (!dataUrl.startsWith('data:image/webp')) {
-    throw new Error('Unexpected output format');
+  const floor = String(unit.floor ?? '').trim();
+  if (!isPlaceholderField(floor)) {
+    const floorLabel = floorLabelForCard(floor, floorWord);
+    if (!addressContainsPart(base, floor) && !addressContainsPart(base, floorLabel)) {
+      parts.push(floorLabel);
+    }
   }
 
-  return dataUrl;
+  const area = normalizeAreaForForm(unit.area ?? '');
+  if (area && !addressContainsPart(base, area)) {
+    parts.push(area);
+  }
+
+  return parts.join(', ');
+}
+
+function deriveBuildingName(addressOrBuilding: string, fallbackBuilding = ''): string {
+  const raw = String(addressOrBuilding ?? '').trim();
+  const fallback = String(fallbackBuilding ?? '').trim();
+  if (!raw) return fallback;
+
+  // Prefer the first segment as the "building name" (keeps title/subtitle concise).
+  // Handles: "Building, Street, City" | "Building · Wing" | "Building - Wing"
+  const first = raw
+    .split(/[,\u00B7-]/)
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+
+  return first || fallback || raw;
 }
 
 function formToWriteBody(
@@ -264,33 +303,77 @@ function formToWriteBody(
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
+  const buildingName = deriveBuildingName(commonAddress, form.buildingName);
   return {
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
-    buildingName: form.buildingName.trim(),
+    buildingName: buildingName.trim(),
     commonAddress: commonAddress || '—',
     legalAddress: legalAddress || commonAddress || '—',
     type: form.type,
     status: form.status,
     area: form.area.trim(),
+    areaSqm: parseMetricInput(form.areaSqm),
+    bedrooms: parseMetricInput(form.bedrooms),
+    bathrooms: parseMetricInput(form.bathrooms),
     monthlyRate: rate,
     photoDataUrl,
+    specialRemarks: form.specialRemarks.trim() || undefined,
     inventory,
   };
 }
 
+function parseMetricInput(raw: string): number | null {
+  const value = String(raw ?? '').trim();
+  if (!value) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+async function notifyUnitSaveSuccess(
+  title: string,
+  detail: string,
+  confirmLabel: string,
+) {
+  await Swal.fire({
+    icon: 'success',
+    title,
+    text: detail,
+    confirmButtonText: confirmLabel,
+    confirmButtonColor: '#4f46e5',
+    buttonsStyling: true,
+  });
+}
+
+async function notifyUnitSaveError(title: string, message: string, confirmLabel: string) {
+  await Swal.fire({
+    icon: 'error',
+    title,
+    text: message,
+    confirmButtonText: confirmLabel,
+    confirmButtonColor: '#4f46e5',
+    buttonsStyling: true,
+  });
+}
+
 function unitToForm(u: Unit): AddUnitForm {
+  const metrics = unitDisplayMetrics(u.type);
   return {
     unitNumber: u.unitNumber,
     floor: normalizeFloorForForm(u.floor),
     tower: u.tower === '—' ? '' : u.tower,
     buildingName: u.buildingName,
-    legalAddress: u.legalAddress,
+    legalAddress: resolveUnitAddressBase(u),
     type: u.type,
     status: u.status,
     area: normalizeAreaForForm(u.area),
+    areaSqm: String(u.areaSqm ?? metrics.sqm),
+    bedrooms: String(u.bedrooms ?? metrics.beds),
+    bathrooms: String(u.bathrooms ?? metrics.baths),
     monthlyRate: String(u.monthlyRate),
+    specialRemarks: u.specialRemarks ?? '',
   };
 }
 
@@ -311,6 +394,13 @@ function normalizeInventoryDraft(items: InventoryItem[] | undefined | null): Inv
 /** Typical layout metrics by unit type (listing cards — not stored on `Unit`). */
 function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths: number } {
   const map: Record<UnitType, { sqm: number; beds: number; baths: number }> = {
+    'House and Lot': { sqm: 120, beds: 3, baths: 2 },
+    Condominium: { sqm: 45, beds: 1, baths: 1 },
+    Apartment: { sqm: 45, beds: 1, baths: 1 },
+    'Commercial Building': { sqm: 200, beds: 0, baths: 2 },
+    Warehouse: { sqm: 500, beds: 0, baths: 1 },
+    Hotel: { sqm: 30, beds: 1, baths: 1 },
+    'Office Space': { sqm: 120, beds: 0, baths: 2 },
     Studio: { sqm: 32, beds: 1, baths: 1 },
     '1BR': { sqm: 45, beds: 1, baths: 1 },
     '2BR': { sqm: 72, beds: 2, baths: 2 },
@@ -319,6 +409,16 @@ function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths:
     Penthouse: { sqm: 165, beds: 3, baths: 3 },
   };
   return map[type];
+}
+
+/** Resolve a unit's layout metrics: prefer stored values, fall back to type defaults. */
+function resolveUnitMetrics(u: Unit): { sqm: number; beds: number; baths: number } {
+  const fallback = unitDisplayMetrics(u.type);
+  return {
+    sqm: u.areaSqm ?? fallback.sqm,
+    beds: u.bedrooms ?? fallback.beds,
+    baths: u.bathrooms ?? fallback.baths,
+  };
 }
 
 function floorLabelForCard(floor: string, floorWord: string): string {
@@ -332,6 +432,54 @@ function activeContractForUnit(unitId: string, contracts: Contract[]): Contract 
   const actives = contracts.filter((c) => c.unitId === unitId && c.status === 'Active');
   if (actives.length === 0) return null;
   return actives[0];
+}
+
+function unitSearchHaystack(
+  unit: Unit,
+  contracts: Contract[],
+  tenants: Tenant[],
+  statusLabel: (status: string) => string,
+): string {
+  const active = activeContractForUnit(unit.id, contracts);
+  const tenant = active ? tenants.find((x) => x.id === active.tenantId) : null;
+  const tenantName = tenant?.name ?? '';
+  const tenantEmail = tenant?.email ?? '';
+  const tenantPhone = tenant?.phone ?? '';
+  const rent = unit.monthlyRate;
+  const rentFormatted = rent ? `₱${rent.toLocaleString()} ${rent}` : '';
+
+  return [
+    unit.unitNumber,
+    unit.buildingName,
+    unit.tower,
+    unit.floor,
+    unit.area,
+    areaDisplayLabel(unit.area),
+    unit.type,
+    unit.status,
+    statusLabel(unit.status),
+    unit.commonAddress,
+    unit.legalAddress,
+    unit.specialRemarks,
+    tenantName,
+    tenantEmail,
+    tenantPhone,
+    rentFormatted,
+    active?.contractNo,
+    active?.status,
+    active?.remarks,
+    ...(unit.inventory ?? []).map((i) => `${i.name} ${i.condition}`),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function matchesUniversalSearch(haystack: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return tokens.every((token) => haystack.includes(token));
 }
 
 function leaseEndInsight(endIso: string | undefined): { daysToEnd: number | null; endLabel: string | null } {
@@ -380,19 +528,27 @@ function formToUnit(
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
+  const buildingName = deriveBuildingName(commonAddress, form.buildingName);
+  const areaSqm = parseMetricInput(form.areaSqm);
+  const bedrooms = parseMetricInput(form.bedrooms);
+  const bathrooms = parseMetricInput(form.bathrooms);
   return {
     id,
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
-    buildingName: form.buildingName.trim(),
+    buildingName: buildingName.trim(),
     commonAddress: commonAddress || '—',
     legalAddress: legalAddress || commonAddress || '—',
     type: form.type,
     status: form.status,
     area: form.area.trim(),
+    areaSqm: areaSqm ?? undefined,
+    bedrooms: bedrooms ?? undefined,
+    bathrooms: bathrooms ?? undefined,
     monthlyRate: Number.isFinite(rate) ? rate : 0,
     photoDataUrl,
+    specialRemarks: form.specialRemarks.trim() || undefined,
     inventory,
   };
 }
@@ -425,13 +581,6 @@ export function UnitsView() {
   const [unitsLoading, setUnitsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [filterBuilding, setFilterBuilding] = useState<string | null>(null);
-  const [filterFloor, setFilterFloor] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<
-    'unit_asc' | 'unit_desc' | 'rate_asc' | 'rate_desc' | 'building_asc'
-  >('unit_asc');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isManageInventoryOpen, setIsManageInventoryOpen] = useState(false);
@@ -527,14 +676,17 @@ export function UnitsView() {
     });
   }, [selectedUnit, branchContracts]);
 
-  const unitRemarksAggregated = useMemo(() => {
+  const activeContractForSelectedUnit = useMemo(() => {
     if (!selectedUnit) return null;
-    const forUnit = branchContracts.filter((c) => c.unitId === selectedUnit.id);
-    const parts = forUnit
-      .map((c) => c.remarks?.trim())
-      .filter((r): r is string => Boolean(r));
-    return [...new Set(parts)].join('\n\n') || null;
+    return activeContractForUnit(selectedUnit.id, branchContracts);
   }, [selectedUnit, branchContracts]);
+
+  const activeTenantForSelectedUnit = useMemo(() => {
+    if (!activeContractForSelectedUnit) return null;
+    return tenantsList.find((x) => x.id === activeContractForSelectedUnit.tenantId) ?? null;
+  }, [activeContractForSelectedUnit, tenantsList]);
+
+  const unitRemarksDisplay = selectedUnit?.specialRemarks?.trim() || null;
 
   useEffect(() => {
     if ((!isDetailsOpen && !isManageInventoryOpen) || !selectedUnit) return;
@@ -732,100 +884,16 @@ export function UnitsView() {
     [t],
   );
 
-  const buildingFilterOptions = useMemo(() => {
-    const names = [...new Set(unitList.map((u) => u.buildingName).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b),
-    );
-    return names.map((n) => ({ value: n, label: n }));
-  }, [unitList]);
-
-  const floorFilterOptions = useMemo(() => {
-    const floors = [...new Set(unitList.map((u) => u.floor).filter((f) => f && f !== '—'))].sort((a, b) =>
-      String(a).localeCompare(String(b), undefined, { numeric: true }),
-    );
-    return floors.map((f) => ({ value: String(f), label: String(f) }));
-  }, [unitList]);
-
-  const typeFilterOptions = useMemo(
-    () => UNIT_TYPES.map((ut) => ({ value: ut, label: ut })),
-    [],
-  );
-
-  const statusFilterOptions = useMemo(
-    () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
-    [statusLabel],
-  );
-
-  const sortSelectOptions = useMemo(
-    () => [
-      { value: 'unit_asc', label: t('views.units.sort.unitAsc') },
-      { value: 'unit_desc', label: t('views.units.sort.unitDesc') },
-      { value: 'building_asc', label: t('views.units.sort.buildingAsc') },
-      { value: 'rate_asc', label: t('views.units.sort.rateAsc') },
-      { value: 'rate_desc', label: t('views.units.sort.rateDesc') },
-    ],
-    [t],
-  );
-
   const processedUnits = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
     const rows = unitList.filter((u) => {
-      if (q) {
-        const active = activeContractForUnit(u.id, branchContracts);
-        const tenantName = active
-          ? (tenantsList.find((x) => x.id === active.tenantId)?.name ?? '')
-          : '';
-        const hay = [
-          u.unitNumber,
-          u.buildingName,
-          u.tower,
-          u.floor,
-          u.area,
-          u.type,
-          u.status,
-          tenantName,
-          u.monthlyRate ? String(u.monthlyRate) : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (filterBuilding && u.buildingName !== filterBuilding) return false;
-      if (filterFloor && u.floor !== filterFloor) return false;
-      if (filterType && u.type !== filterType) return false;
-      if (filterStatus && u.status !== filterStatus) return false;
-      return true;
+      const haystack = unitSearchHaystack(u, branchContracts, tenantsList, statusLabel);
+      return matchesUniversalSearch(haystack, searchTerm);
     });
 
-    return [...rows].sort((a, b) => {
-      switch (sortBy) {
-        case 'unit_desc':
-          return b.unitNumber.localeCompare(a.unitNumber, undefined, { numeric: true });
-        case 'rate_asc':
-          return a.monthlyRate - b.monthlyRate;
-        case 'rate_desc':
-          return b.monthlyRate - a.monthlyRate;
-        case 'building_asc': {
-          const c = a.buildingName.localeCompare(b.buildingName);
-          return c !== 0 ? c : a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
-        }
-        case 'unit_asc':
-        default:
-          return a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
-      }
-    });
-  }, [
-    unitList,
-    searchTerm,
-    filterBuilding,
-    filterFloor,
-    filterType,
-    filterStatus,
-    sortBy,
-    branchContracts,
-    tenantsList,
-  ]);
+    return [...rows].sort((a, b) =>
+      a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true }),
+    );
+  }, [unitList, searchTerm, branchContracts, tenantsList, statusLabel]);
 
   const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);
@@ -894,7 +962,8 @@ export function UnitsView() {
 
   const handleSaveUnit = useCallback(async () => {
     const rate = Number(String(addForm.monthlyRate).replace(/,/g, ''));
-    if (!addForm.unitNumber.trim() || !addForm.buildingName.trim()) {
+    const addressOrBuilding = addForm.legalAddress.trim() || addForm.buildingName.trim();
+    if (!addForm.unitNumber.trim() || !addressOrBuilding) {
       toast.error(t('views.units.addModal.validationRequired'));
       return;
     }
@@ -918,19 +987,32 @@ export function UnitsView() {
         if (formMode === 'edit' && editingId) {
           const updated = formToUnit(editingId, addForm, existingInventory, photoDataUrl);
           setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
-          setSelectedUnit((s) => (s?.id === editingId ? updated : s));
-          toast.success(t('views.units.updated'));
-          setIsDetailsOpen(false);
+          setSelectedUnit(updated);
+          closeAddUnitModal();
+          await notifyUnitSaveSuccess(
+            t('views.units.updated'),
+            t('views.units.saveSuccessEditDetail'),
+            t('common.close'),
+          );
+          setIsDetailsOpen(true);
           setIsManageInventoryOpen(false);
         } else {
           const newId = `local-${Date.now()}`;
           const created = formToUnit(newId, addForm, [], photoDataUrl);
           setUnitList((prev) => [created, ...prev]);
-          toast.success(t('views.units.addModal.saved'));
+          closeAddUnitModal();
+          await notifyUnitSaveSuccess(
+            t('views.units.addModal.saved'),
+            t('views.units.saveSuccessAddDetail'),
+            t('common.close'),
+          );
         }
-        closeAddUnitModal();
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error');
+        await notifyUnitSaveError(
+          t('views.units.saveErrorTitle'),
+          e instanceof Error ? e.message : 'Error',
+          t('common.close'),
+        );
       }
       return;
     }
@@ -940,18 +1022,31 @@ export function UnitsView() {
       if (formMode === 'edit' && editingId) {
         const updated = await updateUnit(editingId, body);
         setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
-        setSelectedUnit((s) => (s?.id === editingId ? updated : s));
-        toast.success(t('views.units.updated'));
-        setIsDetailsOpen(false);
+        setSelectedUnit(updated);
+        closeAddUnitModal();
+        await notifyUnitSaveSuccess(
+          t('views.units.updated'),
+          t('views.units.saveSuccessEditDetail'),
+          t('common.close'),
+        );
+        setIsDetailsOpen(true);
         setIsManageInventoryOpen(false);
       } else {
         const created = await createUnit(body);
         setUnitList((prev) => [created, ...prev]);
-        toast.success(t('views.units.addModal.saved'));
+        closeAddUnitModal();
+        await notifyUnitSaveSuccess(
+          t('views.units.addModal.saved'),
+          t('views.units.saveSuccessAddDetail'),
+          t('common.close'),
+        );
       }
-      closeAddUnitModal();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error');
+      await notifyUnitSaveError(
+        t('views.units.saveErrorTitle'),
+        e instanceof Error ? e.message : 'Error',
+        t('common.close'),
+      );
     }
   }, [
     addForm,
@@ -1156,7 +1251,28 @@ export function UnitsView() {
           <p className="text-slate-500 mt-1 dark:text-slate-400">{t('views.units.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-none">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />
+              <Input
+                placeholder={t('views.units.searchPlaceholder')}
+                className="h-10 rounded-xl border-transparent bg-white pl-9 pr-3 text-sm shadow-sm dark:border-transparent dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {canCreate && (
+              <Button
+                type="button"
+                className="h-10 shrink-0 rounded-xl bg-indigo-600 shadow-sm hover:bg-indigo-700"
+                onClick={openAddUnitModal}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('views.units.addUnit')}
+              </Button>
+            )}
+          </div>
+          <div className="flex rounded-xl bg-white p-0.5 shadow-sm dark:bg-slate-900/90 dark:shadow-none">
             <Button
               type="button"
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
@@ -1184,109 +1300,12 @@ export function UnitsView() {
               <span className="hidden sm:inline">{t('views.units.viewList')}</span>
             </Button>
           </div>
-          {canCreate && (
-            <Button
-              type="button"
-              className="h-10 rounded-xl bg-indigo-600 shadow-sm hover:bg-indigo-700"
-              onClick={openAddUnitModal}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t('views.units.addUnit')}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm dark:border-slate-700/90 dark:bg-slate-900/85 dark:shadow-lg dark:shadow-black/30 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
-          <div className="min-w-0 flex-1 lg:max-w-md">
-            <Label className="mb-1.5 block text-sm font-medium text-transparent select-none dark:text-transparent">
-              &nbsp;
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />
-              <Input
-                placeholder={t('views.units.searchPlaceholder')}
-                className="h-10 rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all hover:border-slate-300 focus-visible:border-slate-900 focus-visible:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus-visible:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="min-w-0">
-              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
-                {t('views.units.filters.property')}
-              </Label>
-              <Select2
-                options={buildingFilterOptions}
-                value={filterBuilding}
-                onChange={(v) => setFilterBuilding(typeof v === 'string' ? v : null)}
-                placeholder={t('views.units.filters.propertyPh')}
-                className="text-sm"
-              />
-            </div>
-            <div className="min-w-0">
-              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
-                {t('views.units.filters.floor')}
-              </Label>
-              <Select2
-                options={floorFilterOptions}
-                value={filterFloor}
-                onChange={(v) => setFilterFloor(typeof v === 'string' ? v : null)}
-                placeholder={t('views.units.filters.floorPh')}
-                className="text-sm"
-              />
-            </div>
-            <div className="min-w-0">
-              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
-                {t('views.units.filters.type')}
-              </Label>
-              <Select2
-                options={typeFilterOptions}
-                value={filterType}
-                onChange={(v) => setFilterType(typeof v === 'string' ? v : null)}
-                placeholder={t('views.units.filters.typePh')}
-                className="text-sm"
-              />
-            </div>
-            <div className="min-w-0">
-              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
-                {t('views.units.filters.status')}
-              </Label>
-              <Select2
-                options={statusFilterOptions}
-                value={filterStatus}
-                onChange={(v) => setFilterStatus(typeof v === 'string' ? v : null)}
-                placeholder={t('views.units.filters.statusPh')}
-                className="text-sm"
-              />
-            </div>
-            <div className="min-w-0">
-              <Label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
-                {t('views.units.sort.label')}
-              </Label>
-              <Select2
-                options={sortSelectOptions}
-                value={sortBy}
-                onChange={(v) => {
-                  if (v === 'unit_asc' || v === 'unit_desc' || v === 'rate_asc' || v === 'rate_desc' || v === 'building_asc') {
-                    setSortBy(v);
-                  } else {
-                    setSortBy('unit_asc');
-                  }
-                }}
-                placeholder={t('views.units.sort.unitAsc')}
-                className="text-sm"
-              />
-            </div>
-          </div>
         </div>
       </div>
 
       {unitsLoading ? (
         viewMode === 'list' ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
             <SkeletonTable rows={8} columns={7} />
           </div>
         ) : (
@@ -1294,7 +1313,7 @@ export function UnitsView() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="overflow-hidden rounded-xl bg-white shadow-md dark:bg-slate-900"
               >
                 <div className="aspect-[4/3] animate-pulse bg-slate-100 dark:bg-slate-800" />
                 <div className="space-y-3 p-4">
@@ -1315,14 +1334,14 @@ export function UnitsView() {
           onRowClick={(unit) => handleViewDetails(unit)}
         />
       ) : processedUnits.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-50/50 py-16 text-center dark:bg-slate-900/40">
           <Building2 className="mb-3 h-12 w-12 text-slate-300 dark:text-slate-600" />
           <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('views.units.card.noResults')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {processedUnits.map((unit) => {
-            const metrics = unitDisplayMetrics(unit.type);
+            const metrics = resolveUnitMetrics(unit);
             const towerLine =
               unit.tower && unit.tower !== '—' ? `${unit.buildingName} · ${unit.tower}` : unit.buildingName;
             const floorPart = floorLabelForCard(unit.floor, t('views.units.table.floor'));
@@ -1421,9 +1440,9 @@ export function UnitsView() {
               <Card
                 key={unit.id}
                 className={cn(
-                  'group relative flex flex-col overflow-hidden rounded-xl border bg-white shadow-lg transition-all duration-300',
-                  'border-slate-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50',
-                  'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 dark:hover:shadow-xl dark:hover:shadow-black/60',
+                  'group relative flex flex-col overflow-hidden rounded-xl bg-white shadow-lg transition-all duration-300',
+                  'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50',
+                  'dark:bg-slate-900 dark:shadow-black/40 dark:hover:shadow-xl dark:hover:shadow-black/60',
                 )}
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
@@ -1501,7 +1520,7 @@ export function UnitsView() {
                     </span>
                   </div>
 
-                  <div className="my-4 border-t border-slate-100 dark:border-slate-800" />
+                  <div className="my-4 h-px bg-slate-100/70 dark:bg-slate-800/60" />
 
                   <div className="space-y-3.5 text-sm leading-snug">
                     <div className="flex items-start justify-between gap-3">
@@ -1543,7 +1562,7 @@ export function UnitsView() {
                   </div>
 
                   <div
-                    className="mt-auto flex items-stretch gap-2 pt-4"
+                    className="mt-auto flex items-stretch gap-1.5 pt-4"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                     role="presentation"
@@ -1552,60 +1571,48 @@ export function UnitsView() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-10 flex-1 rounded-lg border-slate-200 bg-white font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                      className="h-8 min-w-0 flex-1 rounded-lg border-transparent bg-white px-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
                       onClick={() => handleViewDetails(unit)}
                     >
-                      <Eye className="mr-1.5 h-4 w-4" />
-                      {t('views.units.card.view')}
+                      <Eye className="mr-1 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{t('views.units.card.view')}</span>
                     </Button>
                     {canUpdate ? (
                       <Button
                         type="button"
+                        variant="outline"
                         size="sm"
-                        className="h-10 flex-1 rounded-lg bg-indigo-600 font-medium text-white shadow-sm hover:bg-indigo-700"
+                        className="h-8 min-w-0 flex-1 rounded-lg border-transparent bg-white px-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
                         onClick={() => openEditUnitModal(unit)}
                       >
-                        <Pencil className="mr-1.5 h-4 w-4" />
-                        {t('views.units.card.edit')}
+                        <Pencil className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{t('views.units.card.edit')}</span>
                       </Button>
                     ) : null}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            title={t('views.units.table.moreOptions')}
-                            className="h-10 w-10 shrink-0 rounded-lg border-slate-200 bg-white shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
-                          />
-                        }
+                    {canUpdate ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 min-w-0 flex-1 rounded-lg border-transparent bg-white px-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                        onClick={() => handleManageInventory(unit)}
                       >
-                        <MoreVertical className="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleManageInventory(unit);
-                          }}
-                        >
-                          {t('views.units.table.manageInventory')}
-                        </DropdownMenuItem>
-                        {canDelete ? (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            className="text-rose-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleDeleteUnit(unit);
-                            }}
-                          >
-                            {t('views.units.table.delete')}
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        <LayoutGrid className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{t('views.units.card.inventory')}</span>
+                      </Button>
+                    ) : null}
+                    {canDelete ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 min-w-0 flex-1 rounded-lg border-transparent bg-white px-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                        onClick={() => void handleDeleteUnit(unit)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{t('views.units.card.delete')}</span>
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -1621,10 +1628,10 @@ export function UnitsView() {
         onClose={() => setIsDetailsOpen(false)}
         title={
           selectedUnit ? (
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 items-start gap-4">
               <div className="relative shrink-0" onMouseLeave={scheduleDetailPhotoPeekClose}>
                 <div
-                  className="h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white"
+                  className="h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800"
                   onMouseEnter={() => {
                     clearDetailPhotoPeekCloseTimer();
                     if (selectedUnit.photoDataUrl) setDetailHeaderPhotoPeek(true);
@@ -1638,18 +1645,33 @@ export function UnitsView() {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-slate-400">
-                      <Building2 className="h-8 w-8" />
+                      <Building2 className="h-7 w-7" />
                     </div>
                   )}
                 </div>
               </div>
-              <div className="min-w-0">
-                <span className="block text-[32px] leading-none font-bold text-slate-900">
-                  {t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}
-                </span>
-                <span className="mt-1 block text-sm font-normal text-slate-500 truncate">
-                  {selectedUnit.buildingName} - {selectedUnit.legalAddress?.trim() || selectedUnit.commonAddress?.trim() || '—'}
-                </span>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50">
+                    {t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}
+                  </span>
+                  <Badge
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                      selectedUnit.status === 'Available' && 'bg-emerald-500 text-white',
+                      selectedUnit.status === 'Occupied' && 'bg-indigo-500 text-white',
+                      selectedUnit.status === 'Maintenance' && 'bg-rose-500 text-white',
+                      selectedUnit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
+                    )}
+                  >
+                    {statusLabel(selectedUnit.status)}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                  {selectedUnit
+                    ? resolveUnitFullAddress(selectedUnit, t('views.units.table.floor'))
+                    : '—'}
+                </p>
               </div>
             </div>
           ) : (
@@ -1658,190 +1680,251 @@ export function UnitsView() {
         }
         maxWidth="4xl"
         footer={
-          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
-            <div className="flex flex-wrap gap-2">
-              {canDelete && selectedUnit ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 min-w-[120px] rounded-xl text-rose-600 border-rose-200 hover:bg-rose-50"
-                  onClick={() => void handleDeleteUnit(selectedUnit)}
-                >
-                  {t('views.units.table.delete')}
-                </Button>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap gap-3 ml-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+            <Button
+              type="button"
+              className={modalDismissButtonClass}
+              onClick={() => setIsDetailsOpen(false)}
+            >
+              {t('views.units.details.close')}
+            </Button>
+            {canUpdate && selectedUnit ? (
               <Button
                 type="button"
-                variant="outline"
-                className="h-11 min-w-[120px] rounded-xl"
-                onClick={() => setIsDetailsOpen(false)}
+                className={modalActionButtonClass}
+                onClick={() => openEditUnitModal(selectedUnit)}
               >
-                {t('views.units.details.close')}
+                {t('views.units.details.editUnitInfo')}
               </Button>
-              {canUpdate && selectedUnit ? (
-                <Button
-                  type="button"
-                  className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
-                  onClick={() => openEditUnitModal(selectedUnit)}
-                >
-                  {t('views.units.details.editUnitInfo')}
-                </Button>
-              ) : null}
-            </div>
+            ) : null}
           </div>
         }
         variant="default"
       >
-        <div className="flex justify-end items-start mb-2 pr-2">
-          <Badge
-            className={cn(
-              selectedUnit?.status === 'Available'
-                ? 'bg-emerald-500'
-                : selectedUnit?.status === 'Occupied'
-                  ? 'bg-indigo-500'
-                  : selectedUnit?.status === 'Maintenance'
-                    ? 'bg-rose-500'
-                    : selectedUnit?.status === 'Reserved'
-                      ? 'bg-amber-500'
-                      : 'bg-slate-500'
-            )}
-          >
-            {selectedUnit?.status ? statusLabel(selectedUnit.status) : ''}
-          </Badge>
-        </div>
+        <ScrollArea className="max-h-[min(68vh,42rem)] pr-1">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 px-4 py-4 dark:from-emerald-500/10 dark:via-slate-900/40 dark:to-emerald-500/5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-300/80">
+                      {t('views.units.details.monthlyRate')}
+                    </p>
+                    <p className="mt-2 text-2xl font-bold tabular-nums leading-none text-slate-900 dark:text-slate-50">
+                      ₱{selectedUnit?.monthlyRate.toLocaleString()}
+                    </p>
+                    <p className="mt-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('views.units.card.perMonth')}
+                    </p>
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    <CircleDollarSign className="h-5 w-5" aria-hidden />
+                  </span>
+                </div>
+              </div>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-3 rounded-lg border border-slate-100 bg-white">
-                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t('views.units.details.monthlyRate')}</p>
-                <p className="text-lg font-bold text-slate-900">₱{selectedUnit?.monthlyRate.toLocaleString()}</p>
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 px-4 py-4 dark:from-indigo-500/10 dark:via-slate-900/40 dark:to-indigo-500/5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/80 dark:text-indigo-300/80">
+                      {t('views.units.details.unitType')}
+                    </p>
+                    <p className="mt-2 text-2xl font-bold leading-none text-slate-900 dark:text-slate-50">
+                      {selectedUnit?.type || '—'}
+                    </p>
+                    {selectedUnit ? (
+                      <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-1.5">
+                          <BedDouble className="h-4 w-4" aria-hidden />
+                          {resolveUnitMetrics(selectedUnit).beds}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Bath className="h-4 w-4" aria-hidden />
+                          {resolveUnitMetrics(selectedUnit).baths}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Maximize2 className="h-4 w-4" aria-hidden />
+                          {resolveUnitMetrics(selectedUnit).sqm} {t('views.units.card.sqm')}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                    <BedDouble className="h-5 w-5" aria-hidden />
+                  </span>
+                </div>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.details.unitType')}</p>
-                <p className="mt-1 text-3xl leading-none font-bold text-slate-900">{selectedUnit?.type || '—'}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                <p className="text-[11px] font-bold uppercase text-slate-400">{t('views.units.table.area')}</p>
-                <p className="mt-1 text-3xl leading-none font-bold text-slate-900">
-                  {areaDisplayLabel(selectedUnit?.area ?? '')}
-                </p>
+
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-50 via-white to-sky-50/40 px-4 py-4 dark:from-sky-500/10 dark:via-slate-900/40 dark:to-sky-500/5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-300/80">
+                      {t('views.units.table.area')}
+                    </p>
+                    <p className="mt-2 text-lg font-bold leading-snug text-slate-900 dark:text-slate-50">
+                      {areaDisplayLabel(selectedUnit?.area ?? '')}
+                    </p>
+                    {selectedUnit?.tower && selectedUnit.tower !== '—' ? (
+                      <p className="mt-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {selectedUnit.tower}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                    <MapPin className="h-5 w-5" aria-hidden />
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4 text-indigo-600" />
-                {t('views.units.details.inventoryAssets')}
-              </h4>
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                {!selectedUnit?.inventory?.length ? (
-                  <p className="text-sm text-slate-500 px-4 py-8">{t('views.units.inventoryEmpty')}</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b border-slate-200 bg-white hover:bg-white [&>th]:h-11">
-                        <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          {t('views.units.details.inventoryItemName')}
-                        </TableHead>
-                        <TableHead className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          {t('views.units.details.inventoryQty')}
-                        </TableHead>
-                        <TableHead className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          {t('views.units.details.inventoryCondition')}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedUnit.inventory.map((inv) => (
-                        <TableRow
-                          key={inv.id}
-                          className="border-b border-slate-200 bg-white last:border-b-0 hover:bg-slate-50/60"
-                        >
-                          <TableCell className="px-4 py-2.5 text-[13px] font-medium uppercase tracking-wide text-slate-900">
-                            {inv.name}
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5 text-center text-[13px] font-medium text-slate-800">
-                            {inv.quantity}
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5">
-                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-800">
-                              {inv.condition === 'New'
-                                ? t('views.units.details.conditionNew')
-                                : inv.condition === 'Good'
-                                  ? t('views.units.details.conditionGood')
-                                  : inv.condition === 'Fair'
-                                    ? t('views.units.details.conditionFair')
-                                    : t('views.units.details.conditionPoor')}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </div>
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="space-y-5">
+                {activeContractForSelectedUnit && activeTenantForSelectedUnit ? (
+                  <section className="rounded-2xl bg-indigo-50/60 px-4 py-4 dark:bg-indigo-500/10">
+                    <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                        <User className="h-4 w-4" />
+                      </span>
+                      {t('views.units.details.currentTenant')}
+                    </h4>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 dark:text-slate-50">{activeTenantForSelectedUnit.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        {t('views.units.details.activeLease')}: {formatContractPeriod(activeContractForSelectedUnit)}
+                      </p>
+                    </div>
+                  </section>
+                ) : null}
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-600" />
-                {t('views.units.details.legalAddress')}
-              </h4>
-              <div className="p-4 rounded-xl border border-slate-100 bg-white text-sm text-slate-600 leading-relaxed">
-                {selectedUnit?.legalAddress?.trim() ||
-                  selectedUnit?.commonAddress?.trim() ||
-                  t('views.units.details.addressTemplate', {
-                    unitNumber: selectedUnit?.unitNumber,
-                    tower: selectedUnit?.tower,
-                    buildingName: selectedUnit?.buildingName,
-                  })}
-              </div>
-            </div>
+                <section>
+                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
+                      <MapPin className="h-4 w-4" />
+                    </span>
+                    {t('views.units.details.buildingAndAddress')}
+                  </h4>
+                  <div className="rounded-2xl bg-slate-50/90 px-4 py-3.5 text-sm leading-relaxed text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                    {selectedUnit
+                      ? resolveUnitFullAddress(selectedUnit, t('views.units.table.floor'))
+                      : '—'}
+                  </div>
+                </section>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-slate-500">
-                <History className="w-4 h-4" />
-                {t('views.units.details.historicalTenants')}
-              </h4>
-              <div className="space-y-2">
-                {historicalContractsForSelectedUnit.length > 0 ? (
-                  historicalContractsForSelectedUnit.map((c) => {
-                    const tenantName = tenantsList.find((x) => x.id === c.tenantId)?.name ?? '—';
-                    return (
-                      <div
-                        key={c.id}
-                        className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white text-sm"
-                      >
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className="font-semibold text-slate-700 truncate">{tenantName}</span>
-                          <span className="text-slate-500">{formatContractPeriod(c)}</span>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          {contractStatusLabel(c, t)}
-                        </Badge>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-slate-500">{t('views.units.details.noHistorical')}</p>
-                )}
+                <section>
+                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
+                      <MessageSquare className="h-4 w-4" />
+                    </span>
+                    {t('views.units.details.specialRequests')}
+                  </h4>
+                  <div className="rounded-2xl bg-slate-50/90 px-4 py-3.5 text-sm dark:bg-slate-800/50">
+                    {unitRemarksDisplay ? (
+                      <p className="whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-200">
+                        {unitRemarksDisplay}
+                      </p>
+                    ) : (
+                      <p className="text-slate-500 dark:text-slate-400">{t('views.units.details.noRemarks')}</p>
+                    )}
+                  </div>
+                </section>
               </div>
-            </div>
 
-            <div className="space-y-3 border-t border-slate-200 pt-4">
-              <h4 className="text-sm font-bold flex items-center gap-2 text-amber-600">
-                <Plus className="w-4 h-4" />
-                {t('views.units.details.specialRequests')}
-              </h4>
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-sm text-amber-900">
-                {unitRemarksAggregated ? (
-                  <p className="whitespace-pre-wrap leading-relaxed">{unitRemarksAggregated}</p>
-                ) : (
-                  <p className="italic text-amber-900/80">{t('views.units.details.noRemarks')}</p>
-                )}
+              <div className="space-y-5">
+                <section>
+                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
+                      <LayoutGrid className="h-4 w-4" />
+                    </span>
+                    {t('views.units.details.inventoryAssets')}
+                  </h4>
+                  <div className="overflow-hidden rounded-2xl bg-slate-50/90 dark:bg-slate-800/50">
+                    {!selectedUnit?.inventory?.length ? (
+                      <p className="px-4 py-5 text-center text-sm text-slate-500 dark:text-slate-400">
+                        {t('views.units.inventoryEmpty')}
+                      </p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-transparent hover:bg-transparent [&>th]:h-10">
+                            <TableHead className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                              {t('views.units.details.inventoryItemName')}
+                            </TableHead>
+                            <TableHead className="w-16 px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                              {t('views.units.details.inventoryQty')}
+                            </TableHead>
+                            <TableHead className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                              {t('views.units.details.inventoryCondition')}
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedUnit.inventory.map((inv) => (
+                            <TableRow key={inv.id} className="bg-transparent hover:bg-white/50 dark:hover:bg-slate-900/30">
+                              <TableCell className="px-4 py-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                {inv.name}
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-center text-sm text-slate-700 dark:text-slate-300">
+                                {inv.quantity}
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300">
+                                {inv.condition === 'New'
+                                  ? t('views.units.details.conditionNew')
+                                  : inv.condition === 'Good'
+                                    ? t('views.units.details.conditionGood')
+                                    : inv.condition === 'Fair'
+                                      ? t('views.units.details.conditionFair')
+                                      : t('views.units.details.conditionPoor')}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <History className="h-4 w-4" />
+                    </span>
+                    {t('views.units.details.historicalTenants')}
+                  </h4>
+                  <div className="space-y-2">
+                    {historicalContractsForSelectedUnit.length > 0 ? (
+                      historicalContractsForSelectedUnit.map((c) => {
+                        const tenantName = tenantsList.find((x) => x.id === c.tenantId)?.name ?? '—';
+                        return (
+                          <div
+                            key={c.id}
+                            className="flex items-start gap-3 rounded-2xl bg-slate-50/90 px-3.5 py-3 dark:bg-slate-800/50"
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                              {tenantName !== '—' ? tenantName.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                  {tenantName}
+                                </span>
+                                <Badge variant="outline" className="h-5 border-transparent bg-white/80 text-[10px] dark:bg-slate-900/80">
+                                  {contractStatusLabel(c, t)}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                {formatContractPeriod(c)}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-2xl bg-slate-50/90 px-4 py-5 text-center text-sm text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                        {t('views.units.details.noHistorical')}
+                      </p>
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
           </div>
@@ -1860,18 +1943,15 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end w-full">
-            <Button type="button" variant="outline" onClick={() => setIsManageInventoryOpen(false)}>
+            <Button type="button" className={modalDismissButtonClass} onClick={() => setIsManageInventoryOpen(false)}>
               {t('views.units.details.close')}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-slate-500">
-              {selectedUnit?.buildingName} • {selectedUnit?.tower}
-            </div>
-            {canUpdate ? (
+          {canUpdate ? (
+            <div className="flex justify-end">
               <Button
                 type="button"
                 size="sm"
@@ -1881,8 +1961,8 @@ export function UnitsView() {
                 <Plus className="w-4 h-4 mr-1.5" aria-hidden />
                 {t('views.units.details.addInventoryItem')}
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {canUpdate ? (
             <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
@@ -2012,12 +2092,12 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={resetInventoryForm} disabled={inventorySaving}>
+            <Button type="button" className={modalDismissButtonClass} onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+              className={modalPrimaryButtonClass}
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleAddInventoryItemSubmit()}
             >
@@ -2071,12 +2151,12 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" className="h-11 min-w-[120px] rounded-xl" onClick={resetInventoryForm} disabled={inventorySaving}>
+            <Button type="button" className={modalDismissButtonClass} onClick={resetInventoryForm} disabled={inventorySaving}>
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+              className={modalPrimaryButtonClass}
               disabled={inventorySaving || !selectedUnit}
               onClick={() => void handleEditInventoryItemSubmit()}
             >
@@ -2132,15 +2212,14 @@ export function UnitsView() {
           <div className="flex justify-end gap-3 w-full">
             <Button
               type="button"
-              variant="outline"
-              className="h-11 min-w-[120px] rounded-xl"
+              className={modalDismissButtonClass}
               onClick={closeAddUnitModal}
             >
               {t('views.units.addModal.cancel')}
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+              className={modalPrimaryButtonClass}
               onClick={() => void handleSaveUnit()}
             >
               {formMode === 'edit' ? t('views.units.editModal.save') : t('views.units.addModal.save')}
@@ -2155,11 +2234,11 @@ export function UnitsView() {
           className="hidden"
           onChange={handleAddUnitPhotoChange}
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="unit-form-fields grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label>{t('views.units.addModal.photo')}</Label>
             <div className="flex flex-col gap-3">
-              <div className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[4/3] max-h-[min(20rem,50vh)] sm:max-h-[22rem]">
+              <div className="unit-form-bordered relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[4/3] max-h-[min(20rem,50vh)] sm:max-h-[22rem] dark:bg-slate-900/40">
                 {addUnitPhotoPreview ? (
                   <button
                     type="button"
@@ -2212,7 +2291,7 @@ export function UnitsView() {
               value={addForm.unitNumber}
               onChange={(e) => setAddForm((f) => ({ ...f, unitNumber: e.target.value }))}
               placeholder="e.g. 1201"
-              className="h-12 rounded-xl border-slate-200"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
@@ -2222,6 +2301,8 @@ export function UnitsView() {
               value={addForm.floor || null}
               onChange={(v) => setAddForm((f) => ({ ...f, floor: String(v ?? '') }))}
               placeholder="Select floor"
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
             />
           </div>
           <div className="space-y-2">
@@ -2230,35 +2311,46 @@ export function UnitsView() {
               id="add-tower"
               value={addForm.tower}
               onChange={(e) => setAddForm((f) => ({ ...f, tower: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-building">{t('views.units.addModal.buildingName')}</Label>
-            <Input
-              id="add-building"
-              value={addForm.buildingName}
-              onChange={(e) => setAddForm((f) => ({ ...f, buildingName: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-legal">{t('views.units.addModal.legalAddress')}</Label>
+            <Label htmlFor="add-legal">{t('views.units.addModal.buildingAndAddress')}</Label>
             <Input
               id="add-legal"
               value={addForm.legalAddress}
-              onChange={(e) => setAddForm((f) => ({ ...f, legalAddress: e.target.value }))}
-              className="h-12 rounded-xl border-slate-200"
+              onChange={(e) => {
+                const next = e.target.value;
+                setAddForm((f) => ({
+                  ...f,
+                  legalAddress: next,
+                  // Keep storing a concise building name for cards/subtitles.
+                  buildingName: deriveBuildingName(next, f.buildingName),
+                }));
+              }}
+              placeholder={t('views.units.addModal.buildingAndAddressPlaceholder')}
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
-            <Label>{t('views.units.addModal.type')}</Label>
+            <Label>{t('views.units.addModal.categoryType')}</Label>
             <Select2
               options={addTypeOptions}
               value={addForm.type}
-              onChange={(v) =>
-                setAddForm((f) => ({ ...f, type: (v ?? '1BR') as UnitType }))
-              }
+              onChange={(v) => {
+                const nextType = (v ?? 'Condominium') as UnitType;
+                const m = unitDisplayMetrics(nextType);
+                setAddForm((f) => ({
+                  ...f,
+                  type: nextType,
+                  // Prefill sensible defaults for the chosen category (still editable below).
+                  areaSqm: String(m.sqm),
+                  bedrooms: String(m.beds),
+                  bathrooms: String(m.baths),
+                }));
+              }}
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
             />
           </div>
           <div className="space-y-2">
@@ -2269,6 +2361,8 @@ export function UnitsView() {
               onChange={(v) =>
                 setAddForm((f) => ({ ...f, status: (v ?? 'Available') as UnitStatus }))
               }
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
             />
           </div>
           <div className="space-y-2">
@@ -2280,6 +2374,8 @@ export function UnitsView() {
                 setAddForm((f) => ({ ...f, area: String(v ?? '') }))
               }
               placeholder="Type city to search..."
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
             />
           </div>
           <div className="space-y-2">
@@ -2291,7 +2387,65 @@ export function UnitsView() {
               value={addForm.monthlyRate}
               onChange={(e) => setAddForm((f) => ({ ...f, monthlyRate: e.target.value }))}
               placeholder="35000"
-              className="h-12 rounded-xl border-slate-200"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>{t('views.units.addModal.layoutMetrics')}</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="relative">
+                <Ruler className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                <Input
+                  id="add-sqm"
+                  type="text"
+                  inputMode="decimal"
+                  value={addForm.areaSqm}
+                  onChange={(e) => setAddForm((f) => ({ ...f, areaSqm: e.target.value }))}
+                  placeholder={t('views.units.addModal.sqm')}
+                  aria-label={t('views.units.addModal.sqm')}
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                />
+              </div>
+              <div className="relative">
+                <BedDouble className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                <Input
+                  id="add-bedrooms"
+                  type="text"
+                  inputMode="numeric"
+                  value={addForm.bedrooms}
+                  onChange={(e) => setAddForm((f) => ({ ...f, bedrooms: e.target.value }))}
+                  placeholder={t('views.units.addModal.bedrooms')}
+                  aria-label={t('views.units.addModal.bedrooms')}
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                />
+              </div>
+              <div className="relative">
+                <Bath className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                <Input
+                  id="add-bathrooms"
+                  type="text"
+                  inputMode="numeric"
+                  value={addForm.bathrooms}
+                  onChange={(e) => setAddForm((f) => ({ ...f, bathrooms: e.target.value }))}
+                  placeholder={t('views.units.addModal.bathrooms')}
+                  aria-label={t('views.units.addModal.bathrooms')}
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              {t('views.units.addModal.layoutMetricsHint')}
+            </p>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="add-special-remarks">{t('views.units.addModal.specialRemarks')}</Label>
+            <Textarea
+              id="add-special-remarks"
+              value={addForm.specialRemarks}
+              onChange={(e) => setAddForm((f) => ({ ...f, specialRemarks: e.target.value }))}
+              placeholder={t('views.units.addModal.specialRemarksPlaceholder')}
+              rows={3}
+              className="rounded-xl border border-slate-200 bg-white shadow-sm resize-y min-h-[88px] focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
         </div>
@@ -2305,7 +2459,7 @@ export function UnitsView() {
         variant="default"
         footer={
           <div className="flex justify-end w-full">
-            <Button type="button" variant="outline" onClick={closePhotoPreview}>
+            <Button type="button" className={modalDismissButtonClass} onClick={closePhotoPreview}>
               {t('views.units.details.close')}
             </Button>
           </div>

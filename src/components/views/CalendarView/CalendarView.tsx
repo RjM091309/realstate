@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   format,
@@ -69,6 +69,11 @@ type UiEvent = {
   contractId?: string | null;
   paymentId?: string | null;
 };
+
+const CALENDAR_FORM_INPUT =
+  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+const CALENDAR_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 
 function pickContractForCalendarEvent(
   list: Contract[],
@@ -691,19 +696,20 @@ export function CalendarView() {
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeEventModal}>
+            <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={closeEventModal}>
               {t('views.calendar.cancel')}
             </Button>
-            <Button type="button" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void saveEvent()}>
+            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void saveEvent()}>
               {eventFormMode === 'edit' ? t('views.calendar.save') : t('views.calendar.create')}
             </Button>
           </div>
         }
       >
-        <div className="flex flex-col gap-5">
+        <div className="unit-form-fields flex flex-col gap-5">
           <div className="space-y-1.5">
             <Label>{t('views.calendar.eventTitle')}</Label>
             <Input
+              className={CALENDAR_FORM_INPUT}
               value={eventForm.title}
               onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))}
             />
@@ -713,14 +719,16 @@ export function CalendarView() {
               <Label>{t('views.calendar.eventDate')}</Label>
               <Input
                 type="date"
+                className={cn(CALENDAR_FORM_INPUT, 'w-full')}
                 value={eventForm.eventDate}
                 onChange={(e) => setEventForm((p) => ({ ...p, eventDate: e.target.value }))}
-                className="w-full"
               />
             </div>
             <div className="min-w-0 space-y-1.5">
               <Label>{t('views.calendar.eventType')}</Label>
               <Select2
+                borderless={false}
+                className={CALENDAR_SELECT_CLASS}
                 options={eventTypeOptions}
                 value={eventForm.eventType}
                 onChange={(v) => setEventForm((p) => ({ ...p, eventType: (v ?? 'other') as CalendarEventType }))}
@@ -730,6 +738,8 @@ export function CalendarView() {
           <div className="space-y-1.5">
             <Label>{t('views.calendar.unit')}</Label>
             <Select2
+              borderless={false}
+              className={CALENDAR_SELECT_CLASS}
               options={unitOptions}
               value={eventForm.unitId}
               onChange={(v) => setEventForm((p) => ({ ...p, unitId: (v ?? '') as string }))}
@@ -738,6 +748,7 @@ export function CalendarView() {
           <div className="space-y-1.5">
             <Label>{t('views.calendar.color')}</Label>
             <Input
+              className={CALENDAR_FORM_INPUT}
               placeholder="#4f46e5"
               value={eventForm.colorCode}
               onChange={(e) => setEventForm((p) => ({ ...p, colorCode: e.target.value }))}
@@ -754,7 +765,7 @@ export function CalendarView() {
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="outline" onClick={closeDetails}>
+            <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={closeDetails}>
               {t('views.calendar.cancel')}
             </Button>
           </div>

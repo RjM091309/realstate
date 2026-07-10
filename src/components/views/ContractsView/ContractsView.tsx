@@ -2,14 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
-  Filter,
   FileText,
-  History,
-  MoreVertical,
+  Pencil,
   RefreshCw,
+  CheckCircle2,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+import { Button, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/status-badge';
 import { contractStatusVariant } from '@/lib/statusBadge';
@@ -18,80 +20,43 @@ import { DataTable, type ColumnDef } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import {
+  activateContract,
   createContract,
   deleteContract,
-  fetchContractCollaborations,
-  fetchContractTenants,
   fetchContracts,
-  inviteContractCollaborator,
   updateContract,
-  updateContractCollaborator,
 } from '@/lib/contractsApi';
 import { fetchPayments } from '@/lib/paymentsApi';
-import { createContractInvoice } from '@/lib/invoicesApi';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api';
-import type {
-  Contract,
-  ContractCollaborationRow,
-  ContractTenantRow,
-  Tenant,
-  Unit,
-  DocumentTemplateRow,
-  RepositoryDocumentRow,
-  InventorySnapshotItemRow,
-  InventorySnapshotRow,
-  Payment,
-  TransactionType,
-} from '@/types';
+import type { Contract, Tenant, Unit, Payment, UnitInspectionPayload } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
-import {
-  ContractDetailsCollaborationModal,
-  type ActivityItem,
-  type Collaborator,
-} from '@/components/contracts/ContractDetailsCollaborationModal';
+import { UnitInspectionWorkflowModal } from '@/components/contracts/UnitInspectionWorkflowModal';
+import { fetchContractInspection } from '@/lib/unitInspectionApi';
 import { RenewLeaseModal } from '@/components/contracts/RenewLeaseModal';
-import {
-  fetchContractRepositoryDocuments,
-  fetchDocumentTemplates,
-  uploadContractRepositoryDocument,
-  uploadDocumentTemplate,
-} from '@/lib/documentsApi';
-import {
-  createInventorySnapshot,
-  createInventorySnapshotItem,
-  deleteInventorySnapshot,
-  deleteInventorySnapshotItem,
-  fetchContractInventorySnapshots,
-  fetchSnapshotItems,
-  patchInventorySnapshot,
-  patchInventorySnapshotItem,
-} from '@/lib/inventoryApi';
-
-async function loadItemsMapForSnapshots(
-  snapRows: InventorySnapshotRow[],
-): Promise<Record<string, InventorySnapshotItemRow[]>> {
-  const itemPairs = await Promise.all(
-    snapRows.map(async (s) => [s.id, await fetchSnapshotItems(s.id)] as const),
-  );
-  const map: Record<string, InventorySnapshotItemRow[]> = {};
-  for (const [sid, items] of itemPairs) map[sid] = items;
-  return map;
-}
 
 type StaffUserOption = { value: string; label: string };
+
+function parseContractDateTime(value?: string): Date | null {
+  if (!value?.trim()) return null;
+  const normalized = value.trim().includes('T') ? value.trim() : value.trim().replace(' ', 'T');
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isInspectionApprovedForActivation(payload: UnitInspectionPayload | null) {
+  const status = payload?.inspection?.status;
+  return (
+    status === 'ready_for_occupancy' ||
+    status === 'move_in_scheduled' ||
+    status === 'occupied'
+  );
+}
 
 function normalizeAgentIdForWrite(raw: string | null | undefined): string {
   const s = String(raw ?? '').trim();
@@ -100,6 +65,14 @@ function normalizeAgentIdForWrite(raw: string | null | undefined): string {
   if (m) return m[1];
   if (/^\d+$/.test(s)) return s;
   return s.replace(/\D/g, '');
+}
+
+function contractStatusLabel(status: Contract['status'], t: (key: string) => string): string {
+  if (status === 'Active') return t('views.contracts.statuses.active');
+  if (status === 'Expired') return t('views.contracts.statuses.expired');
+  if (status === 'Terminated') return t('views.contracts.statuses.terminated');
+  if (status === 'Pending Inspection') return t('views.contracts.statuses.pendingInspection');
+  return status;
 }
 
 export function ContractsView() {
@@ -111,11 +84,6 @@ export function ContractsView() {
   const canRenewLease = canCreate || canUpdate;
   const [contractsLoading, setContractsLoading] = useState(true);
   const [contractList, setContractList] = useState<Contract[]>([]);
-  const [showArchived, setShowArchived] = useState(false);
-  const [contractFiltersOpen, setContractFiltersOpen] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'all' | Contract['status']>('all');
-  const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
-  const [filterBuilding, setFilterBuilding] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewContractOpen, setIsNewContractOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -139,14 +107,8 @@ export function ContractsView() {
   const [renewTarget, setRenewTarget] = useState<Contract | null>(null);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
 
-  const [contractTenants, setContractTenants] = useState<ContractTenantRow[]>([]);
-  const [contractCollaborations, setContractCollaborations] = useState<ContractCollaborationRow[]>([]);
-  const [repoDocs, setRepoDocs] = useState<RepositoryDocumentRow[]>([]);
-  const [templates, setTemplates] = useState<DocumentTemplateRow[]>([]);
-  const [inventorySnapshots, setInventorySnapshots] = useState<InventorySnapshotRow[]>([]);
-  const [inventoryItemsBySnapshot, setInventoryItemsBySnapshot] = useState<
-    Record<string, InventorySnapshotItemRow[]>
-  >({});
+  const [inspectionPayload, setInspectionPayload] = useState<UnitInspectionPayload | null>(null);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
   const [staffOptions, setStaffOptions] = useState<StaffUserOption[]>([]);
 
   const resetNewContractForm = () => {
@@ -188,26 +150,22 @@ export function ContractsView() {
     resetNewContractForm();
   };
 
-  const reloadContracts = useCallback(
-    async (override?: { archived?: boolean }) => {
-      try {
-        const archived = override?.archived ?? showArchived;
-        const list = await fetchContracts({ archived });
-        setContractList(list);
-      } catch {
-        setContractList([]);
-        toast.warning(t('views.contracts.loadError'));
-      }
-    },
-    [showArchived, t],
-  );
+  const reloadContracts = useCallback(async () => {
+    try {
+      const list = await fetchContracts({ archived: false });
+      setContractList(list);
+    } catch {
+      setContractList([]);
+      toast.warning(t('views.contracts.loadError'));
+    }
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setContractsLoading(true);
       try {
-        const list = await fetchContracts({ archived: showArchived });
+        const list = await fetchContracts({ archived: false });
         if (!cancelled) setContractList(list);
       } catch {
         if (!cancelled) {
@@ -221,7 +179,7 @@ export function ContractsView() {
     return () => {
       cancelled = true;
     };
-  }, [showArchived, t]);
+  }, [t]);
 
   useEffect(() => {
     void (async () => {
@@ -319,47 +277,6 @@ export function ContractsView() {
     return [{ value: currentUserId, label: currentUserName || `Agent ${currentUserId}` }, ...base];
   }, [staffOptions, session?.user]);
 
-  const contractBuildingNames = useMemo(() => {
-    const names = [...new Set(unitList.map((u) => u.buildingName).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b),
-    );
-    return names;
-  }, [unitList]);
-
-  const statusFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: t('views.contracts.filterAll') },
-      { value: 'Pending Inspection', label: t('views.contracts.statuses.pendingInspection') },
-      { value: 'Active', label: t('views.contracts.statuses.active') },
-      { value: 'Expired', label: t('views.contracts.statuses.expired') },
-      { value: 'Terminated', label: t('views.contracts.statuses.terminated') },
-    ],
-    [t],
-  );
-
-  const typeFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: t('views.contracts.filterAll') },
-      { value: 'Monthly Rental', label: t('views.contracts.types.monthly') },
-      { value: 'Sales', label: t('views.contracts.types.sales') },
-      { value: 'Short-term Rental', label: t('views.contracts.types.shortTerm') },
-    ],
-    [t],
-  );
-
-  const buildingFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: t('views.contracts.filterAllBuildings') },
-      ...contractBuildingNames.map((name) => ({ value: name, label: name })),
-    ],
-    [contractBuildingNames, t],
-  );
-
-  const activeContractFilterCount = useMemo(
-    () => [filterStatus !== 'all', filterType !== 'all', filterBuilding !== 'all'].filter(Boolean).length,
-    [filterStatus, filterType, filterBuilding],
-  );
-
   const applyUnitDefaults = (pickedUnitId: string | null) => {
     if (!pickedUnitId) return;
     const unit = unitList.find((u) => u.id === pickedUnitId);
@@ -379,13 +296,17 @@ export function ContractsView() {
     window.open(url, '_blank');
   };
 
-  const resetDetailsPanelData = useCallback(() => {
-    setContractTenants([]);
-    setContractCollaborations([]);
-    setRepoDocs([]);
-    setTemplates([]);
-    setInventorySnapshots([]);
-    setInventoryItemsBySnapshot({});
+  const loadInspection = useCallback(async (contractId: string) => {
+    setInspectionLoading(true);
+    try {
+      const data = await fetchContractInspection(contractId);
+      setInspectionPayload(data);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to load inspection');
+      setInspectionPayload(null);
+    } finally {
+      setInspectionLoading(false);
+    }
   }, []);
 
   const handleDeleteContract = async (contract: Contract) => {
@@ -399,67 +320,49 @@ export function ContractsView() {
     }
   };
 
-  const handleActivateContract = async (contract: Contract) => {
-    if (!window.confirm('Release / Activate this lease? Make sure inspection (inventory snapshot) is completed.')) return;
-    try {
-      const body: Parameters<typeof updateContract>[1] = {
-        unitId: contract.unitId,
-        tenantId: contract.tenantId,
-        agentId: normalizeAgentIdForWrite(contract.agentId),
-        startDate: String(contract.startDate).slice(0, 10),
-        endDate: String(contract.endDate).slice(0, 10),
-        monthlyRent: Number(contract.monthlyRent),
-        securityDeposit: Number(contract.securityDeposit),
-        advanceRent: Number(contract.advanceRent),
-        type: contract.type,
-        status: 'Active',
-        remarks: contract.remarks ?? '',
-      };
-      const updated = await updateContract(contract.id, body);
-      setContractList((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      if (selectedContract?.id === updated.id) setSelectedContract(updated);
-      toast.success('Lease activated.');
-    } catch (e: any) {
-      toast.error(e instanceof Error ? e.message : e?.error ? String(e.error) : 'Failed to activate lease');
+  const openContractDetails = (contract: Contract, prefetch?: UnitInspectionPayload | null) => {
+    setSelectedContract(contract);
+    setIsDetailsOpen(true);
+    if (prefetch) {
+      setInspectionPayload(prefetch);
+      setInspectionLoading(false);
+    } else {
+      setInspectionPayload(null);
+      void loadInspection(contract.id);
     }
   };
 
-  const openContractDetails = (contract: Contract) => {
-    setSelectedContract(contract);
-    setIsDetailsOpen(true);
-    resetDetailsPanelData();
-
-    void (async () => {
-      try {
-        const [tenantsRows, collabRows, docsRows, templateRows, snapRows] = await Promise.all([
-          fetchContractTenants(contract.id),
-          fetchContractCollaborations(contract.id),
-          fetchContractRepositoryDocuments(contract.id),
-          fetchDocumentTemplates(),
-          fetchContractInventorySnapshots(contract.id),
-        ]);
-        setContractTenants(tenantsRows);
-        setContractCollaborations(collabRows);
-        setRepoDocs(docsRows);
-        setTemplates(templateRows);
-        setInventorySnapshots(snapRows);
-        setInventoryItemsBySnapshot(await loadItemsMapForSnapshots(snapRows));
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Failed to load contract details');
+  const handleInspectOrActivate = async (contract: Contract) => {
+    try {
+      const inspectionData = await fetchContractInspection(contract.id);
+      if (isInspectionApprovedForActivation(inspectionData)) {
+        const result = await Swal.fire({
+          icon: 'question',
+          title: t('views.contracts.activateConfirmTitle'),
+          text: t('views.contracts.activateConfirm'),
+          showCancelButton: true,
+          confirmButtonText: t('views.contracts.table.activate'),
+          cancelButtonText: t('views.contracts.cancel'),
+          confirmButtonColor: '#4f46e5',
+          reverseButtons: true,
+        });
+        if (!result.isConfirmed) return;
+        const updated = await activateContract(contract.id);
+        setContractList((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        toast.success(t('views.contracts.leaseActivated'));
+        return;
       }
-    })();
-  };
-
-  const reloadInventory = async (contractId: string) => {
-    const snapRows = await fetchContractInventorySnapshots(contractId);
-    setInventorySnapshots(snapRows);
-    setInventoryItemsBySnapshot(await loadItemsMapForSnapshots(snapRows));
+      openContractDetails(contract, inspectionData);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('views.contracts.activateError'));
+      openContractDetails(contract);
+    }
   };
 
   const closeContractDetails = () => {
     setIsDetailsOpen(false);
     setSelectedContract(null);
-    resetDetailsPanelData();
+    setInspectionPayload(null);
   };
 
   const unpaidBalanceForContract = useCallback(
@@ -487,178 +390,199 @@ export function ContractsView() {
     setRenewTarget(null);
   };
 
-  const buildCollaborators = (tenantsRows: ContractTenantRow[], collabRows: ContractCollaborationRow[]): Collaborator[] => {
-    const fromTenants = (tenantsRows ?? []).map<Collaborator>((r) => ({
-      id: `tenant-${r.tenantId}`,
-      name: r.name || '—',
-      email: r.email || '',
-      role: r.isPrimary ? 'Owner' : 'Viewer',
-      dateAdded: r.createdAt || '',
-      remarks: r.remarks || '',
-    }));
-    const fromCollab = (collabRows ?? []).map<Collaborator>((c) => ({
-      id: `agency-${c.id}`,
-      name: c.partnerAgencyName || 'Agency',
-      email: c.email || '',
-      role: 'Viewer',
-      dateAdded: c.createdAt || '',
-      remarks: c.remarks || '',
-      commissionTerms: c.commissionTerms || '',
-    }));
-    return [...fromTenants, ...fromCollab];
-  };
-
-
   const columns: ColumnDef<Contract>[] = useMemo(
     () => [
       {
+        id: 'createdAt',
+        header: t('views.contracts.table.dateTime'),
+        sortable: true,
+        sortValue: (contract) => contract.createdAt ?? '',
+        render: (contract) => {
+          const dt = parseContractDateTime(contract.createdAt);
+          return dt ? (
+            <div className="flex min-w-[8rem] flex-col gap-0.5">
+              <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+                {format(dt, 'MMM dd, yyyy')}
+              </span>
+              <span className="whitespace-nowrap text-xs text-slate-500">{format(dt, 'h:mm a')}</span>
+            </div>
+          ) : (
+            <span className="text-sm text-slate-400">—</span>
+          );
+        },
+      },
+      {
+        id: 'contractId',
         header: t('views.contracts.table.contractId'),
+        sortable: true,
+        sortValue: (contract) => contract.contractNo ?? contract.id,
         render: (contract) => (
           <span className="font-mono text-xs text-slate-500 uppercase">{contract.contractNo ?? contract.id}</span>
         ),
       },
       {
-        header: t('views.contracts.table.unitTenant'),
+        id: 'tenant',
+        header: t('views.contracts.table.tenant'),
+        sortable: true,
+        sortValue: (contract) => tenantList.find((ten) => ten.id === contract.tenantId)?.name ?? '',
         render: (contract) => {
-          const unit = unitList.find((u) => u.id === contract.unitId);
           const tenant = tenantList.find((ten) => ten.id === contract.tenantId);
           return (
-            <div className="flex flex-col">
-              <span className="font-bold text-slate-900 dark:text-slate-100">
-                {unit?.unitNumber ?? contract.unitId}
-              </span>
-              <span className="text-xs text-slate-500">{tenant?.name}</span>
-            </div>
+            <span className="block min-w-[7rem] font-medium text-slate-700 dark:text-slate-200">
+              {tenant?.name ?? '—'}
+            </span>
           );
         },
       },
       {
-        header: t('views.contracts.table.period'),
-        render: (contract) => (
-          <div className="flex flex-col text-xs">
-            <span className="text-slate-700 dark:text-slate-300">{format(new Date(contract.startDate), 'MMM dd, yyyy')}</span>
-            <span className="text-slate-400 dark:text-slate-500">
-              {t('views.contracts.table.to')} {format(new Date(contract.endDate), 'MMM dd, yyyy')}
+        id: 'unit',
+        header: t('views.contracts.table.unit'),
+        sortable: true,
+        sortValue: (contract) => unitList.find((u) => u.id === contract.unitId)?.unitNumber ?? contract.unitId,
+        render: (contract) => {
+          const unit = unitList.find((u) => u.id === contract.unitId);
+          return (
+            <span className="block min-w-[5rem] font-semibold text-slate-900 dark:text-slate-100">
+              {unit?.unitNumber ?? contract.unitId}
             </span>
-          </div>
+          );
+        },
+      },
+      {
+        id: 'period',
+        header: t('views.contracts.table.period'),
+        sortable: true,
+        sortValue: (contract) => contract.startDate,
+        render: (contract) => (
+          <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+            {format(new Date(contract.startDate), 'MMM dd, yyyy')}
+            <span className="mx-1.5 text-slate-300 dark:text-slate-600">—</span>
+            {format(new Date(contract.endDate), 'MMM dd, yyyy')}
+          </span>
         ),
       },
       {
+        id: 'agent',
         header: t('views.contracts.table.agent'),
+        sortable: true,
+        sortValue: (contract) => contract.agentName?.trim() ?? '',
         render: (contract) => {
           const label = (contract.agentName && contract.agentName.trim()) || '—';
           return <span className="text-sm font-medium">{label}</span>;
         },
       },
       {
+        id: 'status',
         header: t('views.contracts.table.status'),
+        sortable: true,
+        sortValue: (contract) => contract.status,
         render: (contract) => (
           <StatusBadge tone={contract.status === 'Active' ? 'success' : contractStatusVariant(contract.status)}>
-            {contract.status === 'Active' ? t('views.contracts.statuses.active') : contract.status}
+            {contractStatusLabel(contract.status, t)}
           </StatusBadge>
         ),
       },
       {
+        id: 'documents',
         header: t('views.contracts.table.documents'),
         className: 'text-center',
         headerClassName: 'text-center',
         cellClassName: 'text-center',
         render: (contract) => (
-          <div className="flex w-full justify-center items-center gap-2">
+          <div className="flex w-full items-center justify-center gap-1.5">
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
-              className="h-8 px-3 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-200 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 dark:border dark:border-indigo-500/30 whitespace-nowrap"
+              className="h-8 rounded-lg border-transparent bg-white px-2 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'contract');
               }}
             >
-              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              <FileText className="mr-1 h-3.5 w-3.5 shrink-0" />
               {t('views.contracts.table.contract')}
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
-              className="h-8 px-3 text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-700/60 dark:hover:bg-slate-700/80 dark:border dark:border-slate-600 whitespace-nowrap"
+              className="h-8 rounded-lg border-transparent bg-white px-2 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreview(contract, 'invoice');
               }}
             >
-              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              <FileText className="mr-1 h-3.5 w-3.5 shrink-0" />
               {t('views.contracts.table.invoice')}
             </Button>
           </div>
         ),
       },
       {
-        header: 'Action',
-        className: 'text-right',
-        headerClassName: 'text-right',
-        cellClassName: 'text-right',
+        id: 'actions',
+        header: t('views.contracts.table.actions'),
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
         render: (contract) => (
           <div
-            className="inline-flex justify-end"
+            className="flex items-center justify-center gap-1"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} />}
+            {canUpdate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.contracts.table.edit')}
+                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                onClick={() => openEditModal(contract)}
               >
-                <MoreVertical className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canUpdate && !showArchived && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditModal(contract);
-                    }}
-                  >
-                    Edit Contract
-                  </DropdownMenuItem>
-                )}
-                {canRenewLease && !showArchived && contract.status === 'Active' && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openRenewLease(contract);
-                    }}
-                  >
-                    Renew lease
-                  </DropdownMenuItem>
-                )}
-                {canUpdate && !showArchived && contract.status === 'Pending Inspection' && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleActivateContract(contract);
-                    }}
-                  >
-                    Release / Activate
-                  </DropdownMenuItem>
-                )}
-                {canDelete && !showArchived && (
-                  <DropdownMenuItem
-                    className="text-rose-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteContract(contract);
-                    }}
-                  >
-                    Delete Contract
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+            {canRenewLease && contract.status === 'Active' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.contracts.table.renew')}
+                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                onClick={() => openRenewLease(contract)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+            {canUpdate && contract.status === 'Pending Inspection' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.contracts.table.inspectOrActivate')}
+                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                onClick={() => void handleInspectOrActivate(contract)}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title={t('views.contracts.table.delete')}
+                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                onClick={() => void handleDeleteContract(contract)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease, showArchived, selectedContract]
+    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease]
   );
 
   const handleGenerate = () => {
@@ -699,8 +623,7 @@ export function ContractsView() {
           toast.success('Contract updated.');
         } else {
           await createContract(newContractPayload);
-          if (showArchived) setShowArchived(false);
-          else await reloadContracts({ archived: false });
+          await reloadContracts();
           toast.success(t('views.contracts.generateActivate'));
         }
         closeContractModal();
@@ -713,12 +636,6 @@ export function ContractsView() {
   const filteredContracts = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return contractList.filter((c) => {
-      if (filterStatus !== 'all' && c.status !== filterStatus) return false;
-      if (filterType !== 'all' && c.type !== filterType) return false;
-      if (filterBuilding !== 'all') {
-        const unit = unitList.find((u) => u.id === c.unitId);
-        if (!unit || unit.buildingName !== filterBuilding) return false;
-      }
       if (!q) return true;
       const unit = unitList.find((u) => u.id === c.unitId);
       const tenant = tenantList.find((ten) => ten.id === c.tenantId);
@@ -729,24 +646,36 @@ export function ContractsView() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [searchTerm, contractList, tenantList, unitList, filterStatus, filterType, filterBuilding]);
+  }, [searchTerm, contractList, tenantList, unitList]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 shrink-0">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t('views.contracts.title')}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">{t('views.contracts.subtitle')}</p>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">{t('views.contracts.subtitle')}</p>
         </div>
-        {canCreate && (
-          <Button
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            onClick={openCreateModal}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t('views.contracts.newLeaseWorkflow')}
-          </Button>
-        )}
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+          <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder={t('views.contracts.searchPlaceholder')}
+              className="h-10 rounded-xl border-transparent bg-white pl-9 pr-3 text-sm shadow-sm dark:border-transparent dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          {canCreate ? (
+            <Button
+              type="button"
+              className="h-10 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+              onClick={openCreateModal}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {t('views.contracts.newLeaseWorkflow')}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <Modal
@@ -757,17 +686,10 @@ export function ContractsView() {
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button
-              variant="outline"
-              className="h-11 min-w-[120px] rounded-xl"
-              onClick={closeContractModal}
-            >
+            <Button className={modalDismissButtonClass} onClick={closeContractModal}>
               {t('views.contracts.cancel')}
             </Button>
-            <Button
-              className="h-11 min-w-[120px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
-              onClick={handleGenerate}
-            >
+            <Button className={modalPrimaryButtonClass} onClick={handleGenerate}>
               {formMode === 'edit' ? 'Save Changes' : t('views.contracts.generateActivate')}
             </Button>
           </div>
@@ -775,12 +697,14 @@ export function ContractsView() {
       >
         <p className="text-sm text-brand-muted mb-2">{t('views.contracts.newLeaseDescription')}</p>
         <p className="text-xs text-slate-600 mb-4">{t('views.contracts.inspectionGateHint')}</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="unit-form-fields grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t('views.contracts.selectUnit')}</Label>
             <Select2
               options={unitOptions}
               value={unitId}
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
               onChange={(v) => {
                 const picked = v as string | null;
                 setUnitId(picked);
@@ -790,13 +714,21 @@ export function ContractsView() {
           </div>
           <div className="space-y-2">
             <Label>{t('views.contracts.selectTenant')}</Label>
-            <Select2 options={tenantOptions} value={tenantId} onChange={(v) => setTenantId(v as string | null)} />
+            <Select2
+              options={tenantOptions}
+              value={tenantId}
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
+              onChange={(v) => setTenantId(v as string | null)}
+            />
           </div>
           <div className="space-y-2">
             <Label>{t('views.dashboard.agents.agentName')}</Label>
             <Select2
               options={agentOptions}
               value={agentId}
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
               onChange={(v) => setAgentId(String(v as string | null ?? ''))}
             />
           </div>
@@ -808,7 +740,7 @@ export function ContractsView() {
               onChange={(d) => setStartDate((d as Date | null) ?? null)}
               placeholder="Start date"
               fullWidth
-              inputClassName="h-12 rounded-xl text-sm"
+              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
@@ -819,7 +751,7 @@ export function ContractsView() {
               onChange={(d) => setEndDate((d as Date | null) ?? null)}
               placeholder="End date"
               fullWidth
-              inputClassName="h-12 rounded-xl text-sm"
+              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
@@ -827,7 +759,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="35000"
-              className="h-12 rounded-xl border-slate-200"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
               value={monthlyRent}
               onChange={(e) => setMonthlyRent(e.target.value)}
             />
@@ -837,7 +769,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="70000"
-              className="h-12 rounded-xl border-slate-200"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
               value={securityDeposit}
               onChange={(e) => setSecurityDeposit(e.target.value)}
             />
@@ -857,7 +789,7 @@ export function ContractsView() {
         contract={renewTarget}
         unpaidBalance={renewTarget ? unpaidBalanceForContract(renewTarget.id) : 0}
         onRenewed={async () => {
-          toast.success('Lease renewed.');
+          toast.success(t('views.contracts.renewLease.renewed'));
           await reloadContracts();
           try {
             setPayments(await fetchPayments());
@@ -867,350 +799,35 @@ export function ContractsView() {
         }}
       />
 
-      <ContractDetailsCollaborationModal
+      <UnitInspectionWorkflowModal
         isOpen={isDetailsOpen}
         onClose={closeContractDetails}
-        summary={{
-          title: selectedContract ? `Contract ${selectedContract.contractNo ?? selectedContract.id}` : 'Contract',
-          unitLabel: selectedContract
-            ? (() => {
-                const u = unitList.find((x) => x.id === selectedContract.unitId);
-                return u ? `${u.unitNumber} · ${u.buildingName}` : selectedContract.unitId;
-              })()
-            : '—',
-          primaryTenantLabel: selectedContract
-            ? tenantList.find((x) => x.id === selectedContract.tenantId)?.name ?? selectedContract.tenantId
-            : '—',
-          periodLabel: selectedContract
-            ? `${format(new Date(selectedContract.startDate), 'MMM d, yyyy')} — ${format(
-                new Date(selectedContract.endDate),
-                'MMM d, yyyy',
-              )}`
-            : '—',
-          statusLabel: selectedContract ? selectedContract.status : '—',
+        contract={selectedContract}
+        unit={selectedContract ? unitList.find((u) => u.id === selectedContract.unitId) ?? null : null}
+        tenantName={
+          selectedContract
+            ? tenantList.find((ten) => ten.id === selectedContract.tenantId)?.name ?? selectedContract.tenantId
+            : '—'
+        }
+        agentName={
+          selectedContract
+            ? (selectedContract.agentName && selectedContract.agentName.trim()) ||
+              staffOptions.find((s) => s.value === selectedContract.agentId)?.label ||
+              selectedContract.agentId
+            : '—'
+        }
+        payload={inspectionPayload}
+        loading={inspectionLoading}
+        canWrite={canUpdate}
+        onRefresh={async () => {
+          if (selectedContract) await loadInspection(selectedContract.id);
         }}
-        initialCollaborators={buildCollaborators(contractTenants, contractCollaborations)}
-        initialActivity={(() => {
-          const items: ActivityItem[] = [];
-          for (const r of contractTenants ?? []) {
-            if (!r.createdAt) continue;
-            items.push({
-              id: `tenant-${r.tenantId}-${r.isPrimary ? 'p' : 'c'}`,
-              at: r.createdAt,
-              text: `${r.isPrimary ? 'Primary tenant' : 'Co-tenant'} linked: ${r.name || r.tenantId}`,
-            });
-          }
-          for (const c of contractCollaborations ?? []) {
-            if (!c.createdAt) continue;
-            items.push({
-              id: `collab-${c.id}`,
-              at: c.createdAt,
-              text: `Collaboration added: ${c.partnerAgencyName || 'Agency'}${
-                c.commissionTerms ? ` (${c.commissionTerms})` : ''
-              }`,
-            });
-          }
-          return items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-        })()}
-        onSendInvite={async ({ name, email, commissionTerms, remarks }) => {
-          if (!selectedContract) return;
-          try {
-            const next = await inviteContractCollaborator(selectedContract.id, {
-              name,
-              email,
-              commissionTerms,
-              remarks,
-            });
-            setContractCollaborations(next);
-            toast.success('Invite sent.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to send invite');
-            throw e;
-          }
-        }}
-        onEditCollaborator={async (collabId, payload) => {
-          if (!selectedContract) return;
-          try {
-            const { collaborations, tenants } = await updateContractCollaborator(selectedContract.id, collabId, payload);
-            setContractCollaborations(collaborations);
-            setContractTenants(tenants);
-            toast.success('Collaborator updated.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to update collaborator');
-            throw e;
-          }
-        }}
-        documents={repoDocs.map((d) => ({
-          id: d.id,
-          docType: d.docType,
-          title: d.title,
-          filePath: d.filePath,
-          createdAt: d.createdAt,
-          portalVisible: d.portalVisible,
-          contractId: d.contractId,
-        }))}
-        templates={templates.map((t1) => ({
-          id: t1.id,
-          templateKey: t1.templateKey,
-          title: t1.title,
-          filePath: t1.filePath,
-          versionNo: t1.versionNo,
-          createdAt: t1.createdAt,
-        }))}
-        onUploadRepositoryDocument={async (payload) => {
-          if (!selectedContract) return;
-          try {
-            const next = await uploadContractRepositoryDocument(selectedContract.id, {
-              file: payload.file,
-              docType: payload.docType,
-              title: payload.title,
-              portalVisible: payload.portalVisible,
-            });
-            setRepoDocs(next);
-            toast.success('Document uploaded.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to upload document');
-            throw e;
-          }
-        }}
-        onUploadTemplate={async (payload) => {
-          try {
-            const next = await uploadDocumentTemplate({
-              file: payload.file,
-              templateKey: payload.templateKey,
-              title: payload.title,
-              isActive: payload.isActive,
-            });
-            setTemplates(next);
-            toast.success('Template uploaded.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to upload template');
-            throw e;
-          }
-        }}
-        onGenerateInvoice={async () => {
-          if (!selectedContract) return;
-          try {
-            // Default: current month billing, due at month end; base = monthly rent.
-            const now = new Date();
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-            const created = await createContractInvoice(selectedContract.id, {
-              billingPeriodStart: format(start, 'yyyy-MM-dd'),
-              billingPeriodEnd: format(end, 'yyyy-MM-dd'),
-              dueDate: format(end, 'yyyy-MM-dd'),
-              baseAmount: Number(selectedContract.monthlyRent ?? 0),
-              otherCharges: 0,
-              discountAmount: 0,
-              status: 'issued',
-            });
-            toast.success('Invoice generated.');
-            const url = `${window.location.origin}/preview?type=invoice&id=${encodeURIComponent(created.id)}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to generate invoice');
-            throw e;
-          }
-        }}
-        inventory={inventorySnapshots.map((s) => ({
-          id: s.id,
-          snapshotType: s.snapshotType,
-          inspectionDate: s.inspectionDate,
-          remarks: s.remarks,
-          items: (inventoryItemsBySnapshot[s.id] ?? []).map((it) => ({
-            id: it.id,
-            itemName: it.itemName,
-            category: it.category,
-            quantity: it.quantity,
-            conditionState: it.conditionState,
-            notes: it.notes,
-          })),
-        }))}
-        onAddSnapshot={async (payload) => {
-          if (!selectedContract) return;
-          try {
-            await createInventorySnapshot({
-              contractId: selectedContract.id,
-              snapshotType: payload.snapshotType,
-              inspectionDate: payload.inspectionDate,
-              remarks: payload.remarks,
-            });
-            await reloadInventory(selectedContract.id);
-            toast.success('Snapshot added.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to add snapshot');
-          }
-        }}
-        onAddItem={async (payload) => {
-          if (!selectedContract) return;
-          try {
-            await createInventorySnapshotItem({
-              snapshotId: payload.snapshotId,
-              itemName: payload.itemName,
-              category: payload.category,
-              quantity: payload.quantity,
-              conditionState: payload.conditionState,
-              notes: payload.notes,
-            });
-            await reloadInventory(selectedContract.id);
-            toast.success('Item added.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to add item');
-          }
-        }}
-        onEditSnapshot={async (snapshotId, payload) => {
-          if (!selectedContract) return;
-          try {
-            await patchInventorySnapshot(snapshotId, {
-              snapshotType: payload.snapshotType,
-              inspectionDate: payload.inspectionDate,
-              remarks: payload.remarks,
-            });
-            await reloadInventory(selectedContract.id);
-            toast.success('Snapshot updated.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to update snapshot');
-          }
-        }}
-        onDeleteSnapshot={async (snapshotId) => {
-          if (!selectedContract) return;
-          try {
-            await deleteInventorySnapshot(snapshotId);
-            await reloadInventory(selectedContract.id);
-            toast.success('Snapshot deleted.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to delete snapshot');
-          }
-        }}
-        onEditItem={async (itemId, payload) => {
-          if (!selectedContract) return;
-          try {
-            await patchInventorySnapshotItem(itemId, {
-              itemName: payload.itemName,
-              category: payload.category,
-              quantity: payload.quantity,
-              conditionState: payload.conditionState,
-              notes: payload.notes,
-            });
-            await reloadInventory(selectedContract.id);
-            toast.success('Item updated.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to update item');
-          }
-        }}
-        onDeleteItem={async (itemId) => {
-          if (!selectedContract) return;
-          try {
-            await deleteInventorySnapshotItem(itemId);
-            await reloadInventory(selectedContract.id);
-            toast.success('Item deleted.');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Failed to delete item');
-          }
-        }}
+        onPayloadChange={setInspectionPayload}
       />
 
-      <div className="space-y-3">
-        {showArchived ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-            {t('views.contracts.archiveBanner')}
-          </div>
-        ) : null}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <Input
-              placeholder={t('views.contracts.searchPlaceholder')}
-              className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:focus:border-indigo-500 dark:focus-visible:ring-indigo-500/20"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <Button
-              type="button"
-              variant={contractFiltersOpen || activeContractFilterCount > 0 ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-10 rounded-xl border-slate-200 shadow-sm',
-                contractFiltersOpen || activeContractFilterCount > 0
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600'
-                  : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700',
-              )}
-              onClick={() => setContractFiltersOpen((o) => !o)}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              {t('views.contracts.filter')}
-              {activeContractFilterCount > 0 ? (
-                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1 text-[11px] font-bold tabular-nums">
-                  {activeContractFilterCount}
-                </span>
-              ) : null}
-            </Button>
-            <Button
-              type="button"
-              variant={showArchived ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-10 rounded-xl border-slate-200 shadow-sm',
-                showArchived
-                  ? 'border-slate-700 bg-slate-800 text-white hover:bg-slate-900'
-                  : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700',
-              )}
-              onClick={() => setShowArchived((v) => !v)}
-            >
-              <History className="w-4 h-4 mr-2" />
-              {showArchived ? t('views.contracts.backToActive') : t('views.contracts.archive')}
-            </Button>
-          </div>
-        </div>
-        {contractFiltersOpen ? (
-          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="min-w-[10rem] flex-1 space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterStatus')}</Label>
-              <Select2
-                options={statusFilterOptions}
-                value={filterStatus}
-                onChange={(v) => setFilterStatus((v as Contract['status'] | 'all') ?? 'all')}
-              />
-            </div>
-            <div className="min-w-[10rem] flex-1 space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterType')}</Label>
-              <Select2
-                options={typeFilterOptions}
-                value={filterType}
-                onChange={(v) => setFilterType((v as TransactionType | 'all') ?? 'all')}
-              />
-            </div>
-            <div className="min-w-[10rem] flex-1 space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-500">{t('views.contracts.filterBuilding')}</Label>
-              <Select2
-                options={buildingFilterOptions}
-                value={filterBuilding}
-                onChange={(v) => setFilterBuilding((v as string) ?? 'all')}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 shrink-0 rounded-lg"
-              onClick={() => {
-                setFilterStatus('all');
-                setFilterType('all');
-                setFilterBuilding('all');
-              }}
-            >
-              {t('views.contracts.resetFilters')}
-            </Button>
-          </div>
-        ) : null}
-      </div>
-
       {contractsLoading ? (
-        <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden p-6 md:p-8">
-          <SkeletonTable rows={8} columns={6} />
+        <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
+          <SkeletonTable rows={8} columns={9} />
         </div>
       ) : (
         <DataTable

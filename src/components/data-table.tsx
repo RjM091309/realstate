@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export type SortDirection = 'asc' | 'desc';
+
 export interface ColumnDef<T> {
+  /** Stable column id for sorting. Falls back to accessorKey or header. */
+  id?: string;
   header: string;
   accessorKey?: keyof T;
+  /** Enable stacked up/down sort controls in the header. */
+  sortable?: boolean;
+  /** Custom value extractor for sorting when using `render`. */
+  sortValue?: (item: T) => string | number | null | undefined;
   render?: (item: T) => React.ReactNode;
   className?: string;
   headerClassName?: string;
@@ -17,6 +25,10 @@ interface DataTableProps<T> {
   columns: ColumnDef<T>[];
   keyExtractor: (item: T) => string | number;
   onRowClick?: (item: T) => void;
+  /** Rows per page. Default 10. */
+  defaultPageSize?: number;
+  /** Page-size dropdown values. Default [10, 25, 50, 100]. */
+  pageSizeOptions?: number[];
   /**
    * When false, the first column uses the same neutral styling as other columns
    * (no violet highlight stripe). Default true for backward compatibility.
@@ -29,6 +41,74 @@ interface DataTableProps<T> {
   embedded?: boolean;
 }
 
+function columnSortKey<T>(col: ColumnDef<T>): string {
+  if (col.id) return col.id;
+  if (col.accessorKey != null) return String(col.accessorKey);
+  return col.header;
+}
+
+function getSortValue<T>(col: ColumnDef<T>, item: T): string | number | null | undefined {
+  if (col.sortValue) return col.sortValue(item);
+  if (col.accessorKey) return item[col.accessorKey] as string | number | null | undefined;
+  return null;
+}
+
+function compareSortValues(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+  direction: SortDirection,
+): number {
+  const mul = direction === 'asc' ? 1 : -1;
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === 'number' && typeof b === 'number') return (a - b) * mul;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }) * mul;
+}
+
+function ColumnSortControl({
+  direction,
+  onAsc,
+  onDesc,
+}: {
+  direction: SortDirection | null;
+  onAsc: () => void;
+  onDesc: () => void;
+}) {
+  return (
+    <span className="ml-1.5 inline-flex flex-col items-center justify-center leading-none">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAsc();
+        }}
+        className={cn(
+          'rounded p-0.5 transition-colors hover:bg-slate-200/80 dark:hover:bg-slate-700/80',
+          direction === 'asc' ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500',
+        )}
+        aria-label="Sort ascending"
+      >
+        <ChevronUp className="h-3 w-3" strokeWidth={2.5} />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDesc();
+        }}
+        className={cn(
+          '-mt-1 rounded p-0.5 transition-colors hover:bg-slate-200/80 dark:hover:bg-slate-700/80',
+          direction === 'desc' ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500',
+        )}
+        aria-label="Sort descending"
+      >
+        <ChevronDown className="h-3 w-3" strokeWidth={2.5} />
+      </button>
+    </span>
+  );
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -36,70 +116,126 @@ export function DataTable<T>({
   onRowClick,
   highlightFirstColumn = true,
   embedded = false,
+  defaultPageSize = 10,
+  pageSizeOptions = [10, 25, 50, 100],
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [itemsPerPage, setItemsPerPage] = useState(defaultPageSize);
   const [perPageOpen, setPerPageOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection | null>(null);
+
+  const sortedData = useMemo(() => {
+    if (!sortColumn || !sortDirection) return data;
+    const col = columns.find((c) => columnSortKey(c) === sortColumn);
+    if (!col) return data;
+    return [...data].sort((a, b) => compareSortValues(getSortValue(col, a), getSortValue(col, b), sortDirection));
+  }, [columns, data, sortColumn, sortDirection]);
 
   // Pagination logic
-  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = data.slice(startIndex, endIndex);
+  const currentData = sortedData.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const applySort = (col: ColumnDef<T>, direction: SortDirection) => {
+    const key = columnSortKey(col);
+    if (sortColumn === key && sortDirection === direction) {
+      setSortColumn(null);
+      setSortDirection(null);
+    } else {
+      setSortColumn(key);
+      setSortDirection(direction);
+    }
+    setCurrentPage(1);
+  };
+
+  const cycleSort = (col: ColumnDef<T>) => {
+    const key = columnSortKey(col);
+    if (sortColumn !== key) {
+      setSortColumn(key);
+      setSortDirection('asc');
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc');
+    } else {
+      setSortColumn(null);
+      setSortDirection(null);
+    }
+    setCurrentPage(1);
+  };
 
   return (
     <div
       className={cn(
-        'w-full overflow-hidden',
+        'data-table w-full overflow-hidden font-sans',
         embedded ? '' : 'rounded-2xl bg-white dark:bg-slate-900 shadow-sm',
       )}
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700">
-              {columns.map((col, i) => (
+            <tr className="data-table-head-row border-b bg-white dark:bg-slate-900">
+              {columns.map((col, i) => {
+                const sortKey = columnSortKey(col);
+                const isSorted = sortColumn === sortKey;
+                return (
                 <th
-                  key={col.header}
+                  key={sortKey}
+                  onClick={col.sortable ? () => cycleSort(col) : undefined}
                   className={cn(
-                    "px-6 text-[13px] font-medium whitespace-nowrap uppercase tracking-wider",
-                    highlightFirstColumn ? "py-4" : "py-3",
+                    'px-6 text-xs font-semibold whitespace-nowrap uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400',
+                    highlightFirstColumn ? 'py-4' : 'py-3.5',
+                    col.sortable && 'cursor-pointer select-none',
                     highlightFirstColumn && i === 0
-                      ? "bg-violet-50 dark:bg-indigo-500/10 text-brand-text dark:text-slate-200"
-                      : "text-brand-muted dark:text-slate-300 bg-white dark:bg-slate-900",
+                      ? 'bg-violet-50 text-brand-text dark:bg-indigo-500/10 dark:text-slate-200'
+                      : 'bg-white dark:bg-slate-900',
                     col.className,
                     col.headerClassName,
-                    highlightFirstColumn && i === 0 && "border-r-[3px] border-white dark:border-slate-700"
+                    highlightFirstColumn && i === 0 && 'border-r-[3px] border-transparent',
                   )}
                 >
-                  {col.header}
+                  <div className="inline-flex items-center">
+                    <span>{col.header}</span>
+                    {col.sortable ? (
+                      <ColumnSortControl
+                        direction={isSorted ? sortDirection : null}
+                        onAsc={() => applySort(col, 'asc')}
+                        onDesc={() => applySort(col, 'desc')}
+                      />
+                    ) : null}
+                  </div>
                 </th>
-              ))}
+              );
+              })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
+          <tbody>
             {currentData.map((item) => (
               <tr
                 key={keyExtractor(item)}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
                 className={cn(
-                  "group transition-colors",
-                  onRowClick ? "cursor-pointer" : ""
+                  'data-table-row group border-b transition-colors',
+                  onRowClick ? 'cursor-pointer' : '',
                 )}
               >
                 {columns.map((col, i) => (
                   <td
                     key={i}
                     className={cn(
-                      "px-6 text-sm text-brand-text align-top",
-                      "dark:text-slate-200",
-                      highlightFirstColumn ? "py-4" : "py-3",
+                      'px-6 text-sm font-normal leading-5 text-brand-text align-top',
+                      highlightFirstColumn ? 'py-4' : 'py-3.5',
+                      'dark:text-slate-200',
                       highlightFirstColumn && i === 0
-                        ? "bg-violet-50 dark:bg-indigo-500/10 font-medium group-hover:bg-violet-100 dark:group-hover:bg-indigo-500/20 border-r-[3px] border-white dark:border-slate-700"
-                        : "bg-white dark:bg-slate-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/70",
+                        ? 'border-r-[3px] border-transparent bg-violet-50 font-medium group-hover:bg-violet-100 dark:bg-indigo-500/10 dark:group-hover:bg-indigo-500/20'
+                        : 'bg-white group-hover:bg-slate-50/80 dark:bg-slate-900 dark:group-hover:bg-slate-800/70',
                       col.className,
-                      col.cellClassName
+                      col.cellClassName,
                     )}
                   >
                     {col.render
@@ -125,17 +261,17 @@ export function DataTable<T>({
       {/* Pagination Container */}
       <div
         className={cn(
-          'flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-700',
+          'data-table-footer flex items-center justify-between border-t px-6 py-4',
           embedded ? 'bg-slate-50/60 dark:bg-slate-800/90' : 'bg-white dark:bg-slate-900',
         )}
       >
-        <div className="flex items-center gap-4 text-sm text-brand-muted dark:text-slate-300">
+        <div className="flex items-center gap-2 text-sm font-normal text-brand-muted dark:text-slate-300">
           <span>{t('datatable.show')}</span>
           <div className="relative">
             <button
               type="button"
               onClick={() => setPerPageOpen(!perPageOpen)}
-              className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-brand-orange/30 transition-all text-brand-text dark:text-slate-100 font-medium min-w-[60px] justify-between"
+              className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-transparent hover:border-transparent transition-all text-brand-text dark:text-slate-100 font-medium min-w-[60px] justify-between"
             >
               {itemsPerPage}
               <ChevronDown
@@ -147,14 +283,14 @@ export function DataTable<T>({
             {perPageOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setPerPageOpen(false)} aria-hidden />
-                <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700 rounded-lg shadow-lg z-20 py-1 overflow-hidden">
-                  {[50, 100, 150, 200].map((num) => (
+                <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-slate-900 border border-transparent rounded-lg shadow-lg z-20 py-1 overflow-hidden">
+                  {pageSizeOptions.map((num) => (
                     <button
                       type="button"
                       key={num}
                       onClick={() => {
                         setItemsPerPage(num);
-                        setCurrentPage(1); // Reset to first page
+                        setCurrentPage(1);
                         setPerPageOpen(false);
                       }}
                       className={cn(
@@ -171,22 +307,21 @@ export function DataTable<T>({
               </>
             )}
           </div>
-          <span>{t('datatable.entries')}</span>
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-brand-muted dark:text-slate-400 mr-4">
+          <span className="mr-4 text-brand-muted dark:text-slate-400 tabular-nums">
             {t('datatable.showing_info', {
-              from: data.length > 0 ? startIndex + 1 : 0,
-              to: Math.min(endIndex, data.length),
-              total: data.length
+              from: sortedData.length > 0 ? startIndex + 1 : 0,
+              to: Math.min(endIndex, sortedData.length),
+              total: sortedData.length
             })}
           </span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1 || data.length === 0}
+              disabled={currentPage === 1 || sortedData.length === 0}
               className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
             >
               <ChevronLeft size={18} />
@@ -213,7 +348,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || data.length === 0}
+              disabled={currentPage === totalPages || sortedData.length === 0}
               className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
             >
               <ChevronRight size={18} />

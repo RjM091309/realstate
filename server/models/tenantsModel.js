@@ -36,7 +36,8 @@ export async function listTenantsByBranch(branchId) {
       NULLIF(TRIM(d.file_path), '') AS id_image_url,
       t.kyc_verified,
       t.is_blacklisted,
-      t.blacklist_reason
+      t.blacklist_reason,
+      t.created_at
     FROM tenant_profile t
     LEFT JOIN tenant_document d ON d.id = (
       SELECT MAX(d2.id)
@@ -149,7 +150,8 @@ export async function getTenantById(id, branchId) {
       NULLIF(TRIM(d.file_path), '') AS id_image_url,
       t.kyc_verified,
       t.is_blacklisted,
-      t.blacklist_reason
+      t.blacklist_reason,
+      t.created_at
     FROM tenant_profile t
     LEFT JOIN tenant_document d ON d.id = (
       SELECT MAX(d2.id)

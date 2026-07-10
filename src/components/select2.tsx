@@ -16,6 +16,7 @@ interface Select2Props {
   className?: string;
   disabled?: boolean;
   leftIcon?: React.ReactNode;
+  borderless?: boolean;
 }
 
 const Control = ({ children, ...props }: ControlProps<Option, false>) => {
@@ -50,7 +51,8 @@ export const Select2: React.FC<Select2Props> = ({
   placeholder,
   className,
   disabled = false,
-  leftIcon
+  leftIcon,
+  borderless = true
 }) => {
   const { t } = useTranslation();
   const selectedOption = options.find(opt => opt.value === value) || null;
@@ -74,9 +76,13 @@ export const Select2: React.FC<Select2Props> = ({
             cn(
               '!min-h-10 !rounded-xl !cursor-pointer !shadow-sm',
               '!bg-white dark:!bg-slate-950',
-              '!border !border-slate-300 dark:!border-slate-600',
+              borderless
+                ? '!border !border-transparent hover:!border-transparent dark:!border-transparent'
+                : '!unit-form-select-control !border !border-slate-300 dark:!border-slate-600',
               state.isFocused
-                ? '!border-indigo-500 !ring-2 !ring-indigo-500/25'
+                ? borderless
+                  ? '!border-transparent !ring-2 !ring-indigo-500/25'
+                  : '!unit-form-select-control !border-indigo-500 !ring-2 !ring-indigo-500/25'
                 : '!ring-0',
               disabled ? '!opacity-60 !cursor-not-allowed' : undefined,
             ),
@@ -86,8 +92,7 @@ export const Select2: React.FC<Select2Props> = ({
           menu: () =>
             cn(
               '!rounded-xl !mt-1.5 !overflow-hidden !shadow-lg',
-              '!border !border-slate-200 !bg-white dark:!border-slate-600 dark:!bg-slate-950',
-              '!ring-1 !ring-black/5 dark:!ring-white/10',
+              '!border !border-transparent !bg-white dark:!bg-slate-950',
             ),
           menuList: () => '!py-1',
           option: ({ isSelected, isFocused }) => cn(
