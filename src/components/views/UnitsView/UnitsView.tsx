@@ -72,6 +72,15 @@ const UNIT_TYPES: UnitType[] = [
   'Penthouse',
 ];
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
+
+const UNIT_DETAIL_STAT_CARD =
+  'rounded-xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-600 dark:bg-slate-950/80';
+
+const UNIT_DETAIL_VALUE_BOX =
+  'rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950/80';
+
+const UNIT_DETAIL_TENANT_CARD =
+  'rounded-xl border border-indigo-100 bg-white px-4 py-4 dark:border-indigo-500/20 dark:bg-slate-950/80';
 const AREA_CITIES_LUZON: string[] = [
   'Manila',
   'Caloocan City',
@@ -278,6 +287,23 @@ function resolveUnitFullAddress(
   }
 
   return parts.join(', ');
+}
+
+/** Short location line for modal header / cards — avoids repeating the full legal address. */
+function resolveUnitHeaderSubtitle(
+  unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName' | 'tower' | 'floor'>,
+  floorWord = 'Floor',
+): string {
+  const building = deriveBuildingName(resolveUnitAddressBase(unit), unit.buildingName);
+  const tower = String(unit.tower ?? '').trim();
+  const floorPart = floorLabelForCard(unit.floor, floorWord);
+
+  const parts: string[] = [];
+  if (!isPlaceholderField(building)) parts.push(building);
+  if (!isPlaceholderField(tower)) parts.push(tower);
+  if (floorPart !== '—') parts.push(floorPart);
+
+  return parts.length ? parts.join(' · ') : '—';
 }
 
 function deriveBuildingName(addressOrBuilding: string, fallbackBuilding = ''): string {
@@ -1669,7 +1695,7 @@ export function UnitsView() {
                 </div>
                 <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                   {selectedUnit
-                    ? resolveUnitFullAddress(selectedUnit, t('views.units.table.floor'))
+                    ? resolveUnitHeaderSubtitle(selectedUnit, t('views.units.table.floor'))
                     : '—'}
                 </p>
               </div>
@@ -1704,7 +1730,7 @@ export function UnitsView() {
         <ScrollArea className="max-h-[min(68vh,42rem)] pr-1">
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 px-4 py-4 dark:from-emerald-500/10 dark:via-slate-900/40 dark:to-emerald-500/5">
+              <div className={UNIT_DETAIL_STAT_CARD}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-300/80">
@@ -1723,7 +1749,7 @@ export function UnitsView() {
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 px-4 py-4 dark:from-indigo-500/10 dark:via-slate-900/40 dark:to-indigo-500/5">
+              <div className={UNIT_DETAIL_STAT_CARD}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/80 dark:text-indigo-300/80">
@@ -1755,7 +1781,7 @@ export function UnitsView() {
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-50 via-white to-sky-50/40 px-4 py-4 dark:from-sky-500/10 dark:via-slate-900/40 dark:to-sky-500/5">
+              <div className={UNIT_DETAIL_STAT_CARD}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-300/80">
@@ -1764,11 +1790,6 @@ export function UnitsView() {
                     <p className="mt-2 text-lg font-bold leading-snug text-slate-900 dark:text-slate-50">
                       {areaDisplayLabel(selectedUnit?.area ?? '')}
                     </p>
-                    {selectedUnit?.tower && selectedUnit.tower !== '—' ? (
-                      <p className="mt-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        {selectedUnit.tower}
-                      </p>
-                    ) : null}
                   </div>
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
                     <MapPin className="h-5 w-5" aria-hidden />
@@ -1780,7 +1801,7 @@ export function UnitsView() {
             <div className="grid gap-5 lg:grid-cols-2">
               <div className="space-y-5">
                 {activeContractForSelectedUnit && activeTenantForSelectedUnit ? (
-                  <section className="rounded-2xl bg-indigo-50/60 px-4 py-4 dark:bg-indigo-500/10">
+                  <section className={UNIT_DETAIL_TENANT_CARD}>
                     <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
                       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
                         <User className="h-4 w-4" />
@@ -1803,7 +1824,7 @@ export function UnitsView() {
                     </span>
                     {t('views.units.details.buildingAndAddress')}
                   </h4>
-                  <div className="rounded-2xl bg-slate-50/90 px-4 py-3.5 text-sm leading-relaxed text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                  <div className={cn(UNIT_DETAIL_VALUE_BOX, 'leading-relaxed text-slate-600 dark:text-slate-300')}>
                     {selectedUnit
                       ? resolveUnitFullAddress(selectedUnit, t('views.units.table.floor'))
                       : '—'}
@@ -1817,7 +1838,7 @@ export function UnitsView() {
                     </span>
                     {t('views.units.details.specialRequests')}
                   </h4>
-                  <div className="rounded-2xl bg-slate-50/90 px-4 py-3.5 text-sm dark:bg-slate-800/50">
+                  <div className={UNIT_DETAIL_VALUE_BOX}>
                     {unitRemarksDisplay ? (
                       <p className="whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-200">
                         {unitRemarksDisplay}
@@ -1837,7 +1858,7 @@ export function UnitsView() {
                     </span>
                     {t('views.units.details.inventoryAssets')}
                   </h4>
-                  <div className="overflow-hidden rounded-2xl bg-slate-50/90 dark:bg-slate-800/50">
+                  <div className={cn(UNIT_DETAIL_VALUE_BOX, 'overflow-hidden p-0')}>
                     {!selectedUnit?.inventory?.length ? (
                       <p className="px-4 py-5 text-center text-sm text-slate-500 dark:text-slate-400">
                         {t('views.units.inventoryEmpty')}
@@ -1897,7 +1918,7 @@ export function UnitsView() {
                         return (
                           <div
                             key={c.id}
-                            className="flex items-start gap-3 rounded-2xl bg-slate-50/90 px-3.5 py-3 dark:bg-slate-800/50"
+                            className={cn(UNIT_DETAIL_VALUE_BOX, 'flex items-start gap-3 px-3.5 py-3')}
                           >
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                               {tenantName !== '—' ? tenantName.charAt(0).toUpperCase() : '?'}
@@ -1919,7 +1940,7 @@ export function UnitsView() {
                         );
                       })
                     ) : (
-                      <p className="rounded-2xl bg-slate-50/90 px-4 py-5 text-center text-sm text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                      <p className={cn(UNIT_DETAIL_VALUE_BOX, 'px-4 py-5 text-center text-slate-500 dark:text-slate-400')}>
                         {t('views.units.details.noHistorical')}
                       </p>
                     )}

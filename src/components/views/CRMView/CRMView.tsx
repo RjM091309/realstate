@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Users,
@@ -10,14 +10,8 @@ import {
   Mail,
   ShieldCheck,
   History,
-  MoreVertical,
   ExternalLink,
-  ShieldAlert,
-  AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  Calendar,
-  Eye,
   Upload,
   Loader2,
   Copy,
@@ -54,35 +48,16 @@ import {
   updateTenant,
   type TenantWriteBody,
 } from '@/lib/tenantsApi';
-import {
-  createPartnerAgency,
-  deletePartnerAgency,
-  fetchPartnerAgencies,
-  fetchPartnerAgencyCollaborations,
-  uploadPartnerAgencyKycDocument,
-  updatePartnerAgency,
-  type PartnerAgencyCollaborationLog,
-} from '@/lib/partnerAgenciesApi';
-import {
-  createLandlord,
-  deleteLandlord,
-  fetchLandlords,
-  updateLandlord,
-  type LandlordWriteBody,
-} from '@/lib/landlordsApi';
-import {
-  createBlacklistRecord,
-  fetchBlacklist,
-  removeBrokerFromBlacklist,
-  removeTenantFromBlacklist,
-  type BlacklistRowDto,
-} from '@/lib/blacklistApi';
+import { LandlordsPanel } from '@/components/landlords/LandlordsPanel';
+import { BrokersPanel } from '@/components/brokers/BrokersPanel';
+import { BlacklistPanel } from '@/components/blacklist/BlacklistPanel';
+import { removeTenantFromBlacklist } from '@/lib/blacklistApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { BrokerAgency, Contract, Landlord, Tenant, Unit } from '@/types';
+import type { Contract, Tenant, Unit } from '@/types';
 import {
   differenceInCalendarDays,
   format,
@@ -92,8 +67,6 @@ import {
   startOfDay,
 } from 'date-fns';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
-
-type BlacklistRow = BlacklistRowDto;
 
 const CRM_TABLE_ACTION_BTN =
   'h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5';
@@ -118,13 +91,13 @@ function renderCrmDateTimeCell(value?: string) {
       <span className="whitespace-nowrap text-xs text-slate-500">{format(dt, 'h:mm a')}</span>
     </div>
   ) : (
-    <span className="text-sm text-slate-400">—</span>
+    <span className="text-sm text-slate-400">â€”</span>
   );
 }
 
 function formatCrmDateTimeLabel(value?: string) {
   const dt = parseCrmDateTime(value);
-  return dt ? format(dt, 'MMM dd, yyyy · h:mm a') : '—';
+  return dt ? format(dt, 'MMM dd, yyyy Â· h:mm a') : 'â€”';
 }
 
 const CRM_FORM_INPUT =
@@ -134,9 +107,57 @@ const CRM_FORM_DATEPICKER =
   'unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const CRM_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
+const CRM_TENANT_INPUT =
+  'h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+const CRM_TENANT_DATEPICKER =
+  'unit-form-datepicker-input h-9 !rounded-lg border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+const CRM_TENANT_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-9 [&_.unit-form-select-control]:!h-9';
 
 const CRM_TAB_TRIGGER =
-  'flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
+  '!flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-0 text-xs font-medium text-slate-600 shadow-none transition-all data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-none dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
+
+function TenantFormSection({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-indigo-100/70 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80">
+      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+          <Icon className="h-3.5 w-3.5" aria-hidden />
+        </span>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function TenantFormField({
+  label,
+  children,
+  className,
+  span = 1,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  span?: 1 | 2;
+}) {
+  return (
+    <div className={cn('min-w-0 space-y-1', span === 2 && 'sm:col-span-2', className)}>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 const ID_TYPES = ['Passport', 'UMID', "Driver's License", 'Other'] as const;
 const GOV_DOC_TYPES = ['Passport', 'National ID', 'Visa', 'Other'] as const;
@@ -149,7 +170,7 @@ const NATIONALITIES_ALPHA3 = [
 
 function nationalityLabel(alpha3: string | undefined) {
   const code = String(alpha3 ?? '').trim().toUpperCase();
-  if (!code) return '—';
+  if (!code) return 'â€”';
   const hit = NATIONALITIES_ALPHA3.find((x) => x.code === code);
   return hit ? `${hit.label} (${hit.code})` : code;
 }
@@ -250,59 +271,6 @@ async function toWebpIfNeeded(file: File): Promise<File> {
   return new File([blob], `${safeBase}.webp`, { type: 'image/webp' });
 }
 
-function brokerParseExpiry(raw?: string): Date | null {
-  if (!raw?.trim()) return null;
-  try {
-    const d = parseISO(raw);
-    return isValid(d) ? d : null;
-  } catch {
-    return null;
-  }
-}
-
-type BrokerExpiryInsight =
-  | 'none'
-  | { status: 'expired'; daysPast: number }
-  | { status: 'expiring'; daysLeft: number }
-  | { status: 'ok'; daysLeft: number };
-
-function brokerExpiryInsight(expiryDate?: string): BrokerExpiryInsight {
-  const d = brokerParseExpiry(expiryDate);
-  if (!d) return 'none';
-  const today = startOfDay(new Date());
-  const end = startOfDay(d);
-  const diff = differenceInCalendarDays(end, today);
-  if (diff < 0) return { status: 'expired', daysPast: Math.abs(diff) };
-  if (diff <= 14) return { status: 'expiring', daysLeft: diff };
-  return { status: 'ok', daysLeft: diff };
-}
-
-function brokerCollaborationStats(
-  agency: BrokerAgency,
-  contracts: Contract[],
-): { count: number; lastAt: Date | null } {
-  if (agency.collaborationCount != null) {
-    let lastAt: Date | null = null;
-    if (agency.lastCollaborationAt) {
-      const d = new Date(agency.lastCollaborationAt);
-      if (!Number.isNaN(d.getTime())) lastAt = d;
-    }
-    return { count: agency.collaborationCount, lastAt };
-  }
-  const relevant = contracts.filter((c) => c.brokerAgencyId === agency.id);
-  let lastAt: Date | null = null;
-  for (const c of relevant) {
-    try {
-      const sd = parseISO(c.startDate);
-      if (!isValid(sd)) continue;
-      if (!lastAt || sd > lastAt) lastAt = sd;
-    } catch {
-      /* skip */
-    }
-  }
-  return { count: relevant.length, lastAt };
-}
-
 export function CRMView() {
   const { t } = useTranslation();
   const { session } = useAuth();
@@ -311,14 +279,7 @@ export function CRMView() {
   const canDelete = session?.crud?.crm?.delete ?? false;
 
   const [crmLoading, setCrmLoading] = useState(true);
-  const [brokersLoading, setBrokersLoading] = useState(true);
-  const [blacklistLoading, setBlacklistLoading] = useState(true);
-  const [landlordsLoading, setLandlordsLoading] = useState(true);
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
-  const [brokerList, setBrokerList] = useState<BrokerAgency[]>([]);
-  const [landlordList, setLandlordList] = useState<Landlord[]>([]);
-  const [blacklistList, setBlacklistList] = useState<BlacklistRow[]>([]);
-  const [blacklistTypeFilter, setBlacklistTypeFilter] = useState<'all' | 'tenant' | 'broker'>('all');
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -345,55 +306,10 @@ export function CRMView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TenantForm>(emptyForm);
 
-  const [isBrokerFormOpen, setIsBrokerFormOpen] = useState(false);
-  const [brokerFormMode, setBrokerFormMode] = useState<'create' | 'edit'>('create');
-  const [editingBrokerId, setEditingBrokerId] = useState<string | null>(null);
-  const [brokerForm, setBrokerForm] = useState({
-    name: '',
-    contactPerson: '',
-    phone: '',
-    email: '',
-    nationality: '',
-    documentType: '',
-    documentNo: '',
-    expiryDate: '',
-    filePath: '',
-  });
-  const brokerDocUploadRef = useRef<HTMLInputElement | null>(null);
-  const [brokerDocUploading, setBrokerDocUploading] = useState(false);
-  const [pendingBrokerDoc, setPendingBrokerDoc] = useState<File | null>(null);
-  const [pendingBrokerDocName, setPendingBrokerDocName] = useState('');
-  const [pendingBrokerDocPreviewUrl, setPendingBrokerDocPreviewUrl] = useState('');
-  const [isBrokerDeleteOpen, setIsBrokerDeleteOpen] = useState(false);
-  const [pendingDeleteBroker, setPendingDeleteBroker] = useState<BrokerAgency | null>(null);
-  const [isBrokerBlacklistOpen, setIsBrokerBlacklistOpen] = useState(false);
-  const [pendingBlacklistBroker, setPendingBlacklistBroker] = useState<BrokerAgency | null>(null);
-  const [brokerBlacklistReason, setBrokerBlacklistReason] = useState('');
-  const [isBrokerActivateOpen, setIsBrokerActivateOpen] = useState(false);
-  const [pendingActivateBroker, setPendingActivateBroker] = useState<BrokerAgency | null>(null);
-  const [isBrokerMessageOpen, setIsBrokerMessageOpen] = useState(false);
-  const [brokerMessageAgency, setBrokerMessageAgency] = useState<BrokerAgency | null>(null);
-  const [isBrokerLogsOpen, setIsBrokerLogsOpen] = useState(false);
-  const [brokerLogsAgency, setBrokerLogsAgency] = useState<BrokerAgency | null>(null);
-  const [brokerLogs, setBrokerLogs] = useState<PartnerAgencyCollaborationLog[]>([]);
-  const [brokerLogsLoading, setBrokerLogsLoading] = useState(false);
   const [isTenantActivateOpen, setIsTenantActivateOpen] = useState(false);
   const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
   const [isTenantHistoryOpen, setIsTenantHistoryOpen] = useState(false);
   const [tenantHistoryTarget, setTenantHistoryTarget] = useState<Tenant | null>(null);
-
-  const [isLandlordFormOpen, setIsLandlordFormOpen] = useState(false);
-  const [landlordFormMode, setLandlordFormMode] = useState<'create' | 'edit'>('create');
-  const [editingLandlordId, setEditingLandlordId] = useState<string | null>(null);
-  const [landlordForm, setLandlordForm] = useState({
-    fullName: '',
-    mobileNo: '',
-    email: '',
-    govIdNo: '',
-  });
-
-  const [isBlacklistDetailsOpen, setIsBlacklistDetailsOpen] = useState(false);
-  const [selectedBlacklist, setSelectedBlacklist] = useState<BlacklistRow | null>(null);
 
   const reloadTenants = useCallback(async () => {
     try {
@@ -454,54 +370,6 @@ export function CRMView() {
     };
   }, [editingId, formMode, isFormOpen]);
 
-  const reloadBrokers = useCallback(async () => {
-    try {
-      const list = await fetchPartnerAgencies();
-      setBrokerList(list);
-    } catch {
-      setBrokerList([]);
-      toast.warning(t('views.crm.brokers.loadError'));
-    } finally {
-      setBrokersLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void reloadBrokers();
-  }, [reloadBrokers]);
-
-  const reloadBlacklist = useCallback(async () => {
-    try {
-      const list = await fetchBlacklist();
-      setBlacklistList(list);
-    } catch {
-      setBlacklistList([]);
-      toast.warning(t('views.crm.blacklist.loadError'));
-    } finally {
-      setBlacklistLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void reloadBlacklist();
-  }, [reloadBlacklist]);
-
-  const reloadLandlords = useCallback(async () => {
-    try {
-      const list = await fetchLandlords();
-      setLandlordList(list);
-    } catch {
-      setLandlordList([]);
-      toast.warning('Failed to load landlords');
-    } finally {
-      setLandlordsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reloadLandlords();
-  }, [reloadLandlords]);
-
   useEffect(() => {
     void (async () => {
       try {
@@ -524,28 +392,6 @@ export function CRMView() {
     })();
   }, []);
 
-  useEffect(() => {
-    if (!isBrokerLogsOpen || !brokerLogsAgency) return;
-    setBrokerLogsLoading(true);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const logs = await fetchPartnerAgencyCollaborations(brokerLogsAgency.id);
-        if (!cancelled) setBrokerLogs(logs);
-      } catch {
-        if (!cancelled) {
-          setBrokerLogs([]);
-          toast.error(t('views.crm.brokers.logsLoadError'));
-        }
-      } finally {
-        if (!cancelled) setBrokerLogsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isBrokerLogsOpen, brokerLogsAgency?.id, t]);
-
   const filteredTenants = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     if (!q) return tenantList;
@@ -557,107 +403,6 @@ export function CRMView() {
     );
   }, [searchTerm, tenantList]);
 
-  const filteredLandlords = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
-    if (!q) return landlordList;
-    return landlordList.filter(
-      (l) =>
-        l.fullName.toLowerCase().includes(q) ||
-        (l.email || '').toLowerCase().includes(q) ||
-        (l.mobileNo || '').includes(q) ||
-        (l.govIdNo || '').includes(q),
-    );
-  }, [landlordList, searchTerm]);
-
-  const openAddLandlord = () => {
-    setLandlordForm({ fullName: '', mobileNo: '', email: '', govIdNo: '' });
-    setLandlordFormMode('create');
-    setEditingLandlordId(null);
-    setIsLandlordFormOpen(true);
-  };
-
-  const openEditLandlord = (l: Landlord) => {
-    setLandlordForm({
-      fullName: l.fullName ?? '',
-      mobileNo: l.mobileNo ?? '',
-      email: l.email ?? '',
-      govIdNo: l.govIdNo ?? '',
-    });
-    setLandlordFormMode('edit');
-    setEditingLandlordId(l.id);
-    setIsLandlordFormOpen(true);
-  };
-
-  const closeLandlordForm = () => {
-    setIsLandlordFormOpen(false);
-    setLandlordFormMode('create');
-    setEditingLandlordId(null);
-    setLandlordForm({ fullName: '', mobileNo: '', email: '', govIdNo: '' });
-  };
-
-  const handleSaveLandlord = async () => {
-    const payload: LandlordWriteBody = {
-      fullName: landlordForm.fullName,
-      mobileNo: landlordForm.mobileNo,
-      email: landlordForm.email,
-      govIdNo: landlordForm.govIdNo,
-    };
-    try {
-      if (landlordFormMode === 'edit' && editingLandlordId) {
-        const updated = await updateLandlord(editingLandlordId, payload);
-        setLandlordList((prev) => prev.map((x) => (x.id === editingLandlordId ? updated : x)));
-        toast.success('Landlord updated.');
-      } else {
-        const created = await createLandlord(payload);
-        setLandlordList((prev) => [created, ...prev]);
-        toast.success('Landlord created.');
-      }
-      closeLandlordForm();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save landlord');
-    }
-  };
-
-  const handleDeleteLandlord = async (l: Landlord) => {
-    if (!window.confirm(`Deactivate landlord ${l.fullName}?`)) return;
-    try {
-      await deleteLandlord(l.id);
-      setLandlordList((prev) => prev.filter((x) => x.id !== l.id));
-      toast.success('Landlord deactivated.');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to deactivate landlord');
-    }
-  };
-
-  const filteredBlacklist = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
-    const typeFiltered =
-      blacklistTypeFilter === 'all'
-        ? blacklistList
-        : blacklistList.filter((r) =>
-            blacklistTypeFilter === 'tenant' ? r.entityType === 'tenant' : r.entityType === 'broker',
-          );
-
-    if (!q) return typeFiltered;
-    return typeFiltered.filter(
-      (row) =>
-        row.name.toLowerCase().includes(q) ||
-        row.reason.toLowerCase().includes(q) ||
-        row.type.toLowerCase().includes(q),
-    );
-  }, [searchTerm, blacklistList, blacklistTypeFilter]);
-
-  const filteredBrokers = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
-    if (!q) return brokerList;
-    return brokerList.filter((a) => {
-      const hay = [a.name, a.contactPerson, a.phone, a.email ?? '']
-        .join(' ')
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [searchTerm, brokerList]);
-
   const idTypeOptions = useMemo(
     () => ID_TYPES.map((x) => ({ value: x, label: x })),
     [],
@@ -666,11 +411,6 @@ export function CRMView() {
     () => NATIONALITIES_ALPHA3.map((x) => ({ value: x.code, label: `${x.label} (${x.code})` })),
     [],
   );
-  const brokerGovDocTypeOptions = useMemo(
-    () => GOV_DOC_TYPES.map((x) => ({ value: x, label: x })),
-    [],
-  );
-
   const tenantLeaseContext = useMemo(() => {
     if (!selectedTenant) return { contract: null as Contract | null, unit: null as Unit | null };
     const matches = contractList.filter((c) => c.tenantId === selectedTenant.id);
@@ -692,6 +432,8 @@ export function CRMView() {
     const base = window.location.origin;
     return path.startsWith('/') ? `${base}${path}` : `${base}/${path}`;
   };
+
+  const isLikelyPdfPath = (p: string) => /\.pdf$/i.test(p.split('?')[0] || '');
 
   const openViewDetails = useCallback((tenant: Tenant) => {
     setSelectedTenant(tenant);
@@ -728,185 +470,6 @@ export function CRMView() {
     setExistingLeaseContractUrl('');
   };
 
-  const openAddBroker = () => {
-    setBrokerForm({
-      name: '',
-      contactPerson: '',
-      phone: '',
-      email: '',
-      nationality: '',
-      documentType: '',
-      documentNo: '',
-      expiryDate: '',
-      filePath: '',
-    });
-    setBrokerFormMode('create');
-    setEditingBrokerId(null);
-    setPendingBrokerDoc(null);
-    setPendingBrokerDocName('');
-    setPendingBrokerDocPreviewUrl('');
-    setIsBrokerFormOpen(true);
-  };
-
-  const openEditBroker = (agency: BrokerAgency) => {
-    setBrokerForm({
-      name: agency.name ?? '',
-      contactPerson: agency.contactPerson ?? '',
-      phone: agency.phone ?? '',
-      email: agency.email ?? '',
-      nationality: agency.nationality ?? '',
-      documentType: agency.documentType ?? '',
-      documentNo: agency.documentNo ?? '',
-      expiryDate: agency.expiryDate ?? '',
-      filePath: agency.filePath ?? '',
-    });
-    setBrokerFormMode('edit');
-    setEditingBrokerId(agency.id);
-    setPendingBrokerDoc(null);
-    setPendingBrokerDocName('');
-    setPendingBrokerDocPreviewUrl('');
-    setIsBrokerFormOpen(true);
-  };
-
-  const closeBrokerForm = () => {
-    setIsBrokerFormOpen(false);
-    setBrokerForm({
-      name: '',
-      contactPerson: '',
-      phone: '',
-      email: '',
-      nationality: '',
-      documentType: '',
-      documentNo: '',
-      expiryDate: '',
-      filePath: '',
-    });
-    setBrokerFormMode('create');
-    setEditingBrokerId(null);
-    setPendingBrokerDoc(null);
-    setPendingBrokerDocName('');
-    setPendingBrokerDocPreviewUrl('');
-  };
-
-  useEffect(() => {
-    if (!pendingBrokerDoc) {
-      setPendingBrokerDocPreviewUrl('');
-      return;
-    }
-    const isImage = pendingBrokerDoc.type.startsWith('image/');
-    if (!isImage) {
-      setPendingBrokerDocPreviewUrl('');
-      return;
-    }
-    const url = URL.createObjectURL(pendingBrokerDoc);
-    setPendingBrokerDocPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [pendingBrokerDoc]);
-
-  const isLikelyImagePath = (p: string) => /\.(webp|png|jpe?g|gif)$/i.test(p.split('?')[0] || '');
-  const isLikelyPdfPath = (p: string) => /\.pdf$/i.test(p.split('?')[0] || '');
-
-  const handlePickBrokerDocUpload = () => {
-    if (!canUpdate || brokerDocUploading) return;
-    brokerDocUploadRef.current?.click();
-  };
-
-  const handlePickBrokerDoc: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const picked = e.target.files?.[0];
-    e.target.value = '';
-    if (!picked) return;
-    setPendingBrokerDoc(picked);
-    setPendingBrokerDocName(picked.name);
-    toast.success('Document ready to upload.');
-  };
-
-  const handleSaveBroker = async () => {
-    const name = brokerForm.name.trim();
-    if (!name) {
-      toast.error(t('views.crm.brokers.validationName'));
-      return;
-    }
-    try {
-      setBrokerDocUploading(Boolean(pendingBrokerDoc));
-      const payload = {
-        name,
-        contactPerson: brokerForm.contactPerson.trim(),
-        phone: brokerForm.phone.trim(),
-        email: brokerForm.email.trim() || undefined,
-        nationality: brokerForm.nationality.trim() || undefined,
-        documentType: brokerForm.documentType.trim() || undefined,
-        documentNo: brokerForm.documentNo.trim() || undefined,
-        expiryDate: brokerForm.expiryDate.trim() || undefined,
-        filePath: brokerForm.filePath.trim() || undefined,
-      };
-      if (brokerFormMode === 'edit' && editingBrokerId) {
-        let updated = await updatePartnerAgency(editingBrokerId, payload);
-        if (pendingBrokerDoc) {
-          updated = await uploadPartnerAgencyKycDocument(editingBrokerId, pendingBrokerDoc);
-        }
-        setBrokerList((prev) => prev.map((x) => (x.id === editingBrokerId ? updated : x)));
-        toast.success(t('views.crm.brokers.updated'));
-      } else {
-        let created = await createPartnerAgency(payload);
-        if (pendingBrokerDoc) {
-          created = await uploadPartnerAgencyKycDocument(created.id, pendingBrokerDoc);
-        }
-        setBrokerList((prev) => [created, ...prev]);
-        toast.success(t('views.crm.brokers.created'));
-      }
-      closeBrokerForm();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.saveError'));
-    } finally {
-      setBrokerDocUploading(false);
-    }
-  };
-
-  const handleDeleteBroker = async (agency: BrokerAgency) => {
-    setPendingDeleteBroker(agency);
-    setIsBrokerDeleteOpen(true);
-  };
-
-  const closeDeleteBroker = () => {
-    setIsBrokerDeleteOpen(false);
-    setPendingDeleteBroker(null);
-  };
-
-  const confirmDeleteBroker = async () => {
-    const agency = pendingDeleteBroker;
-    if (!agency) return;
-    try {
-      await deletePartnerAgency(agency.id);
-      setBrokerList((prev) => prev.filter((x) => x.id !== agency.id));
-      toast.success(t('views.crm.brokers.deleted'));
-      closeDeleteBroker();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.deleteError'));
-    }
-  };
-
-  const openBrokerMessage = (agency: BrokerAgency) => {
-    setBrokerMessageAgency(agency);
-    setIsBrokerMessageOpen(true);
-  };
-
-  const closeBrokerMessage = () => {
-    setIsBrokerMessageOpen(false);
-    setBrokerMessageAgency(null);
-  };
-
-  const openBrokerLogs = (agency: BrokerAgency) => {
-    setBrokerLogsAgency(agency);
-    setBrokerLogs([]);
-    setIsBrokerLogsOpen(true);
-  };
-
-  const closeBrokerLogs = () => {
-    setIsBrokerLogsOpen(false);
-    setBrokerLogsAgency(null);
-    setBrokerLogs([]);
-  };
-
   const openTenantHistory = (tenant: Tenant) => {
     setTenantHistoryTarget(tenant);
     setIsTenantHistoryOpen(true);
@@ -915,28 +478,6 @@ export function CRMView() {
   const closeTenantHistory = () => {
     setIsTenantHistoryOpen(false);
     setTenantHistoryTarget(null);
-  };
-
-  const openBlacklistBroker = (agency: BrokerAgency) => {
-    setPendingBlacklistBroker(agency);
-    setBrokerBlacklistReason('');
-    setIsBrokerBlacklistOpen(true);
-  };
-
-  const closeBlacklistBroker = () => {
-    setIsBrokerBlacklistOpen(false);
-    setPendingBlacklistBroker(null);
-    setBrokerBlacklistReason('');
-  };
-
-  const openActivateBroker = (agency: BrokerAgency) => {
-    setPendingActivateBroker(agency);
-    setIsBrokerActivateOpen(true);
-  };
-
-  const closeActivateBroker = () => {
-    setIsBrokerActivateOpen(false);
-    setPendingActivateBroker(null);
   };
 
   const openActivateTenant = (tenant: Tenant) => {
@@ -958,7 +499,6 @@ export function CRMView() {
     }
     try {
       await removeTenantFromBlacklist(tenant.id);
-      await reloadBlacklist();
       await reloadTenants();
       setSelectedTenant((prev) =>
         prev && prev.id === tenant.id ? { ...prev, isBlacklisted: false, blacklistReason: undefined } : prev,
@@ -968,92 +508,6 @@ export function CRMView() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.crm.table.activateTenantError'));
     }
-  };
-
-  const confirmActivateBroker = async () => {
-    const agency = pendingActivateBroker;
-    if (!agency) return;
-    if (!agency.kycVerified) {
-      toast.error(t('views.crm.brokers.activationRequiresVerified'));
-      return;
-    }
-    try {
-      await removeBrokerFromBlacklist(agency.id);
-      await reloadBlacklist();
-      await reloadBrokers();
-      toast.success(t('views.crm.brokers.activated'));
-      closeActivateBroker();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.activateError'));
-    }
-  };
-
-  const confirmBlacklistBroker = async () => {
-    const agency = pendingBlacklistBroker;
-    if (!agency) return;
-    const reason = brokerBlacklistReason.trim();
-    if (!reason) {
-      toast.error(t('views.crm.blacklist.reason'));
-      return;
-    }
-    try {
-      const record = await createBlacklistRecord({
-        entityType: 'broker',
-        partnerAgencyId: agency.id,
-        reason,
-      });
-      setBlacklistList((prev) => [record, ...prev]);
-      await reloadBrokers();
-      toast.success(t('views.crm.table.blacklisted'));
-      closeBlacklistBroker();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.blacklist.loadError'));
-    }
-  };
-
-  const openBlacklistDetails = (row: BlacklistRow) => {
-    setSelectedBlacklist(row);
-    setIsBlacklistDetailsOpen(true);
-  };
-
-  const closeBlacklistDetails = () => {
-    setIsBlacklistDetailsOpen(false);
-    setSelectedBlacklist(null);
-  };
-
-  const toggleBrokerActive = async (agency: BrokerAgency) => {
-    try {
-      const nextActive = agency.active === false ? true : false;
-      const updated = await updatePartnerAgency(agency.id, { active: nextActive });
-      setBrokerList((prev) => prev.map((x) => (x.id === agency.id ? updated : x)));
-      toast.success(nextActive ? t('views.crm.brokers.markedActive') : t('views.crm.brokers.markedInactive'));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.statusUpdateError'));
-    }
-  };
-
-  const toggleBrokerVerified = async (agency: BrokerAgency) => {
-    try {
-      const nextVerified = agency.kycVerified ? false : true;
-      const updated = await updatePartnerAgency(agency.id, { kycVerified: nextVerified });
-      setBrokerList((prev) => prev.map((x) => (x.id === agency.id ? updated : x)));
-      toast.success(
-        nextVerified ? t('views.crm.brokers.markedVerified') : t('views.crm.brokers.markedUnverified'),
-      );
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.crm.brokers.statusUpdateError'));
-    }
-  };
-
-  const openTenantFromBlacklist = () => {
-    if (!selectedBlacklist?.tenantId) return;
-    const tenant = tenantList.find((x) => x.id === selectedBlacklist.tenantId);
-    if (!tenant) {
-      toast.error(t('views.crm.blacklist.tenantNotFound'));
-      return;
-    }
-    closeBlacklistDetails();
-    openViewDetails(tenant);
   };
 
   const handleSaveTenant = async () => {
@@ -1096,7 +550,6 @@ export function CRMView() {
         setTenantList((prev) => [created, ...prev]);
         toast.success(t('views.crm.tenantModal.created'));
       }
-      void reloadBlacklist();
       closeForm();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error');
@@ -1177,7 +630,7 @@ export function CRMView() {
         sortable: true,
         sortValue: (tenant) => tenant.idNumber,
         render: (tenant) => (
-          <span className={CRM_TABLE_ID_CELL}>{tenant.idNumber || '—'}</span>
+          <span className={CRM_TABLE_ID_CELL}>{tenant.idNumber || 'â€”'}</span>
         ),
       },
       {
@@ -1353,89 +806,6 @@ export function CRMView() {
     [t, canUpdate, canDelete, openEdit, openActivateTenant, openTenantHistory, handleDeleteTenant, contractList, unitList],
   );
 
-  const landlordColumns: ColumnDef<Landlord>[] = useMemo(
-    () => [
-      {
-        id: 'createdAt',
-        header: t('views.crm.table.dateTime'),
-        sortable: true,
-        sortValue: (l) => l.createdAt ?? '',
-        render: (l) => renderCrmDateTimeCell(l.createdAt),
-      },
-      {
-        id: 'landlord',
-        header: 'Landlord',
-        sortable: true,
-        sortValue: (l) => l.fullName,
-        render: (l) => (
-          <div className="flex min-w-[7rem] flex-col">
-            <span className={CRM_TABLE_NAME_CELL}>{l.fullName}</span>
-            <span className="text-xs text-slate-500">{l.govIdNo || '—'}</span>
-          </div>
-        ),
-      },
-      {
-        id: 'contact',
-        header: 'Contact',
-        sortable: true,
-        sortValue: (l) => l.email || l.mobileNo || '',
-        render: (l) => (
-          <div className="flex min-w-[10rem] flex-col gap-0.5">
-            <span className={cn(CRM_TABLE_TEXT_CELL, 'whitespace-nowrap')}>{l.mobileNo || '—'}</span>
-            <span className={cn(CRM_TABLE_TEXT_CELL, 'break-all')}>{l.email || '—'}</span>
-          </div>
-        ),
-      },
-      {
-        id: 'actions',
-        header: 'Actions',
-        className: 'text-center',
-        headerClassName: 'text-center',
-        cellClassName: 'text-center',
-        render: (l) => (
-          <div
-            className="flex items-center justify-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-            role="presentation"
-          >
-            {canUpdate ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="Edit landlord"
-                className={CRM_TABLE_ACTION_BTN}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEditLandlord(l);
-                }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-            {canDelete ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="Deactivate landlord"
-                className={CRM_TABLE_ACTION_BTN}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void handleDeleteLandlord(l);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-          </div>
-        ),
-      },
-    ],
-    [canDelete, canUpdate, t],
-  );
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
@@ -1458,6 +828,7 @@ export function CRMView() {
                 idType: selectedTenant.idType,
                 idNumber: selectedTenant.idNumber,
                 idExpiry: selectedTenant.idExpiry || undefined,
+                createdAt: selectedTenant.createdAt,
               }
             : null
         }
@@ -1477,7 +848,7 @@ export function CRMView() {
             id: 'lease-pdf',
             name: t('views.crm.details.documentLeasePdf'),
             fileType: 'PDF',
-            sizeLabel: '—',
+            sizeLabel: 'â€”',
             kind: 'pdf',
             onPreview: tenantLeaseContext.contract
               ? () => {
@@ -1496,7 +867,7 @@ export function CRMView() {
             id: 'tenant-id',
             name: t('views.crm.details.documentTenantIdJpg'),
             fileType: 'WEBP',
-            sizeLabel: '—',
+            sizeLabel: 'â€”',
             kind: 'image',
             onPreview: selectedTenant?.idImageUrl
               ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank', 'noopener,noreferrer')
@@ -1517,228 +888,6 @@ export function CRMView() {
         }
       />
 
-      <Modal
-        isOpen={isBrokerDeleteOpen}
-        onClose={closeDeleteBroker}
-        title={t('views.crm.brokers.delete')}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeDeleteBroker}>
-              {t('views.crm.brokers.cancel')}
-            </Button>
-            <Button
-              type="button"
-              className={modalDangerButtonClass}
-              onClick={() => void confirmDeleteBroker()}
-            >
-              {t('views.crm.brokers.delete')}
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-slate-600">
-          {pendingDeleteBroker
-            ? t('views.crm.brokers.deleteConfirm', { name: pendingDeleteBroker.name })
-            : ''}
-        </p>
-      </Modal>
-
-      <Modal
-        isOpen={isBrokerMessageOpen}
-        onClose={closeBrokerMessage}
-        title={
-          brokerMessageAgency
-            ? t('views.crm.brokers.messageModalTitle', { name: brokerMessageAgency.name })
-            : t('views.crm.brokers.messageButton')
-        }
-        maxWidth="md"
-        footer={
-          <div className="flex justify-end w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeBrokerMessage}>
-              {t('views.crm.brokers.cancel')}
-            </Button>
-          </div>
-        }
-      >
-        {brokerMessageAgency ? (
-          (() => {
-            const email = brokerMessageAgency.email?.trim();
-            const phone = brokerMessageAgency.phone?.trim();
-            const telDigits = phone ? phone.replace(/\D/g, '') : '';
-            const telHref = phone ? (telDigits ? `tel:${telDigits}` : `tel:${phone}`) : '';
-            if (!email && !phone) {
-              return <p className="text-sm text-slate-600">{t('views.crm.brokers.noContactForMessage')}</p>;
-            }
-            const copyText = async (label: string, value: string) => {
-              try {
-                await navigator.clipboard.writeText(value);
-                toast.success(t('views.crm.brokers.copied', { label }));
-              } catch {
-                toast.error(t('views.crm.brokers.copyFailed'));
-              }
-            };
-            const gmailComposeUrl = email
-              ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`
-              : '';
-            return (
-              <div className="space-y-4">
-                {email ? (
-                  <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                    <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                      {t('views.crm.brokers.emailShort')}
-                    </div>
-                    <p className="mt-1 break-all text-sm font-semibold text-slate-900 dark:text-slate-100">{email}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="rounded-lg bg-red-600 text-white hover:bg-red-700"
-                        onClick={() => {
-                          window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
-                        }}
-                      >
-                        <ExternalLink className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.openInGmail')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                        onClick={() => {
-                          window.location.href = `mailto:${email}`;
-                        }}
-                      >
-                        <Mail className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.openEmailApp')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="rounded-lg"
-                        onClick={() => void copyText(t('views.crm.brokers.emailShort'), email)}
-                      >
-                        <Copy className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.copyEmail')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-                {phone ? (
-                  <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                    <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                      {t('views.crm.brokers.phone')}
-                    </div>
-                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{phone}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={telHref}
-                        className={cn(
-                          buttonVariants({ variant: 'secondary', size: 'sm' }),
-                          'rounded-lg no-underline',
-                        )}
-                      >
-                        {t('views.crm.brokers.callPhone')}
-                      </a>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="rounded-lg"
-                        onClick={() => void copyText(t('views.crm.brokers.phone'), phone)}
-                      >
-                        <Copy className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.copyPhone')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })()
-        ) : null}
-      </Modal>
-
-      <Modal
-        isOpen={isBrokerLogsOpen}
-        onClose={closeBrokerLogs}
-        title={
-          brokerLogsAgency
-            ? t('views.crm.brokers.logsModalTitle', { name: brokerLogsAgency.name })
-            : t('views.crm.brokers.viewLogs')
-        }
-        maxWidth="3xl"
-        footer={
-          <div className="flex justify-end w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeBrokerLogs}>
-              {t('views.crm.blacklist.close')}
-            </Button>
-          </div>
-        }
-      >
-        {brokerLogsLoading ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="h-9 w-9 animate-spin text-indigo-600" aria-hidden />
-          </div>
-        ) : brokerLogs.length === 0 ? (
-          <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            {t('views.crm.brokers.logsEmpty')}
-          </p>
-        ) : (
-          <div className="max-h-[min(60vh,28rem)] space-y-3 overflow-y-auto pr-1">
-            {brokerLogs.map((log) => (
-              <div
-                key={log.id}
-                className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/40"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-700">
-                  <div className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">
-                    {log.contractNo || `#${log.contractId}`}
-                    {log.unitNumber || log.buildingName ? (
-                      <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
-                        {[log.unitNumber, log.buildingName].filter(Boolean).join(' · ')}
-                      </span>
-                    ) : null}
-                  </div>
-                  <Badge variant="outline" className="shrink-0 border-slate-200 text-xs dark:border-slate-600">
-                    {log.contractStatus}
-                  </Badge>
-                </div>
-                <div className="mt-2 grid gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                  <div>
-                    <span className="font-semibold text-slate-500 dark:text-slate-500">
-                      {t('views.crm.brokers.logsPeriod')}:{' '}
-                    </span>
-                    {log.contractStart && log.contractEnd ? `${log.contractStart} → ${log.contractEnd}` : '—'}
-                  </div>
-                  {log.commissionTerms ? (
-                    <div>
-                      <span className="font-semibold text-slate-500 dark:text-slate-500">
-                        {t('views.crm.brokers.logsCommission')}:{' '}
-                      </span>
-                      {log.commissionTerms}
-                    </div>
-                  ) : null}
-                  {log.remarks ? (
-                    <div>
-                      <span className="font-semibold text-slate-500 dark:text-slate-500">
-                        {t('views.crm.brokers.logsRemarks')}:{' '}
-                      </span>
-                      <span className="whitespace-pre-wrap">{log.remarks}</span>
-                    </div>
-                  ) : null}
-                  <div className="text-[11px] text-slate-500 dark:text-slate-500">
-                    {t('views.crm.brokers.logsLoggedAt')}: {log.createdAt || '—'}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
-
       <TenantHistoryModal
         isOpen={isTenantHistoryOpen}
         onClose={closeTenantHistory}
@@ -1746,72 +895,6 @@ export function CRMView() {
         contracts={contractList}
         units={unitList}
       />
-
-      <Modal
-        isOpen={isBrokerBlacklistOpen}
-        onClose={closeBlacklistBroker}
-        title={t('views.crm.table.blacklisted')}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeBlacklistBroker}>
-              {t('views.crm.brokers.cancel')}
-            </Button>
-            <Button
-              type="button"
-              className={modalDangerButtonClass}
-              onClick={() => void confirmBlacklistBroker()}
-            >
-              {t('views.crm.table.blacklisted')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3 unit-form-fields">
-          <p className="text-sm text-slate-600">{pendingBlacklistBroker ? pendingBlacklistBroker.name : ''}</p>
-          <div className="space-y-2">
-            <Label htmlFor="crm-broker-blacklist-reason">{t('views.crm.blacklist.reason')}</Label>
-            <Input
-              id="crm-broker-blacklist-reason"
-              value={brokerBlacklistReason}
-              onChange={(e) => setBrokerBlacklistReason(e.target.value)}
-              className={CRM_FORM_INPUT}
-              placeholder={t('views.crm.blacklist.reason')}
-            />
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isBrokerActivateOpen}
-        onClose={closeActivateBroker}
-        title={t('views.crm.brokers.activateTitle')}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeActivateBroker}>
-              {t('views.crm.brokers.cancel')}
-            </Button>
-            <Button
-              type="button"
-              className={modalSuccessButtonClass}
-              onClick={() => void confirmActivateBroker()}
-            >
-              {t('views.crm.brokers.activate')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-2">
-          <p className="text-sm text-slate-600">{pendingActivateBroker ? pendingActivateBroker.name : ''}</p>
-          <p className="text-sm text-slate-600">{t('views.crm.brokers.activateDescription')}</p>
-          {pendingActivateBroker && !pendingActivateBroker.kycVerified ? (
-            <p className="text-sm text-rose-700">{t('views.crm.brokers.activationRequiresVerified')}</p>
-          ) : null}
-        </div>
-      </Modal>
 
       <Modal
         isOpen={isTenantActivateOpen}
@@ -1847,8 +930,11 @@ export function CRMView() {
         isOpen={isFormOpen}
         onClose={closeForm}
         title={formMode === 'edit' ? t('views.crm.tenantModal.editTitle') : t('views.crm.tenantModal.createTitle')}
-        maxWidth="2xl"
+        subtitle={t('views.crm.tenantModal.description')}
+        maxWidth="4xl"
         variant="glass"
+        compact
+        shellClassName="crm-form-modal-shell"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" className={modalDismissButtonClass} onClick={closeForm}>
@@ -1860,706 +946,251 @@ export function CRMView() {
           </div>
         }
       >
-        <p className="mb-4 text-sm text-brand-muted">{t('views.crm.tenantModal.description')}</p>
-        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="crm-name">{t('views.crm.tenantModal.name')}</Label>
-            <Input
-              id="crm-name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-email">{t('views.crm.tenantModal.email')}</Label>
-            <Input
-              id="crm-email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-phone">{t('views.crm.tenantModal.phone')}</Label>
-            <Input
-              id="crm-phone"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-nationality">{t('views.crm.tenantModal.nationality')}</Label>
-            <Select2
-              options={nationalityOptions}
-              value={form.nationality}
-              borderless={false}
-              className={CRM_SELECT_CLASS}
-              onChange={(v) => setForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
-              placeholder="Select nationality"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-birth-date">{t('views.crm.tenantModal.birthDate')}</Label>
-            <AppDatePicker
-              mode="single"
-              placeholder="MM/DD/YYYY"
-              fullWidth
-              inputClassName={CRM_FORM_DATEPICKER}
-              value={form.birthDate ? parseISO(form.birthDate) : null}
-              onChange={(picked) =>
-                setForm((f) => ({
-                  ...f,
-                  birthDate: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
-                }))
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.crm.tenantModal.idType')}</Label>
-            <Select2
-              options={idTypeOptions}
-              value={form.idType}
-              borderless={false}
-              className={CRM_SELECT_CLASS}
-              onChange={(v) => setForm((f) => ({ ...f, idType: (v ?? 'Passport') as string }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-id-number">{t('views.crm.tenantModal.idNumber')}</Label>
-            <Input
-              id="crm-id-number"
-              value={form.idNumber}
-              onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="crm-id-expiry">{t('views.crm.tenantModal.idExpiry')}</Label>
-            <AppDatePicker
-              mode="single"
-              placeholder="MM/DD/YYYY"
-              fullWidth
-              inputClassName={CRM_FORM_DATEPICKER}
-              value={form.idExpiry ? parseISO(form.idExpiry) : null}
-              onChange={(picked) =>
-                setForm((f) => ({
-                  ...f,
-                  idExpiry: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
-                }))
-              }
-            />
-          </div>
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <input
-              id="crm-kyc"
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300"
-              checked={form.kycVerified}
-              onChange={(e) => setForm((f) => ({ ...f, kycVerified: e.target.checked }))}
-            />
-            <Label htmlFor="crm-kyc" className="font-normal cursor-pointer">
-              {t('views.crm.tenantModal.kycVerified')}
-            </Label>
-          </div>
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <input
-              id="crm-bl"
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300"
-              checked={form.isBlacklisted}
-              onChange={(e) => setForm((f) => ({ ...f, isBlacklisted: e.target.checked }))}
-            />
-            <Label htmlFor="crm-bl" className="font-normal cursor-pointer">
-              {t('views.crm.tenantModal.blacklisted')}
-            </Label>
-          </div>
-          {form.isBlacklisted ? (
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="crm-bl-reason">{t('views.crm.tenantModal.blacklistReason')}</Label>
-              <Input
-                id="crm-bl-reason"
-                value={form.blacklistReason}
-                onChange={(e) => setForm((f) => ({ ...f, blacklistReason: e.target.value }))}
-                className={CRM_FORM_INPUT}
-              />
+        <div className="tenant-form-modal unit-form-fields max-h-[min(68vh,36rem)] space-y-3 overflow-y-auto pr-1">
+          <TenantFormSection title="Basic Information" icon={Users}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <TenantFormField label={t('views.crm.tenantModal.name')} span={2}>
+                <Input
+                  id="crm-name"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className={CRM_TENANT_INPUT}
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.email')}>
+                <Input
+                  id="crm-email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className={CRM_TENANT_INPUT}
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.phone')}>
+                <Input
+                  id="crm-phone"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  className={CRM_TENANT_INPUT}
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.nationality')}>
+                <Select2
+                  options={nationalityOptions}
+                  value={form.nationality}
+                  borderless={false}
+                  className={CRM_TENANT_SELECT_CLASS}
+                  onChange={(v) => setForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
+                  placeholder="Select nationality"
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.birthDate')}>
+                <AppDatePicker
+                  mode="single"
+                  placeholder="MM/DD/YYYY"
+                  fullWidth
+                  inputClassName={CRM_TENANT_DATEPICKER}
+                  value={form.birthDate ? parseISO(form.birthDate) : null}
+                  onChange={(picked) =>
+                    setForm((f) => ({
+                      ...f,
+                      birthDate: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
+                    }))
+                  }
+                />
+              </TenantFormField>
             </div>
-          ) : null}
+          </TenantFormSection>
 
-          {canUpdate ? (
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Tenant ID photo (WEBP)</Label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">
-                    {pendingIdImageName || 'No file selected'}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Uploading will auto-convert to WEBP.
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
+          <TenantFormSection title="Identification (KYC)" icon={ShieldCheck}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <TenantFormField label={t('views.crm.tenantModal.idType')}>
+                <Select2
+                  options={idTypeOptions}
+                  value={form.idType}
+                  borderless={false}
+                  className={CRM_TENANT_SELECT_CLASS}
+                  onChange={(v) => setForm((f) => ({ ...f, idType: (v ?? 'Passport') as string }))}
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.idNumber')}>
+                <Input
+                  id="crm-id-number"
+                  value={form.idNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))}
+                  className={CRM_TENANT_INPUT}
+                />
+              </TenantFormField>
+              <TenantFormField label={t('views.crm.tenantModal.idExpiry')} span={2}>
+                <AppDatePicker
+                  mode="single"
+                  placeholder="MM/DD/YYYY"
+                  fullWidth
+                  inputClassName={CRM_TENANT_DATEPICKER}
+                  value={form.idExpiry ? parseISO(form.idExpiry) : null}
+                  onChange={(picked) =>
+                    setForm((f) => ({
+                      ...f,
+                      idExpiry: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
+                    }))
+                  }
+                />
+              </TenantFormField>
+              <div className="flex flex-wrap gap-4 sm:col-span-2">
+                <label htmlFor="crm-kyc" className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                   <input
-                    ref={idUploadRef}
-                    type="file"
-                    accept="image/webp,image/*"
-                    className="hidden"
-                    onChange={handlePickIdImage}
+                    id="crm-kyc"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 accent-indigo-600"
+                    checked={form.kycVerified}
+                    onChange={(e) => setForm((f) => ({ ...f, kycVerified: e.target.checked }))}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9"
-                    onClick={handlePickIdUpload}
-                    disabled={idUploading}
-                  >
-                    {idUploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
-                        Processing
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" aria-hidden />
-                        Choose photo
-                      </>
-                    )}
-                  </Button>
-                  {pendingIdImage ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-9"
-                      onClick={() => {
-                        setPendingIdImage(null);
-                        setPendingIdImageName('');
-                        setPendingIdPreviewUrl('');
-                      }}
-                      disabled={idUploading}
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
-                </div>
+                  {t('views.crm.tenantModal.kycVerified')}
+                </label>
+                <label htmlFor="crm-bl" className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input
+                    id="crm-bl"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 accent-indigo-600"
+                    checked={form.isBlacklisted}
+                    onChange={(e) => setForm((f) => ({ ...f, isBlacklisted: e.target.checked }))}
+                  />
+                  {t('views.crm.tenantModal.blacklisted')}
+                </label>
               </div>
-
-              {pendingIdPreviewUrl ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
-                    Preview
-                  </div>
-                  <button
-                    type="button"
-                    className="w-full"
-                    onClick={() => window.open(pendingIdPreviewUrl, '_blank')}
-                    title="Open full image"
-                  >
-                    <img
-                      src={pendingIdPreviewUrl}
-                      alt="Selected tenant ID"
-                      className="w-full max-h-56 object-contain rounded-lg bg-white"
-                      loading="lazy"
-                    />
-                  </button>
-                </div>
-              ) : existingTenantIdImageUrl ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
-                    Uploaded
-                  </div>
-                  <button
-                    type="button"
-                    className="w-full"
-                    onClick={() => window.open(resolveUploadUrl(existingTenantIdImageUrl), '_blank')}
-                    title="Open full image"
-                  >
-                    <img
-                      src={resolveUploadUrl(existingTenantIdImageUrl)}
-                      alt="Tenant ID"
-                      className="w-full max-h-56 object-contain rounded-lg bg-white"
-                      loading="lazy"
-                    />
-                  </button>
-                </div>
+              {form.isBlacklisted ? (
+                <TenantFormField label={t('views.crm.tenantModal.blacklistReason')} span={2}>
+                  <Input
+                    id="crm-bl-reason"
+                    value={form.blacklistReason}
+                    onChange={(e) => setForm((f) => ({ ...f, blacklistReason: e.target.value }))}
+                    className={CRM_TENANT_INPUT}
+                  />
+                </TenantFormField>
               ) : null}
             </div>
-          ) : null}
+          </TenantFormSection>
 
           {canUpdate ? (
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Lease contract (PDF/Image)</Label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">{pendingLeaseName || 'No file selected'}</div>
-                  <div className="text-xs text-slate-500">Uploads to document repository as `lease_contract`.</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={leaseUploadRef}
-                    type="file"
-                    accept="application/pdf,image/*"
-                    className="hidden"
-                    onChange={handlePickLeaseFile}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9"
-                    onClick={handlePickLeaseUpload}
-                    disabled={leaseUploading}
-                  >
-                    {leaseUploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
-                        Uploading
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" aria-hidden />
-                        Choose file
-                      </>
-                    )}
-                  </Button>
-                  {pendingLeaseFile ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-9"
-                      onClick={() => {
-                        setPendingLeaseFile(null);
-                        setPendingLeaseName('');
-                        setPendingLeasePreviewUrl('');
-                      }}
-                      disabled={leaseUploading}
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-
-              {pendingLeasePreviewUrl ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Preview</div>
-                  <button
-                    type="button"
-                    className="w-full"
-                    onClick={() => window.open(pendingLeasePreviewUrl, '_blank')}
-                    title="Open full image"
-                  >
-                    <img
-                      src={pendingLeasePreviewUrl}
-                      alt="Selected lease contract"
-                      className="w-full max-h-56 object-contain rounded-lg bg-white"
-                      loading="lazy"
-                    />
-                  </button>
-                </div>
-              ) : existingLeaseContractUrl ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Uploaded</div>
-                  {isLikelyPdfPath(existingLeaseContractUrl) ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-slate-700 truncate">Lease contract</div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-9"
-                        onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')}
-                      >
-                        Open PDF
-                      </Button>
+            <TenantFormSection title="Documents" icon={Upload}>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <TenantFormField label="Tenant ID photo (WEBP)">
+                  <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-950/80">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                          {pendingIdImageName || 'No file selected'}
+                        </div>
+                        <div className="text-xs text-slate-500">Auto-converts to WEBP.</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <input
+                          ref={idUploadRef}
+                          type="file"
+                          accept="image/webp,image/*"
+                          className="hidden"
+                          onChange={handlePickIdImage}
+                        />
+                        <Button type="button" variant="outline" className="h-8 px-2 text-xs" onClick={handlePickIdUpload} disabled={idUploading}>
+                          {idUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
+                          Photo
+                        </Button>
+                        {pendingIdImage ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setPendingIdImage(null);
+                              setPendingIdImageName('');
+                              setPendingIdPreviewUrl('');
+                            }}
+                            disabled={idUploading}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="w-full"
-                      onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')}
-                      title="Open full image"
-                    >
-                      <img
-                        src={resolveUploadUrl(existingLeaseContractUrl)}
-                        alt="Lease contract"
-                        className="w-full max-h-56 object-contain rounded-lg bg-white"
-                        loading="lazy"
-                      />
-                    </button>
-                  )}
-                </div>
-              ) : null}
-            </div>
+                    {pendingIdPreviewUrl ? (
+                      <button type="button" className="mt-2 w-full" onClick={() => window.open(pendingIdPreviewUrl, '_blank')} title="Open full image">
+                        <img src={pendingIdPreviewUrl} alt="Selected tenant ID" className="max-h-36 w-full rounded-lg bg-slate-50 object-contain" loading="lazy" />
+                      </button>
+                    ) : existingTenantIdImageUrl ? (
+                      <button type="button" className="mt-2 w-full" onClick={() => window.open(resolveUploadUrl(existingTenantIdImageUrl), '_blank')} title="Open full image">
+                        <img src={resolveUploadUrl(existingTenantIdImageUrl)} alt="Tenant ID" className="max-h-36 w-full rounded-lg bg-slate-50 object-contain" loading="lazy" />
+                      </button>
+                    ) : null}
+                  </div>
+                </TenantFormField>
+
+                <TenantFormField label="Lease contract (PDF/Image)">
+                  <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-950/80">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{pendingLeaseName || 'No file selected'}</div>
+                        <div className="text-xs text-slate-500">Saved as lease contract.</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <input
+                          ref={leaseUploadRef}
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="hidden"
+                          onChange={handlePickLeaseFile}
+                        />
+                        <Button type="button" variant="outline" className="h-8 px-2 text-xs" onClick={handlePickLeaseUpload} disabled={leaseUploading}>
+                          {leaseUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
+                          File
+                        </Button>
+                        {pendingLeaseFile ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setPendingLeaseFile(null);
+                              setPendingLeaseName('');
+                              setPendingLeasePreviewUrl('');
+                            }}
+                            disabled={leaseUploading}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {pendingLeasePreviewUrl ? (
+                      <button type="button" className="mt-2 w-full" onClick={() => window.open(pendingLeasePreviewUrl, '_blank')} title="Open full image">
+                        <img src={pendingLeasePreviewUrl} alt="Selected lease contract" className="max-h-36 w-full rounded-lg bg-slate-50 object-contain" loading="lazy" />
+                      </button>
+                    ) : existingLeaseContractUrl ? (
+                      <div className="mt-2 rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
+                        {isLikelyPdfPath(existingLeaseContractUrl) ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="truncate text-sm text-slate-700 dark:text-slate-200">Lease contract</div>
+                            <Button type="button" variant="outline" className="h-8 px-2 text-xs" onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')}>
+                              Open PDF
+                            </Button>
+                          </div>
+                        ) : (
+                          <button type="button" className="w-full" onClick={() => window.open(resolveUploadUrl(existingLeaseContractUrl), '_blank')} title="Open full image">
+                            <img src={resolveUploadUrl(existingLeaseContractUrl)} alt="Lease contract" className="max-h-36 w-full rounded-lg bg-white object-contain" loading="lazy" />
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </TenantFormField>
+              </div>
+            </TenantFormSection>
           ) : null}
         </div>
-      </Modal>
-
-      <Modal
-        isOpen={isLandlordFormOpen}
-        onClose={closeLandlordForm}
-        title={landlordFormMode === 'edit' ? 'Edit landlord' : 'Add landlord'}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closeLandlordForm}>
-              Cancel
-            </Button>
-            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void handleSaveLandlord()}>
-              Save
-            </Button>
-          </div>
-        }
-      >
-        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Full name</Label>
-            <Input
-              className={CRM_FORM_INPUT}
-              value={landlordForm.fullName}
-              onChange={(e) => setLandlordForm((f) => ({ ...f, fullName: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Mobile no</Label>
-            <Input
-              className={CRM_FORM_INPUT}
-              value={landlordForm.mobileNo}
-              onChange={(e) => setLandlordForm((f) => ({ ...f, mobileNo: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              className={CRM_FORM_INPUT}
-              value={landlordForm.email}
-              onChange={(e) => setLandlordForm((f) => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Government ID no</Label>
-            <Input
-              className={CRM_FORM_INPUT}
-              value={landlordForm.govIdNo}
-              onChange={(e) => setLandlordForm((f) => ({ ...f, govIdNo: e.target.value }))}
-            />
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isBrokerFormOpen}
-        onClose={closeBrokerForm}
-        title={brokerFormMode === 'edit' ? t('views.crm.brokers.editTitle') : t('views.crm.brokers.addTitle')}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button
-              type="button"
-              className={modalDismissButtonClass}
-              onClick={closeBrokerForm}
-            >
-              {t('views.crm.brokers.cancel')}
-            </Button>
-            <Button
-              type="button"
-              className={modalPrimaryButtonClass}
-              onClick={() => void handleSaveBroker()}
-            >
-              {t('views.crm.brokers.save')}
-            </Button>
-          </div>
-        }
-      >
-        <p className="mb-4 text-sm text-brand-muted">
-          {brokerFormMode === 'edit' ? t('views.crm.brokers.editDescription') : t('views.crm.brokers.addDescription')}
-        </p>
-        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="crm-broker-name">{t('views.crm.brokers.agencyName')}</Label>
-            <Input
-              id="crm-broker-name"
-              value={brokerForm.name}
-              onChange={(e) => setBrokerForm((f) => ({ ...f, name: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-broker-contact">{t('views.crm.brokers.contactPersonLabel')}</Label>
-            <Input
-              id="crm-broker-contact"
-              value={brokerForm.contactPerson}
-              onChange={(e) => setBrokerForm((f) => ({ ...f, contactPerson: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-broker-phone">{t('views.crm.brokers.phoneLabel')}</Label>
-            <Input
-              id="crm-broker-phone"
-              value={brokerForm.phone}
-              onChange={(e) => setBrokerForm((f) => ({ ...f, phone: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="crm-broker-email">{t('views.crm.brokers.emailLabel')}</Label>
-            <Input
-              id="crm-broker-email"
-              type="email"
-              value={brokerForm.email}
-              onChange={(e) => setBrokerForm((f) => ({ ...f, email: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Nationality</Label>
-            <Select2
-              options={nationalityOptions}
-              value={brokerForm.nationality}
-              borderless={false}
-              className={CRM_SELECT_CLASS}
-              onChange={(v) => setBrokerForm((f) => ({ ...f, nationality: (v ?? '') as string }))}
-              placeholder="Select nationality"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Government document type</Label>
-            <Select2
-              options={brokerGovDocTypeOptions}
-              value={brokerForm.documentType}
-              borderless={false}
-              className={CRM_SELECT_CLASS}
-              onChange={(v) => setBrokerForm((f) => ({ ...f, documentType: (v ?? '') as string }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="crm-broker-doc-no">Document no.</Label>
-            <Input
-              id="crm-broker-doc-no"
-              value={brokerForm.documentNo}
-              onChange={(e) => setBrokerForm((f) => ({ ...f, documentNo: e.target.value }))}
-              className={CRM_FORM_INPUT}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="crm-broker-expiry">Expiry date</Label>
-            <AppDatePicker
-              mode="single"
-              placeholder="MM/DD/YYYY"
-              fullWidth
-              inputClassName={CRM_FORM_DATEPICKER}
-              value={brokerForm.expiryDate ? parseISO(brokerForm.expiryDate) : null}
-              onChange={(picked) =>
-                setBrokerForm((f) => ({
-                  ...f,
-                  expiryDate: picked instanceof Date ? format(picked, 'yyyy-MM-dd') : '',
-                }))
-              }
-            />
-          </div>
-
-          {canUpdate ? (
-            <div className="space-y-2 sm:col-span-2">
-              <Label>KYC document (image or PDF)</Label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">
-                    {pendingBrokerDocName || 'No file selected'}
-                  </div>
-                  <div className="text-xs text-slate-500">Max 5MB. Images will be converted to WEBP.</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={brokerDocUploadRef}
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    onChange={handlePickBrokerDoc}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-xl"
-                    onClick={handlePickBrokerDocUpload}
-                    disabled={brokerDocUploading}
-                  >
-                    {brokerDocUploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
-                        Uploading
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" aria-hidden />
-                        Choose file
-                      </>
-                    )}
-                  </Button>
-                  {pendingBrokerDoc ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-10 rounded-xl"
-                      onClick={() => {
-                        setPendingBrokerDoc(null);
-                        setPendingBrokerDocName('');
-                        setPendingBrokerDocPreviewUrl('');
-                      }}
-                      disabled={brokerDocUploading}
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-
-              {pendingBrokerDocPreviewUrl ? (
-                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Preview</div>
-                  <button
-                    type="button"
-                    className="w-full"
-                    onClick={() => window.open(pendingBrokerDocPreviewUrl, '_blank')}
-                    title="Open full image"
-                  >
-                    <img
-                      src={pendingBrokerDocPreviewUrl}
-                      alt="Selected partner agency document"
-                      className="w-full max-h-56 object-contain rounded-lg bg-white"
-                      loading="lazy"
-                    />
-                  </button>
-                </div>
-              ) : brokerForm.filePath && isLikelyImagePath(brokerForm.filePath) ? (
-                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Uploaded</div>
-                  <button
-                    type="button"
-                    className="w-full"
-                    onClick={() => window.open(resolveUploadUrl(brokerForm.filePath), '_blank')}
-                    title="Open full image"
-                  >
-                    <img
-                      src={resolveUploadUrl(brokerForm.filePath)}
-                      alt="Partner agency document"
-                      className="w-full max-h-56 object-contain rounded-lg bg-white"
-                      loading="lazy"
-                    />
-                  </button>
-                </div>
-              ) : brokerForm.filePath && isLikelyPdfPath(brokerForm.filePath) ? (
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Uploaded</div>
-                    <div className="text-sm font-medium text-slate-900 truncate">PDF document</div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9"
-                    onClick={() => window.open(resolveUploadUrl(brokerForm.filePath), '_blank')}
-                  >
-                    Open PDF
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isBlacklistDetailsOpen}
-        onClose={closeBlacklistDetails}
-        title={selectedBlacklist ? t('views.crm.blacklist.detailsTitle') : ''}
-        maxWidth="lg"
-        variant="glass"
-        footer={
-          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 w-full">
-            {selectedBlacklist?.entityType === 'tenant' && selectedBlacklist.tenantId ? (
-              <Button type="button" className={cn('sm:mr-auto', modalPrimaryButtonClass)} onClick={openTenantFromBlacklist}>
-                {t('views.crm.blacklist.viewTenantProfile')}
-              </Button>
-            ) : null}
-            <Button type="button" className={modalDismissButtonClass} onClick={closeBlacklistDetails}>
-              {t('views.crm.blacklist.close')}
-            </Button>
-          </div>
-        }
-      >
-        {selectedBlacklist ? (
-          <div className="space-y-4 text-sm text-slate-700">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.name')}</div>
-                  <div className="text-base font-semibold text-slate-900">{selectedBlacklist.name}</div>
-                </div>
-                <Badge variant="outline" className="border-0 bg-slate-100 text-slate-700 font-medium">
-                  {selectedBlacklist.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker')}
-                </Badge>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.reason')}</div>
-                <div className="text-sm">{selectedBlacklist.reason}</div>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase text-slate-400">{t('views.crm.blacklist.dateAdded')}</div>
-                <div className="text-sm">{format(parseISO(selectedBlacklist.date), 'MMM d, yyyy')}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-slate-100 bg-white p-3">
-                <div className="text-xs text-slate-500">{t('views.crm.blacklist.recordId')}</div>
-                <div className="font-mono text-xs">{selectedBlacklist.id}</div>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-white p-3">
-                <div className="text-xs text-slate-500">{t('views.crm.blacklist.branch')}</div>
-                <div className="font-mono text-xs">{selectedBlacklist.branchId}</div>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-white p-3">
-                <div className="text-xs text-slate-500">{t('views.crm.blacklist.entity')}</div>
-                <div className="font-mono text-xs">{selectedBlacklist.entityType}</div>
-              </div>
-              {selectedBlacklist.tenantId ? (
-                <div className="rounded-xl border border-slate-100 bg-white p-3">
-                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.tenantId')}</div>
-                  <div className="font-mono text-xs">{selectedBlacklist.tenantId}</div>
-                </div>
-              ) : null}
-              {selectedBlacklist.partnerAgencyId ? (
-                <div className="rounded-xl border border-slate-100 bg-white p-3">
-                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.brokerId')}</div>
-                  <div className="font-mono text-xs">{selectedBlacklist.partnerAgencyId}</div>
-                </div>
-              ) : null}
-              {selectedBlacklist.taggedBy ? (
-                <div className="rounded-xl border border-slate-100 bg-white p-3 sm:col-span-2">
-                  <div className="text-xs text-slate-500">{t('views.crm.blacklist.taggedBy')}</div>
-                  <div className="font-mono text-xs">{selectedBlacklist.taggedBy}</div>
-                </div>
-              ) : null}
-            </div>
-
-            {selectedBlacklist.details ? (
-              <div className="rounded-xl border border-slate-100 bg-white p-4">
-                <div className="text-xs font-bold uppercase text-slate-400 mb-2">{t('views.crm.blacklist.detailsLabel')}</div>
-                <pre className="text-xs whitespace-pre-wrap text-slate-700">{selectedBlacklist.details}</pre>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
       </Modal>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <TabsList className="h-9 w-fit max-w-full shrink-0 gap-0.5 overflow-x-auto rounded-lg border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-800/90">
+          <TabsList className="h-9 w-max max-w-full shrink-0 self-start gap-0.5 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900 [&_[data-slot=tabs-trigger]]:flex-none [&_[data-slot=tabs-trigger]]:after:hidden">
             <TabsTrigger value="tenants" className={CRM_TAB_TRIGGER}>
               <Users className="size-3.5 shrink-0 opacity-90" aria-hidden />
               <span className="truncate">{t('views.crm.tabs.tenants')}</span>
@@ -2578,35 +1209,25 @@ export function CRMView() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
-            <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input
-                placeholder={t('views.crm.searchPlaceholder')}
-                className="h-9 rounded-xl border-transparent bg-white pl-9 pr-3 text-sm shadow-sm dark:border-transparent dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          {activeTab !== 'landlords' && activeTab !== 'brokers' && activeTab !== 'blacklist' ? (
+            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+              <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Input
+                  placeholder={t('views.crm.searchPlaceholder')}
+                  className="h-9 rounded-xl border-transparent bg-white pl-9 pr-3 text-sm shadow-sm dark:border-transparent dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {canCreate && activeTab === 'tenants' ? (
+                <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openRegister}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('views.crm.registerTenant')}
+                </Button>
+              ) : null}
             </div>
-            {canCreate && activeTab === 'tenants' ? (
-              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openRegister}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('views.crm.registerTenant')}
-              </Button>
-            ) : null}
-            {canCreate && activeTab === 'brokers' ? (
-              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openAddBroker}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('views.crm.brokers.addAgency')}
-              </Button>
-            ) : null}
-            {canCreate && activeTab === 'landlords' ? (
-              <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openAddLandlord}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Landlord
-              </Button>
-            ) : null}
-          </div>
+          ) : null}
         </div>
 
         <TabsContent value="tenants" className="mt-4 w-full outline-none">
@@ -2626,566 +1247,22 @@ export function CRMView() {
         </TabsContent>
 
         <TabsContent value="landlords" className="mt-4 w-full outline-none">
-          {landlordsLoading ? (
-            <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
-              <SkeletonTable rows={6} columns={4} />
-            </div>
-          ) : (
-            <DataTable data={filteredLandlords} columns={landlordColumns} keyExtractor={(l) => l.id} highlightFirstColumn={false} />
-          )}
+          <LandlordsPanel
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+          />
         </TabsContent>
 
         <TabsContent value="brokers" className="mt-4 w-full outline-none">
-          {brokersLoading ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
-                >
-                  <div className="border-b border-slate-100 p-4 dark:border-slate-800">
-                    <div className="flex gap-3">
-                      <div className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800" />
-                      <div className="flex-1 space-y-2 pt-0.5">
-                        <div className="h-4 w-3/5 rounded bg-slate-100 dark:bg-slate-800" />
-                        <div className="h-3 w-2/5 rounded bg-slate-100 dark:bg-slate-800" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-10 bg-slate-50 dark:bg-slate-800/80" />
-                  <div className="space-y-2 p-4">
-                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
-                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
-                    <div className="h-3 w-4/5 rounded bg-slate-100 dark:bg-slate-800" />
-                  </div>
-                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <div className="mb-3 flex justify-between">
-                      <div className="h-3 w-24 rounded bg-slate-100 dark:bg-slate-800" />
-                      <div className="h-3 w-12 rounded bg-slate-100 dark:bg-slate-800" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
-                      <div className="h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid min-w-0 grid-cols-1 items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {filteredBrokers.map((agency) => {
-                const isBrokerBl =
-                  Boolean(agency.isBlacklisted) ||
-                  blacklistList.some((r) => r.entityType === 'broker' && r.partnerAgencyId === agency.id);
-                const expInsight = brokerExpiryInsight(agency.expiryDate);
-                const collab = brokerCollaborationStats(agency, contractList);
-
-                const passportValue =
-                  agency.documentType || agency.documentNo
-                    ? `${agency.documentType ?? '—'}${agency.documentNo ? ` · ${agency.documentNo}` : ''}`
-                    : '—';
-
-                const banner = (() => {
-                  if (isBrokerBl) {
-                    return (
-                      <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 dark:bg-rose-950/45 dark:text-rose-100">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
-                        {t('views.crm.brokers.bannerBlacklisted')}
-                      </div>
-                    );
-                  }
-                  if (expInsight !== 'none' && expInsight.status === 'expired') {
-                    return (
-                      <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-900 dark:bg-red-950/40 dark:text-red-100">
-                        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.bannerExpired')}
-                      </div>
-                    );
-                  }
-                  if (expInsight !== 'none' && expInsight.status === 'expiring') {
-                    return (
-                      <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 dark:bg-amber-950/35 dark:text-amber-100">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
-                        {t('views.crm.brokers.bannerExpiring', { days: expInsight.daysLeft })}
-                      </div>
-                    );
-                  }
-                  if (agency.kycVerified) {
-                    return (
-                      <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                        {t('views.crm.brokers.bannerVerifiedOk')}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 dark:bg-amber-950/35 dark:text-amber-100">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
-                      {t('views.crm.brokers.bannerPending')}
-                    </div>
-                  );
-                })();
-
-                let statsNode: React.ReactNode;
-                if (isBrokerBl) {
-                  statsNode = (
-                    <span className="font-semibold text-rose-600 dark:text-rose-400">{t('views.crm.table.blacklisted')}</span>
-                  );
-                } else if (
-                  !agency.kycVerified ||
-                  (expInsight !== 'none' &&
-                    (expInsight.status === 'expired' || expInsight.status === 'expiring'))
-                ) {
-                  statsNode = (
-                    <span className="font-semibold text-amber-700 dark:text-amber-400">
-                      {t('views.crm.brokers.statsReview')}
-                    </span>
-                  );
-                } else {
-                  statsNode = (
-                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {t('views.crm.brokers.statsOk')}
-                    </span>
-                  );
-                }
-
-                const primaryButton = (() => {
-                  if (isBrokerBl && canUpdate) {
-                    return (
-                      <Button
-                        type="button"
-                        className="h-10 w-full min-w-0 rounded-lg border border-amber-300 bg-amber-50 text-sm font-semibold text-amber-950 shadow-sm hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
-                        onClick={() => openActivateBroker(agency)}
-                      >
-                        {t('views.crm.brokers.activate')}
-                      </Button>
-                    );
-                  }
-                  if (!isBrokerBl && canUpdate && !agency.kycVerified) {
-                    return (
-                      <Button
-                        type="button"
-                        className="h-10 w-full min-w-0 rounded-lg bg-amber-400 text-sm font-semibold text-slate-900 shadow-sm hover:bg-amber-500"
-                        onClick={() => void toggleBrokerVerified(agency)}
-                      >
-                        <ShieldCheck className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.brokers.verifyButton')}
-                      </Button>
-                    );
-                  }
-                  return (
-                    <Button
-                      type="button"
-                      className="h-10 w-full min-w-0 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                      onClick={() => openBrokerMessage(agency)}
-                    >
-                      <Mail className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                      {t('views.crm.brokers.messageButton')}
-                    </Button>
-                  );
-                })();
-
-                return (
-                  <div
-                    key={agency.id}
-                    className="group flex min-h-[420px] min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-                  >
-                    <div className="relative min-w-0 border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
-                      <div className="flex items-start gap-3 pr-9">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-base font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                          {(agency.name || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                            {agency.name}
-                          </h3>
-                          <p className="mt-0.5 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
-                            {agency.contactPerson || '—'}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-3">
-                            {isBrokerBl ? (
-                              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                                {t('views.crm.table.blacklisted')}
-                              </span>
-                            ) : (
-                              <>
-                                <span
-                                  className={cn(
-                                    'flex items-center gap-1.5 text-[11px] font-semibold',
-                                    agency.kycVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      'h-1.5 w-1.5 rounded-full',
-                                      agency.kycVerified ? 'bg-emerald-500' : 'bg-amber-500',
-                                    )}
-                                  />
-                                  {agency.kycVerified
-                                    ? t('views.crm.table.verified')
-                                    : t('views.crm.table.verificationPending')}
-                                </span>
-                                <span
-                                  className={cn(
-                                    'flex items-center gap-1.5 text-[11px] font-semibold',
-                                    agency.active !== false
-                                      ? 'text-slate-600 dark:text-slate-300'
-                                      : 'text-slate-400 dark:text-slate-500',
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      'h-1.5 w-1.5 rounded-full',
-                                      agency.active !== false ? 'bg-slate-500 dark:bg-slate-400' : 'bg-slate-300 dark:bg-slate-600',
-                                    )}
-                                  />
-                                  {agency.active !== false
-                                    ? t('views.crm.table.active')
-                                    : t('views.crm.table.inactive')}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {canUpdate || canDelete ? (
-                        <div className="absolute right-3 top-4">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 shrink-0 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              }
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => openEditBroker(agency)}>
-                                  {t('views.crm.brokers.edit')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    if (isBrokerBl) {
-                                      openActivateBroker(agency);
-                                      return;
-                                    }
-                                    openBlacklistBroker(agency);
-                                  }}
-                                >
-                                  {isBrokerBl ? t('views.crm.brokers.activate') : t('views.crm.table.blacklisted')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => void toggleBrokerVerified(agency)}>
-                                  {agency.kycVerified
-                                    ? t('views.crm.brokers.unverify')
-                                    : t('views.crm.brokers.verify')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate ? (
-                                <DropdownMenuItem onClick={() => void toggleBrokerActive(agency)}>
-                                  {agency.active !== false
-                                    ? t('views.crm.brokers.deactivate')
-                                    : t('views.crm.brokers.activateActive')}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canDelete ? (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  className="text-rose-600"
-                                  onClick={() => void handleDeleteBroker(agency)}
-                                >
-                                  {t('views.crm.brokers.delete')}
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="min-w-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">{banner}</div>
-
-                    <div className="flex min-w-0 flex-1 flex-col px-4 py-3">
-                      <div className="min-w-0 space-y-2.5 text-xs">
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                            {t('views.crm.brokers.phone')}
-                          </span>
-                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
-                            {agency.phone || '—'}
-                          </span>
-                        </div>
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                            {t('views.crm.brokers.emailShort')}
-                          </span>
-                          <span className="min-w-0 break-all text-right font-semibold text-slate-900 dark:text-slate-100">
-                            {agency.email?.trim() || '—'}
-                          </span>
-                        </div>
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                            {t('views.crm.brokers.nationality')}
-                          </span>
-                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
-                            {agency.nationality?.trim() || '—'}
-                          </span>
-                        </div>
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                            {t('views.crm.brokers.passport')}
-                          </span>
-                          <span className="min-w-0 text-right font-semibold text-slate-900 dark:text-slate-100">
-                            {passportValue}
-                          </span>
-                        </div>
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                            {t('views.crm.brokers.stats')}
-                          </span>
-                          <div className="min-w-0 text-right">{statsNode}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto min-w-0 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-                      <div className="mb-3 flex min-w-0 items-start justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                        <span className="flex min-w-0 flex-1 items-start gap-1">
-                          <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
-                          <span className="min-w-0 leading-snug break-words">
-                            <span className="font-medium text-slate-600 dark:text-slate-300">
-                              {t('views.crm.brokers.lastCollaboration')}:
-                            </span>{' '}
-                            {collab.lastAt
-                              ? formatDistanceToNow(collab.lastAt, { addSuffix: true })
-                              : '—'}
-                          </span>
-                        </span>
-                        <span className="shrink-0 pl-1 font-semibold tabular-nums text-slate-700 dark:text-slate-200">
-                          {t('views.crm.brokers.totalLabel')}: {collab.count}
-                        </span>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-2">
-                        <div className="min-w-0 w-full">{primaryButton}</div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-auto min-h-10 w-full min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 whitespace-normal rounded-lg border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-snug text-blue-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800 [&_svg]:shrink-0"
-                          onClick={() => openBrokerLogs(agency)}
-                        >
-                          <span className="max-w-full text-center">{t('views.crm.brokers.viewLogs')}</span>
-                          <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <BrokersPanel
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+          />
         </TabsContent>
         <TabsContent value="blacklist" className="mt-4 w-full outline-none">
-          <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white px-4 py-4 shadow-sm dark:border-rose-900/50 dark:from-rose-950/35 dark:via-slate-900 dark:to-slate-900">
-            <div className="flex gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/80">
-                <ShieldAlert className="h-6 w-6 text-rose-600 dark:text-rose-400" aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-rose-950 dark:text-rose-50">{t('views.crm.blacklist.title')}</h2>
-                <p className="mt-1 text-sm leading-relaxed text-rose-900/85 dark:text-rose-200/90">
-                  {t('views.crm.blacklist.description')}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <Button
-              type="button"
-              variant={blacklistTypeFilter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-9 rounded-lg px-3',
-                blacklistTypeFilter === 'all'
-                  ? 'bg-rose-600 text-white hover:bg-rose-700'
-                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
-              )}
-              onClick={() => setBlacklistTypeFilter('all')}
-            >
-              All
-            </Button>
-            <Button
-              type="button"
-              variant={blacklistTypeFilter === 'tenant' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-9 rounded-lg px-3',
-                blacklistTypeFilter === 'tenant'
-                  ? 'bg-rose-600 text-white hover:bg-rose-700'
-                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
-              )}
-              onClick={() => setBlacklistTypeFilter('tenant')}
-            >
-              {t('views.crm.blacklist.tenant')}
-            </Button>
-            <Button
-              type="button"
-              variant={blacklistTypeFilter === 'broker' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-9 rounded-lg px-3',
-                blacklistTypeFilter === 'broker'
-                  ? 'bg-rose-600 text-white hover:bg-rose-700'
-                  : 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40',
-              )}
-              onClick={() => setBlacklistTypeFilter('broker')}
-            >
-              {t('views.crm.blacklist.broker')}
-            </Button>
-          </div>
-
-          {crmLoading || blacklistLoading ? (
-            <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
-                >
-                  <div className="border-b border-slate-100 p-4 dark:border-slate-800">
-                    <div className="flex gap-3">
-                      <div className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800" />
-                      <div className="flex-1 space-y-2 pt-0.5">
-                        <div className="h-4 w-3/5 rounded bg-slate-100 dark:bg-slate-800" />
-                        <div className="h-3 w-2/5 rounded bg-slate-100 dark:bg-slate-800" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-12 bg-rose-50/80 dark:bg-rose-950/30" />
-                  <div className="space-y-2 p-4">
-                    <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800" />
-                    <div className="h-12 w-full rounded bg-slate-100 dark:bg-slate-800" />
-                  </div>
-                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <div className="h-10 w-full rounded-lg bg-slate-100 dark:bg-slate-800" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : filteredBlacklist.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center dark:border-slate-700 dark:bg-slate-900/40">
-              <ShieldAlert className="mb-3 h-12 w-12 text-rose-300 dark:text-rose-700" />
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('views.crm.blacklist.emptyCards')}</p>
-            </div>
-          ) : (
-            <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {filteredBlacklist.map((row) => {
-                const initial = (row.name || '?').trim().charAt(0).toUpperCase();
-                const typeLabel =
-                  row.type === 'Tenant' ? t('views.crm.blacklist.tenant') : t('views.crm.blacklist.broker');
-                let dateAdded = row.date;
-                try {
-                  const d = parseISO(row.date);
-                  if (isValid(d)) dateAdded = format(d, 'MMM d, yyyy');
-                } catch {
-                  /* keep raw */
-                }
-                return (
-                  <div
-                    key={row.id}
-                    className="flex min-h-[320px] min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-                  >
-                    <div className="relative min-w-0 border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-base font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
-                          {initial}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                            {row.name}
-                          </h3>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-950/80 dark:text-rose-200">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                              {t('views.crm.table.blacklisted')}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="border-0 bg-slate-100 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                            >
-                              {typeLabel}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="min-w-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                      <div className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 dark:bg-rose-950/45 dark:text-rose-100">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
-                        <span className="leading-snug">{t('views.crm.blacklist.cardBanner')}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex min-w-0 flex-1 flex-col px-4 py-3">
-                      <div className="min-w-0 space-y-2.5 text-xs">
-                        <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="flex shrink-0 items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-                            <Calendar className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                            {t('views.crm.blacklist.dateAdded')}
-                          </span>
-                          <span className="min-w-0 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                            {dateAdded}
-                          </span>
-                        </div>
-                        {row.taggedBy ? (
-                          <div className="flex min-w-0 items-start justify-between gap-3 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                            <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
-                              {t('views.crm.blacklist.taggedBy')}
-                            </span>
-                            <span className="min-w-0 break-all text-right font-mono text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                              {row.taggedBy}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          {t('views.crm.blacklist.reason')}
-                        </div>
-                        <p className="mt-1.5 text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
-                          {row.reason?.trim() || '—'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto min-w-0 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 w-full min-w-0 rounded-lg border-slate-200 bg-white text-sm font-semibold text-blue-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800"
-                        onClick={() => openBlacklistDetails(row)}
-                      >
-                        <Eye className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                        {t('views.crm.blacklist.details')}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <BlacklistPanel canCreate={canCreate} canUpdate={canUpdate} />
         </TabsContent>
       </Tabs>
     </div>

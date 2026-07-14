@@ -135,6 +135,63 @@ export async function ensureNotificationSchema() {
   `);
 }
 
+/** One-time copy of active legacy blacklist_record rows into the new blacklist table. */
+async function migrateLegacyBlacklistRecords() {
+  const [[countRow]] = await pool.query(`SELECT COUNT(*) AS cnt FROM \`blacklist\``);
+  if (Number(countRow?.cnt ?? 0) > 0) return;
+
+  const [[legacyRow]] = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM \`blacklist_record\` WHERE is_active = 1 AND entity_type IN ('tenant','broker')`,
+  );
+  if (Number(legacyRow?.cnt ?? 0) === 0) return;
+
+  await pool.query(`
+    INSERT INTO \`blacklist\` (
+      branch_id,
+      entity_type,
+      name,
+      email,
+      phone,
+      government_id,
+      reason,
+      blacklisted_by,
+      tenant_id,
+      partner_agency_id,
+      is_active,
+      created_at,
+      updated_at
+    )
+    SELECT
+      b.branch_id,
+      b.entity_type,
+      COALESCE(
+        NULLIF(TRIM(tp.full_name), ''),
+        NULLIF(TRIM(pa.agency_name), ''),
+        '—'
+      ) AS name,
+      COALESCE(NULLIF(TRIM(tp.email), ''), NULLIF(TRIM(pa.email), '')) AS email,
+      COALESCE(NULLIF(TRIM(tp.mobile_no), ''), NULLIF(TRIM(pa.contact_number), '')) AS phone,
+      COALESCE(NULLIF(TRIM(td.document_no), ''), NULLIF(TRIM(pa.document_no), '')) AS government_id,
+      b.reason,
+      b.tagged_by,
+      b.tenant_id,
+      b.partner_agency_id,
+      b.is_active,
+      b.tagged_at,
+      b.tagged_at
+    FROM blacklist_record b
+    LEFT JOIN tenant_profile tp ON tp.id = b.tenant_id
+    LEFT JOIN partner_agency pa ON pa.id = b.partner_agency_id
+    LEFT JOIN tenant_document td ON td.id = (
+      SELECT MAX(td2.id)
+      FROM tenant_document td2
+      WHERE td2.tenant_id = b.tenant_id
+        AND td2.document_type IN ('passport', 'national_id', 'visa')
+    )
+    WHERE b.is_active = 1 AND b.entity_type IN ('tenant', 'broker')
+  `);
+}
+
 export async function ensureSchema() {
   async function ensurePartnerAgencyDocColumns() {
     async function addColumnIfMissing(sql) {
@@ -847,6 +904,39 @@ export async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`blacklist\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`entity_type\` ENUM('tenant','broker') NOT NULL,
+      \`name\` VARCHAR(255) NOT NULL,
+      \`email\` VARCHAR(255) NULL DEFAULT NULL,
+      \`phone\` VARCHAR(64) NULL DEFAULT NULL,
+      \`government_id\` VARCHAR(128) NULL DEFAULT NULL,
+      \`reason\` TEXT NOT NULL,
+      \`blacklisted_by\` INT UNSIGNED NULL DEFAULT NULL,
+      \`tenant_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`partner_agency_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`is_active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_blacklist_branch_active\` (\`branch_id\`, \`is_active\`),
+      KEY \`idx_blacklist_entity\` (\`entity_type\`, \`is_active\`),
+      KEY \`idx_blacklist_email\` (\`email\`),
+      KEY \`idx_blacklist_phone\` (\`phone\`),
+      KEY \`idx_blacklist_government_id\` (\`government_id\`),
+      KEY \`idx_blacklist_tenant\` (\`tenant_id\`),
+      KEY \`idx_blacklist_partner\` (\`partner_agency_id\`),
+      CONSTRAINT \`fk_blacklist_v2_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+      CONSTRAINT \`fk_blacklist_v2_by\` FOREIGN KEY (\`blacklisted_by\`) REFERENCES \`user_info\` (\`IDNO\`),
+      CONSTRAINT \`fk_blacklist_v2_tenant\` FOREIGN KEY (\`tenant_id\`) REFERENCES \`tenant_profile\` (\`id\`),
+      CONSTRAINT \`fk_blacklist_v2_partner\` FOREIGN KEY (\`partner_agency_id\`) REFERENCES \`partner_agency\` (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await migrateLegacyBlacklistRecords();
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS \`document_template\` (
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`branch_id\` INT UNSIGNED NULL DEFAULT NULL,
@@ -1356,5 +1446,164 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_lease_renewal_logs_actor\` FOREIGN KEY (\`actor_user_id\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  async function ensureLandlordCrmColumns() {
+    async function addColumnIfMissing(sql) {
+      try {
+        await pool.query(sql);
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
+
+    const landlordCols = [
+      'first_name',
+      'middle_name',
+      'last_name',
+      'company_name',
+      'birth_date',
+      'address',
+      'city',
+      'province',
+      'postal_code',
+      'id_type',
+      'id_number',
+      'id_front_url',
+      'id_back_url',
+      'tin',
+      'proof_of_address_url',
+      'bank_name',
+      'account_name',
+      'account_number',
+      'gcash',
+      'maya',
+      'internal_notes',
+      'kyc_status',
+      'account_status',
+      'assigned_agent_id',
+      'last_activity_at',
+      'updated_at',
+    ];
+    const [landlordRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'landlord_profile'
+        AND column_name IN (${landlordCols.map(() => '?').join(', ')})
+      `,
+      landlordCols,
+    );
+    const existingLandlord = new Set(landlordRows.map((r) => String(r.column_name)));
+
+    const landlordAlters = [
+      ['first_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`first_name\` VARCHAR(80) NULL DEFAULT NULL AFTER \`full_name\``],
+      ['middle_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`middle_name\` VARCHAR(80) NULL DEFAULT NULL AFTER \`first_name\``],
+      ['last_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`last_name\` VARCHAR(80) NULL DEFAULT NULL AFTER \`middle_name\``],
+      ['company_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`company_name\` VARCHAR(180) NULL DEFAULT NULL AFTER \`last_name\``],
+      ['birth_date', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`birth_date\` DATE NULL DEFAULT NULL AFTER \`email\``],
+      ['address', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`address\` VARCHAR(255) NULL DEFAULT NULL AFTER \`birth_date\``],
+      ['city', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`city\` VARCHAR(100) NULL DEFAULT NULL AFTER \`address\``],
+      ['province', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`province\` VARCHAR(100) NULL DEFAULT NULL AFTER \`city\``],
+      ['postal_code', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`postal_code\` VARCHAR(20) NULL DEFAULT NULL AFTER \`province\``],
+      ['id_type', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`id_type\` VARCHAR(60) NULL DEFAULT NULL AFTER \`gov_id_no\``],
+      ['id_number', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`id_number\` VARCHAR(100) NULL DEFAULT NULL AFTER \`id_type\``],
+      ['id_front_url', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`id_front_url\` VARCHAR(512) NULL DEFAULT NULL AFTER \`id_number\``],
+      ['id_back_url', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`id_back_url\` VARCHAR(512) NULL DEFAULT NULL AFTER \`id_front_url\``],
+      ['tin', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`tin\` VARCHAR(40) NULL DEFAULT NULL AFTER \`id_back_url\``],
+      ['proof_of_address_url', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`proof_of_address_url\` VARCHAR(512) NULL DEFAULT NULL AFTER \`tin\``],
+      ['bank_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`bank_name\` VARCHAR(120) NULL DEFAULT NULL AFTER \`proof_of_address_url\``],
+      ['account_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`account_name\` VARCHAR(180) NULL DEFAULT NULL AFTER \`bank_name\``],
+      ['account_number', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`account_number\` VARCHAR(60) NULL DEFAULT NULL AFTER \`account_name\``],
+      ['gcash', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`gcash\` VARCHAR(40) NULL DEFAULT NULL AFTER \`account_number\``],
+      ['maya', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`maya\` VARCHAR(40) NULL DEFAULT NULL AFTER \`gcash\``],
+      ['internal_notes', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`internal_notes\` TEXT NULL AFTER \`maya\``],
+      [
+        'kyc_status',
+        `ALTER TABLE \`landlord_profile\` ADD COLUMN \`kyc_status\` ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending' AFTER \`internal_notes\``,
+      ],
+      [
+        'account_status',
+        `ALTER TABLE \`landlord_profile\` ADD COLUMN \`account_status\` ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active' AFTER \`kyc_status\``,
+      ],
+      ['assigned_agent_id', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`assigned_agent_id\` INT UNSIGNED NULL DEFAULT NULL AFTER \`account_status\``],
+      ['last_activity_at', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`last_activity_at\` DATETIME NULL DEFAULT NULL AFTER \`assigned_agent_id\``],
+      ['updated_at', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER \`created_at\``],
+    ];
+    for (const [col, sql] of landlordAlters) {
+      if (!existingLandlord.has(col)) await addColumnIfMissing(sql);
+    }
+
+    const [propertyRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'property'
+        AND column_name = 'landlord_id'
+      `,
+    );
+    if (!propertyRows.length) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`property\` ADD COLUMN \`landlord_id\` BIGINT UNSIGNED NULL DEFAULT NULL AFTER \`area_id\``,
+      );
+      try {
+        await pool.query(
+          `ALTER TABLE \`property\`
+           ADD CONSTRAINT \`fk_property_landlord\` FOREIGN KEY (\`landlord_id\`) REFERENCES \`landlord_profile\` (\`id\`)`,
+        );
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_KEYNAME' && error?.code !== 'ER_CANT_CREATE_TABLE') {
+          // FK may already exist or landlord table missing in legacy DBs.
+        }
+      }
+    }
+
+    const [leaseLandlordRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'lease_contract'
+        AND column_name = 'landlord_id'
+      `,
+    );
+    if (!leaseLandlordRows.length) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`lease_contract\` ADD COLUMN \`landlord_id\` BIGINT UNSIGNED NULL DEFAULT NULL AFTER \`unit_id\``,
+      );
+      try {
+        await pool.query(
+          `ALTER TABLE \`lease_contract\`
+           ADD CONSTRAINT \`fk_contract_landlord\` FOREIGN KEY (\`landlord_id\`) REFERENCES \`landlord_profile\` (\`id\`)`,
+        );
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_KEYNAME' && error?.code !== 'ER_CANT_CREATE_TABLE') {
+          // FK may already exist on legacy DBs.
+        }
+      }
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`landlord_document\` (
+        \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        \`branch_id\` INT UNSIGNED NOT NULL,
+        \`landlord_id\` BIGINT UNSIGNED NOT NULL,
+        \`document_type\` ENUM('government_id','land_title','tax_declaration','lease_authorization','business_permit','proof_of_address','other') NOT NULL DEFAULT 'other',
+        \`title\` VARCHAR(180) NOT NULL,
+        \`file_path\` VARCHAR(512) NOT NULL,
+        \`uploaded_by\` INT UNSIGNED NULL DEFAULT NULL,
+        \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`),
+        KEY \`idx_landlord_document_branch\` (\`branch_id\`),
+        KEY \`idx_landlord_document_landlord\` (\`landlord_id\`),
+        CONSTRAINT \`fk_landlord_document_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+        CONSTRAINT \`fk_landlord_document_landlord\` FOREIGN KEY (\`landlord_id\`) REFERENCES \`landlord_profile\` (\`id\`) ON DELETE CASCADE,
+        CONSTRAINT \`fk_landlord_document_uploaded_by\` FOREIGN KEY (\`uploaded_by\`) REFERENCES \`user_info\` (\`IDNO\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+  }
+
+  await ensureLandlordCrmColumns();
 
 }

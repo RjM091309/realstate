@@ -1,10 +1,12 @@
 import { loadSessionPayload } from '../services/sessionService.js';
 import {
-  getBlacklistRowById,
+  deactivateBlacklistById,
+  getBlacklistById,
+  insertBlacklistEntry,
+  insertBlacklistRecord,
+  listBlacklistByBranch,
   clearBrokerBlacklistState,
   clearTenantBlacklistState,
-  insertBlacklistRecord,
-  listActiveBlacklistByBranch,
   tagBrokerPartnerAgencyBlacklist,
 } from '../models/blacklistModel.js';
 import { getPartnerAgencyById } from '../models/partnerAgenciesModel.js';
@@ -21,66 +23,75 @@ function fmtDate(d) {
 
 function rowToBlacklist(row) {
   const entityType = String(row.entity_type);
-  const type = entityType === 'tenant' ? 'Tenant' : 'Broker';
-  const name =
-    entityType === 'broker'
-      ? String(row.partner_agency_name ?? '').trim()
-      : entityType === 'landlord'
-        ? String(row.landlord_name ?? '').trim()
-        : String(row.tenant_name ?? '').trim();
-
   return {
     id: String(row.id),
     branchId: String(row.branch_id),
-    entityType: entityType === 'broker' ? 'broker' : entityType === 'landlord' ? 'landlord' : 'tenant',
+    entityType: entityType === 'broker' ? 'broker' : 'tenant',
     tenantId: row.tenant_id != null ? String(row.tenant_id) : undefined,
-    landlordId: row.landlord_id != null ? String(row.landlord_id) : undefined,
     partnerAgencyId: row.partner_agency_id != null ? String(row.partner_agency_id) : undefined,
-    name: name || '—',
-    type,
+    name: String(row.name ?? '').trim() || '—',
+    email: row.email ? String(row.email) : undefined,
+    phone: row.phone ? String(row.phone) : undefined,
+    governmentId: row.government_id ? String(row.government_id) : undefined,
+    type: entityType === 'broker' ? 'Broker' : 'Tenant',
     reason: String(row.reason ?? ''),
-    details: row.details ? String(row.details) : undefined,
-    taggedBy: row.tagged_by != null ? String(row.tagged_by) : undefined,
-    date: row.tagged_at ? fmtDate(row.tagged_at) : '',
+    blacklistedBy: row.blacklisted_by != null ? String(row.blacklisted_by) : undefined,
+    blacklistedByName:
+      row.blacklisted_by_first_name || row.blacklisted_by_last_name
+        ? `${String(row.blacklisted_by_first_name ?? '').trim()} ${String(row.blacklisted_by_last_name ?? '').trim()}`.trim()
+        : undefined,
+    date: row.created_at ? fmtDate(row.created_at) : '',
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : undefined,
   };
+}
+
+function parseListFilters(req) {
+  const typeRaw = String(req.query.type ?? 'all').trim().toLowerCase();
+  const type = typeRaw === 'tenant' || typeRaw === 'broker' ? typeRaw : 'all';
+  const search = String(req.query.search ?? '').trim();
+  return { type, search };
 }
 
 function validateCreate(body) {
   const entityTypeRaw = String(body.entityType ?? '').trim().toLowerCase();
-  if (entityTypeRaw !== 'tenant' && entityTypeRaw !== 'landlord' && entityTypeRaw !== 'broker') return null;
+  if (entityTypeRaw !== 'tenant' && entityTypeRaw !== 'broker') return null;
 
   const reason = String(body.reason ?? '').trim();
   if (!reason) return null;
 
+  const name = String(body.name ?? '').trim();
+  const email = String(body.email ?? '').trim() || null;
+  const phone = String(body.phone ?? '').trim() || null;
+  const governmentId = String(body.governmentId ?? body.government_id ?? '').trim() || null;
+
   const tenantIdRaw = body.tenantId;
-  const landlordIdRaw = body.landlordId;
   const partnerAgencyIdRaw = body.partnerAgencyId;
 
   const tenantId =
     tenantIdRaw === null || tenantIdRaw === undefined || String(tenantIdRaw).trim() === ''
       ? null
       : String(tenantIdRaw).trim();
-  const landlordId =
-    landlordIdRaw === null || landlordIdRaw === undefined || String(landlordIdRaw).trim() === ''
-      ? null
-      : String(landlordIdRaw).trim();
   const partnerAgencyId =
     partnerAgencyIdRaw === null || partnerAgencyIdRaw === undefined || String(partnerAgencyIdRaw).trim() === ''
       ? null
       : String(partnerAgencyIdRaw).trim();
 
-  if (entityTypeRaw === 'tenant' && !tenantId) return null;
-  if (entityTypeRaw === 'landlord' && !landlordId) return null;
-  if (entityTypeRaw === 'broker' && !partnerAgencyId) return null;
-  if (entityTypeRaw === 'tenant' && (landlordId || partnerAgencyId)) return null;
-  if (entityTypeRaw === 'landlord' && (tenantId || partnerAgencyId)) return null;
-  if (entityTypeRaw === 'broker' && (tenantId || landlordId)) return null;
+  if (entityTypeRaw === 'tenant' && partnerAgencyId) return null;
+  if (entityTypeRaw === 'broker' && tenantId) return null;
 
-  const detailsRaw = body.details;
-  const details =
-    detailsRaw === null || detailsRaw === undefined ? null : String(detailsRaw).trim() || null;
+  if (!name && !tenantId && !partnerAgencyId) return null;
 
-  return { entityType: entityTypeRaw, tenantId, landlordId, partnerAgencyId, reason, details };
+  return {
+    entityType: entityTypeRaw,
+    name,
+    email,
+    phone,
+    governmentId,
+    tenantId,
+    partnerAgencyId,
+    reason,
+  };
 }
 
 function canCrud(session, op) {
@@ -109,7 +120,8 @@ export async function listBlacklist(req, res) {
   const ctx = await getAuthContext(req, res);
   if (!ctx) return;
   try {
-    const rows = await listActiveBlacklistByBranch(ctx.session.branchId);
+    const filters = parseListFilters(req);
+    const rows = await listBlacklistByBranch(ctx.session.branchId, filters);
     res.json({ blacklist: rows.map(rowToBlacklist) });
   } catch (e) {
     console.error(e);
@@ -132,14 +144,14 @@ export async function createBlacklist(req, res) {
   }
 
   try {
-    if (parsed.entityType === 'broker') {
+    if (parsed.entityType === 'broker' && parsed.partnerAgencyId) {
       const id = await tagBrokerPartnerAgencyBlacklist(
         ctx.session.branchId,
         parsed.partnerAgencyId,
         parsed.reason,
         ctx.session.user.id,
       );
-      const created = await getBlacklistRowById(id, ctx.session.branchId);
+      const created = await getBlacklistById(id, ctx.session.branchId);
       if (!created) {
         res.status(500).json({ error: 'Failed to load created blacklist record' });
         return;
@@ -148,17 +160,39 @@ export async function createBlacklist(req, res) {
       return;
     }
 
-    const id = await insertBlacklistRecord(ctx.session.branchId, {
+    if (parsed.entityType === 'tenant' && parsed.tenantId) {
+      const id = await insertBlacklistRecord(ctx.session.branchId, {
+        entityType: 'tenant',
+        tenantId: parsed.tenantId,
+        name: parsed.name,
+        email: parsed.email,
+        phone: parsed.phone,
+        governmentId: parsed.governmentId,
+        reason: parsed.reason,
+        taggedBy: ctx.session.user.id,
+      });
+      const created = await getBlacklistById(id, ctx.session.branchId);
+      if (!created) {
+        res.status(500).json({ error: 'Failed to load created blacklist record' });
+        return;
+      }
+      res.status(201).json({ record: rowToBlacklist(created) });
+      return;
+    }
+
+    const id = await insertBlacklistEntry(ctx.session.branchId, {
       entityType: parsed.entityType,
-      tenantId: parsed.tenantId,
-      landlordId: parsed.landlordId,
-      partnerAgencyId: parsed.partnerAgencyId,
+      name: parsed.name || '—',
+      email: parsed.email,
+      phone: parsed.phone,
+      governmentId: parsed.governmentId,
       reason: parsed.reason,
-      details: parsed.details,
-      taggedBy: ctx.session.user.id,
+      blacklistedBy: ctx.session.user.id,
+      tenantId: parsed.tenantId,
+      partnerAgencyId: parsed.partnerAgencyId,
     });
 
-    const created = await getBlacklistRowById(id, ctx.session.branchId);
+    const created = await getBlacklistById(id, ctx.session.branchId);
     if (!created) {
       res.status(500).json({ error: 'Failed to load created blacklist record' });
       return;
@@ -167,6 +201,33 @@ export async function createBlacklist(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to create blacklist record' });
+  }
+}
+
+export async function removeBlacklistById(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to update blacklist records' });
+    return;
+  }
+
+  const id = String(req.params.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+
+  try {
+    const ok = await deactivateBlacklistById(id, ctx.session.branchId);
+    if (!ok) {
+      res.status(404).json({ error: 'Blacklist record not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to remove blacklist record' });
   }
 }
 

@@ -38,7 +38,16 @@ interface DataTableProps<T> {
    * When true, drops the inner white card frame (rounded-2xl, shadow) so the table
    * can sit flush inside a parent Card without a double border/box.
    */
-  embedded?: boolean;
+  /**
+   * When true, keeps the table header visible while scrolling table body.
+   */
+  stickyHeader?: boolean;
+  /** Extra classes on the `<table>` element (e.g. `table-fixed` for fit-to-width layouts). */
+  tableClassName?: string;
+  /** Tighter cell padding for wide tables that must fit without horizontal scroll. */
+  compact?: boolean;
+  /** Lock table to container width (no horizontal scroll). */
+  fitWidth?: boolean;
 }
 
 function columnSortKey<T>(col: ColumnDef<T>): string {
@@ -116,6 +125,10 @@ export function DataTable<T>({
   onRowClick,
   highlightFirstColumn = true,
   embedded = false,
+  stickyHeader = false,
+  tableClassName,
+  compact = false,
+  fitWidth = false,
   defaultPageSize = 10,
   pageSizeOptions = [10, 25, 50, 100],
 }: DataTableProps<T>) {
@@ -176,9 +189,15 @@ export function DataTable<T>({
         embedded ? '' : 'rounded-2xl bg-white dark:bg-slate-900 shadow-sm',
       )}
     >
-      <div className="w-full overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <thead>
+      <div
+        className={cn(
+          'w-full',
+          fitWidth ? 'overflow-x-hidden' : 'overflow-x-auto',
+          stickyHeader && 'max-h-[min(70vh,40rem)] overflow-y-auto',
+        )}
+      >
+        <table className={cn('w-full border-collapse text-left', fitWidth && 'table-fixed', tableClassName)}>
+          <thead className={cn(stickyHeader && 'sticky top-0 z-10')}>
             <tr className="data-table-head-row border-b bg-white dark:bg-slate-900">
               {columns.map((col, i) => {
                 const sortKey = columnSortKey(col);
@@ -188,8 +207,9 @@ export function DataTable<T>({
                   key={sortKey}
                   onClick={col.sortable ? () => cycleSort(col) : undefined}
                   className={cn(
-                    'px-6 text-xs font-semibold whitespace-nowrap uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400',
-                    highlightFirstColumn ? 'py-4' : 'py-3.5',
+                    'font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400',
+                    compact ? 'px-2.5 py-2 text-[10px] leading-tight' : 'px-6 py-3.5 text-xs whitespace-nowrap',
+                    highlightFirstColumn && !compact && 'py-4',
                     col.sortable && 'cursor-pointer select-none',
                     highlightFirstColumn && i === 0
                       ? 'bg-violet-50 text-brand-text dark:bg-indigo-500/10 dark:text-slate-200'
@@ -228,9 +248,9 @@ export function DataTable<T>({
                   <td
                     key={i}
                     className={cn(
-                      'px-6 text-sm font-normal leading-5 text-brand-text align-top',
-                      highlightFirstColumn ? 'py-4' : 'py-3.5',
-                      'dark:text-slate-200',
+                      'text-sm font-normal leading-5 text-brand-text dark:text-slate-200',
+                      compact ? 'px-2.5 py-2 align-middle' : 'px-6',
+                      !compact && (highlightFirstColumn ? 'py-4 align-top' : 'py-3 align-middle'),
                       highlightFirstColumn && i === 0
                         ? 'border-r-[3px] border-transparent bg-violet-50 font-medium group-hover:bg-violet-100 dark:bg-indigo-500/10 dark:group-hover:bg-indigo-500/20'
                         : 'bg-white group-hover:bg-slate-50/80 dark:bg-slate-900 dark:group-hover:bg-slate-800/70',
@@ -261,7 +281,8 @@ export function DataTable<T>({
       {/* Pagination Container */}
       <div
         className={cn(
-          'data-table-footer flex items-center justify-between border-t px-6 py-4',
+          'data-table-footer flex items-center justify-between border-t',
+          compact ? 'px-3 py-3' : 'px-6 py-4',
           embedded ? 'bg-slate-50/60 dark:bg-slate-800/90' : 'bg-white dark:bg-slate-900',
         )}
       >

@@ -288,7 +288,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
                   {t('views.crm.history.leaseDossier')}
                 </SectionHeading>
                 {currentLease ? (
-                  <div className="rounded-2xl bg-slate-50/80 p-4 text-sm dark:bg-slate-800/40">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-600 dark:bg-slate-950/80">
                     <div className="flex flex-wrap items-start justify-between gap-2 pb-3">
                       <div className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">
                         <span className="font-mono text-xs uppercase tracking-wide">
@@ -348,7 +348,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
                 ) : (
                   <ol className="relative ml-1 space-y-6 border-none pl-6">
                     <span
-                      className="pointer-events-none absolute left-[5px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-indigo-300 via-slate-200 to-transparent dark:from-indigo-500/50 dark:via-slate-700"
+                      className="pointer-events-none absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200 dark:bg-slate-700"
                       aria-hidden
                     />
                     {timelineEvents.map((event, index) => (
@@ -384,7 +384,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
 
             <TabsContent value="financial" className="mt-0 max-h-[min(60vh,28rem)] space-y-8 overflow-y-auto pr-1">
               <section className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-800/40">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     {t('views.crm.history.financial.onTimeLabel')}
                   </p>
@@ -406,7 +406,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
                     {financialSummary.reliabilityLabel}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-800/40">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     {t('views.crm.history.financial.outstandingLabel')}
                   </p>
@@ -439,7 +439,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
                 ) : (
                   <div className="space-y-3">
                     {ledgerRows.map((row) => (
-                      <div key={row.id} className="rounded-xl bg-slate-50/70 p-3.5 text-sm dark:bg-slate-800/30">
+                      <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-3.5 text-sm dark:border-slate-600 dark:bg-slate-950/80">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <span className="font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{row.invoiceNo}</span>
                           <span
@@ -488,7 +488,7 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
                     const meta = NOTE_CATEGORY_META[note.category] ?? NOTE_CATEGORY_META.admin;
                     const CategoryIcon = meta.icon;
                     return (
-                      <div key={note.id} className="flex gap-3 rounded-xl bg-slate-50/70 p-3.5 text-sm dark:bg-slate-800/30">
+                      <div key={note.id} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3.5 text-sm dark:border-slate-600 dark:bg-slate-950/80">
                         <span
                           className={cn(
                             'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',

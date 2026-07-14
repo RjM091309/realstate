@@ -68,15 +68,110 @@ export interface Tenant {
   createdAt?: string;
 }
 
+export type LandlordKycStatus = 'pending' | 'verified' | 'rejected';
+export type LandlordAccountStatus = 'active' | 'inactive' | 'suspended';
+
 export interface Landlord {
   id: string;
   fullName: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  companyName?: string;
   mobileNo: string;
   email: string;
+  birthDate?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
   govIdNo: string;
+  idType?: string;
+  idNumber?: string;
+  idFrontUrl?: string;
+  idBackUrl?: string;
+  tin?: string;
+  proofOfAddressUrl?: string;
+  bankName?: string;
+  accountName?: string;
+  accountNumber?: string;
+  gcash?: string;
+  maya?: string;
+  internalNotes?: string;
+  kycStatus?: LandlordKycStatus;
+  accountStatus?: LandlordAccountStatus;
+  assignedAgentId?: string;
+  assignedAgentName?: string;
+  propertyCount?: number;
+  totalUnits?: number;
+  monthlyRentalIncome?: number;
+  lastActivity?: string;
   active: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
+
+export type LandlordPropertyRow = {
+  id: string;
+  name: string;
+  propertyType: string;
+  address: string;
+  units: number;
+  occupied: number;
+  vacant: number;
+  monthlyIncome: number;
+  status: string;
+};
+
+export type LandlordContractRow = {
+  id: string;
+  contractNo: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  status: string;
+  unitNo: string;
+  propertyName: string;
+  createdAt: string;
+};
+
+export type LandlordDocumentRow = {
+  id: string;
+  documentType: string;
+  title: string;
+  filePath: string;
+  uploadedByName?: string;
+  createdAt: string;
+};
+
+export type LandlordTransactionRow = {
+  id: string;
+  amountPaid: number;
+  paymentDate: string;
+  paymentMethod: string;
+  referenceNo?: string;
+  contractNo: string;
+  propertyName: string;
+  unitNo: string;
+  createdAt: string;
+};
+
+export type LandlordActivityRow = {
+  id: string;
+  action: string;
+  changeSummary?: string;
+  actorUserId?: string;
+  createdAt: string;
+};
+
+export type LandlordDetailPayload = {
+  landlord: Landlord;
+  properties: LandlordPropertyRow[];
+  contracts: LandlordContractRow[];
+  documents: LandlordDocumentRow[];
+  transactions: LandlordTransactionRow[];
+  activityLogs: LandlordActivityRow[];
+};
 
 export interface Contract {
   id: string;

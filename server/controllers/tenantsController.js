@@ -15,6 +15,7 @@ import {
   updateTenantById,
 } from '../models/tenantsModel.js';
 import { deactivateBlacklistForTenant, upsertActiveTenantBlacklist } from '../models/blacklistModel.js';
+import { assertNotBlacklisted, assertTenantNotBlacklisted } from '../services/blacklistCheckService.js';
 import { finalizeKycUploadToWebpOrPdf } from '../services/kycUploadService.js';
 import { isValidPortalArtifactSlug, streamPortalArtifactPdf } from '../services/portalArtifactPdfService.js';
 import { finalizeRepositoryUploadToWebpOrPdf } from '../services/repositoryUploadService.js';
@@ -385,6 +386,13 @@ export async function createTenant(req, res) {
   const parsed = validatePayload(req.body ?? {});
   if (!parsed) {
     res.status(400).json({ error: 'Invalid tenant payload' });
+    return;
+  }
+  if (!(await assertNotBlacklisted(res, ctx.session.branchId, {
+    email: parsed.email,
+    phone: parsed.phone,
+    governmentId: parsed.idNumber,
+  }))) {
     return;
   }
   try {

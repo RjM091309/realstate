@@ -15,6 +15,8 @@ export interface ModalProps {
   variant?: 'default' | 'glass';
   /** Tighter header/body padding and smaller title — for data-heavy modals. */
   compact?: boolean;
+  /** Extra classes on the outer modal shell. */
+  shellClassName?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -27,6 +29,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'md',
   variant = 'default',
   compact = false,
+  shellClassName,
 }) => {
   const { t } = useTranslation();
   // Prevent body scroll when modal is open
@@ -80,6 +83,7 @@ export const Modal: React.FC<ModalProps> = ({
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className={cn(
                 'app-modal-shell w-full flex flex-col pointer-events-auto',
+                shellClassName,
                 compact ? 'max-h-[85vh]' : 'max-h-[90vh]',
                 isGlass
                   ? [

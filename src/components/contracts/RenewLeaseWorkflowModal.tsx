@@ -71,6 +71,12 @@ const STEP_INDEX: Record<LeaseRenewalWorkflowStep, number> = {
   activation: 5,
 };
 
+const RENEW_LEASE_PANEL =
+  'rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-600 dark:bg-slate-950/80';
+
+const RENEW_LEASE_SHELL =
+  'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80';
+
 function renewalStatusLabelKey(status: string): string {
   const map: Record<string, string> = {
     pending_renewal: 'statusPendingRenewal',
@@ -358,10 +364,10 @@ export function RenewLeaseWorkflowModal({
                 className={cn(
                   'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors',
                   active
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-100'
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500/50 dark:bg-indigo-950 dark:text-indigo-100'
                     : done
-                      ? 'border-emerald-300/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100'
-                      : 'border-slate-200 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950 dark:text-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-300',
                 )}
               >
                 {done ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : null}
@@ -383,7 +389,7 @@ export function RenewLeaseWorkflowModal({
           </StatusBadge>
         </div>
       ) : null}
-      <div className="renew-lease-summary grid gap-3 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-600/80 dark:bg-slate-800/40">
+      <div className={cn('renew-lease-summary grid gap-3 sm:grid-cols-2 lg:grid-cols-3', RENEW_LEASE_PANEL)}>
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
             {t('views.contracts.renewLease.contractNo')}
@@ -452,7 +458,7 @@ export function RenewLeaseWorkflowModal({
 
   const renderBalanceStep = () => (
     <div className="space-y-4">
-      <div className="renew-lease-shell rounded-xl border border-slate-200/90 bg-white/50 p-4 dark:border-slate-600/80 dark:bg-slate-900/20">
+      <div className={cn('renew-lease-shell', RENEW_LEASE_SHELL)}>
         <div className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
           {t('views.contracts.renewLease.workflow.balanceBreakdown')}
         </div>
@@ -477,7 +483,7 @@ export function RenewLeaseWorkflowModal({
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-indigo-200/80 bg-indigo-50/60 px-3 py-2.5 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 dark:border-indigo-500/30 dark:bg-indigo-950">
           <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
             {t('views.contracts.renewLease.workflow.totalOutstanding')}
           </span>
@@ -564,7 +570,7 @@ export function RenewLeaseWorkflowModal({
   );
 
   const renderTermsStep = () => (
-    <div className="renew-lease-shell space-y-4 rounded-xl border border-slate-200/90 bg-white/50 p-4 dark:border-slate-600/80 dark:bg-slate-900/20">
+    <div className={cn('renew-lease-shell space-y-4', RENEW_LEASE_SHELL)}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>{t('views.contracts.renewLease.newStartDate')}</Label>
@@ -642,7 +648,7 @@ export function RenewLeaseWorkflowModal({
             </Button>
           </div>
         </div>
-        <div className="mt-2 grid gap-2 rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 text-xs dark:border-slate-600/70 dark:bg-slate-800/30 sm:grid-cols-2">
+        <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-600 dark:bg-slate-950/80 sm:grid-cols-2">
           <div>
             <span className="text-slate-500">{t('views.contracts.renewLease.previousRent')}: </span>
             <span className="font-semibold">{formatPhp(previousRent)}</span>
@@ -701,7 +707,7 @@ export function RenewLeaseWorkflowModal({
               <div className="text-slate-600 dark:text-slate-300">{formatPhp(previousRent)} / mo</div>
             </div>
           </div>
-          <div className="renew-lease-summary rounded-xl border border-indigo-200/80 bg-indigo-50/40 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+          <div className={cn('renew-lease-summary', RENEW_LEASE_PANEL)}>
             <div className="mb-2 text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
               {t('views.contracts.renewLease.workflow.newContract')}
             </div>
@@ -845,7 +851,7 @@ export function RenewLeaseWorkflowModal({
           <Input
             readOnly
             value={payload?.newContractPreview?.contractNumber ?? t('views.contracts.renewLease.workflow.generatedOnActivate')}
-            className="mt-1.5 h-11 rounded-xl bg-slate-50 dark:bg-slate-800/50"
+            className="mt-1.5 h-11 rounded-xl border border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-950/80"
           />
         </div>
       </div>
@@ -873,7 +879,7 @@ export function RenewLeaseWorkflowModal({
   };
 
   const footer = (
-    <div className="renew-lease-footer sticky bottom-0 z-10 -mx-1 border-t border-slate-200/90 bg-white/95 px-1 pt-3 backdrop-blur dark:border-slate-600/80 dark:bg-slate-900/95">
+    <div className="renew-lease-footer sticky bottom-0 z-10 -mx-1 border-t border-slate-200 bg-white px-1 pt-3 dark:border-slate-600 dark:bg-slate-950">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-2">
@@ -937,7 +943,7 @@ export function RenewLeaseWorkflowModal({
 
         {outstanding > 0 && !carryOver ? (
           <div
-            className="flex gap-3 rounded-xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100"
+            className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-100"
             role="status"
           >
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden />
@@ -947,7 +953,7 @@ export function RenewLeaseWorkflowModal({
 
         {readyForActivation && step === 'activation' ? (
           <div
-            className="flex gap-3 rounded-xl border border-emerald-300/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100"
+            className="flex gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-500/40 dark:bg-emerald-950 dark:text-emerald-100"
             role="status"
           >
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-300" aria-hidden />

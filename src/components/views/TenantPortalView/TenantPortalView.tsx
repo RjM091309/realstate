@@ -1027,7 +1027,7 @@ export function TenantPortalView() {
               {supportInboxEmail}
             </a>
           </p>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               On file for your account
             </div>

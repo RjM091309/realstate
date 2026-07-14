@@ -388,6 +388,15 @@
   border-color: rgb(71 85 105) !important;
 }
 
+/* CRM form modals: seamless header/body/footer (no divider lines) */
+#root .crm-form-modal-shell .app-modal-header {
+  border-bottom-width: 0 !important;
+}
+
+#root .crm-form-modal-shell .app-modal-footer {
+  border-top-width: 0 !important;
+}
+
 /* Tenant history: keep inner content borderless (surface-on-surface) */
 #root .tenant-history-modal [class*="border-slate-"],
 #root .tenant-history-modal [class*="divide-slate-"] {

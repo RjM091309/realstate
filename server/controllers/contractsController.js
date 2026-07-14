@@ -1,5 +1,6 @@
 import { loadSessionPayload } from '../services/sessionService.js';
 import { logAudit } from '../services/auditLogService.js';
+import { assertTenantNotBlacklisted } from '../services/blacklistCheckService.js';
 import {
   deleteContractById,
   findOrCreatePartnerAgencyForInvite,
@@ -289,6 +290,9 @@ export async function createContract(req, res) {
     res.status(400).json({ error: 'Invalid contract payload' });
     return;
   }
+  if (!(await assertTenantNotBlacklisted(res, ctx.session.branchId, parsed.tenantId))) {
+    return;
+  }
   const dbPayload = payloadForDatabase(parsed);
   if (String(dbPayload.status).toLowerCase() === 'active') {
     res.status(409).json({
@@ -364,6 +368,9 @@ export async function updateContract(req, res) {
         });
         return;
       }
+      if (!(await assertTenantNotBlacklisted(res, ctx.session.branchId, parsed.tenantId))) {
+        return;
+      }
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'Failed to validate inspection requirement' });
@@ -420,6 +427,9 @@ export async function activateContract(req, res) {
     const parsed = contractRowToActivatePayload(row);
     if (!parsed.tenantId || !parsed.agentId) {
       res.status(400).json({ error: 'Contract is missing tenant or agent details.' });
+      return;
+    }
+    if (!(await assertTenantNotBlacklisted(res, ctx.session.branchId, parsed.tenantId))) {
       return;
     }
     const dbPayload = payloadForDatabase(parsed);

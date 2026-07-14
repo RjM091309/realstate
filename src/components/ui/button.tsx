@@ -59,11 +59,11 @@ export { Button, buttonVariants }
 
 /** Standard indigo modal footer button — auto width, consistent height. */
 export const modalActionButtonClass =
-  'h-10 min-w-[7.5rem] px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700';
+  'h-10 min-w-[7.5rem] px-4 rounded-xl font-medium bg-indigo-600 text-white shadow-none hover:bg-indigo-700';
 
-/** Outline companion for multi-action modal footers. */
+/** Outline companion for multi-action modal footers — matches modalActionButtonClass size & radius. */
 export const modalOutlineButtonClass =
-  'h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-none hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+  'h-10 min-w-[7.5rem] px-4 rounded-xl border border-indigo-200 bg-white font-medium text-indigo-700 shadow-none hover:bg-indigo-50 hover:text-indigo-800 dark:border-indigo-500/40 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-500/10';
 
 export const modalDangerButtonClass =
   'h-10 min-w-[7.5rem] px-4 rounded-xl bg-rose-600 text-white hover:bg-rose-700';
