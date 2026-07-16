@@ -1,12 +1,14 @@
 import { pool } from '../config/db.js';
 
-const KYC_DOC_TYPES = ['passport', 'national_id', 'visa'];
+const KYC_DOC_TYPES = ['passport', 'national_id', 'visa', 'drivers_license'];
 
 export function clientIdTypeToDocEnum(idType) {
   const s = String(idType ?? '').trim().toLowerCase();
   if (s.includes('passport')) return 'passport';
   if (s.includes('visa')) return 'visa';
-  return 'national_id';
+  if (s.includes('driver')) return 'drivers_license';
+  if (s.includes('umid') || s.includes('national') || s.includes('philsys')) return 'national_id';
+  return 'other';
 }
 
 function kycTypesSqlList() {
@@ -27,7 +29,8 @@ export async function listTenantsByBranch(branchId) {
       t.birth_date,
       CASE d.document_type
         WHEN 'passport' THEN 'Passport'
-        WHEN 'national_id' THEN 'National ID'
+        WHEN 'national_id' THEN 'UMID'
+        WHEN 'drivers_license' THEN 'Driver''s License'
         WHEN 'visa' THEN 'Visa'
         ELSE ''
       END AS id_type,
@@ -141,7 +144,8 @@ export async function getTenantById(id, branchId) {
       t.birth_date,
       CASE d.document_type
         WHEN 'passport' THEN 'Passport'
-        WHEN 'national_id' THEN 'National ID'
+        WHEN 'national_id' THEN 'UMID'
+        WHEN 'drivers_license' THEN 'Driver''s License'
         WHEN 'visa' THEN 'Visa'
         ELSE ''
       END AS id_type,

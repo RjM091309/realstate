@@ -347,6 +347,27 @@ export async function ensureSchema() {
     }
   }
 
+  async function ensureTenantDocumentDriversLicenseEnum() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_type
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'tenant_document'
+        AND column_name = 'document_type'
+      LIMIT 1
+      `,
+    );
+    const columnType = String(rows[0]?.column_type ?? '');
+    if (columnType.includes('drivers_license')) return;
+    await pool.query(
+      `ALTER TABLE \`tenant_document\`
+       MODIFY COLUMN \`document_type\`
+       ENUM('passport','national_id','visa','drivers_license','contract_attachment','other')
+       NOT NULL DEFAULT 'other'`,
+    );
+  }
+
   async function ensureTenantDocumentCascade() {
     const [rows] = await pool.query(
       `
@@ -984,7 +1005,7 @@ export async function ensureSchema() {
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`branch_id\` INT UNSIGNED NOT NULL,
       \`tenant_id\` BIGINT UNSIGNED NOT NULL,
-      \`document_type\` ENUM('passport','national_id','visa','contract_attachment','other') NOT NULL DEFAULT 'other',
+      \`document_type\` ENUM('passport','national_id','visa','drivers_license','contract_attachment','other') NOT NULL DEFAULT 'other',
       \`document_no\` VARCHAR(120) NULL DEFAULT NULL,
       \`expiry_date\` DATE NULL DEFAULT NULL,
       \`file_path\` VARCHAR(255) NOT NULL,
@@ -1000,6 +1021,7 @@ export async function ensureSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
   await ensureTenantDocumentCascade();
+  await ensureTenantDocumentDriversLicenseEnum();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`invoice\` (
@@ -1605,5 +1627,26 @@ export async function ensureSchema() {
   }
 
   await ensureLandlordCrmColumns();
+  await ensureKycScannerApiTable();
 
+}
+
+/**
+ * Stores Gemini (or other) API credentials for tenant ID OCR.
+ * Create-if-not-exists. Insert/update api_key in this table to rotate keys.
+ */
+async function ensureKycScannerApiTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`kyc_scanner_api\` (
+      \`id\` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`api_key\` VARCHAR(512) NOT NULL,
+      \`model\` VARCHAR(128) NOT NULL DEFAULT 'gemini-3.5-flash',
+      \`provider\` VARCHAR(64) NOT NULL DEFAULT 'gemini',
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_kyc_scanner_api_active\` (\`active\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
 }

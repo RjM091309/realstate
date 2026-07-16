@@ -1081,7 +1081,22 @@
         "deleted": "임차인이 삭제되었습니다.",
         "deleteConfirm": "{{name}}을(를) 목록에서 삭제할까요?",
         "validationRequired": "이름, 이메일, 전화, 신분증 유형, 신분증 번호를 입력하세요.",
-        "loadError": "서버에서 임차인을 불러오지 못했습니다. 샘플 데이터를 표시합니다."
+        "loadError": "서버에서 임차인을 불러오지 못했습니다. 샘플 데이터를 표시합니다.",
+        "idPhotoLabel": "임차인 신분증 사진 (WEBP)",
+        "idPhotoHint": "신분증 이미지를 업로드하면 필드가 자동 입력됩니다. 저장 시 WEBP로 변환됩니다.",
+        "noIdPhoto": "선택된 파일 없음",
+        "choosePhoto": "사진 선택",
+        "replacePhoto": "교체",
+        "rescanPhoto": "다시 스캔",
+        "removePhoto": "제거",
+        "processing": "처리 중",
+        "scanning": "신분증 스캔 중…",
+        "scanningHint": "Gemini가 신분증 이미지를 읽는 중입니다. 폼 입력이 일시적으로 잠깁니다.",
+        "scanSuccess": "업로드한 이미지에서 신분증 정보를 자동 입력했습니다.",
+        "scanFailed": "신분증 이미지를 스캔하지 못했습니다. 수동으로 입력할 수 있습니다.",
+        "scanNotConfigured": "신분증 자동 입력을 사용할 수 없습니다. 스캐너 API 키를 설정하거나 직접 입력하세요.",
+        "idImageReady": "신분증 이미지가 준비되었습니다 (WEBP).",
+        "rescanNoImage": "다시 스캔할 신분증 이미지가 없습니다."
       },
       "brokers": {
         "pageTitle": "중개 업체",

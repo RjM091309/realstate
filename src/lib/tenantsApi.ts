@@ -64,6 +64,32 @@ export type TenantWriteBody = {
   blacklistReason?: string;
 };
 
+export type TenantIdScanFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  birthDate: string;
+  idType: string;
+  idNumber: string;
+  idExpiry: string;
+};
+
+export type TenantIdScanResponse = {
+  ok: boolean;
+  raw: {
+    fullName: string;
+    email: string;
+    phone: string;
+    nationality: string;
+    birthDate: string;
+    idType: string;
+    idNumber: string;
+    idExpiry: string;
+  };
+  data: TenantIdScanFormData;
+};
+
 export async function fetchTenants(): Promise<Tenant[]> {
   const { tenants } = await apiFetch<{ tenants: Tenant[] }>('/api/tenants');
   return tenants;
@@ -99,6 +125,30 @@ export async function updateTenant(id: string, body: TenantWriteBody): Promise<T
 
 export async function deleteTenant(id: string): Promise<void> {
   await apiFetch<{ ok: boolean }>(`/api/tenants/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function scanTenantIdPhoto(file: File): Promise<TenantIdScanResponse> {
+  const form = new FormData();
+  form.append('file', file);
+
+  const res = await fetch('/api/tenants/scan-id', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await tryParseJson(res);
+    const msg = readApiErrorMessage(err, res.statusText || `HTTP ${res.status}`);
+    const error = new Error(msg || `HTTP ${res.status}`) as Error & { code?: string; status?: number };
+    if (err && typeof err === 'object' && 'code' in err && typeof (err as { code?: unknown }).code === 'string') {
+      error.code = (err as { code: string }).code;
+    }
+    error.status = res.status;
+    throw error;
+  }
+
+  return (await res.json()) as TenantIdScanResponse;
 }
 
 export async function uploadTenantKycDocument(tenantId: string, file: File): Promise<Tenant> {

@@ -1081,7 +1081,22 @@
         "deleted": "Tenant removed.",
         "deleteConfirm": "Remove {{name}} from the directory?",
         "validationRequired": "Please fill in name, email, phone, ID type, and ID number.",
-        "loadError": "Could not load tenants from the server. Showing sample data."
+        "loadError": "Could not load tenants from the server. Showing sample data.",
+        "idPhotoLabel": "Tenant ID photo (WEBP)",
+        "idPhotoHint": "Upload an ID image to auto-fill fields. Saved as WEBP on submit.",
+        "noIdPhoto": "No file selected",
+        "choosePhoto": "Choose photo",
+        "replacePhoto": "Replace",
+        "rescanPhoto": "Re-scan",
+        "removePhoto": "Remove",
+        "processing": "Processing",
+        "scanning": "Scanning ID…",
+        "scanningHint": "Gemini is reading the ID image. Form fields are temporarily locked.",
+        "scanSuccess": "ID details auto-filled from the uploaded image.",
+        "scanFailed": "Could not scan the ID image. You can still enter details manually.",
+        "scanNotConfigured": "ID auto-fill is not available. Please set up the scanner API key, or enter the details manually.",
+        "idImageReady": "ID image ready (WEBP).",
+        "rescanNoImage": "No ID image available to re-scan."
       },
       "brokers": {
         "pageTitle": "Broker Agencies",

@@ -43,6 +43,7 @@ import {
   deleteTenant,
   fetchTenants,
   fetchTenantLeaseContract,
+  scanTenantIdPhoto,
   uploadTenantKycDocument,
   uploadTenantLeaseContract,
   updateTenant,
@@ -290,6 +291,7 @@ export function CRMView() {
 
   const idUploadRef = useRef<HTMLInputElement | null>(null);
   const [idUploading, setIdUploading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [pendingIdImage, setPendingIdImage] = useState<File | null>(null);
   const [pendingIdImageName, setPendingIdImageName] = useState<string>('');
   const [pendingIdPreviewUrl, setPendingIdPreviewUrl] = useState<string>('');
@@ -464,6 +466,7 @@ export function CRMView() {
     setPendingIdImage(null);
     setPendingIdImageName('');
     setPendingIdPreviewUrl('');
+    setIsScanning(false);
     setPendingLeaseFile(null);
     setPendingLeaseName('');
     setPendingLeasePreviewUrl('');
@@ -574,24 +577,128 @@ export function CRMView() {
   };
 
   const handlePickIdUpload = () => {
-    if (!canUpdate || idUploading) return;
+    if (!(canCreate || canUpdate) || idUploading || isScanning) return;
     idUploadRef.current?.click();
+  };
+
+  const handleDropIdImage: React.DragEventHandler<HTMLButtonElement> = async (e) => {
+    e.preventDefault();
+    if (!(canCreate || canUpdate) || idUploading || isScanning) return;
+    const picked = e.dataTransfer.files?.[0];
+    if (!picked) return;
+    await processPickedIdImage(picked);
+  };
+
+  const applyScanToForm = useCallback(
+    (data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      nationality?: string;
+      birthDate?: string;
+      idType?: string;
+      idNumber?: string;
+      idExpiry?: string;
+    }) => {
+      setForm((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        email: data.email || prev.email,
+        phone: data.phone || prev.phone,
+        nationality: data.nationality || prev.nationality,
+        birthDate: data.birthDate || prev.birthDate,
+        idType: data.idType || prev.idType,
+        idNumber: data.idNumber || prev.idNumber,
+        idExpiry: data.idExpiry || prev.idExpiry,
+      }));
+    },
+    [],
+  );
+
+  const scanErrorMessage = useCallback(
+    (err: unknown) => {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'SCANNER_NOT_CONFIGURED') {
+        return t('views.crm.tenantModal.scanNotConfigured');
+      }
+      if (err instanceof Error && err.message.trim()) return err.message;
+      return t('views.crm.tenantModal.scanFailed');
+    },
+    [t],
+  );
+
+  const processPickedIdImage = async (picked: File) => {
+    if (!picked) return;
+
+    setIsScanning(true);
+    setPendingIdImageName(picked.name);
+
+    try {
+      let scanError: string | null = null;
+      const [scanResult, webp] = await Promise.all([
+        scanTenantIdPhoto(picked).catch((err) => {
+          scanError = scanErrorMessage(err);
+          return null;
+        }),
+        toWebpIfNeeded(picked),
+      ]);
+
+      setPendingIdImage(webp);
+      setPendingIdImageName(webp.name);
+
+      if (scanResult?.data) {
+        applyScanToForm(scanResult.data);
+        toast.success(t('views.crm.tenantModal.scanSuccess'));
+      } else if (scanError) {
+        toast.warning(scanError);
+      } else {
+        toast.success(t('views.crm.tenantModal.idImageReady'));
+      }
+    } catch (err) {
+      toast.error(scanErrorMessage(err));
+      setPendingIdImage(null);
+      setPendingIdImageName('');
+      setPendingIdPreviewUrl('');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleRescanId = async () => {
+    if (!(canCreate || canUpdate) || idUploading || isScanning) return;
+
+    setIsScanning(true);
+    try {
+      let file: File | null = pendingIdImage;
+      if (!file && existingTenantIdImageUrl) {
+        const res = await fetch(resolveUploadUrl(existingTenantIdImageUrl));
+        if (!res.ok) throw new Error(t('views.crm.tenantModal.scanFailed'));
+        const blob = await res.blob();
+        const name = pendingIdImageName || existingTenantIdImageUrl.split('/').pop() || 'id.webp';
+        file = new File([blob], name, { type: blob.type || 'image/webp' });
+      }
+      if (!file) {
+        toast.warning(t('views.crm.tenantModal.rescanNoImage'));
+        return;
+      }
+
+      const scanResult = await scanTenantIdPhoto(file);
+      if (scanResult?.data) {
+        applyScanToForm(scanResult.data);
+        toast.success(t('views.crm.tenantModal.scanSuccess'));
+      } else {
+        toast.warning(t('views.crm.tenantModal.scanFailed'));
+      }
+    } catch (err) {
+      toast.warning(scanErrorMessage(err));
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handlePickIdImage: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const picked = e.target.files?.[0];
     e.target.value = '';
-    if (!picked) return;
-    try {
-      const webp = await toWebpIfNeeded(picked);
-      setPendingIdImage(webp);
-      setPendingIdImageName(webp.name);
-      toast.success('ID image ready (WEBP).');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Invalid image');
-      setPendingIdImage(null);
-      setPendingIdImageName('');
-    }
+    if (picked) await processPickedIdImage(picked);
   };
 
   const handleDeleteTenant = useCallback(
@@ -852,13 +959,13 @@ export function CRMView() {
             kind: 'pdf',
             onPreview: tenantLeaseContext.contract
               ? () => {
-                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
+                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract?.id}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }
               : undefined,
             onDownload: tenantLeaseContext.contract
               ? () => {
-                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract.id}`;
+                  const url = `${window.location.origin}/preview?type=contract&id=${tenantLeaseContext.contract?.id}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }
               : undefined,
@@ -870,10 +977,10 @@ export function CRMView() {
             sizeLabel: 'â€”',
             kind: 'image',
             onPreview: selectedTenant?.idImageUrl
-              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank', 'noopener,noreferrer')
+              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl ?? ''), '_blank', 'noopener,noreferrer')
               : undefined,
             onDownload: selectedTenant?.idImageUrl
-              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl), '_blank', 'noopener,noreferrer')
+              ? () => window.open(resolveUploadUrl(selectedTenant.idImageUrl ?? ''), '_blank', 'noopener,noreferrer')
               : undefined,
           },
         ]}
@@ -947,6 +1054,117 @@ export function CRMView() {
         }
       >
         <div className="tenant-form-modal unit-form-fields max-h-[min(68vh,36rem)] space-y-3 overflow-y-auto pr-1">
+          {(canCreate || canUpdate) ? (
+            <TenantFormSection title={t('views.crm.tenantModal.idPhotoLabel')} icon={Upload}>
+              <input
+                ref={idUploadRef}
+                type="file"
+                accept="image/webp,image/*"
+                className="hidden"
+                onChange={handlePickIdImage}
+                disabled={isScanning || idUploading}
+              />
+              {!pendingIdPreviewUrl && !existingTenantIdImageUrl ? (
+                <button
+                  type="button"
+                  onClick={handlePickIdUpload}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDropIdImage}
+                  disabled={idUploading || isScanning}
+                  className={cn(
+                    'relative flex min-h-28 w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-indigo-300/80 bg-gradient-to-br from-indigo-50/70 via-white to-violet-50/80 px-4 py-5 text-center shadow-sm transition-all',
+                    'hover:border-indigo-400 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-500/15',
+                    'dark:border-indigo-500/40 dark:from-indigo-950/25 dark:via-slate-950 dark:to-violet-950/25',
+                    (isScanning || idUploading) && 'cursor-wait',
+                  )}
+                >
+                  <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-100 dark:bg-slate-900 dark:text-indigo-300 dark:ring-indigo-500/30">
+                    {isScanning ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Upload className="h-5 w-5" aria-hidden />}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {isScanning ? t('views.crm.tenantModal.scanning') : t('views.crm.tenantModal.choosePhoto')}
+                  </span>
+                  <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {t('views.crm.tenantModal.idPhotoHint')}
+                  </span>
+                </button>
+              ) : (
+                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
+                  {isScanning ? (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-950/70">
+                      <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-300" aria-hidden />
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="shrink-0"
+                      onClick={() =>
+                        window.open(pendingIdPreviewUrl || resolveUploadUrl(existingTenantIdImageUrl), '_blank')
+                      }
+                      title="Open full image"
+                    >
+                      <img
+                        src={pendingIdPreviewUrl || resolveUploadUrl(existingTenantIdImageUrl)}
+                        alt="Selected tenant ID"
+                        className="h-16 w-28 rounded-lg border border-slate-200 bg-slate-50 object-cover dark:border-slate-700"
+                        loading="lazy"
+                      />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      {isScanning ? (
+                        <div className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          {t('views.crm.tenantModal.scanning')}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500">{t('views.crm.tenantModal.idPhotoHint')}</div>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => void handleRescanId()}
+                        disabled={idUploading || isScanning}
+                      >
+                        {isScanning ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : null}
+                        {t('views.crm.tenantModal.rescanPhoto')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 px-2 text-xs"
+                        onClick={handlePickIdUpload}
+                        disabled={idUploading || isScanning}
+                      >
+                        {t('views.crm.tenantModal.replacePhoto')}
+                      </Button>
+                      {pendingIdImage ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => {
+                            setPendingIdImage(null);
+                            setPendingIdImageName('');
+                            setPendingIdPreviewUrl('');
+                          }}
+                          disabled={idUploading || isScanning}
+                        >
+                          {t('views.crm.tenantModal.removePhoto')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TenantFormSection>
+          ) : null}
+
           <TenantFormSection title="Basic Information" icon={Users}>
             <div className="grid gap-2 sm:grid-cols-2">
               <TenantFormField label={t('views.crm.tenantModal.name')} span={2}>
@@ -1073,58 +1291,7 @@ export function CRMView() {
 
           {canUpdate ? (
             <TenantFormSection title="Documents" icon={Upload}>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <TenantFormField label="Tenant ID photo (WEBP)">
-                  <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-950/80">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {pendingIdImageName || 'No file selected'}
-                        </div>
-                        <div className="text-xs text-slate-500">Auto-converts to WEBP.</div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <input
-                          ref={idUploadRef}
-                          type="file"
-                          accept="image/webp,image/*"
-                          className="hidden"
-                          onChange={handlePickIdImage}
-                        />
-                        <Button type="button" variant="outline" className="h-8 px-2 text-xs" onClick={handlePickIdUpload} disabled={idUploading}>
-                          {idUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
-                          Photo
-                        </Button>
-                        {pendingIdImage ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8 px-2 text-xs"
-                            onClick={() => {
-                              setPendingIdImage(null);
-                              setPendingIdImageName('');
-                              setPendingIdPreviewUrl('');
-                            }}
-                            disabled={idUploading}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    {pendingIdPreviewUrl ? (
-                      <button type="button" className="mt-2 w-full" onClick={() => window.open(pendingIdPreviewUrl, '_blank')} title="Open full image">
-                        <img src={pendingIdPreviewUrl} alt="Selected tenant ID" className="max-h-36 w-full rounded-lg bg-slate-50 object-contain" loading="lazy" />
-                      </button>
-                    ) : existingTenantIdImageUrl ? (
-                      <button type="button" className="mt-2 w-full" onClick={() => window.open(resolveUploadUrl(existingTenantIdImageUrl), '_blank')} title="Open full image">
-                        <img src={resolveUploadUrl(existingTenantIdImageUrl)} alt="Tenant ID" className="max-h-36 w-full rounded-lg bg-slate-50 object-contain" loading="lazy" />
-                      </button>
-                    ) : null}
-                  </div>
-                </TenantFormField>
-
-                <TenantFormField label="Lease contract (PDF/Image)">
+              <TenantFormField label="Lease contract (PDF/Image)">
                   <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-950/80">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -1182,7 +1349,6 @@ export function CRMView() {
                     ) : null}
                   </div>
                 </TenantFormField>
-              </div>
             </TenantFormSection>
           ) : null}
         </div>

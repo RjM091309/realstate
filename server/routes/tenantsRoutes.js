@@ -7,6 +7,7 @@ import {
   getTenantLeaseContract,
   listTenantPortalDocuments,
   listTenants,
+  scanTenantId,
   streamTenantPortalArtifact,
   updateTenant,
   uploadTenantLeaseContract,
@@ -35,6 +36,11 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
+const scanUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
 const repoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -57,6 +63,7 @@ const repoUpload = multer({
 const router = Router();
 router.use(requireAuth);
 router.get('/', listTenants);
+router.post('/scan-id', scanUpload.single('file'), scanTenantId);
 router.get('/:id/portal-documents', listTenantPortalDocuments);
 router.get('/:id/portal-artifacts/:slug', streamTenantPortalArtifact);
 router.get('/:id/lease-contract', getTenantLeaseContract);

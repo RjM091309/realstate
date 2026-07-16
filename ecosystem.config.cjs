@@ -22,7 +22,6 @@ for (const key of [
   'API_PORT',
   'JWT_SECRET',
   'ALLOW_BYPASS_AUTH',
-  'GEMINI_API_KEY',
 ]) {
   if (process.env[key] !== undefined) envFromDotenv[key] = process.env[key];
 }

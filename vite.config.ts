@@ -31,9 +31,6 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       include: ['socket.io-client', 'engine.io-client'],
     },
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(configDir, './src'),

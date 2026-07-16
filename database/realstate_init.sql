@@ -17,6 +17,7 @@ SET NAMES utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `audit_log`;
+DROP TABLE IF EXISTS `kyc_scanner_api`;
 DROP TABLE IF EXISTS `calendar_event`;
 DROP TABLE IF EXISTS `inventory_snapshot_item`;
 DROP TABLE IF EXISTS `inventory_snapshot`;
@@ -423,7 +424,7 @@ CREATE TABLE `tenant_document` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `branch_id` INT UNSIGNED NOT NULL,
   `tenant_id` BIGINT UNSIGNED NOT NULL,
-  `document_type` ENUM('passport','national_id','visa','contract_attachment','other') NOT NULL DEFAULT 'other',
+  `document_type` ENUM('passport','national_id','visa','drivers_license','contract_attachment','other') NOT NULL DEFAULT 'other',
   `document_no` VARCHAR(120) NULL DEFAULT NULL,
   `expiry_date` DATE NULL DEFAULT NULL,
   `file_path` VARCHAR(255) NOT NULL,
@@ -628,6 +629,23 @@ CREATE TABLE `calendar_event` (
   CONSTRAINT `fk_calendar_payment_schedule` FOREIGN KEY (`payment_schedule_id`) REFERENCES `payment_schedule` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Calendar feed for operations and payment statuses';
+
+-- ---------------------------------------------------------------------------
+-- kyc_scanner_api (Gemini / OCR credentials for tenant ID scan)
+-- Update api_key here when rotating keys — no .env change required after seed.
+-- ---------------------------------------------------------------------------
+CREATE TABLE `kyc_scanner_api` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `api_key` VARCHAR(512) NOT NULL,
+  `model` VARCHAR(128) NOT NULL DEFAULT 'gemini-3.5-flash',
+  `provider` VARCHAR(64) NOT NULL DEFAULT 'gemini',
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_kyc_scanner_api_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+COMMENT='Active API key for tenant ID OCR (Gemini). Change api_key in DB to rotate.';
 
 -- ---------------------------------------------------------------------------
 -- audit_log (manual overrides + sensitive action trace)

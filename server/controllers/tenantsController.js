@@ -21,6 +21,7 @@ import { isValidPortalArtifactSlug, streamPortalArtifactPdf } from '../services/
 import { finalizeRepositoryUploadToWebpOrPdf } from '../services/repositoryUploadService.js';
 import { insertRepositoryDocument } from '../models/documentsModel.js';
 import { logAudit } from '../services/auditLogService.js';
+import { scanTenantIdImage } from '../services/scanIdService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_ROOT = path.normalize(path.join(__dirname, '..', 'uploads'));
@@ -508,6 +509,32 @@ export async function deleteTenant(req, res) {
       return;
     }
     res.status(500).json({ error: 'Failed to delete tenant' });
+  }
+}
+
+export async function scanTenantId(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canCrud(ctx.session, 'create') && !canCrud(ctx.session, 'update')) {
+    res.status(403).json({ error: 'No permission to scan tenant ID documents' });
+    return;
+  }
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  try {
+    const result = await scanTenantIdImage(file);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
+    const msg = e instanceof Error ? e.message : 'Failed to scan ID image';
+    const errorCode = typeof e?.code === 'string' ? e.code : undefined;
+    if (code >= 500) console.error(e);
+    res.status(code).json({ error: msg, ...(errorCode ? { code: errorCode } : {}) });
   }
 }
 
