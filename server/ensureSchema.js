@@ -1633,7 +1633,7 @@ export async function ensureSchema() {
 
 /**
  * Stores Gemini (or other) API credentials for tenant ID OCR.
- * Create-if-not-exists. Insert/update api_key in this table to rotate keys.
+ * Create-if-not-exists; seeds an empty active row when missing so api_key can be set in DB.
  */
 async function ensureKycScannerApiTable() {
   await pool.query(`
@@ -1649,4 +1649,26 @@ async function ensureKycScannerApiTable() {
       KEY \`idx_kyc_scanner_api_active\` (\`active\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  const DEFAULT_MODEL = 'gemini-3.5-flash';
+
+  const [rows] = await pool.query(
+    `
+    SELECT id
+    FROM \`kyc_scanner_api\`
+    WHERE \`active\` = 1
+    ORDER BY \`id\` ASC
+    LIMIT 1
+    `,
+  );
+
+  if (!rows.length) {
+    await pool.query(
+      `
+      INSERT INTO \`kyc_scanner_api\` (\`id\`, \`api_key\`, \`model\`, \`provider\`, \`active\`)
+      VALUES (1, '', ?, 'gemini', 1)
+      `,
+      [DEFAULT_MODEL],
+    );
+  }
 }

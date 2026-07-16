@@ -647,6 +647,9 @@ CREATE TABLE `kyc_scanner_api` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 COMMENT='Active API key for tenant ID OCR (Gemini). Change api_key in DB to rotate.';
 
+INSERT IGNORE INTO `kyc_scanner_api` (`id`, `api_key`, `model`, `provider`, `active`) VALUES
+  (1, '', 'gemini-3.5-flash', 'gemini', 1);
+
 -- ---------------------------------------------------------------------------
 -- audit_log (manual overrides + sensitive action trace)
 -- ---------------------------------------------------------------------------
