@@ -1,23 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
-import {
-  AlertTriangle,
-  CalendarClock,
-  FileText,
-  Loader2,
-  ReceiptText,
-  StickyNote,
-  Wallet,
-  Wrench,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Modal } from '@/components/modal';
-import { Button, modalDismissButtonClass } from '@/components/ui/button';
-import { StatusBadge } from '@/components/status-badge';
+import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { contractStatusVariant } from '@/lib/statusBadge';
 import { fetchAuditLogs } from '@/lib/auditLogsApi';
 import { fetchContractInvoices } from '@/lib/invoicesApi';
 import { fetchPayments } from '@/lib/paymentsApi';
@@ -43,86 +32,36 @@ export type TenantHistoryModalProps = {
   tenant: Tenant | null;
   contracts: Contract[];
   units: Unit[];
+  onEditTenant?: () => void;
 };
 
-const HISTORY_TAB_TRIGGER =
-  'flex-none rounded-none border-0 bg-transparent px-0 pb-3 text-sm font-medium shadow-none text-slate-400 transition-colors hover:text-slate-600 data-active:bg-transparent data-active:text-slate-900 data-active:shadow-none dark:text-slate-500 dark:hover:text-slate-300 dark:data-active:text-slate-50';
+const TAB_TRIGGER =
+  'rounded-none border-0 bg-transparent px-0 pb-2 text-sm font-medium text-slate-400 shadow-none hover:text-slate-700 data-active:bg-transparent data-active:text-slate-900 data-active:shadow-none dark:text-slate-500 dark:hover:text-slate-300 dark:data-active:text-slate-50';
 
 function ledgerStatusClass(status: LedgerRow['status']): string {
-  if (status === 'Paid') return 'text-emerald-600 dark:text-emerald-400';
-  if (status === 'Overdue') return 'text-rose-600 dark:text-rose-400';
-  if (status === 'Partial') return 'text-amber-600 dark:text-amber-400';
-  return 'text-slate-500 dark:text-slate-400';
+  if (status === 'Paid') return 'text-emerald-600';
+  if (status === 'Overdue') return 'text-rose-600';
+  if (status === 'Partial') return 'text-amber-600';
+  return 'text-slate-500';
 }
 
-function ledgerStatusDotClass(status: LedgerRow['status']): string {
-  if (status === 'Paid') return 'bg-emerald-500';
-  if (status === 'Overdue') return 'bg-rose-500';
-  if (status === 'Partial') return 'bg-amber-500';
-  return 'bg-slate-400';
-}
-
-function reliabilityToneClass(tone: 'success' | 'warning' | 'danger' | 'neutral'): string {
-  if (tone === 'success') return 'text-emerald-700 dark:text-emerald-400';
-  if (tone === 'warning') return 'text-amber-700 dark:text-amber-400';
-  if (tone === 'danger') return 'text-rose-700 dark:text-rose-400';
-  return 'text-slate-600 dark:text-slate-400';
-}
-
-function reliabilityBarClass(tone: 'success' | 'warning' | 'danger' | 'neutral'): string {
-  if (tone === 'success') return 'bg-emerald-500';
-  if (tone === 'warning') return 'bg-amber-500';
-  if (tone === 'danger') return 'bg-rose-500';
-  return 'bg-slate-400';
-}
-
-const NOTE_CATEGORY_META: Record<
-  LogisticsNote['category'],
-  { icon: React.ComponentType<{ className?: string }>; iconWrap: string }
-> = {
-  incident: {
-    icon: AlertTriangle,
-    iconWrap: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400',
-  },
-  maintenance: {
-    icon: Wrench,
-    iconWrap: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-  },
-  lease: {
-    icon: FileText,
-    iconWrap: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400',
-  },
-  admin: {
-    icon: StickyNote,
-    iconWrap: 'bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-300',
-  },
-};
-
-function SectionHeading({
-  icon: Icon,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-      <Icon className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden />
-      {children}
-    </h3>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <span className="font-semibold text-slate-500 dark:text-slate-500">{label}: </span>
-      <span className="text-slate-700 dark:text-slate-300">{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{value ?? '—'}</dd>
     </div>
   );
 }
 
-export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }: TenantHistoryModalProps) {
+export function TenantHistoryModal({
+  isOpen,
+  onClose,
+  tenant,
+  contracts,
+  units,
+  onEditTenant,
+}: TenantHistoryModalProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<HistoryTab>('lease');
   const [loading, setLoading] = useState(false);
@@ -144,6 +83,10 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
   const currentUnit = useMemo(
     () => (currentLease ? units.find((u) => u.id === currentLease.unitId) : undefined),
     [currentLease, units],
+  );
+  const pastLeases = useMemo(
+    () => tenantContracts.filter((c) => !currentLease || c.id !== currentLease.id),
+    [tenantContracts, currentLease],
   );
 
   useEffect(() => {
@@ -235,6 +178,22 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
   }, [tenant, tenantContracts, specialRequests, inspection, profileLogs, t]);
 
   const registeredLabel = tenant?.createdAt ? formatHistoryDateTime(tenant.createdAt) : '—';
+  const kycVerified = tenant?.kycVerified !== false;
+  const unitLabel = currentUnit
+    ? `${currentUnit.unitNumber}${currentUnit.buildingName ? ` · ${currentUnit.buildingName}` : ''}`
+    : null;
+
+  const metaBits = [
+    tenant?.email,
+    tenant?.phone,
+    unitLabel,
+    tenant
+      ? kycVerified
+        ? t('views.crm.table.verified')
+        : t('views.crm.table.verificationPending')
+      : null,
+    tenant?.isBlacklisted ? t('views.crm.table.blacklisted') : t('views.crm.table.active'),
+  ].filter(Boolean);
 
   return (
     <Modal
@@ -246,285 +205,254 @@ export function TenantHistoryModal({ isOpen, onClose, tenant, contracts, units }
           ? t('views.crm.history.registeredAt', { dateTime: registeredLabel })
           : undefined
       }
-      maxWidth="3xl"
+      maxWidth="2xl"
       variant="glass"
       compact
       footer={
-        <div className="flex justify-end w-full">
-          <Button type="button" className={modalDismissButtonClass} onClick={onClose}>
-            {t('views.crm.blacklist.close')}
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={onClose}>
+            {t('views.crm.details.close')}
           </Button>
+          {onEditTenant ? (
+            <Button type="button" className={modalPrimaryButtonClass} onClick={onEditTenant}>
+              {t('views.crm.details.editTenant')}
+            </Button>
+          ) : null}
         </div>
       }
     >
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as HistoryTab)} className="tenant-history-modal gap-0">
-        <TabsList
-          variant="line"
-          className="mb-6 h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-0 bg-transparent p-0"
-        >
-          <TabsTrigger value="lease" className={HISTORY_TAB_TRIGGER}>
-            <CalendarClock className="mr-1.5 inline-block h-4 w-4 align-[-3px]" aria-hidden />
-            {t('views.crm.history.tabs.lease')}
-          </TabsTrigger>
-          <TabsTrigger value="financial" className={HISTORY_TAB_TRIGGER}>
-            <Wallet className="mr-1.5 inline-block h-4 w-4 align-[-3px]" aria-hidden />
-            {t('views.crm.history.tabs.financial')}
-          </TabsTrigger>
-          <TabsTrigger value="notes" className={HISTORY_TAB_TRIGGER}>
-            <StickyNote className="mr-1.5 inline-block h-4 w-4 align-[-3px]" aria-hidden />
-            {t('views.crm.history.tabs.notes')}
-          </TabsTrigger>
-        </TabsList>
+      {tenant ? (
+        <div className="tenant-history-modal max-h-[min(68vh,34rem)] space-y-6 overflow-y-auto pr-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400">{metaBits.join(' · ')}</p>
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-9 w-9 animate-spin text-indigo-600" aria-hidden />
-          </div>
-        ) : (
-          <>
-            <TabsContent value="lease" className="mt-0 max-h-[min(60vh,28rem)] space-y-8 overflow-y-auto pr-1">
-              <section>
-                <SectionHeading icon={FileText}>
-                  {t('views.crm.history.leaseDossier')}
-                </SectionHeading>
-                {currentLease ? (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-600 dark:bg-slate-950/80">
-                    <div className="flex flex-wrap items-start justify-between gap-2 pb-3">
-                      <div className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">
-                        <span className="font-mono text-xs uppercase tracking-wide">
-                          {currentLease.contractNo ?? currentLease.id}
-                        </span>
-                        {currentUnit ? (
-                          <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
-                            {currentUnit.unitNumber}
-                            {currentUnit.buildingName ? ` · ${currentUnit.buildingName}` : ''}
-                          </span>
-                        ) : null}
-                      </div>
-                      <StatusBadge
-                        tone={
-                          currentLease.status === 'Active'
-                            ? 'success'
-                            : contractStatusVariant(currentLease.status)
-                        }
-                      >
-                        {currentLease.status}
-                      </StatusBadge>
-                    </div>
-                    <div className="grid gap-2.5 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-2">
-                      <DetailRow
-                        label={t('views.crm.history.monthlyRent')}
-                        value={formatHistoryPhp(currentLease.monthlyRent)}
-                      />
-                      <DetailRow
-                        label={t('views.crm.history.leasePeriod')}
-                        value={formatBillingPeriod(currentLease.startDate, currentLease.endDate)}
-                      />
-                      <DetailRow
-                        label={t('views.crm.history.unitNumber')}
-                        value={currentUnit?.unitNumber ?? '—'}
-                      />
-                      <DetailRow
-                        label={t('views.crm.history.building')}
-                        value={currentUnit?.buildingName ?? '—'}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    {t('views.crm.history.leasesEmpty')}
-                  </p>
-                )}
-              </section>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as HistoryTab)}
+            className="gap-0"
+          >
+            <TabsList
+              variant="line"
+              className="mb-5 h-auto w-full justify-start gap-6 rounded-none border-0 bg-transparent p-0"
+            >
+              <TabsTrigger value="lease" className={TAB_TRIGGER}>
+                {t('views.crm.history.tabs.lease')}
+              </TabsTrigger>
+              <TabsTrigger value="financial" className={TAB_TRIGGER}>
+                {t('views.crm.history.tabs.financial')}
+              </TabsTrigger>
+              <TabsTrigger value="notes" className={TAB_TRIGGER}>
+                {t('views.crm.history.tabs.notes')}
+              </TabsTrigger>
+            </TabsList>
 
-              <section>
-                <SectionHeading icon={CalendarClock}>
-                  {t('views.crm.history.timeline')}
-                </SectionHeading>
-                {timelineEvents.length === 0 ? (
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    {t('views.crm.history.activityEmpty')}
-                  </p>
-                ) : (
-                  <ol className="relative ml-1 space-y-6 border-none pl-6">
-                    <span
-                      className="pointer-events-none absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200 dark:bg-slate-700"
-                      aria-hidden
-                    />
-                    {timelineEvents.map((event, index) => (
-                      <li key={event.id} className="relative text-sm">
-                        <span
-                          className={cn(
-                            'absolute -left-6 top-1 h-3 w-3 rounded-full ring-4 ring-white dark:ring-slate-900',
-                            event.pinned
-                              ? 'bg-emerald-500'
-                              : index === 0
-                                ? 'bg-indigo-500'
-                                : 'bg-slate-300 dark:bg-slate-600',
-                          )}
-                          aria-hidden
-                        />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{event.title}</p>
-                          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                            {formatHistoryDateTime(event.at)}
-                          </span>
-                        </div>
-                        {event.detail ? (
-                          <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                            {event.detail}
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-hidden />
+              </div>
+            ) : (
+              <>
+                <TabsContent value="lease" className="mt-0 space-y-8">
+                  <section className="space-y-4">
+                    <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {t('views.crm.history.leaseDossier')}
+                    </h3>
+                    {currentLease ? (
+                      <>
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {currentLease.contractNo ?? currentLease.id}
+                            {unitLabel ? (
+                              <span className="font-normal text-slate-500"> · {unitLabel}</span>
+                            ) : null}
                           </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
-            </TabsContent>
-
-            <TabsContent value="financial" className="mt-0 max-h-[min(60vh,28rem)] space-y-8 overflow-y-auto pr-1">
-              <section className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    {t('views.crm.history.financial.onTimeLabel')}
-                  </p>
-                  <p
-                    className={cn(
-                      'mt-1 text-2xl font-semibold tabular-nums',
-                      reliabilityToneClass(financialSummary.reliabilityTone),
+                          <p className="text-xs text-slate-500">{currentLease.status}</p>
+                        </div>
+                        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                          <Field
+                            label={t('views.crm.history.monthlyRent')}
+                            value={formatHistoryPhp(currentLease.monthlyRent)}
+                          />
+                          <Field
+                            label={t('views.crm.history.leasePeriod')}
+                            value={formatBillingPeriod(currentLease.startDate, currentLease.endDate)}
+                          />
+                          <Field
+                            label={t('views.crm.history.securityDeposit')}
+                            value={formatHistoryPhp(currentLease.securityDeposit)}
+                          />
+                          <Field
+                            label={t('views.crm.history.advanceRent')}
+                            value={formatHistoryPhp(currentLease.advanceRent)}
+                          />
+                          {currentLease.agentName ? (
+                            <Field label={t('views.crm.history.agent')} value={currentLease.agentName} />
+                          ) : null}
+                          {currentLease.remarks ? (
+                            <Field label={t('views.crm.history.remarks')} value={currentLease.remarks} />
+                          ) : null}
+                        </dl>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-500">{t('views.crm.history.leasesEmpty')}</p>
                     )}
-                  >
-                    {financialSummary.onTimePercent != null ? `${financialSummary.onTimePercent}%` : '—'}
-                  </p>
-                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-700/60">
-                    <div
-                      className={cn('h-full rounded-full transition-all', reliabilityBarClass(financialSummary.reliabilityTone))}
-                      style={{ width: `${financialSummary.onTimePercent ?? 0}%` }}
-                    />
-                  </div>
-                  <p className={cn('mt-2 text-xs font-medium', reliabilityToneClass(financialSummary.reliabilityTone))}>
-                    {financialSummary.reliabilityLabel}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-950/80">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    {t('views.crm.history.financial.outstandingLabel')}
-                  </p>
-                  <p
-                    className={cn(
-                      'mt-1 text-2xl font-semibold tabular-nums',
-                      financialSummary.outstandingBalance > 0
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : 'text-emerald-600 dark:text-emerald-400',
-                    )}
-                  >
-                    {formatHistoryPhp(financialSummary.outstandingBalance)}
-                  </p>
-                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                    {financialSummary.outstandingBalance > 0
-                      ? t('views.crm.history.financial.outstandingHint')
-                      : t('views.crm.history.financial.settledHint')}
-                  </p>
-                </div>
-              </section>
+                  </section>
 
-              <section>
-                <SectionHeading icon={ReceiptText}>
-                  {t('views.crm.history.financial.invoiceNo')}
-                </SectionHeading>
-                {ledgerRows.length === 0 ? (
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    {t('views.crm.history.financial.empty')}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {ledgerRows.map((row) => (
-                      <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-3.5 text-sm dark:border-slate-600 dark:bg-slate-950/80">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <span className="font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{row.invoiceNo}</span>
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1.5 text-xs font-medium',
-                              ledgerStatusClass(row.status),
-                            )}
+                  {pastLeases.length > 0 ? (
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                        {t('views.crm.history.leases')}
+                      </h3>
+                      <ul className="space-y-3">
+                        {pastLeases.map((lease) => {
+                          const unit = units.find((u) => u.id === lease.unitId);
+                          return (
+                            <li
+                              key={lease.id}
+                              className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                            >
+                              <div>
+                                <p className="text-slate-900 dark:text-slate-100">
+                                  {lease.contractNo ?? lease.id}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {unit
+                                    ? `${unit.unitNumber}${unit.buildingName ? ` · ${unit.buildingName}` : ''}`
+                                    : '—'}
+                                  {' · '}
+                                  {formatBillingPeriod(lease.startDate, lease.endDate)}
+                                </p>
+                              </div>
+                              <p className="text-xs text-slate-500">
+                                {formatHistoryPhp(lease.monthlyRent)} · {lease.status}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  <section className="space-y-3">
+                    <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {t('views.crm.history.timeline')}
+                    </h3>
+                    {timelineEvents.length === 0 ? (
+                      <p className="text-sm text-slate-500">{t('views.crm.history.activityEmpty')}</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {timelineEvents.map((event) => (
+                          <li
+                            key={event.id}
+                            className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-sm"
                           >
-                            <span className={cn('h-1.5 w-1.5 rounded-full', ledgerStatusDotClass(row.status))} aria-hidden />
-                            {t(`views.crm.history.financial.statuses.${row.status}`)}
-                          </span>
-                        </div>
-                        <div className="mt-2 grid gap-1.5 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
-                          <DetailRow
-                            label={t('views.crm.history.financial.billingPeriod')}
-                            value={row.billingPeriod}
-                          />
-                          <DetailRow
-                            label={t('views.crm.history.financial.amount')}
-                            value={formatHistoryPhp(row.amount)}
-                          />
-                          <DetailRow
-                            label={t('views.crm.history.financial.paymentDate')}
-                            value={
-                              row.paymentDate
-                                ? format(new Date(`${row.paymentDate}T12:00:00`), 'MMM dd, yyyy')
-                                : '—'
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </TabsContent>
+                            <div className="min-w-0">
+                              <p className="text-slate-900 dark:text-slate-100">{event.title}</p>
+                              {event.detail ? (
+                                <p className="mt-0.5 text-xs text-slate-500">{event.detail}</p>
+                              ) : null}
+                            </div>
+                            <p className="shrink-0 text-xs text-slate-400">
+                              {formatHistoryDateTime(event.at)}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </TabsContent>
 
-            <TabsContent value="notes" className="mt-0 max-h-[min(60vh,28rem)] overflow-y-auto pr-1">
-              {logisticsNotes.length === 0 ? (
-                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                  {t('views.crm.history.notes.empty')}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {logisticsNotes.map((note) => {
-                    const meta = NOTE_CATEGORY_META[note.category] ?? NOTE_CATEGORY_META.admin;
-                    const CategoryIcon = meta.icon;
-                    return (
-                      <div key={note.id} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3.5 text-sm dark:border-slate-600 dark:bg-slate-950/80">
-                        <span
-                          className={cn(
-                            'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                            meta.iconWrap,
-                          )}
-                          aria-hidden
-                        >
-                          <CategoryIcon className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <p className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">{note.title}</p>
-                            {note.status ? (
-                              <span className="shrink-0 text-xs capitalize text-slate-400">{note.status.replace(/_/g, ' ')}</span>
+                <TabsContent value="financial" className="mt-0 space-y-8">
+                  <dl className="grid gap-6 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs text-slate-400">
+                        {t('views.crm.history.financial.onTimeLabel')}
+                      </dt>
+                      <dd className="mt-1 text-xl font-medium tabular-nums text-slate-900 dark:text-slate-100">
+                        {financialSummary.onTimePercent != null
+                          ? `${financialSummary.onTimePercent}%`
+                          : '—'}
+                      </dd>
+                      <p className="mt-1 text-xs text-slate-500">{financialSummary.reliabilityLabel}</p>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-400">
+                        {t('views.crm.history.financial.outstandingLabel')}
+                      </dt>
+                      <dd
+                        className={cn(
+                          'mt-1 text-xl font-medium tabular-nums',
+                          financialSummary.outstandingBalance > 0
+                            ? 'text-rose-600'
+                            : 'text-slate-900 dark:text-slate-100',
+                        )}
+                      >
+                        {formatHistoryPhp(financialSummary.outstandingBalance)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <section className="space-y-3">
+                    <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {t('views.crm.history.financial.invoiceNo')}
+                    </h3>
+                    {ledgerRows.length === 0 ? (
+                      <p className="text-sm text-slate-500">{t('views.crm.history.financial.empty')}</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {ledgerRows.map((row) => (
+                          <li key={row.id} className="text-sm">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <p className="text-slate-900 dark:text-slate-100">{row.invoiceNo}</p>
+                              <p className={cn('text-xs', ledgerStatusClass(row.status))}>
+                                {t(`views.crm.history.financial.statuses.${row.status}`)}
+                              </p>
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {row.billingPeriod}
+                              {' · '}
+                              {formatHistoryPhp(row.amount)}
+                              {row.paymentDate
+                                ? ` · ${format(new Date(`${row.paymentDate}T12:00:00`), 'MMM dd, yyyy')}`
+                                : ''}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </TabsContent>
+
+                <TabsContent value="notes" className="mt-0 space-y-3">
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    {t('views.crm.history.tabs.notes')}
+                  </h3>
+                  {logisticsNotes.length === 0 ? (
+                    <p className="text-sm text-slate-500">{t('views.crm.history.notes.empty')}</p>
+                  ) : (
+                    <ul className="space-y-4">
+                      {logisticsNotes.map((note) => (
+                        <li key={note.id} className="text-sm">
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <p className="text-slate-900 dark:text-slate-100">{note.title}</p>
+                            {note.at ? (
+                              <p className="text-xs text-slate-400">{formatHistoryDateTime(note.at)}</p>
                             ) : null}
                           </div>
                           {note.body ? (
-                            <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-500">
                               {note.body}
                             </p>
                           ) : null}
-                          {note.at ? (
-                            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-                              {formatHistoryDateTime(note.at)}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
+        </div>
+      ) : null}
     </Modal>
   );
 }

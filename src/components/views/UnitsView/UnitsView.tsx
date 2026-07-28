@@ -28,7 +28,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button, modalActionButtonClass, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
+import { Button, modalActionButtonClass, modalDismissButtonClass, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -358,18 +358,14 @@ function parseMetricInput(raw: string): number | null {
   return n;
 }
 
-async function notifyUnitSaveSuccess(
-  title: string,
-  detail: string,
-  confirmLabel: string,
-) {
+async function notifyUnitSaveSuccess(title: string, detail: string) {
   await Swal.fire({
     icon: 'success',
     title,
     text: detail,
-    confirmButtonText: confirmLabel,
-    confirmButtonColor: '#4f46e5',
-    buttonsStyling: true,
+    timer: 2000,
+    timerProgressBar: true,
+    showConfirmButton: false,
   });
 }
 
@@ -1018,7 +1014,6 @@ export function UnitsView() {
           await notifyUnitSaveSuccess(
             t('views.units.updated'),
             t('views.units.saveSuccessEditDetail'),
-            t('common.close'),
           );
           setIsDetailsOpen(true);
           setIsManageInventoryOpen(false);
@@ -1030,7 +1025,6 @@ export function UnitsView() {
           await notifyUnitSaveSuccess(
             t('views.units.addModal.saved'),
             t('views.units.saveSuccessAddDetail'),
-            t('common.close'),
           );
         }
       } catch (e) {
@@ -1053,7 +1047,6 @@ export function UnitsView() {
         await notifyUnitSaveSuccess(
           t('views.units.updated'),
           t('views.units.saveSuccessEditDetail'),
-          t('common.close'),
         );
         setIsDetailsOpen(true);
         setIsManageInventoryOpen(false);
@@ -1064,7 +1057,6 @@ export function UnitsView() {
         await notifyUnitSaveSuccess(
           t('views.units.addModal.saved'),
           t('views.units.saveSuccessAddDetail'),
-          t('common.close'),
         );
       }
     } catch (e) {
@@ -2283,11 +2275,11 @@ export function UnitsView() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 rounded-xl"
+                  className={modalOutlineButtonClass}
                   onClick={openAddUnitPhotoPicker}
                 >
                   {t('views.units.addModal.photoUpload')}
@@ -2296,7 +2288,7 @@ export function UnitsView() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"
+                    className="h-10 min-w-[7.5rem] px-4 rounded-xl border border-rose-200 bg-white font-medium text-rose-600 shadow-none hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
                     onClick={() => setAddUnitPhotoPreview('')}
                   >
                     {t('views.units.table.delete')}

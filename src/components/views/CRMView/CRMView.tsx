@@ -1001,6 +1001,15 @@ export function CRMView() {
         tenant={tenantHistoryTarget}
         contracts={contractList}
         units={unitList}
+        onEditTenant={
+          canUpdate && tenantHistoryTarget
+            ? () => {
+                const target = tenantHistoryTarget;
+                closeTenantHistory();
+                openEdit(target);
+              }
+            : undefined
+        }
       />
 
       <Modal

@@ -123,7 +123,7 @@ export function DataTable<T>({
   columns,
   keyExtractor,
   onRowClick,
-  highlightFirstColumn = true,
+  highlightFirstColumn = false,
   embedded = false,
   stickyHeader = false,
   tableClassName,

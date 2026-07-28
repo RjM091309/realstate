@@ -203,6 +203,28 @@
   border-bottom: 1px solid rgb(241 245 249) !important;
 }
 
+/* Calendar month grid lines (override borderless UI) */
+#root .calendar-month-grid {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+#root .calendar-month-grid .calendar-month-grid-cell,
+#root .calendar-month-grid [class*="border-slate-"] {
+  border-style: solid !important;
+  border-color: rgb(226 232 240) !important;
+}
+
+.dark #root .calendar-month-grid {
+  border-color: rgb(51 65 85) !important;
+}
+
+.dark #root .calendar-month-grid .calendar-month-grid-cell,
+.dark #root .calendar-month-grid [class*="border-slate-"] {
+  border-color: rgb(51 65 85) !important;
+}
+
 #root .data-table .data-table-footer {
   border-top: 1px solid rgb(226 232 240) !important;
 }
@@ -395,13 +417,6 @@
 
 #root .crm-form-modal-shell .app-modal-footer {
   border-top-width: 0 !important;
-}
-
-/* Tenant history: keep inner content borderless (surface-on-surface) */
-#root .tenant-history-modal [class*="border-slate-"],
-#root .tenant-history-modal [class*="divide-slate-"] {
-  border-color: transparent !important;
-  border-width: 0 !important;
 }
 
 #root .renew-lease-modal [data-slot="input"]:focus-visible,

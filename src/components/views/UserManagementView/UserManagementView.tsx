@@ -486,7 +486,6 @@ export function UserManagementView() {
         <CardContent className="p-0">
           <DataTable
             embedded
-            highlightFirstColumn
             data={filtered}
             columns={columns}
             keyExtractor={(u) => u.id}
