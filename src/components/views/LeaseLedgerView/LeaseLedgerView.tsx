@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FileText,
   Download,
@@ -9,9 +9,11 @@ import {
   Search,
   Plus,
   MoreVertical,
+  Trash2,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
+import { Button, modalOutlineButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/status-badge';
 import { paymentStatusVariant } from '@/lib/statusBadge';
@@ -32,17 +34,14 @@ import { cn } from '@/lib/utils';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
-import { createPayment, deletePayment, fetchPayments, updatePayment } from '@/lib/paymentsApi';
-import { addDays, endOfMonth, format, isAfter, isBefore, isWithinInterval, startOfMonth } from 'date-fns';
+import { deletePayment, fetchPayments, updatePayment } from '@/lib/paymentsApi';
+import { addDays, endOfMonth, format, isAfter, isBefore, isWithinInterval, parseISO, startOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import type { Contract, Payment, PaymentStatus, Tenant, Unit } from '@/types';
 
 const LEDGER_STATUS_FILTERS: PaymentStatus[] = ['Paid', 'Pending', 'Overdue'];
-
-const LEDGER_FORM_INPUT =
-  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const LEDGER_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 
@@ -59,35 +58,38 @@ function paymentMatchesLedgerFilters(
   return statuses.has(p.status);
 }
 
-type PaymentForm = {
-  contractId: string | null;
-  unitId: string;
-  amount: string;
-  dueDate: string;
-  status: Payment['status'];
-  paidDate: string;
-};
-
-function emptyForm(): PaymentForm {
-  return {
-    contractId: null,
-    unitId: '',
-    amount: '',
-    dueDate: format(new Date(), 'yyyy-MM-dd'),
-    status: 'Pending',
-    paidDate: '',
-  };
+/** Normalize API / form dates to YYYY-MM-DD. */
+function toDateInputValue(value?: string | null): string {
+  if (!value?.trim()) return '';
+  const slice = value.trim().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(slice)) return slice;
+  try {
+    return format(parseISO(value.trim()), 'yyyy-MM-dd');
+  } catch {
+    return '';
+  }
 }
 
-function toForm(payment: Payment): PaymentForm {
-  return {
-    contractId: payment.contractId,
-    unitId: payment.unitId,
-    amount: String(payment.amount),
-    dueDate: payment.dueDate,
-    status: payment.status,
-    paidDate: payment.paidDate ?? '',
-  };
+function todayYmd(): string {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+function formatPaymentDate(value?: string | null): string {
+  const ymd = toDateInputValue(value);
+  if (!ymd) return '—';
+  try {
+    const d = parseISO(ymd);
+    return Number.isNaN(d.getTime()) ? ymd : format(d, 'MMM dd, yyyy');
+  } catch {
+    return ymd;
+  }
+}
+
+/** True when the due date is today or earlier (can collect / mark paid). */
+function isDueOrPast(dueDate?: string | null): boolean {
+  const ymd = toDateInputValue(dueDate);
+  if (!ymd) return false;
+  return ymd <= todayYmd();
 }
 
 function paymentMatchesQuery(
@@ -120,6 +122,8 @@ function paymentMatchesQuery(
 export function LeaseLedgerView() {
   const { t } = useTranslation();
   const { session } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkHandledRef = useRef(false);
   const canCreate = session?.crud?.ledger?.create ?? false;
   const canUpdate = session?.crud?.ledger?.update ?? false;
   const canDelete = session?.crud?.ledger?.delete ?? false;
@@ -131,13 +135,13 @@ export function LeaseLedgerView() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
-  const [form, setForm] = useState<PaymentForm>(emptyForm);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleContractId, setScheduleContractId] = useState<string | null>(null);
+  const [highlightPaymentId, setHighlightPaymentId] = useState<string | null>(null);
   const [refLoading, setRefLoading] = useState(false);
   const [ledgerFilterStatuses, setLedgerFilterStatuses] = useState<Set<PaymentStatus>>(defaultLedgerStatusFilters);
   const [ledgerFilterUnitId, setLedgerFilterUnitId] = useState<string | null>(null);
+  const [scheduleBusyId, setScheduleBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -370,62 +374,83 @@ export function LeaseLedgerView() {
     toast.success(t('views.ledger.exported'));
   }, [contracts, downloadCsv, filteredPayments, t, tenants, units]);
 
-  const openCreateModal = useCallback(() => {
-    setFormMode('create');
-    setEditingPaymentId(null);
-    setForm(emptyForm());
-    setIsPaymentModalOpen(true);
-    void ensureReferenceDataLoaded();
-  }, [ensureReferenceDataLoaded]);
+  const schedulePayments = useMemo(() => {
+    if (!scheduleContractId) return [];
+    return payments
+      .filter((p) => String(p.contractId) === String(scheduleContractId))
+      .slice()
+      .sort((a, b) => toDateInputValue(a.dueDate).localeCompare(toDateInputValue(b.dueDate)));
+  }, [payments, scheduleContractId]);
 
-  const openEditModal = useCallback((payment: Payment) => {
-    setFormMode('edit');
-    setEditingPaymentId(payment.id);
-    setForm(toForm(payment));
-    setIsPaymentModalOpen(true);
-    void ensureReferenceDataLoaded();
-  }, [ensureReferenceDataLoaded]);
+  const scheduleContract = useMemo(
+    () => contracts.find((c) => String(c.id) === String(scheduleContractId)) ?? null,
+    [contracts, scheduleContractId],
+  );
+
+  const scheduleSummary = useMemo(() => {
+    const paid = schedulePayments.filter((p) => p.status === 'Paid').length;
+    const total = schedulePayments.length;
+    const outstanding = schedulePayments
+      .filter((p) => p.status !== 'Paid')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const leaseTotal = schedulePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const monthly = Number(scheduleContract?.monthlyRent || 0);
+    const yearTotal = monthly > 0 ? monthly * 12 : leaseTotal;
+    return { paid, total, outstanding, leaseTotal, yearTotal };
+  }, [schedulePayments, scheduleContract]);
+
+  const openScheduleModal = useCallback(
+    (contractId?: string | null, highlightId?: string | null) => {
+      setScheduleContractId(contractId ?? null);
+      setHighlightPaymentId(highlightId ?? null);
+      setIsScheduleModalOpen(true);
+      void ensureReferenceDataLoaded();
+    },
+    [ensureReferenceDataLoaded],
+  );
+
+  useEffect(() => {
+    if (loading || deepLinkHandledRef.current) return;
+    const contractId = searchParams.get('contractId');
+    const paymentId = searchParams.get('paymentId');
+    if (!contractId && !paymentId) return;
+
+    deepLinkHandledRef.current = true;
+    let resolvedContractId = contractId;
+    if (!resolvedContractId && paymentId) {
+      resolvedContractId =
+        payments.find((p) => String(p.id) === String(paymentId))?.contractId ?? null;
+    }
+    if (resolvedContractId) {
+      openScheduleModal(resolvedContractId, paymentId);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('contractId');
+    next.delete('paymentId');
+    setSearchParams(next, { replace: true });
+  }, [loading, openScheduleModal, payments, searchParams, setSearchParams]);
+
+  const openCreateModal = useCallback(() => {
+    openScheduleModal(null, null);
+  }, [openScheduleModal]);
+
+  const openEditModal = useCallback(
+    (payment: Payment) => {
+      openScheduleModal(payment.contractId, payment.id);
+    },
+    [openScheduleModal],
+  );
 
   const closeModal = useCallback(() => {
-    setIsPaymentModalOpen(false);
-    setFormMode('create');
-    setEditingPaymentId(null);
-    setForm(emptyForm());
+    setIsScheduleModalOpen(false);
+    setScheduleContractId(null);
+    setHighlightPaymentId(null);
+    setScheduleBusyId(null);
   }, []);
 
-  const savePayment = useCallback(async () => {
-    if (!form.contractId || !form.unitId || !form.dueDate) {
-      toast.error(t('views.ledger.validationRequired'));
-      return;
-    }
-    const amount = Number(form.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error(t('views.ledger.validationAmount'));
-      return;
-    }
-    const payload = {
-      contractId: form.contractId,
-      unitId: form.unitId,
-      amount,
-      dueDate: form.dueDate,
-      paidDate: form.paidDate || undefined,
-      status: form.status,
-    };
-    try {
-      if (formMode === 'edit' && editingPaymentId) {
-        const updated = await updatePayment(editingPaymentId, payload);
-        setPayments((prev) => prev.map((p) => (p.id === editingPaymentId ? updated : p)));
-        toast.success(t('views.ledger.updated'));
-      } else {
-        const created = await createPayment(payload);
-        setPayments((prev) => [created, ...prev]);
-        toast.success(t('views.ledger.recorded'));
-      }
-      closeModal();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('views.ledger.saveError'));
-    }
-  }, [closeModal, editingPaymentId, form, formMode, t]);
+  const patchPaymentInList = useCallback((updated: Payment) => {
+    setPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  }, []);
 
   const handleDeletePayment = useCallback(async (payment: Payment) => {
     if (!window.confirm(t('views.ledger.deleteConfirm', { id: payment.id }))) return;
@@ -440,61 +465,70 @@ export function LeaseLedgerView() {
 
   const handleQuickMarkPaid = useCallback(
     async (payment: Payment) => {
+      setScheduleBusyId(payment.id);
       try {
-        const today = format(new Date(), 'yyyy-MM-dd');
+        const today = todayYmd();
         const updated = await updatePayment(payment.id, {
           contractId: payment.contractId,
           unitId: payment.unitId,
           amount: payment.amount,
-          dueDate: payment.dueDate,
+          dueDate: toDateInputValue(payment.dueDate),
           paidDate: today,
           status: 'Paid',
         });
-        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        patchPaymentInList(updated);
         toast.success(t('views.ledger.markedPaid'));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      } finally {
+        setScheduleBusyId(null);
       }
     },
-    [t],
+    [patchPaymentInList, t],
   );
 
   const handleQuickMarkPending = useCallback(
     async (payment: Payment) => {
+      setScheduleBusyId(payment.id);
       try {
         const updated = await updatePayment(payment.id, {
           contractId: payment.contractId,
           unitId: payment.unitId,
           amount: payment.amount,
-          dueDate: payment.dueDate,
+          dueDate: toDateInputValue(payment.dueDate),
           status: 'Pending',
         });
-        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        patchPaymentInList(updated);
         toast.success(t('views.ledger.markedPending'));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      } finally {
+        setScheduleBusyId(null);
       }
     },
-    [t],
+    [patchPaymentInList, t],
   );
 
   const handleQuickMarkOverdue = useCallback(
     async (payment: Payment) => {
+      setScheduleBusyId(payment.id);
       try {
         const updated = await updatePayment(payment.id, {
           contractId: payment.contractId,
           unitId: payment.unitId,
           amount: payment.amount,
-          dueDate: payment.dueDate,
+          dueDate: toDateInputValue(payment.dueDate),
           status: 'Overdue',
         });
-        setPayments((prev) => prev.map((p) => (p.id === payment.id ? updated : p)));
+        patchPaymentInList(updated);
         toast.success(t('views.ledger.markedOverdue'));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      } finally {
+        setScheduleBusyId(null);
       }
     },
-    [t],
+    [patchPaymentInList, t],
   );
 
   const upcomingColumns: ColumnDef<Payment>[] = useMemo(
@@ -516,7 +550,7 @@ export function LeaseLedgerView() {
       },
       {
         header: t('views.ledger.table.dueDate'),
-        render: (payment) => <span>{format(new Date(payment.dueDate), 'MMM dd, yyyy')}</span>,
+        render: (payment) => <span>{formatPaymentDate(payment.dueDate)}</span>,
       },
       {
         header: t('views.ledger.table.amount'),
@@ -553,7 +587,7 @@ export function LeaseLedgerView() {
       },
       {
         header: t('views.ledger.table.dueDate'),
-        render: (payment) => <span>{format(new Date(payment.dueDate), 'MMM dd, yyyy')}</span>,
+        render: (payment) => <span>{formatPaymentDate(payment.dueDate)}</span>,
       },
       {
         header: t('views.ledger.table.amount'),
@@ -584,7 +618,7 @@ export function LeaseLedgerView() {
       },
       {
         header: t('views.ledger.table.paidDate'),
-        render: (payment) => <span>{payment.paidDate ? format(new Date(payment.paidDate), 'MMM dd, yyyy') : '-'}</span>,
+        render: (payment) => <span>{payment.paidDate ? formatPaymentDate(payment.paidDate) : '-'}</span>,
       },
       {
         header: t('views.ledger.table.actions'),
@@ -604,15 +638,29 @@ export function LeaseLedgerView() {
             >
               <FileText className="w-4 h-4" />
             </Button>
-            {(canUpdate || canDelete) && (
+            {canDelete ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                title={t('views.ledger.deletePayment')}
+                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDeletePayment(payment);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            ) : null}
+            {canUpdate && (
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} />}
+                  render={<Button variant="ghost" size="icon" title={t('views.ledger.moreActions')} onClick={(e) => e.stopPropagation()} />}
                 >
                   <MoreVertical className="w-4 h-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {canUpdate && payment.status !== 'Paid' && (
+                  {payment.status !== 'Paid' && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -622,7 +670,7 @@ export function LeaseLedgerView() {
                       {t('views.ledger.markPaid')}
                     </DropdownMenuItem>
                   )}
-                  {canUpdate && payment.status !== 'Overdue' && payment.status !== 'Paid' && (
+                  {payment.status !== 'Overdue' && payment.status !== 'Paid' && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -632,7 +680,7 @@ export function LeaseLedgerView() {
                       {t('views.ledger.markOverdue')}
                     </DropdownMenuItem>
                   )}
-                  {canUpdate && payment.status === 'Paid' && (
+                  {payment.status === 'Paid' && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -640,28 +688,6 @@ export function LeaseLedgerView() {
                       }}
                     >
                       {t('views.ledger.markPending')}
-                    </DropdownMenuItem>
-                  )}
-                  {canUpdate && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(payment);
-                      }}
-                    >
-                      {t('views.ledger.editPayment')}
-                    </DropdownMenuItem>
-                  )}
-                  {canDelete && (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      className="text-rose-600"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDeletePayment(payment);
-                      }}
-                    >
-                      {t('views.ledger.deletePayment')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -699,93 +725,170 @@ export function LeaseLedgerView() {
             <Download className="w-4 h-4 mr-2" />
             {t('views.ledger.exportReport')}
           </Button>
-          {canCreate && (
+          {(canCreate || canUpdate) && (
             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openCreateModal}>
               <Plus className="w-4 h-4 mr-2" />
-              {t('views.ledger.recordPayment')}
+              {t('views.ledger.monthlyPayments')}
             </Button>
           )}
         </div>
       </div>
 
       <Modal
-        isOpen={isPaymentModalOpen}
+        isOpen={isScheduleModalOpen}
         onClose={closeModal}
-        title={formMode === 'edit' ? 'Edit Payment' : t('views.ledger.recordPayment')}
-        maxWidth="2xl"
+        title={t('views.ledger.monthlyScheduleTitle')}
+        maxWidth="3xl"
         variant="glass"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={closeModal}>
-              Cancel
-            </Button>
-            <Button type="button" className={modalPrimaryButtonClass} onClick={() => void savePayment()}>
-              {formMode === 'edit' ? 'Save Changes' : t('views.ledger.recordPayment')}
+              {t('views.ledger.closeSchedule')}
             </Button>
           </div>
         }
       >
-        <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Contract</Label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>{t('views.ledger.scheduleContract')}</Label>
             <Select2
               options={contractOptions}
-              value={form.contractId}
+              value={scheduleContractId}
               borderless={false}
               className={LEDGER_SELECT_CLASS}
+              placeholder={t('views.ledger.chooseContract')}
               onChange={(v) => {
-                const cid = (v ?? null) as string | null;
-                const c = contracts.find((x) => x.id === cid);
-                setForm((prev) => ({
-                  ...prev,
-                  contractId: cid,
-                  unitId: c?.unitId ?? prev.unitId,
-                  amount: c ? String(c.monthlyRent) : prev.amount,
-                }));
+                setScheduleContractId((v ?? null) as string | null);
+                setHighlightPaymentId(null);
               }}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Amount</Label>
-            <Input
-              type="number"
-              className={LEDGER_FORM_INPUT}
-              value={form.amount}
-              onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select2
-              borderless={false}
-              className={LEDGER_SELECT_CLASS}
-              options={[
-                { value: 'Pending', label: t('views.ledger.table.pending') },
-                { value: 'Overdue', label: t('views.ledger.table.overdue') },
-                { value: 'Paid', label: t('views.ledger.table.paid') },
-              ]}
-              value={form.status}
-              onChange={(v) => setForm((prev) => ({ ...prev, status: (v ?? 'Pending') as Payment['status'] }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.ledger.table.dueDate')}</Label>
-            <Input
-              type="date"
-              className={LEDGER_FORM_INPUT}
-              value={form.dueDate}
-              onChange={(e) => setForm((prev) => ({ ...prev, dueDate: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.ledger.table.paidDate')}</Label>
-            <Input
-              type="date"
-              className={LEDGER_FORM_INPUT}
-              value={form.paidDate}
-              onChange={(e) => setForm((prev) => ({ ...prev, paidDate: e.target.value }))}
-            />
-          </div>
+
+          {scheduleContractId ? (
+            <>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
+                <span>
+                  {t('views.ledger.scheduleProgress', {
+                    paid: scheduleSummary.paid,
+                    total: scheduleSummary.total,
+                  })}
+                </span>
+                <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                  {t('views.ledger.scheduleYearTotal', {
+                    amount: `₱${scheduleSummary.yearTotal.toLocaleString()}`,
+                  })}
+                </span>
+                <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                  {t('views.ledger.scheduleOutstanding', {
+                    amount: `₱${scheduleSummary.outstanding.toLocaleString()}`,
+                  })}
+                </span>
+                {scheduleContract ? (
+                  <span className="text-xs text-slate-500">
+                    {t('views.ledger.scheduleRentHint', {
+                      amount: `₱${Number(scheduleContract.monthlyRent || 0).toLocaleString()}`,
+                    })}
+                  </span>
+                ) : null}
+              </div>
+
+              {schedulePayments.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  {t('views.ledger.scheduleEmpty')}
+                </p>
+              ) : (
+                <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                      <tr>
+                        <th className="px-3 py-2.5">{t('views.ledger.table.month')}</th>
+                        <th className="px-3 py-2.5">{t('views.ledger.table.dueDate')}</th>
+                        <th className="px-3 py-2.5 text-right">{t('views.ledger.table.amount')}</th>
+                        <th className="px-3 py-2.5">{t('views.ledger.table.status')}</th>
+                        <th className="px-3 py-2.5 text-right">{t('views.ledger.table.actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {schedulePayments.map((payment) => {
+                        const due = toDateInputValue(payment.dueDate);
+                        const dueDate = due ? parseISO(due) : null;
+                        const monthLabel =
+                          dueDate && !Number.isNaN(dueDate.getTime())
+                            ? format(dueDate, 'MMMM yyyy')
+                            : due || '—';
+                        const dueLabel =
+                          dueDate && !Number.isNaN(dueDate.getTime())
+                            ? format(dueDate, 'MMM dd, yyyy')
+                            : due || '—';
+                        const highlighted = highlightPaymentId === payment.id;
+                        const busy = scheduleBusyId === payment.id;
+                        return (
+                          <tr
+                            key={payment.id}
+                            className={cn(
+                              'bg-white dark:bg-slate-950',
+                              highlighted && 'bg-indigo-50/80 dark:bg-indigo-500/10',
+                            )}
+                          >
+                            <td className="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-100">
+                              {monthLabel}
+                            </td>
+                            <td className="px-3 py-2.5 tabular-nums text-slate-600 dark:text-slate-300">
+                              {dueLabel}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-50">
+                              ₱{Number(payment.amount || 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <StatusBadge tone={paymentStatusVariant(payment.status)}>
+                                {payment.status === 'Paid'
+                                  ? t('views.ledger.table.paid')
+                                  : payment.status === 'Overdue'
+                                    ? t('views.ledger.table.overdue')
+                                    : t('views.ledger.table.pending')}
+                              </StatusBadge>
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              {canUpdate && payment.status === 'Paid' ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 rounded-lg px-2.5 text-xs"
+                                  disabled={busy}
+                                  onClick={() => void handleQuickMarkPending(payment)}
+                                >
+                                  {t('views.ledger.markPending')}
+                                </Button>
+                              ) : canUpdate && payment.status !== 'Paid' && isDueOrPast(due) ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-8 rounded-lg bg-indigo-600 px-2.5 text-xs text-white hover:bg-indigo-700"
+                                  disabled={busy}
+                                  onClick={() => void handleQuickMarkPaid(payment)}
+                                >
+                                  {t('views.ledger.markPaid')}
+                                </Button>
+                              ) : payment.status !== 'Paid' ? (
+                                <span className="text-xs text-slate-400">{t('views.ledger.notDueYet')}</span>
+                              ) : (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              {t('views.ledger.schedulePickContract')}
+            </p>
+          )}
         </div>
       </Modal>
 

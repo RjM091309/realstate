@@ -44,12 +44,15 @@ import {
   type CalendarEvent,
   type CalendarEventType,
 } from '@/lib/calendarEventsApi';
+import { StatusBadge } from '@/components/status-badge';
+import { contractStatusVariant, paymentStatusVariant } from '@/lib/statusBadge';
 import type { Contract, Payment, Tenant, Unit } from '@/types';
 import { Modal } from '@/components/modal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select2 } from '@/components/select2';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 function formatPhp(amount: number | null | undefined): string {
   if (amount == null || !Number.isFinite(amount)) return '—';
@@ -69,8 +72,12 @@ function formatEventDate(value: string | Date | null | undefined): string {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[13px] text-slate-500 dark:text-slate-400">{label}</dt>
-      <dd className="mt-1 text-sm leading-snug text-slate-900 dark:text-slate-100">{value ?? '—'}</dd>
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">
+        {value ?? '—'}
+      </dd>
     </div>
   );
 }
@@ -87,10 +94,33 @@ function formatPersonName(value?: string | null): string {
     .join(' ');
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function DetailCard({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{children}</h3>
+    <section
+      className={cn(
+        'rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60',
+        className,
+      )}
+    >
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {title}
+      </h3>
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">{children}</dl>
+    </section>
   );
+}
+
+function yearRentTotal(monthlyRent: number | null | undefined): number {
+  const n = Number(monthlyRent);
+  return Number.isFinite(n) && n > 0 ? n * 12 : 0;
 }
 
 type UiEvent = {
@@ -198,6 +228,7 @@ function defaultEventForm(today: Date, unitId: string): EventForm {
 
 export function CalendarView() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { session } = useAuth();
   const canCreate = session?.crud?.calendar?.create ?? false;
   const canUpdate = session?.crud?.calendar?.update ?? false;
@@ -297,7 +328,10 @@ export function CalendarView() {
       ...payments.map((p) => ({
         id: `payment-due-${p.id}`,
         date: startOfDay(parseISO(p.dueDate)),
-        typeLabel: t('views.calendar.eventTypes.paymentDue'),
+        typeLabel:
+          p.status === 'Paid'
+            ? t('views.calendar.paymentPaid')
+            : t('views.calendar.eventTypes.paymentDue'),
         unitId: p.unitId,
         color: p.status === 'Paid' ? 'bg-blue-500' : 'bg-amber-500',
         icon: <DollarSign className="w-3 h-3" />,
@@ -924,13 +958,35 @@ export function CalendarView() {
         isOpen={detailsOpen}
         onClose={closeDetails}
         title={t('views.calendar.viewDetails')}
-        maxWidth="2xl"
+        maxWidth="3xl"
         variant="glass"
         footer={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button type="button" variant="outline" className={modalOutlineButtonClass} onClick={closeDetails}>
               {t('views.calendar.cancel')}
             </Button>
+            {(detailsEvent?.contractId || detailsContext?.contract?.id) ? (
+              <Button
+                type="button"
+                variant="outline"
+                className={modalOutlineButtonClass}
+                onClick={() => {
+                  const contractId = String(
+                    detailsEvent?.contractId || detailsContext?.contract?.id || '',
+                  );
+                  const paymentId = String(
+                    detailsEvent?.paymentId || detailsContext?.payment?.id || '',
+                  );
+                  const params = new URLSearchParams();
+                  if (contractId) params.set('contractId', contractId);
+                  if (paymentId) params.set('paymentId', paymentId);
+                  closeDetails();
+                  navigate(`/ledger?${params.toString()}`);
+                }}
+              >
+                {t('views.calendar.processPayment')}
+              </Button>
+            ) : null}
             {(detailsEvent?.contractId || detailsContext?.contract?.id) ? (
               <Button
                 type="button"
@@ -984,12 +1040,12 @@ export function CalendarView() {
         }
       >
         {detailsEvent && detailsContext ? (
-          <div className="max-h-[min(64vh,32rem)] space-y-7 overflow-y-auto pr-1">
-            <div>
+          <div className="max-h-[min(70vh,36rem)] space-y-4 overflow-y-auto pr-1">
+            <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {detailsEvent.typeLabel}
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-slate-500">
                 {formatEventDate(detailsEvent.date)}
                 {' · '}
                 {detailsEvent.source === 'custom'
@@ -998,10 +1054,34 @@ export function CalendarView() {
               </p>
             </div>
 
-            {detailsContext.unit ? (
-              <section className="space-y-3">
-                <SectionTitle>{t('views.calendar.details.unitInfo')}</SectionTitle>
-                <dl className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {detailsContext.tenant ? (
+                <DetailCard title={t('views.calendar.details.tenantInfo')}>
+                  <Field
+                    label={t('views.calendar.details.tenant')}
+                    value={formatPersonName(detailsContext.tenant.name)}
+                  />
+                  <Field
+                    label={t('views.calendar.details.phone')}
+                    value={detailsContext.tenant.phone || '—'}
+                  />
+                  <div className="sm:col-span-2">
+                    <Field
+                      label={t('views.calendar.details.email')}
+                      value={
+                        detailsContext.tenant.email ? (
+                          <span className="break-all">{detailsContext.tenant.email}</span>
+                        ) : (
+                          '—'
+                        )
+                      }
+                    />
+                  </div>
+                </DetailCard>
+              ) : null}
+
+              {detailsContext.unit ? (
+                <DetailCard title={t('views.calendar.details.unitInfo')}>
                   <Field
                     label={t('views.calendar.unit')}
                     value={t('views.calendar.unitLabel', {
@@ -1015,7 +1095,23 @@ export function CalendarView() {
                   <Field label={t('views.calendar.details.floor')} value={detailsContext.unit.floor || '—'} />
                   <Field
                     label={t('views.calendar.details.status')}
-                    value={detailsContext.unit.status || '—'}
+                    value={
+                      detailsContext.unit.status ? (
+                        <StatusBadge
+                          tone={
+                            detailsContext.unit.status === 'Occupied'
+                              ? 'success'
+                              : detailsContext.unit.status === 'Available'
+                                ? 'info'
+                                : 'neutral'
+                          }
+                        >
+                          {detailsContext.unit.status}
+                        </StatusBadge>
+                      ) : (
+                        '—'
+                      )
+                    }
                   />
                   <div className="sm:col-span-2">
                     <Field
@@ -1027,39 +1123,39 @@ export function CalendarView() {
                       }
                     />
                   </div>
-                  <Field
-                    label={t('views.calendar.details.monthlyRate')}
-                    value={formatPhp(detailsContext.unit.monthlyRate)}
-                  />
-                </dl>
-              </section>
-            ) : null}
+                  {!detailsContext.contract ? (
+                    <Field
+                      label={t('views.calendar.details.monthlyRate')}
+                      value={formatPhp(detailsContext.unit.monthlyRate)}
+                    />
+                  ) : null}
+                </DetailCard>
+              ) : null}
 
-            {detailsContext.tenant ? (
-              <section className="space-y-3">
-                <SectionTitle>{t('views.calendar.details.tenantInfo')}</SectionTitle>
-                <dl className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
-                  <Field
-                    label={t('views.calendar.details.tenant')}
-                    value={formatPersonName(detailsContext.tenant.name)}
-                  />
-                  <Field label={t('views.calendar.details.email')} value={detailsContext.tenant.email || '—'} />
-                  <Field label={t('views.calendar.details.phone')} value={detailsContext.tenant.phone || '—'} />
-                </dl>
-              </section>
-            ) : null}
-
-            {detailsContext.contract ? (
-              <section className="space-y-3">
-                <SectionTitle>{t('views.calendar.details.leaseInfo')}</SectionTitle>
-                <dl className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+              {detailsContext.contract ? (
+                <DetailCard
+                  title={t('views.calendar.details.leaseInfo')}
+                  className={detailsContext.payment ? undefined : 'sm:col-span-2'}
+                >
                   <Field
                     label={t('views.calendar.details.contractNo')}
-                    value={detailsContext.contract.contractNo || detailsContext.contract.id}
+                    value={
+                      <span className="font-mono text-xs uppercase tracking-wide">
+                        {detailsContext.contract.contractNo || detailsContext.contract.id}
+                      </span>
+                    }
                   />
                   <Field
                     label={t('views.calendar.details.status')}
-                    value={detailsContext.contract.status || '—'}
+                    value={
+                      detailsContext.contract.status ? (
+                        <StatusBadge tone={contractStatusVariant(detailsContext.contract.status)}>
+                          {detailsContext.contract.status}
+                        </StatusBadge>
+                      ) : (
+                        '—'
+                      )
+                    }
                   />
                   <div className="sm:col-span-2">
                     <Field
@@ -1070,6 +1166,14 @@ export function CalendarView() {
                   <Field
                     label={t('views.calendar.details.monthlyRent')}
                     value={formatPhp(detailsContext.contract.monthlyRent)}
+                  />
+                  <Field
+                    label={t('views.calendar.details.yearTotal')}
+                    value={
+                      <span className="font-semibold tabular-nums">
+                        {formatPhp(yearRentTotal(detailsContext.contract.monthlyRent))}
+                      </span>
+                    }
                   />
                   <Field
                     label={t('views.calendar.details.securityDeposit')}
@@ -1085,21 +1189,30 @@ export function CalendarView() {
                       value={formatPersonName(detailsContext.contract.agentName)}
                     />
                   ) : null}
-                </dl>
-              </section>
-            ) : null}
+                </DetailCard>
+              ) : null}
 
-            {detailsContext.payment ? (
-              <section className="space-y-3">
-                <SectionTitle>{t('views.calendar.details.paymentInfo')}</SectionTitle>
-                <dl className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+              {detailsContext.payment ? (
+                <DetailCard title={t('views.calendar.details.paymentInfo')}>
                   <Field
                     label={t('views.calendar.details.amount')}
-                    value={formatPhp(detailsContext.payment.amount)}
+                    value={
+                      <span className="font-semibold tabular-nums">
+                        {formatPhp(detailsContext.payment.amount)}
+                      </span>
+                    }
                   />
                   <Field
                     label={t('views.calendar.details.status')}
-                    value={detailsContext.payment.status || '—'}
+                    value={
+                      detailsContext.payment.status ? (
+                        <StatusBadge tone={paymentStatusVariant(detailsContext.payment.status)}>
+                          {detailsContext.payment.status}
+                        </StatusBadge>
+                      ) : (
+                        '—'
+                      )
+                    }
                   />
                   <Field
                     label={t('views.calendar.details.dueDate')}
@@ -1109,9 +1222,33 @@ export function CalendarView() {
                     label={t('views.calendar.details.paidDate')}
                     value={formatEventDate(detailsContext.payment.paidDate)}
                   />
-                </dl>
-              </section>
-            ) : null}
+                  {(detailsEvent?.contractId || detailsContext?.contract?.id) ? (
+                    <div className="sm:col-span-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={`${modalOutlineButtonClass} w-full`}
+                        onClick={() => {
+                          const contractId = String(
+                            detailsEvent?.contractId || detailsContext?.contract?.id || '',
+                          );
+                          const paymentId = String(
+                            detailsEvent?.paymentId || detailsContext?.payment?.id || '',
+                          );
+                          const params = new URLSearchParams();
+                          if (contractId) params.set('contractId', contractId);
+                          if (paymentId) params.set('paymentId', paymentId);
+                          closeDetails();
+                          navigate(`/ledger?${params.toString()}`);
+                        }}
+                      >
+                        {t('views.calendar.processPayment')}
+                      </Button>
+                    </div>
+                  ) : null}
+                </DetailCard>
+              ) : null}
+            </div>
 
             {!detailsContext.unit && !detailsContext.contract && !detailsContext.payment ? (
               <p className="text-sm text-slate-500">{t('views.calendar.details.noLinkedData')}</p>

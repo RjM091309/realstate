@@ -24,6 +24,7 @@ import {
   isContractInspectionApproved,
   updateInspectionFields,
 } from '../models/unitInspectionsModel.js';
+import { ensureMonthlyPaymentSchedule } from '../models/paymentsModel.js';
 
 function fmtDate(d) {
   if (d == null) return '';
@@ -438,6 +439,11 @@ export async function activateContract(req, res) {
       res.status(404).json({ error: 'Contract not found' });
       return;
     }
+    await ensureMonthlyPaymentSchedule(ctx.session.branchId, id, {
+      startDate: parsed.startDate,
+      endDate: parsed.endDate,
+      monthlyRent: parsed.monthlyRent,
+    });
     const inspection = await getInspectionByContractId(id, ctx.session.branchId);
     if (inspection) {
       await updateInspectionFields(String(inspection.id), ctx.session.branchId, { status: 'occupied' });

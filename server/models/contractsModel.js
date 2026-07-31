@@ -1,5 +1,5 @@
 import { pool } from '../config/db.js';
-import { moveUnpaidSchedulesToContract, sumUnpaidBalanceForContract } from './paymentsModel.js';
+import { moveUnpaidSchedulesToContract, sumUnpaidBalanceForContract, ensureMonthlyPaymentSchedule } from './paymentsModel.js';
 
 /** Display name: "First Last", or USERNAME if names empty. */
 const AGENT_NAME_SQL = `(
@@ -463,6 +463,13 @@ export async function renewLeaseContract(branchId, oldContractId, payload) {
     if (carryOver && unpaid > 0) {
       await moveUnpaidSchedulesToContract(conn, branchId, oldContractId, newId);
     }
+
+    await ensureMonthlyPaymentSchedule(
+      branchId,
+      newId,
+      { startDate, endDate, monthlyRent },
+      conn,
+    );
 
     await conn.query(
       `UPDATE lease_contract

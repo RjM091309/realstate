@@ -579,9 +579,17 @@ function formatContractPeriod(c: Contract): string {
   try {
     const a = parseISO(c.startDate);
     const b = parseISO(c.endDate);
-    return `${format(a, 'MMM yyyy')} - ${format(b, 'MMM yyyy')}`;
+    return `${format(a, 'MMM dd, yyyy')} — ${format(b, 'MMM dd, yyyy')}`;
   } catch {
     return `${c.startDate} – ${c.endDate}`;
+  }
+}
+
+function formatContractDate(value: string): string {
+  try {
+    return format(parseISO(value), 'MMM dd, yyyy');
+  } catch {
+    return value || '—';
   }
 }
 
@@ -1802,9 +1810,24 @@ export function UnitsView() {
                     </h4>
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 dark:text-slate-50">{activeTenantForSelectedUnit.name}</p>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        {t('views.units.details.activeLease')}: {formatContractPeriod(activeContractForSelectedUnit)}
-                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {t('views.units.details.leaseStart')}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                            {formatContractDate(activeContractForSelectedUnit.startDate)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {t('views.units.details.leaseEnd')}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                            {formatContractDate(activeContractForSelectedUnit.endDate)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </section>
                 ) : null}

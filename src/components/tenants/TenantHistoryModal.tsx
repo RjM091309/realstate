@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { Modal } from '@/components/modal';
 import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StatusBadge } from '@/components/status-badge';
+import { contractStatusVariant, paymentStatusVariant } from '@/lib/statusBadge';
 import { fetchAuditLogs } from '@/lib/auditLogsApi';
 import { fetchContractInvoices } from '@/lib/invoicesApi';
 import { fetchPayments } from '@/lib/paymentsApi';
@@ -48,10 +50,54 @@ function ledgerStatusClass(status: LedgerRow['status']): string {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{value ?? '—'}</dd>
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">
+        {value ?? '—'}
+      </dd>
     </div>
   );
+}
+
+function DetailCard({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        'rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60',
+        className,
+      )}
+    >
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {title}
+      </h3>
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">{children}</dl>
+    </section>
+  );
+}
+
+function formatPersonName(value?: string | null): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '—';
+  if (raw !== raw.toUpperCase() || raw.length < 3) return raw;
+  return raw
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function yearRentTotal(monthly?: number | null): number {
+  const m = Number(monthly || 0);
+  return m > 0 ? m * 12 : 0;
 }
 
 export function TenantHistoryModal({
@@ -163,6 +209,21 @@ export function TenantHistoryModal({
     [payments, invoices, t],
   );
 
+  const currentLeasePayments = useMemo(() => {
+    if (!currentLease) return [];
+    return payments
+      .filter((p) => String(p.contractId) === String(currentLease.id))
+      .slice()
+      .sort((a, b) => String(b.dueDate).localeCompare(String(a.dueDate)));
+  }, [payments, currentLease]);
+
+  const latestPayment = currentLeasePayments[0] ?? null;
+  const unpaidPayment =
+    currentLeasePayments.find((p) => p.status === 'Overdue') ??
+    currentLeasePayments.find((p) => p.status === 'Pending') ??
+    null;
+  const paymentSpotlight = unpaidPayment ?? latestPayment;
+
   const ledgerRows = useMemo(() => buildLedgerRows(invoices, payments), [invoices, payments]);
 
   const logisticsNotes = useMemo(() => {
@@ -251,30 +312,130 @@ export function TenantHistoryModal({
               </div>
             ) : (
               <>
-                <TabsContent value="lease" className="mt-0 space-y-8">
-                  <section className="space-y-4">
-                    <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      {t('views.crm.history.leaseDossier')}
-                    </h3>
-                    {currentLease ? (
-                      <>
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                            {currentLease.contractNo ?? currentLease.id}
-                            {unitLabel ? (
-                              <span className="font-normal text-slate-500"> · {unitLabel}</span>
-                            ) : null}
-                          </p>
-                          <p className="text-xs text-slate-500">{currentLease.status}</p>
+                <TabsContent value="lease" className="mt-0 space-y-6">
+                  {currentLease || tenant ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DetailCard title={t('views.crm.history.cards.tenant')}>
+                        <Field
+                          label={t('views.crm.history.name')}
+                          value={formatPersonName(tenant.name)}
+                        />
+                        <Field label={t('views.crm.history.phone')} value={tenant.phone || '—'} />
+                        <div className="sm:col-span-2">
+                          <Field label={t('views.crm.history.email')} value={tenant.email || '—'} />
                         </div>
-                        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                        <Field
+                          label={t('views.crm.history.status')}
+                          value={
+                            tenant.isBlacklisted ? (
+                              <StatusBadge tone="danger">{t('views.crm.table.blacklisted')}</StatusBadge>
+                            ) : (
+                              <StatusBadge tone="success">{t('views.crm.table.active')}</StatusBadge>
+                            )
+                          }
+                        />
+                        <Field
+                          label={t('views.crm.table.kycStatus')}
+                          value={
+                            <StatusBadge tone={kycVerified ? 'success' : 'warning'}>
+                              {kycVerified
+                                ? t('views.crm.table.verified')
+                                : t('views.crm.table.verificationPending')}
+                            </StatusBadge>
+                          }
+                        />
+                      </DetailCard>
+
+                      {currentUnit ? (
+                        <DetailCard title={t('views.crm.history.cards.unit')}>
+                          <Field
+                            label={t('views.crm.history.unitNumber')}
+                            value={currentUnit.unitNumber || '—'}
+                          />
+                          <Field
+                            label={t('views.crm.history.building')}
+                            value={currentUnit.buildingName || '—'}
+                          />
+                          <Field label={t('views.crm.history.floor')} value={currentUnit.floor || '—'} />
+                          <Field
+                            label={t('views.crm.history.status')}
+                            value={
+                              currentUnit.status ? (
+                                <StatusBadge
+                                  tone={
+                                    currentUnit.status === 'Occupied'
+                                      ? 'success'
+                                      : currentUnit.status === 'Available'
+                                        ? 'info'
+                                        : 'neutral'
+                                  }
+                                >
+                                  {currentUnit.status}
+                                </StatusBadge>
+                              ) : (
+                                '—'
+                              )
+                            }
+                          />
+                          <div className="sm:col-span-2">
+                            <Field
+                              label={t('views.crm.history.address')}
+                              value={
+                                currentUnit.legalAddress || currentUnit.commonAddress || '—'
+                              }
+                            />
+                          </div>
+                        </DetailCard>
+                      ) : (
+                        <DetailCard title={t('views.crm.history.cards.unit')}>
+                          <div className="sm:col-span-2">
+                            <p className="text-sm text-slate-500">{t('views.crm.history.leasesEmpty')}</p>
+                          </div>
+                        </DetailCard>
+                      )}
+
+                      {currentLease ? (
+                        <DetailCard
+                          title={t('views.crm.history.cards.lease')}
+                          className={paymentSpotlight ? undefined : 'sm:col-span-2'}
+                        >
+                          <Field
+                            label={t('views.crm.history.contractNo')}
+                            value={
+                              <span className="font-mono text-xs uppercase tracking-wide">
+                                {currentLease.contractNo || currentLease.id}
+                              </span>
+                            }
+                          />
+                          <Field
+                            label={t('views.crm.history.status')}
+                            value={
+                              currentLease.status ? (
+                                <StatusBadge tone={contractStatusVariant(currentLease.status)}>
+                                  {currentLease.status}
+                                </StatusBadge>
+                              ) : (
+                                '—'
+                              )
+                            }
+                          />
+                          <div className="sm:col-span-2">
+                            <Field
+                              label={t('views.crm.history.leasePeriod')}
+                              value={formatBillingPeriod(currentLease.startDate, currentLease.endDate)}
+                            />
+                          </div>
                           <Field
                             label={t('views.crm.history.monthlyRent')}
                             value={formatHistoryPhp(currentLease.monthlyRent)}
                           />
                           <Field
-                            label={t('views.crm.history.leasePeriod')}
-                            value={formatBillingPeriod(currentLease.startDate, currentLease.endDate)}
+                            label={t('views.crm.history.yearTotal')}
+                            value={
+                              <span className="font-semibold tabular-nums">
+                                {formatHistoryPhp(yearRentTotal(currentLease.monthlyRent))}
+                              </span>
+                            }
                           />
                           <Field
                             label={t('views.crm.history.securityDeposit')}
@@ -285,50 +446,141 @@ export function TenantHistoryModal({
                             value={formatHistoryPhp(currentLease.advanceRent)}
                           />
                           {currentLease.agentName ? (
-                            <Field label={t('views.crm.history.agent')} value={currentLease.agentName} />
+                            <Field
+                              label={t('views.crm.history.agent')}
+                              value={formatPersonName(currentLease.agentName)}
+                            />
                           ) : null}
                           {currentLease.remarks ? (
-                            <Field label={t('views.crm.history.remarks')} value={currentLease.remarks} />
+                            <div className="sm:col-span-2">
+                              <Field
+                                label={t('views.crm.history.remarks')}
+                                value={currentLease.remarks}
+                              />
+                            </div>
                           ) : null}
-                        </dl>
-                      </>
-                    ) : (
-                      <p className="text-sm text-slate-500">{t('views.crm.history.leasesEmpty')}</p>
-                    )}
-                  </section>
+                        </DetailCard>
+                      ) : null}
+
+                      {paymentSpotlight ? (
+                        <DetailCard title={t('views.crm.history.cards.payment')}>
+                          <Field
+                            label={t('views.crm.history.financial.amount')}
+                            value={
+                              <span className="font-semibold tabular-nums">
+                                {formatHistoryPhp(paymentSpotlight.amount)}
+                              </span>
+                            }
+                          />
+                          <Field
+                            label={t('views.crm.history.financial.status')}
+                            value={
+                              <StatusBadge tone={paymentStatusVariant(paymentSpotlight.status)}>
+                                {paymentSpotlight.status}
+                              </StatusBadge>
+                            }
+                          />
+                          <Field
+                            label={t('views.crm.history.dueDate')}
+                            value={
+                              paymentSpotlight.dueDate
+                                ? format(
+                                    new Date(`${String(paymentSpotlight.dueDate).slice(0, 10)}T12:00:00`),
+                                    'MMM dd, yyyy',
+                                  )
+                                : '—'
+                            }
+                          />
+                          <Field
+                            label={t('views.crm.history.financial.paymentDate')}
+                            value={
+                              paymentSpotlight.paidDate
+                                ? format(
+                                    new Date(`${String(paymentSpotlight.paidDate).slice(0, 10)}T12:00:00`),
+                                    'MMM dd, yyyy',
+                                  )
+                                : '—'
+                            }
+                          />
+                          <div className="sm:col-span-2">
+                            <Field
+                              label={t('views.crm.history.financial.outstandingLabel')}
+                              value={
+                                <span
+                                  className={cn(
+                                    'tabular-nums',
+                                    financialSummary.outstandingBalance > 0
+                                      ? 'font-semibold text-rose-600'
+                                      : undefined,
+                                  )}
+                                >
+                                  {formatHistoryPhp(financialSummary.outstandingBalance)}
+                                </span>
+                              }
+                            />
+                          </div>
+                        </DetailCard>
+                      ) : currentLease ? (
+                        <DetailCard title={t('views.crm.history.cards.payment')}>
+                          <div className="sm:col-span-2">
+                            <p className="text-sm text-slate-500">
+                              {t('views.crm.history.financial.empty')}
+                            </p>
+                          </div>
+                        </DetailCard>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">{t('views.crm.history.leasesEmpty')}</p>
+                  )}
 
                   {pastLeases.length > 0 ? (
                     <section className="space-y-3">
                       <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
                         {t('views.crm.history.leases')}
                       </h3>
-                      <ul className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
                         {pastLeases.map((lease) => {
                           const unit = units.find((u) => u.id === lease.unitId);
                           return (
-                            <li
+                            <DetailCard
                               key={lease.id}
-                              className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                              title={lease.contractNo ?? lease.id}
                             >
-                              <div>
-                                <p className="text-slate-900 dark:text-slate-100">
-                                  {lease.contractNo ?? lease.id}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {unit
+                              <Field
+                                label={t('views.crm.history.unitNumber')}
+                                value={
+                                  unit
                                     ? `${unit.unitNumber}${unit.buildingName ? ` · ${unit.buildingName}` : ''}`
-                                    : '—'}
-                                  {' · '}
-                                  {formatBillingPeriod(lease.startDate, lease.endDate)}
-                                </p>
+                                    : '—'
+                                }
+                              />
+                              <Field
+                                label={t('views.crm.history.status')}
+                                value={
+                                  lease.status ? (
+                                    <StatusBadge tone={contractStatusVariant(lease.status)}>
+                                      {lease.status}
+                                    </StatusBadge>
+                                  ) : (
+                                    '—'
+                                  )
+                                }
+                              />
+                              <div className="sm:col-span-2">
+                                <Field
+                                  label={t('views.crm.history.leasePeriod')}
+                                  value={formatBillingPeriod(lease.startDate, lease.endDate)}
+                                />
                               </div>
-                              <p className="text-xs text-slate-500">
-                                {formatHistoryPhp(lease.monthlyRent)} · {lease.status}
-                              </p>
-                            </li>
+                              <Field
+                                label={t('views.crm.history.monthlyRent')}
+                                value={formatHistoryPhp(lease.monthlyRent)}
+                              />
+                            </DetailCard>
                           );
                         })}
-                      </ul>
+                      </div>
                     </section>
                   ) : null}
 
@@ -339,14 +591,16 @@ export function TenantHistoryModal({
                     {timelineEvents.length === 0 ? (
                       <p className="text-sm text-slate-500">{t('views.crm.history.activityEmpty')}</p>
                     ) : (
-                      <ul className="space-y-3">
+                      <ul className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
                         {timelineEvents.map((event) => (
                           <li
                             key={event.id}
                             className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-sm"
                           >
                             <div className="min-w-0">
-                              <p className="text-slate-900 dark:text-slate-100">{event.title}</p>
+                              <p className="font-medium text-slate-900 dark:text-slate-100">
+                                {event.title}
+                              </p>
                               {event.detail ? (
                                 <p className="mt-0.5 text-xs text-slate-500">{event.detail}</p>
                               ) : null}

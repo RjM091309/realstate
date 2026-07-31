@@ -1,6 +1,204 @@
 import { pool } from '../config/db.js';
 import { emitBranchNotificationsChanged } from '../realtime/io.js';
 
+/** YYYY-MM-DD from MySQL DATE / Date / string (matches paymentsController local formatting). */
+function toYmd(value) {
+  if (value == null) return '';
+  if (typeof value === 'string') {
+    const s = value.trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : '';
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return '';
+}
+
+function daysInMonth(year, month1to12) {
+  return new Date(year, month1to12, 0).getDate();
+}
+
+function ymdWithClampedDay(year, month1to12, day) {
+  const dim = daysInMonth(year, month1to12);
+  const d = Math.min(Math.max(1, day), dim);
+  return `${year}-${String(month1to12).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/**
+ * Monthly rent due dates for a lease: first due on start date, then same day each month
+ * while due < end date (typical 12 dues for a 1-year lease).
+ */
+export function buildMonthlyDueDates(startDate, endDate) {
+  const start = toYmd(startDate);
+  const end = toYmd(endDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start >= end) {
+    return [];
+  }
+  const anchorDay = Number(start.slice(8, 10));
+  let year = Number(start.slice(0, 4));
+  let month = Number(start.slice(5, 7));
+  const out = [];
+  let due = start;
+  // Cap at 120 months to avoid runaway loops on bad data.
+  for (let i = 0; i < 120 && due < end; i += 1) {
+    out.push(due);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+    due = ymdWithClampedDay(year, month, anchorDay);
+  }
+  return out;
+}
+
+/**
+ * Insert missing monthly payment_schedule rows for a contract (idempotent).
+ * @returns {Promise<number>} number of rows inserted
+ */
+export async function ensureMonthlyPaymentSchedule(
+  branchId,
+  contractId,
+  { startDate, endDate, monthlyRent },
+  conn = pool,
+) {
+  const amount = Number(monthlyRent);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  const dues = buildMonthlyDueDates(startDate, endDate);
+  if (!dues.length) return 0;
+
+  const [existing] = await conn.query(
+    `
+    SELECT due_date
+    FROM payment_schedule
+    WHERE branch_id = ? AND contract_id = ? AND active = 1
+    `,
+    [branchId, contractId],
+  );
+  const have = new Set(existing.map((r) => toYmd(r.due_date)).filter(Boolean));
+  const today = toYmd(new Date());
+  const missing = dues.filter((d) => !have.has(d));
+  if (!missing.length) return 0;
+
+  const values = [];
+  const params = [];
+  for (const due of missing) {
+    values.push('(?, ?, ?, ?, ?, 1, ?)');
+    params.push(
+      branchId,
+      contractId,
+      due,
+      amount,
+      due < today ? 'overdue' : 'pending',
+      'Monthly rent',
+    );
+  }
+
+  await conn.query(
+    `
+    INSERT INTO payment_schedule (
+      branch_id, contract_id, due_date, amount_due, status, active, notes
+    ) VALUES ${values.join(', ')}
+    `,
+    params,
+  );
+
+  emitBranchNotificationsChanged(branchId);
+  return missing.length;
+}
+
+/** Ensure every active lease in the branch has a full monthly rent schedule. */
+export async function backfillMonthlySchedulesForBranch(branchId, conn = pool) {
+  const [contracts] = await conn.query(
+    `
+    SELECT id, start_date, end_date, monthly_rent
+    FROM lease_contract
+    WHERE branch_id = ?
+      AND active = 1
+      AND status = 'active'
+    `,
+    [branchId],
+  );
+  let total = 0;
+  for (const c of contracts) {
+    total += await ensureMonthlyPaymentSchedule(
+      branchId,
+      c.id,
+      {
+        startDate: toYmd(c.start_date),
+        endDate: toYmd(c.end_date),
+        monthlyRent: c.monthly_rent,
+      },
+      conn,
+    );
+    total += await pruneOffScheduleDues(
+      branchId,
+      c.id,
+      {
+        startDate: toYmd(c.start_date),
+        endDate: toYmd(c.end_date),
+      },
+      conn,
+    );
+  }
+  return total;
+}
+
+/**
+ * Soft-delete dues that are not on the lease monthly schedule
+ * (legacy one-off / wrong-year rows, including mistaken paid entries).
+ */
+export async function pruneOffScheduleDues(
+  branchId,
+  contractId,
+  { startDate, endDate },
+  conn = pool,
+) {
+  const expected = new Set(buildMonthlyDueDates(startDate, endDate));
+  if (!expected.size) return 0;
+  const [rows] = await conn.query(
+    `
+    SELECT id, due_date
+    FROM payment_schedule
+    WHERE branch_id = ?
+      AND contract_id = ?
+      AND active = 1
+    `,
+    [branchId, contractId],
+  );
+  const badIds = rows
+    .filter((r) => !expected.has(toYmd(r.due_date)))
+    .map((r) => r.id);
+  if (!badIds.length) return 0;
+  await conn.query(
+    `
+    UPDATE payment_schedule
+    SET active = 0
+    WHERE branch_id = ?
+      AND contract_id = ?
+      AND active = 1
+      AND id IN (${badIds.map(() => '?').join(',')})
+    `,
+    [branchId, contractId, ...badIds],
+  );
+  await conn.query(
+    `
+    UPDATE payment_transaction
+    SET active = 0
+    WHERE payment_schedule_id IN (${badIds.map(() => '?').join(',')})
+      AND active = 1
+    `,
+    badIds,
+  );
+  return badIds.length;
+}
+
+const monthlyBackfillDone = new Set();
+
 /** Sum of unpaid payment_schedule rows for a contract (pending + overdue). */
 export async function sumUnpaidBalanceForContract(branchId, contractId, conn = pool) {
   const [rows] = await conn.query(
@@ -43,6 +241,15 @@ function mapToScheduleStatus(appStatus) {
 }
 
 export async function listPaymentsByBranch(branchId) {
+  if (!monthlyBackfillDone.has(branchId)) {
+    try {
+      await backfillMonthlySchedulesForBranch(branchId);
+      monthlyBackfillDone.add(branchId);
+    } catch (e) {
+      console.error('[payments] monthly schedule backfill failed:', e);
+    }
+  }
+
   const [rows] = await pool.query(
     `
     SELECT

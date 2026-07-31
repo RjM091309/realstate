@@ -401,7 +401,8 @@ export function CRMView() {
       (tenant) =>
         tenant.name.toLowerCase().includes(q) ||
         tenant.email.toLowerCase().includes(q) ||
-        tenant.phone.includes(q)
+        tenant.phone.includes(q) ||
+        tenant.idNumber?.toLowerCase().includes(q),
     );
   }, [searchTerm, tenantList]);
 

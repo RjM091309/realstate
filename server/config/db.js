@@ -18,5 +18,7 @@ export const pool = mysql.createPool({
   database: process.env.DATABASE_NAME ?? 'realstate',
   waitForConnections: true,
   connectionLimit: 10,
+  // Keep DATE/DATETIME as strings so calendar/ledger dues don't shift by timezone.
+  dateStrings: true,
 });
 

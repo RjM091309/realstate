@@ -9,7 +9,15 @@ import {
 
 function fmtDate(d) {
   if (d == null) return undefined;
-  if (typeof d === 'string') return d.slice(0, 10);
+  if (typeof d === 'string') {
+    const s = d.trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : undefined;
+  }
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return undefined;
+  // Prefer UTC for MySQL DATE values returned as midnight UTC.
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+    return d.toISOString().slice(0, 10);
+  }
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
