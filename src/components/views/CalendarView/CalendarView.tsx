@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  Calendar as CalendarIcon,
   Info,
   ArrowRight,
   ArrowLeft,
@@ -10,6 +11,8 @@ import {
   Trash2,
   Pencil,
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import {
   format,
@@ -119,6 +122,26 @@ const CALENDAR_FORM_INPUT =
   'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const CALENDAR_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
+
+/** Soft chip styles for calendar day pills (icons keep solid `color` classes). */
+function eventChipClass(color: string): string {
+  if (color.includes('emerald')) {
+    return 'bg-emerald-100 text-emerald-800 border-l-emerald-500 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-l-emerald-400';
+  }
+  if (color.includes('rose')) {
+    return 'bg-rose-100 text-rose-800 border-l-rose-500 dark:bg-rose-500/25 dark:text-rose-200 dark:border-l-rose-400';
+  }
+  if (color.includes('blue')) {
+    return 'bg-blue-100 text-blue-800 border-l-blue-500 dark:bg-blue-500/25 dark:text-blue-200 dark:border-l-blue-400';
+  }
+  if (color.includes('amber')) {
+    return 'bg-amber-100 text-amber-900 border-l-amber-500 dark:bg-amber-500/25 dark:text-amber-200 dark:border-l-amber-400';
+  }
+  if (color.includes('indigo')) {
+    return 'bg-indigo-100 text-indigo-800 border-l-indigo-500 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-l-indigo-400';
+  }
+  return 'bg-slate-100 text-slate-700 border-l-slate-400 dark:bg-slate-700/50 dark:text-slate-200 dark:border-l-slate-400';
+}
 
 function pickContractForCalendarEvent(
   list: Contract[],
@@ -386,23 +409,24 @@ export function CalendarView() {
   const openEditEvent = useCallback(
     (ev: UiEvent) => {
       if (ev.source !== 'custom' || !ev.raw) return;
+      const raw = ev.raw;
       const unitIdFromContract =
-        ev.raw.contractId != null ? contracts.find((c) => c.id === ev.raw.contractId)?.unitId : undefined;
+        raw.contractId != null ? contracts.find((c) => c.id === raw.contractId)?.unitId : undefined;
       const unitIdFromPayment =
-        ev.raw.paymentScheduleId != null ? payments.find((p) => p.id === ev.raw.paymentScheduleId)?.unitId : undefined;
+        raw.paymentScheduleId != null ? payments.find((p) => p.id === raw.paymentScheduleId)?.unitId : undefined;
       const unitIdFromMeta =
-        ev.raw.metadata && typeof ev.raw.metadata === 'object' && ev.raw.metadata !== null && 'unitId' in ev.raw.metadata
-          ? String((ev.raw.metadata as { unitId?: string }).unitId ?? '').trim()
+        raw.metadata && typeof raw.metadata === 'object' && raw.metadata !== null && 'unitId' in raw.metadata
+          ? String((raw.metadata as { unitId?: string }).unitId ?? '').trim()
           : '';
       const unitId = unitIdFromContract ?? unitIdFromPayment ?? unitIdFromMeta ?? units[0]?.id ?? '';
       setEventFormMode('edit');
-      setEditingEventId(ev.raw.id);
+      setEditingEventId(raw.id);
       setEventForm({
-        eventType: ev.raw.eventType,
-        eventDate: ev.raw.eventDate,
-        title: ev.raw.title,
+        eventType: raw.eventType,
+        eventDate: raw.eventDate,
+        title: raw.title,
         unitId,
-        colorCode: ev.raw.colorCode ?? '',
+        colorCode: raw.colorCode ?? '',
       });
       setEventModalOpen(true);
     },
@@ -465,10 +489,11 @@ export function CalendarView() {
   const removeEvent = useCallback(
     async (ev: UiEvent) => {
       if (ev.source !== 'custom' || !ev.raw) return;
-      if (!window.confirm(t('views.calendar.deleteConfirm', { title: ev.raw.title }))) return;
+      const raw = ev.raw;
+      if (!window.confirm(t('views.calendar.deleteConfirm', { title: raw.title }))) return;
       try {
-        await deleteCalendarEvent(ev.raw.id);
-        setCustomEvents((prev) => prev.filter((e) => e.id !== ev.raw.id));
+        await deleteCalendarEvent(raw.id);
+        setCustomEvents((prev) => prev.filter((e) => e.id !== raw.id));
         toast.success(t('views.calendar.deleted'));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t('views.calendar.deleteError'));
@@ -565,10 +590,8 @@ export function CalendarView() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            {t('views.calendar.title')}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">{t('views.calendar.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{t('views.calendar.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{t('views.calendar.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canCreate ? (
@@ -581,243 +604,252 @@ export function CalendarView() {
               {t('views.calendar.addEvent')}
             </Button>
           ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              setCurrentMonth(today);
-              setSelectedDay(today);
-            }}
-            className="h-9 px-3 text-sm text-slate-600 hover:text-slate-900"
-          >
-            {t('views.calendar.today')}
-          </Button>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={prevMonth}
-              className="h-9 w-9 text-slate-500 hover:text-slate-900"
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                const today = new Date();
+                setCurrentMonth(today);
+                setSelectedDay(today);
+              }} 
+              className="h-8 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
             >
-              <ChevronLeft className="h-4 w-4" />
+              {t('views.calendar.today')}
             </Button>
-            <div className="min-w-[8.5rem] text-center text-sm font-medium text-slate-800 dark:text-slate-100">
+            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="px-4 font-bold text-sm min-w-[140px] text-center text-slate-700 dark:text-slate-200">
               {format(currentMonth, 'MMMM yyyy')}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={nextMonth}
-              className="h-9 w-9 text-slate-500 hover:text-slate-900"
-            >
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          {t('views.calendar.moveIn')}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-rose-500" />
-          {t('views.calendar.moveOut')}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-blue-500" />
-          {t('views.calendar.paymentPaid')}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
-          {t('views.calendar.paymentPending')}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-indigo-500" />
-          {t('views.calendar.eventTypes.inspection')}
-        </span>
-      </div>
+      <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-black/50 overflow-hidden bg-slate-200/70 dark:bg-slate-900/90 backdrop-blur-sm">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-7 border-b border-slate-300/60 dark:border-slate-800 bg-slate-200/80 dark:bg-slate-900/70">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="p-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 divide-x divide-y divide-slate-300/50 border-b border-slate-300/50 bg-slate-200/60 dark:divide-slate-800 dark:border-slate-800 dark:bg-transparent">
+            {calendarGridDays.map((day) => {
+              const dayEvents = events.filter((e) => isSameDay(e.date, day));
+              const isSelected = selectedDay && isSameDay(day, selectedDay);
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isTday = isToday(day);
 
-      <div className="calendar-month-grid overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div
-              key={d}
-              className="calendar-month-grid-cell border-r border-slate-200 px-1 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-slate-500 last:border-r-0 dark:border-slate-700 dark:text-slate-400"
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-          {calendarGridDays.map((day, index) => {
-            const dayEvents = events.filter((e) => isSameDay(e.date, day));
-            const isSelected = selectedDay && isSameDay(day, selectedDay);
-            const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isTday = isToday(day);
-            const isLastCol = (index + 1) % 7 === 0;
-
-            return (
-              <div
-                key={day.toString()}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedDay(day)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedDay(day);
-                  }
-                }}
-                className={cn(
-                  'calendar-month-grid-cell min-h-[5.5rem] cursor-pointer border-b border-slate-200 p-1.5 text-left transition-colors dark:border-slate-700',
-                  !isLastCol && 'border-r border-slate-200 dark:border-slate-700',
-                  !isCurrentMonth && 'bg-slate-50/50 text-slate-300 dark:bg-slate-900/30',
-                  isSelected && 'bg-indigo-50/60 dark:bg-indigo-500/10',
-                  isCurrentMonth && !isSelected && 'bg-white hover:bg-slate-50 dark:bg-transparent dark:hover:bg-slate-900/40',
-                )}
-              >
-                <span
+              return (
+                <div
+                  key={day.toString()}
+                  onClick={() => setSelectedDay(day)}
                   className={cn(
-                    'mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium',
-                    isTday && 'bg-indigo-600 text-white',
-                    isSelected && !isTday && 'text-indigo-600',
-                    !isTday && !isSelected && isCurrentMonth && 'text-slate-600 dark:text-slate-300',
+                    "min-h-[100px] p-2 cursor-pointer transition-all duration-200 relative group",
+                    !isCurrentMonth
+                      ? "bg-slate-100/80 text-slate-400 dark:bg-slate-950/40 dark:text-slate-600"
+                      : "bg-white text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300 dark:shadow-none",
+                    isSelected
+                      ? "bg-slate-200 ring-2 ring-inset ring-indigo-500/40 shadow-md dark:bg-indigo-500/10 dark:ring-1 dark:ring-indigo-500/20 dark:ring-indigo-400/25 dark:shadow-none z-10"
+                      : "hover:bg-white/90 dark:hover:bg-slate-800/50"
                   )}
                 >
-                  {format(day, 'd')}
-                </span>
-                <div className="space-y-0.5">
-                  {dayEvents.slice(0, 3).map((ev) => {
-                    const accent = eventAccent(ev);
-                    const { shortLabel } = resolveEventLine(ev);
-                    return (
+                  <div className="flex justify-between items-start mb-1">
+                    <span className={cn(
+                      "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
+                      isTday
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-950/60"
+                        : isSelected
+                          ? "text-indigo-700 bg-slate-300/60 dark:text-indigo-300 dark:bg-indigo-500/20"
+                          : "text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-none">
+                        {dayEvents.length}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 mt-2">
+                    {dayEvents.slice(0, 3).map((ev) => (
                       <div
                         key={ev.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDay(day);
-                          openDetails(ev);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setSelectedDay(day);
-                            openDetails(ev);
-                          }
-                        }}
-                        className="truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight hover:opacity-80"
-                        style={{
-                          backgroundColor: `${accent}18`,
-                          color: accent,
-                          borderLeft: `2px solid ${accent}`,
-                        }}
-                        title={shortLabel}
+                        className={cn(
+                          'text-[10px] px-2 py-0.5 rounded-md border-l-2 truncate flex items-center gap-1 font-semibold',
+                          !ev.colorHex && eventChipClass(ev.color || 'bg-slate-500'),
+                        )}
+                        style={
+                          ev.colorHex
+                            ? {
+                                backgroundColor: `${ev.colorHex}33`,
+                                color: ev.colorHex,
+                                borderLeftColor: ev.colorHex,
+                              }
+                            : undefined
+                        }
                       >
-                        {shortLabel}
+                        <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                        <span className="truncate">{ev.typeLabel}</span>
                       </div>
-                    );
-                  })}
-                  {dayEvents.length > 3 ? (
-                    <p className="pl-1 text-[10px] text-slate-400">+{dayEvents.length - 3}</p>
-                  ) : null}
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <div className="text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-1">
+                        +{dayEvents.length - 3} {t('views.calendar.more', 'more')}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {t('views.calendar.dailySchedule')}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {selectedDay ? format(selectedDay, 'MMMM dd, yyyy') : t('views.calendar.selectDate')}
-              {selectedDay && isToday(selectedDay) ? ` · ${t('views.calendar.today')}` : ''}
-            </p>
-          </div>
-          <p className="text-xs text-slate-400">
-            {selectedDayEvents.length}{' '}
-            {selectedDayEvents.length === 1
-              ? t('views.calendar.eventSingular', 'event')
-              : t('views.calendar.eventPlural', 'events')}
-          </p>
-        </div>
-
-        {selectedDayEvents.length > 0 ? (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {selectedDayEvents.map((event) => {
-              const line = resolveEventLine(event);
-              const accent = eventAccent(event);
-              return (
-                <li
-                  key={event.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span
-                      className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: accent }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                        {event.typeLabel}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500">{line.subtitle}</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {event.source === 'custom' && canUpdate ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs text-slate-600"
-                        onClick={() => openEditEvent(event)}
-                      >
-                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                        {t('views.calendar.edit')}
-                      </Button>
-                    ) : null}
-                    {event.source === 'custom' && canDelete ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs text-rose-600"
-                        onClick={() => void removeEvent(event)}
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        {t('views.calendar.delete')}
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-indigo-600 hover:text-indigo-700"
-                      onClick={() => openDetails(event)}
-                    >
-                      {t('views.calendar.viewDetails')}
-                    </Button>
-                  </div>
-                </li>
               );
             })}
-          </ul>
-        ) : (
-          <p className="py-2 text-sm text-slate-500">{t('views.calendar.noEvents')}</p>
-        )}
-      </section>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <Card className="lg:col-span-2 border-none shadow-md dark:shadow-black/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">{t('views.calendar.dailySchedule')}</CardTitle>
+                <CardDescription className="text-xs font-medium mt-0.5 text-slate-500 dark:text-slate-400">
+                  {selectedDay ? format(selectedDay, 'MMMM dd, yyyy') : t('views.calendar.selectDate')}
+                </CardDescription>
+              </div>
+              {selectedDay && isToday(selectedDay) && (
+                <Badge className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-500/30 shadow-sm dark:shadow-none border-none px-3 py-1 text-xs font-bold uppercase tracking-wider">{t('views.calendar.today')}</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {selectedDayEvents.length > 0 ? (
+                selectedDayEvents.map((event) => {
+                  const unit = units.find((u) => u.id === event.unitId);
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/60 group hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={cn(
+                            "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-inner",
+                            !event.colorHex && (event.color || 'bg-indigo-600'),
+                          )}
+                          style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
+                        >
+                          {React.isValidElement(event.icon)
+                            ? React.cloneElement(event.icon as React.ReactElement<any>, { className: "w-3 h-3 drop-shadow-sm" })
+                            : event.icon}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-slate-100">{event.typeLabel}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{t('views.calendar.unitLabel', { unitNumber: unit?.unitNumber })} • {unit?.buildingName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 transition-opacity">
+                        {event.source === 'custom' && canUpdate ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 font-medium"
+                            onClick={() => openEditEvent(event)}
+                          >
+                            <Pencil className="w-4 h-4 mr-1.5" />
+                            {t('views.calendar.edit')}
+                          </Button>
+                        ) : null}
+                        {event.source === 'custom' && canDelete ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 font-medium"
+                            onClick={() => void removeEvent(event)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1.5" />
+                            {t('views.calendar.delete')}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                          onClick={() => openDetails(event)}
+                        >
+                          {t('views.calendar.viewDetails')}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
+                  <CalendarIcon className="w-12 h-12 mb-3 opacity-20" />
+                  <p className="text-sm italic">{t('views.calendar.noEvents')}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-md dark:shadow-black/30">
+          <CardHeader>
+            <CardTitle className="text-sm font-bold flex items-center gap-2 dark:text-slate-100">
+              <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              {t('views.calendar.timelineLegend')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveIn')}</span>
+                </div>
+                <ArrowRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.moveOut')}</span>
+                </div>
+                <ArrowLeft className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPaid')}</span>
+                </div>
+                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.paymentPending')}</span>
+                </div>
+                <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                {t('views.calendar.infoText')}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Modal
         isOpen={eventModalOpen}

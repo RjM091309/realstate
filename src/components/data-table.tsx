@@ -38,6 +38,7 @@ interface DataTableProps<T> {
    * When true, drops the inner white card frame (rounded-2xl, shadow) so the table
    * can sit flush inside a parent Card without a double border/box.
    */
+  embedded?: boolean;
   /**
    * When true, keeps the table header visible while scrolling table body.
    */

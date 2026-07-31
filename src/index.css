@@ -33,6 +33,13 @@
 }
 
 @layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent; /* slate-300 */
+  }
+  .dark .custom-scrollbar {
+    scrollbar-color: rgb(71 85 105) transparent; /* slate-600 */
+  }
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }
@@ -41,6 +48,9 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-200 rounded-full hover:bg-slate-300;
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-600 hover:bg-slate-500;
   }
 }
 @custom-variant dark (&:is(.dark *));

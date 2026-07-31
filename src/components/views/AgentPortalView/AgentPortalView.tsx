@@ -14,7 +14,6 @@ import { fetchContracts } from '@/lib/contractsApi';
 import { fetchUnits } from '@/lib/unitsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/utils';
 
 export function AgentPortalView() {
   const { t } = useTranslation();
@@ -138,7 +137,10 @@ export function AgentPortalView() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 lg:min-w-[min(100%,20rem)] lg:flex-col lg:justify-center lg:pl-10 xl:min-w-[22rem] xl:flex-row xl:flex-wrap xl:items-center">
-              <Button type="button" className="bg-white text-indigo-700 shadow-sm hover:bg-indigo-50">
+              <Button
+                type="button"
+                className="h-9 border border-white/40 !bg-white !text-indigo-700 shadow-sm hover:!bg-indigo-50 hover:!text-indigo-800 dark:border-white/50 dark:!bg-white dark:!text-indigo-800 dark:hover:!bg-indigo-50 dark:hover:!text-indigo-900"
+              >
                 <PhoneCall className="mr-2 h-4 w-4" aria-hidden />
                 {t('views.agentPortal.contactManagement')}
               </Button>
@@ -149,7 +151,7 @@ export function AgentPortalView() {
 
       <div className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6">
         <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-950/[0.04] dark:border-slate-800 dark:bg-slate-950 lg:flex-row lg:items-stretch">
-          <main className="min-w-0 flex-1 space-y-6 bg-white p-6 sm:p-8 dark:bg-slate-950 lg:shadow-[inset_-8px_0_24px_-20px_rgb(15_23_42/0.06)] dark:lg:shadow-[inset_-8px_0_24px_-20px_rgb(0_0_0/0.35)]">
+          <main className="min-w-0 flex-1 space-y-6 bg-white p-6 sm:p-8 dark:bg-slate-950">
             <Card className="border border-slate-200/80 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -211,30 +213,23 @@ export function AgentPortalView() {
             </Card>
           </main>
 
-          <div
-            className="hidden shrink-0 lg:flex lg:w-[13px] lg:flex-col lg:justify-stretch lg:bg-gradient-to-b lg:from-slate-100/80 lg:via-slate-200/60 lg:to-slate-100/80 lg:border-x lg:border-slate-300/80 dark:lg:from-slate-900/95 dark:lg:via-slate-800/90 dark:lg:to-slate-900/95 dark:lg:border-slate-700/60"
-            aria-hidden
-          >
-            <div className="mx-auto my-10 w-px flex-1 rounded-full bg-gradient-to-b from-indigo-400/50 via-slate-500/70 to-violet-400/50 shadow-[0_0_0_1px_rgb(255_255_255/0.65)] dark:from-indigo-500/35 dark:via-slate-500/50 dark:to-violet-500/35 dark:shadow-[0_0_0_1px_rgb(255_255_255/0.08)]" />
-          </div>
-
-          <aside className="min-w-0 space-y-6 border-t border-slate-200/90 bg-gradient-to-b from-slate-50/95 via-slate-50/80 to-slate-100/50 p-6 sm:p-8 lg:w-[min(22rem,100%)] lg:shrink-0 lg:border-t-0 lg:bg-gradient-to-b lg:from-slate-50 lg:to-slate-100/40 lg:shadow-[inset_8px_0_24px_-20px_rgb(15_23_42/0.07)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-900/95 dark:to-slate-950 dark:lg:from-slate-950 dark:lg:to-slate-900/90 dark:lg:shadow-[inset_8px_0_24px_-20px_rgb(0_0_0/0.35)] lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-            <Card className="border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-[2px] transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/60 dark:hover:border-slate-600">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+          <aside className="min-w-0 space-y-6 border-t border-slate-200/90 bg-slate-50/80 p-6 sm:p-8 lg:w-[min(22rem,100%)] lg:shrink-0 lg:border-t-0 lg:border-l lg:border-slate-200/90 dark:border-slate-800 dark:bg-slate-950/80">
+            <section className="space-y-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                   <CheckCircle2 className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
                   {t('views.agentPortal.tasks.title')}
-                </CardTitle>
-                <CardDescription className="dark:text-slate-400">{t('views.agentPortal.tasks.description')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('views.agentPortal.tasks.description')}</p>
+              </div>
+              <div className="space-y-2">
                 {['followUps', 'scheduleVisits', 'sendProposals'].map((taskKey) => (
                   <div
                     key={taskKey}
-                    className="rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-slate-300 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/70 dark:hover:border-slate-600 dark:hover:bg-slate-900/80"
+                    className="rounded-xl border border-slate-200/90 bg-white p-3 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-slate-600"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2 text-sm dark:text-slate-200">
+                      <div className="flex min-w-0 items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
                         <span className="leading-snug">{t(`views.agentPortal.tasks.${taskKey}`)}</span>
                       </div>
@@ -244,24 +239,24 @@ export function AgentPortalView() {
                     </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-[2px] transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/60 dark:hover:border-slate-600">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+            <section className="space-y-3 border-t border-slate-200/80 pt-6 dark:border-slate-800">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                   <FileText className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
                   {t('views.agentPortal.docs.title')}
-                </CardTitle>
-                <CardDescription className="dark:text-slate-400">{t('views.agentPortal.docs.description')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('views.agentPortal.docs.description')}</p>
+              </div>
+              <div className="space-y-2">
                 {['contractTemplates', 'rateCards', 'policyGuide'].map((docKey) => (
                   <div
                     key={docKey}
-                    className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-slate-300 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/70 dark:hover:border-slate-600 dark:hover:bg-slate-900/80"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white p-3 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-slate-600"
                   >
-                    <div className="flex min-w-0 items-center gap-2 text-sm dark:text-slate-200">
+                    <div className="flex min-w-0 items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
                       <FileText className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
                       <span className="truncate">{t(`views.agentPortal.docs.${docKey}`)}</span>
                     </div>
@@ -269,15 +264,15 @@ export function AgentPortalView() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="shrink-0 dark:text-indigo-300 dark:hover:bg-slate-800"
+                      className="shrink-0 text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-slate-800"
                       onClick={() => openResource(docKey as 'contractTemplates' | 'rateCards' | 'policyGuide')}
                     >
                       {t('views.agentPortal.docs.open')}
                     </Button>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </aside>
         </div>
       </div>

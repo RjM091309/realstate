@@ -134,7 +134,7 @@ function StepperProgress({
   const activeIdx = currentIdx < 0 ? 0 : currentIdx;
 
   return (
-    <div className="overflow-x-auto pb-0.5">
+    <div className="overflow-x-auto px-0.5 py-1">
       <div className="flex min-w-max items-center gap-1 sm:gap-1.5">
         {STEPPER_STEPS.map((step, idx) => {
           const done = idx < activeIdx;
@@ -144,12 +144,12 @@ function StepperProgress({
               <div className="flex items-center gap-1">
                 <div
                   className={cn(
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold shadow-sm',
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
                     done
                       ? 'bg-indigo-600 text-white'
                       : active
-                        ? 'bg-white text-indigo-700 ring-2 ring-indigo-500 dark:bg-indigo-950 dark:text-indigo-200'
-                        : 'bg-slate-100 text-slate-400 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:ring-slate-700',
+                        ? 'border-2 border-indigo-500 bg-white text-indigo-700 dark:bg-slate-900 dark:text-indigo-200'
+                        : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-400',
                   )}
                 >
                   {done ? <CheckCircle className="h-3 w-3" /> : idx + 1}
