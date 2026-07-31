@@ -7,7 +7,6 @@ import {
   Clock,
   Filter,
   Search,
-  Plus,
   MoreVertical,
   Trash2,
 } from 'lucide-react';
@@ -310,16 +309,61 @@ export function LeaseLedgerView() {
 
   const contractOptions = useMemo(
     () =>
-      contracts.map((c) => {
-        const unit = units.find((u) => u.id === c.unitId);
-        const tenant = tenants.find((tnt) => tnt.id === c.tenantId);
-        return {
-          value: c.id,
-          label: `${unit?.unitNumber ?? c.unitId} - ${tenant?.name ?? c.tenantId}`,
-        };
-      }),
+      [...contracts]
+        .sort((a, b) => {
+          const aActive = a.status === 'Active' ? 0 : 1;
+          const bActive = b.status === 'Active' ? 0 : 1;
+          if (aActive !== bActive) return aActive - bActive;
+          const ua = units.find((u) => u.id === a.unitId)?.unitNumber ?? '';
+          const ub = units.find((u) => u.id === b.unitId)?.unitNumber ?? '';
+          return String(ua).localeCompare(String(ub), undefined, { numeric: true });
+        })
+        .map((c) => {
+          const unit = units.find((u) => u.id === c.unitId);
+          const tenant = tenants.find((tnt) => tnt.id === c.tenantId);
+          return {
+            value: c.id,
+            label: `${unit?.unitNumber ?? c.unitId} · ${tenant?.name ?? c.tenantId}${
+              c.status === 'Active' ? '' : ` (${c.status})`
+            }`,
+          };
+        }),
     [contracts, units, tenants],
   );
+
+  const schedulePickerCards = useMemo(() => {
+    const activeOrWithPayments = contracts.filter(
+      (c) =>
+        c.status === 'Active' ||
+        payments.some((p) => String(p.contractId) === String(c.id)),
+    );
+    const list = activeOrWithPayments.length > 0 ? activeOrWithPayments : contracts;
+    return [...list]
+      .sort((a, b) => {
+        const aActive = a.status === 'Active' ? 0 : 1;
+        const bActive = b.status === 'Active' ? 0 : 1;
+        if (aActive !== bActive) return aActive - bActive;
+        const ua = units.find((u) => u.id === a.unitId)?.unitNumber ?? '';
+        const ub = units.find((u) => u.id === b.unitId)?.unitNumber ?? '';
+        return String(ua).localeCompare(String(ub), undefined, { numeric: true });
+      })
+      .map((c) => {
+        const unit = units.find((u) => u.id === c.unitId);
+        const tenant = tenants.find((tnt) => tnt.id === c.tenantId);
+        const rows = payments.filter((p) => String(p.contractId) === String(c.id));
+        const unpaid = rows.filter((p) => p.status !== 'Paid').length;
+        return {
+          id: c.id,
+          unitLabel: unit?.unitNumber ?? c.unitId,
+          building: unit?.buildingName || '',
+          tenantName: tenant?.name ?? '—',
+          status: c.status,
+          monthlyRent: Number(c.monthlyRent || 0),
+          unpaid,
+          total: rows.length,
+        };
+      });
+  }, [contracts, payments, tenants, units]);
 
   const handlePreviewInvoice = useCallback((contractId: string) => {
     const url = `${window.location.origin}/preview?type=invoice&id=${encodeURIComponent(contractId)}`;
@@ -727,7 +771,6 @@ export function LeaseLedgerView() {
           </Button>
           {(canCreate || canUpdate) && (
             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openCreateModal}>
-              <Plus className="w-4 h-4 mr-2" />
               {t('views.ledger.monthlyPayments')}
             </Button>
           )}
@@ -749,23 +792,23 @@ export function LeaseLedgerView() {
         }
       >
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t('views.ledger.scheduleContract')}</Label>
-            <Select2
-              options={contractOptions}
-              value={scheduleContractId}
-              borderless={false}
-              className={LEDGER_SELECT_CLASS}
-              placeholder={t('views.ledger.chooseContract')}
-              onChange={(v) => {
-                setScheduleContractId((v ?? null) as string | null);
-                setHighlightPaymentId(null);
-              }}
-            />
-          </div>
-
           {scheduleContractId ? (
             <>
+              <div className="space-y-2">
+                <Label>{t('views.ledger.scheduleContract')}</Label>
+                <Select2
+                  options={contractOptions}
+                  value={scheduleContractId}
+                  borderless={false}
+                  className={LEDGER_SELECT_CLASS}
+                  placeholder={t('views.ledger.chooseContract')}
+                  onChange={(v) => {
+                    setScheduleContractId((v ?? null) as string | null);
+                    setHighlightPaymentId(null);
+                  }}
+                />
+              </div>
+
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
                 <span>
                   {t('views.ledger.scheduleProgress', {
@@ -885,9 +928,59 @@ export function LeaseLedgerView() {
               )}
             </>
           ) : (
-            <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              {t('views.ledger.schedulePickContract')}
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {t('views.ledger.schedulePickContract')}
+              </p>
+              {schedulePickerCards.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  {t('views.ledger.scheduleNoContracts')}
+                </p>
+              ) : (
+                <div className="grid max-h-[min(28rem,55vh)] gap-3 overflow-auto sm:grid-cols-2">
+                  {schedulePickerCards.map((card) => (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => {
+                        setScheduleContractId(card.id);
+                        setHighlightPaymentId(null);
+                      }}
+                      className="rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-indigo-500/50"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {card.unitLabel}
+                            {card.building ? (
+                              <span className="font-normal text-slate-500"> · {card.building}</span>
+                            ) : null}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">{card.tenantName}</p>
+                        </div>
+                        {card.status ? (
+                          <StatusBadge tone={card.status === 'Active' ? 'success' : 'neutral'}>
+                            {card.status}
+                          </StatusBadge>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                          ₱{card.monthlyRent.toLocaleString()}
+                          <span className="font-normal text-slate-400"> / mo</span>
+                        </span>
+                        <span>
+                          {t('views.ledger.scheduleCardUnpaid', {
+                            unpaid: card.unpaid,
+                            total: card.total,
+                          })}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </Modal>

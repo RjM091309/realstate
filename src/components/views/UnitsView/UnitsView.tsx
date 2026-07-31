@@ -925,6 +925,11 @@ export function UnitsView() {
     );
   }, [unitList, searchTerm, branchContracts, tenantsList, statusLabel]);
 
+  const totalMonthlyRate = useMemo(
+    () => processedUnits.reduce((sum, u) => sum + (Number(u.monthlyRate) || 0), 0),
+    [processedUnits],
+  );
+
   const openAddUnitModal = useCallback(() => {
     setIsDetailsOpen(false);
     setIsManageInventoryOpen(false);
@@ -1358,6 +1363,20 @@ export function UnitsView() {
           columns={columns}
           keyExtractor={(u) => u.id}
           onRowClick={(unit) => handleViewDetails(unit)}
+          footerRow={
+            <>
+              <td
+                colSpan={Math.max(1, columns.length - 2)}
+                className="px-6 py-3.5 text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+              >
+                {t('views.units.table.totalAmount')}
+              </td>
+              <td className="px-6 py-3.5 text-sm font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                ₱{totalMonthlyRate.toLocaleString()}
+              </td>
+              <td className="px-6 py-3.5" />
+            </>
+          }
         />
       ) : processedUnits.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-50/50 py-16 text-center dark:bg-slate-900/40">

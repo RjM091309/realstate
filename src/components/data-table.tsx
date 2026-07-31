@@ -49,6 +49,10 @@ interface DataTableProps<T> {
   compact?: boolean;
   /** Lock table to container width (no horizontal scroll). */
   fitWidth?: boolean;
+  /**
+   * Optional summary row rendered in `<tfoot>` (e.g. totals), above pagination.
+   */
+  footerRow?: React.ReactNode;
 }
 
 function columnSortKey<T>(col: ColumnDef<T>): string {
@@ -132,6 +136,7 @@ export function DataTable<T>({
   fitWidth = false,
   defaultPageSize = 10,
   pageSizeOptions = [10, 25, 50, 100],
+  footerRow,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
@@ -276,6 +281,13 @@ export function DataTable<T>({
               </tr>
             )}
           </tbody>
+          {footerRow && sortedData.length > 0 ? (
+            <tfoot>
+              <tr className="border-t border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-800/80">
+                {footerRow}
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
 
