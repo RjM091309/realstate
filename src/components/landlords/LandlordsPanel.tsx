@@ -215,7 +215,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
         className: LANDLORD_COL.name,
         cellClassName: LANDLORD_CELL,
         render: (l) => (
-          <TruncatedText value={l.fullName} className="font-medium text-slate-800 dark:text-slate-100" />
+          <TruncatedText value={l.fullName} className="text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100" />
         ),
       },
       {
@@ -226,7 +226,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
         className: LANDLORD_COL.contact,
         cellClassName: LANDLORD_CELL,
         render: (l) => (
-          <TruncatedText value={l.mobileNo || '—'} className="text-slate-600 dark:text-slate-300" />
+          <TruncatedText value={l.mobileNo || '—'} className="text-[12px] font-bold uppercase tracking-tight text-slate-600 dark:text-slate-300" />
         ),
       },
       {
@@ -237,7 +237,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
         className: LANDLORD_COL.email,
         cellClassName: LANDLORD_CELL,
         render: (l) => (
-          <TruncatedText value={l.email || '—'} className="text-slate-600 dark:text-slate-300" />
+          <TruncatedText value={l.email || '—'} className="text-[12px] font-bold tracking-tight text-slate-600 dark:text-slate-300" />
         ),
       },
       {
@@ -351,11 +351,11 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label={t('views.crm.landlords.summary.total')} value={summary.totalLandlords} icon={Users} accent="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300" />
+        <SummaryCard label={t('views.crm.landlords.summary.total')} value={summary.totalLandlords} icon={Users} accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue" />
         <SummaryCard label={t('views.crm.landlords.summary.verified')} value={summary.verifiedLandlords} icon={CheckCircle2} accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300" />
         <SummaryCard label={t('views.crm.landlords.summary.pendingKyc')} value={summary.pendingKyc} icon={Clock3} accent="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300" />
         <SummaryCard label={t('views.crm.landlords.summary.properties')} value={summary.totalProperties} icon={Home} accent="bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300" />
-        <SummaryCard label={t('views.crm.landlords.summary.units')} value={summary.totalUnits} icon={Building2} accent="bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300" />
+        <SummaryCard label={t('views.crm.landlords.summary.units')} value={summary.totalUnits} icon={Building2} accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -385,7 +385,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
           {canCreate ? (
             <Button
               type="button"
-              className="h-10 shrink-0 rounded-xl bg-indigo-600 px-4 text-white shadow-sm hover:bg-indigo-700"
+              className="h-10 shrink-0 rounded-xl bg-brand-blue px-4 text-white shadow-sm hover:bg-[#3d7ab8]"
               onClick={openCreate}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -403,7 +403,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
         <div className="rounded-2xl bg-white p-12 text-center shadow-sm dark:bg-slate-900">
           <p className="text-sm text-slate-500">{t('views.crm.landlords.empty')}</p>
           {canCreate ? (
-            <Button type="button" className="mt-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={openCreate}>
+            <Button type="button" className="mt-4 rounded-xl bg-brand-blue text-white hover:bg-[#3d7ab8]" onClick={openCreate}>
               {t('views.crm.landlords.addLandlord')}
             </Button>
           ) : null}
@@ -414,8 +414,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
           columns={columns}
           keyExtractor={(l) => l.id}
           onRowClick={(l) => openProfile(l)}
-          highlightFirstColumn={false}
-          stickyHeader
+                    stickyHeader
           compact
           fitWidth
         />

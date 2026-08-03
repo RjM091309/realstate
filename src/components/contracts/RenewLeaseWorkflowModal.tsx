@@ -364,7 +364,7 @@ export function RenewLeaseWorkflowModal({
                 className={cn(
                   'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors',
                   active
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500/50 dark:bg-indigo-950 dark:text-indigo-100'
+                    ? 'border-brand-blue bg-brand-blue/10 text-brand-blue dark:border-brand-blue/50 dark:bg-brand-blue/20 dark:text-blue-100'
                     : done
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950 dark:text-emerald-100'
                       : 'border-slate-200 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-300',
@@ -483,11 +483,11 @@ export function RenewLeaseWorkflowModal({
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 dark:border-indigo-500/30 dark:bg-indigo-950">
-          <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-brand-blue/20 bg-brand-blue/10 px-3 py-2.5 dark:border-brand-blue/30 dark:bg-brand-blue/20">
+          <span className="text-sm font-semibold text-brand-blue dark:text-blue-100">
             {t('views.contracts.renewLease.workflow.totalOutstanding')}
           </span>
-          <span className="text-base font-bold text-indigo-900 dark:text-indigo-50">{formatPhp(outstanding)}</span>
+          <span className="text-base font-bold text-brand-blue dark:text-blue-50">{formatPhp(outstanding)}</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
@@ -708,7 +708,7 @@ export function RenewLeaseWorkflowModal({
             </div>
           </div>
           <div className={cn('renew-lease-summary', RENEW_LEASE_PANEL)}>
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-blue dark:text-brand-blue">
               {t('views.contracts.renewLease.workflow.newContract')}
             </div>
             <div className="space-y-1 text-sm">

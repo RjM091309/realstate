@@ -50,7 +50,7 @@ function ledgerStatusClass(status: LedgerRow['status']): string {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <dt className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
         {label}
       </dt>
       <dd className="mt-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">

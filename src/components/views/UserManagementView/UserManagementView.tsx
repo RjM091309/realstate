@@ -64,11 +64,11 @@ function StatusSwitch({
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         'relative inline-flex h-7 w-12 shrink-0 rounded-full border border-transparent transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2',
         disabled && 'cursor-not-allowed opacity-60',
         !disabled && 'cursor-pointer',
         checked
-          ? 'bg-indigo-600 shadow-sm shadow-indigo-900/10'
+          ? 'bg-brand-blue shadow-sm shadow-brand-blue/10'
           : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600',
       )}
     >
@@ -382,7 +382,7 @@ export function UserManagementView() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
+              className="h-9 w-9 rounded-lg text-slate-500 hover:text-brand-blue hover:bg-brand-blue/10 dark:text-slate-400 dark:hover:bg-brand-blue/20"
               title={t('views.userInfo.edit')}
               disabled={busy}
               onClick={(e) => {
@@ -449,7 +449,7 @@ export function UserManagementView() {
         <Button
           type="button"
           onClick={openAdd}
-          className="rounded-xl bg-indigo-600 px-5 text-white shadow-sm hover:bg-indigo-700"
+          className="rounded-xl bg-brand-blue px-5 text-white shadow-sm hover:bg-[#3d7ab8]"
         >
           <Plus className="mr-2 h-4 w-4" />
           {t('views.userInfo.addUser')}

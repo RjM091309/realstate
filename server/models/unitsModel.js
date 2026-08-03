@@ -40,6 +40,7 @@ export async function listUnitsByBranch(branchId) {
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
+      u.more_details AS more_details,
       u.special_remarks AS special_remarks
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
@@ -52,7 +53,15 @@ export async function listUnitsByBranch(branchId) {
   return rows;
 }
 
-async function upsertAreaAndGetId(branchId, areaName) {
+async function upsertAreaAndGetId(branchId, areaName, brgyName = null) {
+  try {
+    const { resolveAreaIds } = await import('../locations/locationsModel.js');
+    const resolved = await resolveAreaIds(branchId, areaName, brgyName);
+    if (resolved?.areaId) return resolved.areaId;
+  } catch (e) {
+    console.warn('[unitsModel] resolveAreaIds fallback:', e?.message ?? e);
+  }
+
   await pool.query(
     `INSERT INTO area (branch_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)`,
     [branchId, areaName],
@@ -75,7 +84,10 @@ async function upsertPropertyAndGetId(branchId, areaId, payload) {
     `,
     [branchId, areaId, payload.buildingName, payload.commonAddress, payload.legalAddress],
   );
-  if (rows[0]?.id) return rows[0].id;
+  if (rows[0]?.id) {
+    await pool.query(`UPDATE property SET active = 1 WHERE id = ? AND active = 0`, [rows[0].id]);
+    return rows[0].id;
+  }
 
   const [ins] = await pool.query(
     `
@@ -89,7 +101,7 @@ async function upsertPropertyAndGetId(branchId, areaId, payload) {
 }
 
 export async function insertUnit(branchId, payload) {
-  const areaId = await upsertAreaAndGetId(branchId, payload.area);
+  const areaId = await upsertAreaAndGetId(branchId, payload.area, payload.buildingName);
   if (!areaId) throw new Error('Failed to resolve area_id');
 
   const propertyId = await upsertPropertyAndGetId(branchId, areaId, payload);
@@ -112,8 +124,9 @@ export async function insertUnit(branchId, payload) {
       photo_data,
       status,
       inventory_json,
+      more_details,
       special_remarks
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?, ?)
     `,
     [
       propertyId,
@@ -129,6 +142,7 @@ export async function insertUnit(branchId, payload) {
       payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
+      payload.moreDetails ?? null,
       payload.specialRemarks ?? null,
     ],
   );
@@ -150,7 +164,7 @@ export async function updateUnitById(id, branchId, payload) {
   );
   if (!existingRows[0]?.id) return 0;
 
-  const areaId = await upsertAreaAndGetId(branchId, payload.area);
+  const areaId = await upsertAreaAndGetId(branchId, payload.area, payload.buildingName);
   const propertyId = await upsertPropertyAndGetId(branchId, areaId, payload);
 
   const [result] = await pool.query(
@@ -170,6 +184,7 @@ export async function updateUnitById(id, branchId, payload) {
       photo_data = ?,
       status = ?,
       inventory_json = ?,
+      more_details = ?,
       special_remarks = ?
     WHERE id = ? AND active = 1
     `,
@@ -187,6 +202,7 @@ export async function updateUnitById(id, branchId, payload) {
       payload.photoDataUrl ?? null,
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
+      payload.moreDetails ?? null,
       payload.specialRemarks ?? null,
       id,
     ],
@@ -221,6 +237,7 @@ export async function getUnitById(id, branchId) {
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
+      u.more_details AS more_details,
       u.special_remarks AS special_remarks
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
@@ -265,4 +282,96 @@ export async function updateUnitStatusById(id, branchId, status) {
     id,
   ]);
   return result.affectedRows;
+}
+
+/** Soft-deleted barangay/building panel rows (seed lists stay hidden after delete). */
+export async function listDeletedBuildings(branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT location_name, building_name
+    FROM deleted_building
+    WHERE branch_id = ? AND active = 1
+    ORDER BY location_name ASC, building_name ASC
+    `,
+    [branchId],
+  );
+  return rows;
+}
+
+/**
+ * Soft-delete a building/barangay under a city/area:
+ * - units → active=0
+ * - matching property rows → active=0
+ * - record in deleted_building so seeded lists stay hidden
+ */
+export async function softDeleteBuilding(branchId, locationName, buildingName) {
+  const location = String(locationName ?? '').trim();
+  const building = String(buildingName ?? '').trim();
+  if (!location || !building) return { units: 0, properties: 0 };
+
+  const [unitResult] = await pool.query(
+    `
+    UPDATE unit u
+    JOIN property pr ON pr.id = u.property_id
+    JOIN area a ON a.id = pr.area_id
+    SET
+      u.active = 0,
+      u.status = 'inactive'
+    WHERE pr.branch_id = ?
+      AND u.active = 1
+      AND LOWER(TRIM(a.name)) = LOWER(?)
+      AND LOWER(TRIM(pr.name)) = LOWER(?)
+    `,
+    [branchId, location, building],
+  );
+
+  const [propertyResult] = await pool.query(
+    `
+    UPDATE property pr
+    JOIN area a ON a.id = pr.area_id
+    SET pr.active = 0
+    WHERE pr.branch_id = ?
+      AND pr.active = 1
+      AND LOWER(TRIM(a.name)) = LOWER(?)
+      AND LOWER(TRIM(pr.name)) = LOWER(?)
+    `,
+    [branchId, location, building],
+  );
+
+  await pool.query(
+    `
+    INSERT INTO deleted_building (branch_id, location_name, building_name, active, deleted_at)
+    VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+    ON DUPLICATE KEY UPDATE
+      active = 1,
+      deleted_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+    `,
+    [branchId, location, building],
+  );
+
+  return {
+    units: Number(unitResult.affectedRows ?? 0),
+    properties: Number(propertyResult.affectedRows ?? 0),
+  };
+}
+
+/** Clear soft-delete so a barangay/building can show again (e.g. re-added via +). */
+export async function restoreDeletedBuilding(branchId, locationName, buildingName) {
+  const location = String(locationName ?? '').trim();
+  const building = String(buildingName ?? '').trim();
+  if (!location || !building) return 0;
+
+  const [result] = await pool.query(
+    `
+    UPDATE deleted_building
+    SET active = 0, updated_at = CURRENT_TIMESTAMP
+    WHERE branch_id = ?
+      AND LOWER(TRIM(location_name)) = LOWER(?)
+      AND LOWER(TRIM(building_name)) = LOWER(?)
+      AND active = 1
+    `,
+    [branchId, location, building],
+  );
+  return Number(result.affectedRows ?? 0);
 }

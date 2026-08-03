@@ -152,7 +152,7 @@ export function UserRoleManagementView() {
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
+                className="h-9 w-9 rounded-lg text-slate-500 hover:text-brand-blue hover:bg-brand-blue/10 dark:text-slate-400 dark:hover:bg-brand-blue/20"
                 aria-label={t('views.userRole.edit')}
                 onClick={() => openEdit(r)}
               >
@@ -284,7 +284,7 @@ export function UserRoleManagementView() {
         <Button
           type="button"
           onClick={openAdd}
-          className="rounded-xl bg-indigo-600 px-5 text-white shadow-sm hover:bg-indigo-700"
+          className="rounded-xl bg-brand-blue px-5 text-white shadow-sm hover:bg-[#3d7ab8]"
         >
           <Plus className="mr-2 h-4 w-4" />
           {t('views.userRole.addRole')}
@@ -345,8 +345,7 @@ export function UserRoleManagementView() {
               data={filtered}
               columns={roleColumns}
               keyExtractor={(r) => r.id}
-              highlightFirstColumn={false}
-            />
+                          />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((r) => {
@@ -378,7 +377,7 @@ export function UserRoleManagementView() {
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="h-9 w-9 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:bg-indigo-950/40"
+                          className="h-9 w-9 rounded-lg text-slate-500 hover:text-brand-blue hover:bg-brand-blue/10 dark:text-slate-400 dark:hover:bg-brand-blue/20"
                           aria-label={t('views.userRole.edit')}
                           onClick={() => openEdit(r)}
                         >
@@ -436,7 +435,7 @@ export function UserRoleManagementView() {
               type="button"
               disabled={saving}
               onClick={() => void handleSaveForm()}
-              className="rounded-xl bg-indigo-600 px-6 text-white shadow-sm hover:bg-indigo-700"
+              className="rounded-xl bg-brand-blue px-6 text-white shadow-sm hover:bg-[#3d7ab8]"
             >
               {saving ? '…' : t('views.userRole.saveRole')}
             </Button>
@@ -449,7 +448,7 @@ export function UserRoleManagementView() {
               {t('views.userRole.roleName')}
             </Label>
             <Input
-              className={cn(inputClass, 'ring-violet-500/30 focus-visible:ring-2')}
+              className={cn(inputClass, 'ring-brand-blue/30 focus-visible:ring-2')}
               placeholder={t('views.userRole.roleNamePlaceholder')}
               value={roleName}
               onChange={(e) => setRoleName(e.target.value)}
@@ -461,7 +460,7 @@ export function UserRoleManagementView() {
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
               <input
                 type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
                 checked={roleActive}
                 onChange={(e) => setRoleActive(e.target.checked)}
               />

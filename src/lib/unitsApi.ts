@@ -16,6 +16,7 @@ export type UnitWriteBody = {
   bathrooms?: number | null;
   monthlyRate: number;
   photoDataUrl?: string | null;
+  moreDetails?: string;
   specialRemarks?: string;
   inventory: Unit['inventory'];
 };

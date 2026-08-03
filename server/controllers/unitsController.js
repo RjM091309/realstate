@@ -51,6 +51,7 @@ function rowToUnit(row) {
     bathrooms: row.bathrooms == null ? undefined : Number(row.bathrooms),
     monthlyRate: Number(row.monthly_rate),
     photoDataUrl: row.photo_data ? String(row.photo_data) : null,
+    moreDetails: row.more_details ? String(row.more_details) : undefined,
     specialRemarks: row.special_remarks ? String(row.special_remarks) : undefined,
     inventory,
   };
@@ -73,6 +74,7 @@ function payloadToUnit(id, parsed) {
     bathrooms: parsed.bathrooms,
     monthlyRate: parsed.monthlyRate,
     photoDataUrl: parsed.photoDataUrl,
+    moreDetails: parsed.moreDetails,
     specialRemarks: parsed.specialRemarks,
     inventory: parsed.inventory ?? [],
   };
@@ -111,16 +113,21 @@ function normalizePhotoDataUrl(photoRaw) {
 
 function validatePayload(body) {
   const unitNumber = String(body.unitNumber ?? '').trim();
-  const legalAddress = String(body.legalAddress ?? '').trim();
-  const commonAddress = String(body.commonAddress ?? '').trim();
-  const buildingName =
+  const legalAddressRaw = String(body.legalAddress ?? '').trim();
+  const commonAddressRaw = String(body.commonAddress ?? '').trim();
+  const isPlaceholder = (v) => !v || v === '—' || v === '-';
+  const legalAddress = isPlaceholder(legalAddressRaw) ? '' : legalAddressRaw;
+  const commonAddress = isPlaceholder(commonAddressRaw) ? '' : commonAddressRaw;
+  const buildingNameRaw =
     String(body.buildingName ?? '').trim() ||
     deriveBuildingName(legalAddress, commonAddress);
+  const buildingName = isPlaceholder(buildingNameRaw) ? '' : buildingNameRaw;
   if (!unitNumber || !buildingName) return null;
 
   const unitType = String(body.type ?? '');
   const status = String(body.status ?? '');
-  const area = String(body.area ?? '').trim();
+  const areaRaw = String(body.area ?? '').trim();
+  const area = isPlaceholder(areaRaw) ? '' : areaRaw;
   if (!UNIT_TYPES.has(unitType) || !UNIT_STATUSES.has(status) || !area) return null;
 
   const monthlyRate = Number(body.monthlyRate);
@@ -142,6 +149,12 @@ function validatePayload(body) {
       ? null
       : String(specialRemarksRaw).trim() || null;
 
+  const moreDetailsRaw = body.moreDetails;
+  const moreDetails =
+    moreDetailsRaw === null || moreDetailsRaw === undefined
+      ? null
+      : String(moreDetailsRaw).trim() || null;
+
   const parseMetric = (raw, { max, allowDecimal }) => {
     if (raw === null || raw === undefined || String(raw).trim() === '') return null;
     const n = Number(raw);
@@ -160,7 +173,7 @@ function validatePayload(body) {
     tower: String(body.tower ?? '').trim() || '—',
     buildingName,
     commonAddress: commonAddress || legalAddress || buildingName,
-    legalAddress: legalAddress || commonAddress || '—',
+    legalAddress: legalAddress || commonAddress || buildingName,
     unitType,
     status,
     area,
@@ -170,6 +183,7 @@ function validatePayload(body) {
     monthlyRate,
     photoDataUrl,
     inventory,
+    moreDetails,
     specialRemarks,
   };
 }
@@ -241,6 +255,7 @@ export async function createUnit(req, res) {
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
+      moreDetails: parsed.moreDetails,
       specialRemarks: parsed.specialRemarks,
     });
     if (!row) {
@@ -292,6 +307,7 @@ export async function updateUnit(req, res) {
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
+      moreDetails: parsed.moreDetails,
       specialRemarks: parsed.specialRemarks,
     });
     if (affectedRows === 0) {

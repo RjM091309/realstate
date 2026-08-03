@@ -122,7 +122,7 @@ export function AgentPortalView() {
 
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 animate-in fade-in duration-500 dark:bg-slate-950 dark:text-slate-100">
-      <header className="relative overflow-hidden bg-gradient-to-br from-violet-800 via-indigo-700 to-indigo-950 text-white shadow-[inset_0_-1px_0_0_rgb(255_255_255/0.08)]">
+      <header className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-brand-blue to-slate-950 text-white shadow-[inset_0_-1px_0_0_rgb(255_255_255/0.08)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_-20%,rgb(196_181_253/0.35),transparent)]" aria-hidden />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-0">
@@ -139,7 +139,7 @@ export function AgentPortalView() {
             <div className="flex flex-wrap gap-2 lg:min-w-[min(100%,20rem)] lg:flex-col lg:justify-center lg:pl-10 xl:min-w-[22rem] xl:flex-row xl:flex-wrap xl:items-center">
               <Button
                 type="button"
-                className="h-9 border border-white/40 !bg-white !text-indigo-700 shadow-sm hover:!bg-indigo-50 hover:!text-indigo-800 dark:border-white/50 dark:!bg-white dark:!text-indigo-800 dark:hover:!bg-indigo-50 dark:hover:!text-indigo-900"
+                className="h-9 border border-white/40 !bg-white !text-brand-blue shadow-sm hover:!bg-brand-blue/10 hover:!text-brand-blue dark:border-white/50 dark:!bg-white dark:!text-brand-blue dark:hover:!bg-brand-blue/10 dark:hover:!text-brand-blue"
               >
                 <PhoneCall className="mr-2 h-4 w-4" aria-hidden />
                 {t('views.agentPortal.contactManagement')}
@@ -155,7 +155,7 @@ export function AgentPortalView() {
             <Card className="border border-slate-200/80 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                  <TrendingUp className="h-4 w-4 text-brand-blue dark:text-brand-blue" aria-hidden />
                   {t('views.agentPortal.overview.title')}
                 </CardTitle>
                 <CardDescription className="dark:text-slate-400">{t('views.agentPortal.overview.description')}</CardDescription>
@@ -190,7 +190,7 @@ export function AgentPortalView() {
             <Card className="border border-slate-200/80 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                  <FileText className="h-4 w-4 text-brand-blue dark:text-brand-blue" aria-hidden />
                   {t('views.agentPortal.contracts.title')}
                 </CardTitle>
                 <CardDescription className="dark:text-slate-400">{t('views.agentPortal.contracts.description')}</CardDescription>
@@ -205,8 +205,7 @@ export function AgentPortalView() {
                       columns={contractColumns}
                       keyExtractor={(c) => c.id}
                       embedded
-                      highlightFirstColumn={false}
-                    />
+                                          />
                   </div>
                 )}
               </CardContent>
@@ -217,7 +216,7 @@ export function AgentPortalView() {
             <section className="space-y-3">
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
-                  <CheckCircle2 className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                  <CheckCircle2 className="h-4 w-4 text-brand-blue dark:text-brand-blue" aria-hidden />
                   {t('views.agentPortal.tasks.title')}
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('views.agentPortal.tasks.description')}</p>
@@ -245,7 +244,7 @@ export function AgentPortalView() {
             <section className="space-y-3 border-t border-slate-200/80 pt-6 dark:border-slate-800">
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
-                  <FileText className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                  <FileText className="h-4 w-4 text-brand-blue dark:text-brand-blue" aria-hidden />
                   {t('views.agentPortal.docs.title')}
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('views.agentPortal.docs.description')}</p>
@@ -264,7 +263,7 @@ export function AgentPortalView() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="shrink-0 text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-slate-800"
+                      className="shrink-0 text-brand-blue hover:bg-brand-blue/10 dark:text-brand-blue dark:hover:bg-slate-800"
                       onClick={() => openResource(docKey as 'contractTemplates' | 'rateCards' | 'policyGuide')}
                     >
                       {t('views.agentPortal.docs.open')}

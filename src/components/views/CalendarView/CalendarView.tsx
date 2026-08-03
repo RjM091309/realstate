@@ -72,7 +72,7 @@ function formatEventDate(value: string | Date | null | undefined): string {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <dt className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
         {label}
       </dt>
       <dd className="mt-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">
@@ -144,12 +144,12 @@ function eventAccent(ev: Pick<UiEvent, 'color' | 'colorHex'>): string {
   if (ev.color.includes('rose')) return '#f43f5e';
   if (ev.color.includes('blue')) return '#3b82f6';
   if (ev.color.includes('amber')) return '#f59e0b';
-  if (ev.color.includes('indigo')) return '#4f46e5';
+  if (ev.color.includes('indigo')) return '#4B89CD';
   return '#64748b';
 }
 
 const CALENDAR_FORM_INPUT =
-  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const CALENDAR_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 
@@ -168,7 +168,7 @@ function eventChipClass(color: string): string {
     return 'bg-amber-100 text-amber-900 border-l-amber-500 dark:bg-amber-500/25 dark:text-amber-200 dark:border-l-amber-400';
   }
   if (color.includes('indigo')) {
-    return 'bg-indigo-100 text-indigo-800 border-l-indigo-500 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-l-indigo-400';
+    return 'bg-brand-blue/10 text-brand-blue border-l-brand-blue dark:bg-brand-blue/25 dark:text-blue-200 dark:border-l-brand-blue';
   }
   return 'bg-slate-100 text-slate-700 border-l-slate-400 dark:bg-slate-700/50 dark:text-slate-200 dark:border-l-slate-400';
 }
@@ -222,7 +222,7 @@ function defaultEventForm(today: Date, unitId: string): EventForm {
     eventDate: format(today, 'yyyy-MM-dd'),
     title: 'Inspection',
     unitId,
-    colorCode: '#4f46e5',
+    colorCode: '#4B89CD',
   };
 }
 
@@ -371,7 +371,7 @@ export function CalendarView() {
         hex
           ? 'bg-slate-500'
           : e.eventType === 'inspection'
-            ? 'bg-indigo-500'
+            ? 'bg-brand-blue'
             : e.eventType === 'payment_received'
               ? 'bg-blue-500'
               : 'bg-slate-500';
@@ -630,7 +630,7 @@ export function CalendarView() {
         <div className="flex flex-wrap items-center gap-2">
           {canCreate ? (
             <Button
-              className="h-9 rounded-lg bg-indigo-600 px-3 text-sm text-white hover:bg-indigo-700"
+              className="h-9 rounded-lg bg-brand-blue px-3 text-sm text-white hover:bg-[#3d7ab8]"
               onClick={openCreateEvent}
               disabled={loading}
             >
@@ -647,18 +647,18 @@ export function CalendarView() {
                 setCurrentMonth(today);
                 setSelectedDay(today);
               }} 
-              className="h-8 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+              className="h-8 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-brand-blue hover:bg-brand-blue/10 dark:hover:bg-brand-blue/10 transition-colors"
             >
               {t('views.calendar.today')}
             </Button>
             <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="px-4 font-bold text-sm min-w-[140px] text-center text-slate-700 dark:text-slate-200">
               {format(currentMonth, 'MMMM yyyy')}
             </div>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -691,7 +691,7 @@ export function CalendarView() {
                       ? "bg-slate-100/80 text-slate-400 dark:bg-slate-950/40 dark:text-slate-600"
                       : "bg-white text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300 dark:shadow-none",
                     isSelected
-                      ? "bg-slate-200 ring-2 ring-inset ring-indigo-500/40 shadow-md dark:bg-indigo-500/10 dark:ring-1 dark:ring-indigo-500/20 dark:ring-indigo-400/25 dark:shadow-none z-10"
+                      ? "bg-slate-200 ring-2 ring-inset ring-brand-blue/40 shadow-md dark:bg-brand-blue/10 dark:ring-1 dark:ring-brand-blue/20 dark:ring-brand-blue/25 dark:shadow-none z-10"
                       : "hover:bg-white/90 dark:hover:bg-slate-800/50"
                   )}
                 >
@@ -699,10 +699,10 @@ export function CalendarView() {
                     <span className={cn(
                       "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
                       isTday
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-950/60"
+                        ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20 dark:shadow-brand-blue/40"
                         : isSelected
-                          ? "text-indigo-700 bg-slate-300/60 dark:text-indigo-300 dark:bg-indigo-500/20"
-                          : "text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+                          ? "text-brand-blue bg-slate-300/60 dark:text-brand-blue dark:bg-brand-blue/20"
+                          : "text-slate-500 dark:text-slate-400 group-hover:text-brand-blue dark:group-hover:text-brand-blue"
                     )}>
                       {format(day, 'd')}
                     </span>
@@ -758,7 +758,7 @@ export function CalendarView() {
                 </CardDescription>
               </div>
               {selectedDay && isToday(selectedDay) && (
-                <Badge className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-500/30 shadow-sm dark:shadow-none border-none px-3 py-1 text-xs font-bold uppercase tracking-wider">{t('views.calendar.today')}</Badge>
+                <Badge className="bg-brand-blue/10 dark:bg-brand-blue/20 text-brand-blue dark:text-brand-blue hover:bg-brand-blue/20 dark:hover:bg-brand-blue/30 shadow-sm dark:shadow-none border-none px-3 py-1 text-xs font-bold uppercase tracking-wider">{t('views.calendar.today')}</Badge>
               )}
             </div>
           </CardHeader>
@@ -770,13 +770,13 @@ export function CalendarView() {
                   return (
                     <div
                       key={event.id}
-                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/60 group hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all"
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/60 group hover:border-brand-blue/20 dark:hover:border-brand-blue/30 transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <div
                           className={cn(
                             "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-inner",
-                            !event.colorHex && (event.color || 'bg-indigo-600'),
+                            !event.colorHex && (event.color || 'bg-brand-blue'),
                           )}
                           style={event.colorHex ? { backgroundColor: event.colorHex } : undefined}
                         >
@@ -795,7 +795,7 @@ export function CalendarView() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 font-medium"
+                            className="text-brand-blue dark:text-brand-blue hover:text-brand-blue dark:hover:text-brand-blue hover:bg-brand-blue/10 dark:hover:bg-brand-blue/10 font-medium"
                             onClick={() => openEditEvent(event)}
                           >
                             <Pencil className="w-4 h-4 mr-1.5" />
@@ -840,7 +840,7 @@ export function CalendarView() {
         <Card className="border-none shadow-md dark:shadow-black/30">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2 dark:text-slate-100">
-              <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <Info className="w-4 h-4 text-brand-blue dark:text-brand-blue" />
               {t('views.calendar.timelineLegend')}
             </CardTitle>
           </CardHeader>
@@ -946,7 +946,7 @@ export function CalendarView() {
             <Label>{t('views.calendar.color')}</Label>
             <Input
               className={CALENDAR_FORM_INPUT}
-              placeholder="#4f46e5"
+              placeholder="#4B89CD"
               value={eventForm.colorCode}
               onChange={(e) => setEventForm((p) => ({ ...p, colorCode: e.target.value }))}
             />

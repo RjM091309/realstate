@@ -10,6 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Sidebar, TopNav } from './components/Navigation';
 import { DashboardView } from './components/views/DashboardView/index';
 import { UnitsView } from './components/views/UnitsView/index';
+import { AddUnitByLocationView } from './components/views/AddUnitByLocationView/index';
+import { FileMaintenanceView } from './components/views/FileMaintenanceView/index';
 import { ContractsView } from './components/views/ContractsView/index';
 import { CRMView } from './components/views/CRMView/CRMView';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
@@ -46,8 +48,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+      <div className="min-h-screen bg-[#F4F7F9] dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
+        <Loader2 className="h-10 w-10 animate-spin text-brand-blue" aria-hidden />
         <p className="text-sm">Loading…</p>
       </div>
     );
@@ -74,6 +76,8 @@ function MainApp() {
   const tabToPath: Record<string, string> = {
     dashboard: '/dashboard',
     units: '/units',
+    addUnitByLocation: '/add-unit-by-location',
+    fileMaintenance: '/file-maintenance',
     contracts: '/contracts',
     crm: '/crm',
     ledger: '/ledger',
@@ -81,6 +85,8 @@ function MainApp() {
     userManagement: '/user-management/user-info',
     settings: '/settings',
   };
+  const tabPermissionOf = (tab: string) =>
+    tab === 'addUnitByLocation' || tab === 'fileMaintenance' ? 'units' : tab;
   const pathToTab = Object.entries(tabToPath).reduce((acc, [tab, path]) => {
     acc[path] = tab;
     return acc;
@@ -105,7 +111,7 @@ function MainApp() {
     const alwaysAllowedTabs = ['settings', ...(isAdmin ? ['userManagement'] : [])];
     if (alwaysAllowedTabs.includes(activeTab)) return;
 
-    if (!allowedTabIds.includes(activeTab)) {
+    if (!allowedTabIds.includes(tabPermissionOf(activeTab))) {
       const fallback = allowedTabIds[0] ?? 'dashboard';
       navigate(tabToPath[fallback] ?? '/dashboard', { replace: true });
     }
@@ -113,8 +119,8 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden />
+      <div className="min-h-screen bg-[#F4F7F9] dark:bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-slate-300">
+        <Loader2 className="h-10 w-10 animate-spin text-brand-blue" aria-hidden />
         <p className="text-sm">Loading…</p>
       </div>
     );
@@ -163,6 +169,10 @@ function MainApp() {
         return <DashboardView />;
       case 'units':
         return <UnitsView />;
+      case 'addUnitByLocation':
+        return <AddUnitByLocationView />;
+      case 'fileMaintenance':
+        return <FileMaintenanceView />;
       case 'contracts':
         return <ContractsView />;
       case 'crm':
@@ -179,7 +189,7 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100">
+    <div className="flex h-screen bg-[#F4F7F9] dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -191,10 +201,10 @@ function MainApp() {
         }}
       />
       
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F7F9] dark:bg-slate-950">
         <TopNav onOpenSettings={() => setActiveTab('settings')} onLogout={() => logout()} />
         
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50 dark:bg-slate-950">
+        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar light-scroll bg-[#F4F7F9] dark:bg-slate-950">
           <div className="max-w-screen-2xl mx-auto">
             {renderView()}
           </div>

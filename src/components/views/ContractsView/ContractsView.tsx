@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/status-badge';
 import { contractStatusVariant } from '@/lib/statusBadge';
 import { Label } from '@/components/ui/label';
-import { DataTable, type ColumnDef } from '@/components/data-table';
+import { DataTable, type ColumnDef, meritCellAccentClass, meritCellPrimaryClass, meritCellMetaClass } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
@@ -33,6 +33,7 @@ import { fetchPayments } from '@/lib/paymentsApi';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import type { Contract, Tenant, Unit, Payment, UnitInspectionPayload } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
@@ -343,7 +344,7 @@ export function ContractsView() {
           showCancelButton: true,
           confirmButtonText: t('views.contracts.table.activate'),
           cancelButtonText: t('views.contracts.cancel'),
-          confirmButtonColor: '#4f46e5',
+          confirmButtonColor: '#4B89CD',
           reverseButtons: true,
         });
         if (!result.isConfirmed) return;
@@ -401,10 +402,12 @@ export function ContractsView() {
           const dt = parseContractDateTime(contract.createdAt);
           return dt ? (
             <div className="flex min-w-[8rem] flex-col gap-0.5">
-              <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+              <span className={cn(meritCellMetaClass, 'whitespace-nowrap text-slate-500')}>
                 {format(dt, 'MMM dd, yyyy')}
               </span>
-              <span className="whitespace-nowrap text-xs text-slate-500">{format(dt, 'h:mm a')}</span>
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {format(dt, 'h:mm a')}
+              </span>
             </div>
           ) : (
             <span className="text-sm text-slate-400">—</span>
@@ -417,7 +420,7 @@ export function ContractsView() {
         sortable: true,
         sortValue: (contract) => contract.contractNo ?? contract.id,
         render: (contract) => (
-          <span className="font-mono text-xs text-slate-500 uppercase">{contract.contractNo ?? contract.id}</span>
+          <span className={meritCellAccentClass}>{contract.contractNo ?? contract.id}</span>
         ),
       },
       {
@@ -428,7 +431,7 @@ export function ContractsView() {
         render: (contract) => {
           const tenant = tenantList.find((ten) => ten.id === contract.tenantId);
           return (
-            <span className="block min-w-[7rem] font-medium text-slate-700 dark:text-slate-200">
+            <span className={cn(meritCellPrimaryClass, 'block min-w-[7rem]')}>
               {tenant?.name ?? '—'}
             </span>
           );
@@ -442,7 +445,7 @@ export function ContractsView() {
         render: (contract) => {
           const unit = unitList.find((u) => u.id === contract.unitId);
           return (
-            <span className="block min-w-[5rem] font-semibold text-slate-900 dark:text-slate-100">
+            <span className={cn(meritCellPrimaryClass, 'block min-w-[5rem]')}>
               {unit?.unitNumber ?? contract.unitId}
             </span>
           );
@@ -454,7 +457,7 @@ export function ContractsView() {
         sortable: true,
         sortValue: (contract) => contract.startDate,
         render: (contract) => (
-          <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+          <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-500">
             {format(new Date(contract.startDate), 'MMM dd, yyyy')}
             <span className="mx-1.5 text-slate-300 dark:text-slate-600">—</span>
             {format(new Date(contract.endDate), 'MMM dd, yyyy')}
@@ -468,7 +471,7 @@ export function ContractsView() {
         sortValue: (contract) => contract.agentName?.trim() ?? '',
         render: (contract) => {
           const label = (contract.agentName && contract.agentName.trim()) || '—';
-          return <span className="text-sm font-medium">{label}</span>;
+          return <span className="text-[12px] font-black uppercase tracking-tight text-slate-700">{label}</span>;
         },
       },
       {
@@ -668,7 +671,7 @@ export function ContractsView() {
           {canCreate ? (
             <Button
               type="button"
-              className="h-10 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+              className="h-10 shrink-0 rounded-xl bg-brand-blue text-white shadow-sm hover:bg-[#3d7ab8]"
               onClick={openCreateModal}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -740,7 +743,7 @@ export function ContractsView() {
               onChange={(d) => setStartDate((d as Date | null) ?? null)}
               placeholder="Start date"
               fullWidth
-              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
@@ -751,7 +754,7 @@ export function ContractsView() {
               onChange={(d) => setEndDate((d as Date | null) ?? null)}
               placeholder="End date"
               fullWidth
-              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              inputClassName="unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2">
@@ -759,7 +762,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="35000"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
               value={monthlyRent}
               onChange={(e) => setMonthlyRent(e.target.value)}
             />
@@ -769,7 +772,7 @@ export function ContractsView() {
             <Input
               type="number"
               placeholder="70000"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
               value={securityDeposit}
               onChange={(e) => setSecurityDeposit(e.target.value)}
             />
@@ -835,8 +838,7 @@ export function ContractsView() {
           columns={columns}
           keyExtractor={(c) => c.id}
           onRowClick={(c) => openContractDetails(c)}
-          highlightFirstColumn={false}
-        />
+                  />
       )}
     </div>
   );

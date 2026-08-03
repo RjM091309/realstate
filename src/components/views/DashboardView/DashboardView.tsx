@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -60,7 +59,12 @@ import { fetchContracts } from '@/lib/contractsApi';
 import { fetchPayments } from '@/lib/paymentsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 
-const COLORS = ['#4f46e5', '#10b981', '#f59e0b'];
+/** Merit brand accents — fixed per unit status (not index-based). */
+const UNIT_STATUS_COLORS = {
+  occupied: '#4B89CD',
+  available: '#43A751',
+  maintenance: '#f08135',
+} as const;
 
 function sumPaidBetween(payments: Payment[], startYmd: string, endYmd: string): number {
   return payments
@@ -73,16 +77,28 @@ function sumPaidBetween(payments: Payment[], startYmd: string, endYmd: string): 
 }
 
 const occupancyData = (t: (key: string) => string, units: Array<{ status: string }>) => [
-  { name: t('views.dashboard.charts.statuses.occupied'), value: units.filter((u) => u.status === 'Occupied').length },
-  { name: t('views.dashboard.charts.statuses.available'), value: units.filter((u) => u.status === 'Available').length },
-  { name: t('views.dashboard.charts.statuses.maintenance'), value: units.filter((u) => u.status === 'Maintenance').length },
+  {
+    name: t('views.dashboard.charts.statuses.available'),
+    value: units.filter((u) => u.status === 'Available').length,
+    color: UNIT_STATUS_COLORS.available,
+  },
+  {
+    name: t('views.dashboard.charts.statuses.occupied'),
+    value: units.filter((u) => u.status === 'Occupied').length,
+    color: UNIT_STATUS_COLORS.occupied,
+  },
+  {
+    name: t('views.dashboard.charts.statuses.maintenance'),
+    value: units.filter((u) => u.status === 'Maintenance').length,
+    color: UNIT_STATUS_COLORS.maintenance,
+  },
 ];
 
 function getGreeting(): { text: string; icon: React.ReactNode } {
   const hour = new Date().getHours();
   if (hour < 12) return { text: 'Good morning', icon: <Sun className="w-5 h-5 text-amber-400" /> };
   if (hour < 18) return { text: 'Good afternoon', icon: <Sunset className="w-5 h-5 text-orange-400" /> };
-  return { text: 'Good evening', icon: <Moon className="w-5 h-5 text-indigo-400" /> };
+  return { text: 'Good evening', icon: <Moon className="w-5 h-5 text-brand-blue" /> };
 }
 
 interface StatCardProps {
@@ -91,34 +107,36 @@ interface StatCardProps {
   subtext: string;
   subtextVariant?: 'up' | 'down' | 'alert' | 'neutral';
   icon: React.ReactNode;
-  iconBg: string;
+  iconColor: string;
 }
 
-function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, iconBg }: StatCardProps) {
+function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, iconColor }: StatCardProps) {
   return (
-    <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition-shadow duration-200">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center', iconBg)}>{icon}</div>
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-4 flex items-start justify-between">
+        <div className={cn('flex h-12 w-12 items-center justify-center rounded text-white shadow-lg', iconColor)}>
+          {icon}
         </div>
-        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{value}</div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">{label}</p>
-        <div
-          className={cn(
-            'flex items-center gap-1 mt-3 text-xs font-medium',
-            subtextVariant === 'up' && 'text-emerald-600',
-            subtextVariant === 'down' && 'text-rose-500',
-            subtextVariant === 'alert' && 'text-rose-500',
-            subtextVariant === 'neutral' && 'text-slate-400 dark:text-slate-500',
-          )}
-        >
-          {subtextVariant === 'up' && <ArrowUpRight className="w-3 h-3" />}
-          {subtextVariant === 'down' && <ArrowDownRight className="w-3 h-3" />}
-          {subtextVariant === 'alert' && <AlertCircle className="w-3 h-3" />}
-          {subtext}
+        <div className="text-right">
+          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+          <h3 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{value}</h3>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div
+        className={cn(
+          'mt-auto flex items-center gap-1 border-t border-slate-50 pt-3 text-xs font-medium transition-colors dark:border-slate-800',
+          subtextVariant === 'up' && 'text-brand-green',
+          subtextVariant === 'down' && 'text-rose-500',
+          subtextVariant === 'alert' && 'text-rose-500',
+          subtextVariant === 'neutral' && 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500',
+        )}
+      >
+        {subtextVariant === 'up' && <ArrowUpRight className="h-3 w-3" />}
+        {subtextVariant === 'down' && <ArrowDownRight className="h-3 w-3" />}
+        {subtextVariant === 'alert' && <AlertCircle className="h-3 w-3" />}
+        {subtext}
+      </div>
+    </div>
   );
 }
 
@@ -413,7 +431,7 @@ export function DashboardView() {
         header: t('views.dashboard.agents.agentName'),
         render: (a) => (
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-500/25 text-indigo-700 dark:text-indigo-200 flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-xs font-bold text-brand-blue dark:bg-brand-blue/25 dark:text-blue-200">
               {a.name.charAt(0)}
             </div>
             <span className="font-medium">{a.name}</span>
@@ -442,7 +460,7 @@ export function DashboardView() {
         render: (a) => (
           <Badge
             variant={a.status === t('views.dashboard.agents.statusTopPerformer') ? 'default' : 'outline'}
-            className={cn(a.status === t('views.dashboard.agents.statusTopPerformer') && 'bg-indigo-600')}
+            className={cn(a.status === t('views.dashboard.agents.statusTopPerformer') && 'bg-brand-blue')}
           >
             {a.status}
           </Badge>
@@ -453,7 +471,6 @@ export function DashboardView() {
   );
 
   const chartGridColor = isDarkMode ? '#334155' : '#f1f5f9';
-  const chartTickColor = '#94a3b8';
   const chartCursorColor = isDarkMode ? '#1e293b' : '#f8fafc';
   const tooltipStyle = {
     borderRadius: '10px',
@@ -467,7 +484,7 @@ export function DashboardView() {
   if (dataLoading) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 animate-in fade-in duration-300">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden />
+        <Loader2 className="h-10 w-10 animate-spin text-brand-blue" aria-hidden />
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('views.dashboard.loading')}</p>
       </div>
     );
@@ -494,16 +511,16 @@ export function DashboardView() {
           value={`₱${periodTotals.current.toLocaleString()}`}
           subtext={collectedTrend.text}
           subtextVariant={collectedTrend.variant === 'down' ? 'down' : collectedTrend.variant === 'up' ? 'up' : 'neutral'}
-          iconBg="bg-indigo-50 dark:bg-indigo-500/20"
-          icon={<DollarSign className="w-5 h-5 text-indigo-600" />}
+          iconColor="bg-[#334155]"
+          icon={<DollarSign className="h-6 w-6" />}
         />
         <StatCard
           label={t('views.dashboard.cards.netProfit')}
           value={`₱${baseMonthlyRentProfit.toLocaleString()}`}
           subtext={t('views.dashboard.cards.netProfitHint')}
           subtextVariant="neutral"
-          iconBg="bg-violet-50 dark:bg-violet-500/20"
-          icon={<TrendingUp className="w-5 h-5 text-violet-600" />}
+          iconColor="bg-brand-blue"
+          icon={<TrendingUp className="h-6 w-6" />}
         />
         <StatCard
           label={t('views.dashboard.cards.activeLeases')}
@@ -514,36 +531,37 @@ export function DashboardView() {
               : t('views.dashboard.cards.newLeasesThisWeekZero')
           }
           subtextVariant={newLeasesThisWeekCount > 0 ? 'up' : 'neutral'}
-          iconBg="bg-emerald-50 dark:bg-emerald-500/20"
-          icon={<Users className="w-5 h-5 text-emerald-600" />}
+          iconColor="bg-brand-green"
+          icon={<Users className="h-6 w-6" />}
         />
         <StatCard
           label={t('views.dashboard.cards.vacancyRate')}
           value={`${vacancyRate}%`}
           subtext={`${availableUnits} ${availableUnits === 1 ? 'unit' : 'units'} available`}
           subtextVariant="down"
-          iconBg="bg-amber-50 dark:bg-amber-500/20"
-          icon={<Building2 className="w-5 h-5 text-amber-600" />}
+          iconColor="bg-brand-orange"
+          icon={<Building2 className="h-6 w-6" />}
         />
         <StatCard
           label={t('views.dashboard.cards.overdueRent')}
           value={overduePayments}
           subtext={t('views.dashboard.cards.overdueHint')}
           subtextVariant={overduePayments > 0 ? 'alert' : 'neutral'}
-          iconBg="bg-rose-50 dark:bg-rose-500/20"
-          icon={<AlertCircle className="w-5 h-5 text-rose-500" />}
+          iconColor="bg-rose-500"
+          icon={<AlertCircle className="h-6 w-6" />}
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('views.dashboard.charts.salesTitle')}</CardTitle>
-            <CardDescription>{t('views.dashboard.charts.salesDescription')}</CardDescription>
-            <CardAction className="flex flex-col items-end gap-2 sm:flex-row sm:items-start sm:gap-2">
+      {/* Charts Section — Merit bar/pie chrome */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section className="flex h-[420px] flex-col rounded-lg border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:h-[480px] lg:col-span-2">
+          <div className="flex shrink-0 flex-col gap-3 border-b border-slate-50 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-sm font-bold uppercase text-brand-blue">
+              {t('views.dashboard.charts.salesTitle')}
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
               <div
-                className="inline-flex rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/60 p-0.5"
+                className="inline-flex rounded-full border border-slate-200 bg-slate-100/90 p-0.5 dark:border-slate-700 dark:bg-slate-800/60"
                 role="group"
                 aria-label={t('views.dashboard.charts.chartMetricAria')}
               >
@@ -554,8 +572,8 @@ export function DashboardView() {
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                     salesChartMetric === 'collected'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                      ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
                   )}
                 >
                   {t('views.dashboard.charts.profitLabel')}
@@ -567,15 +585,15 @@ export function DashboardView() {
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                     salesChartMetric === 'newLeases'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                      ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
                   )}
                 >
                   {t('views.dashboard.charts.newLeasesLabel')}
                 </button>
               </div>
               <div
-                className="inline-flex rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-800/60 p-0.5"
+                className="inline-flex rounded-full border border-slate-200 bg-slate-100/90 p-0.5 dark:border-slate-700 dark:bg-slate-800/60"
                 role="group"
                 aria-label={t('views.dashboard.charts.chartStyleAria')}
               >
@@ -586,8 +604,8 @@ export function DashboardView() {
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                     salesChartStyle === 'bar'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                      ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
                   )}
                 >
                   {t('views.dashboard.charts.chartStyleBar')}
@@ -599,34 +617,49 @@ export function DashboardView() {
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                     salesChartStyle === 'line'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                      ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
                   )}
                 >
                   {t('views.dashboard.charts.chartStyleLine')}
                 </button>
               </div>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="h-[300px]">
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 p-4">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyBars} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: chartTickColor, fontSize: 12 }} />
+              <ComposedChart data={monthlyBars} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#f1f5f9'} />
+                <XAxis
+                  dataKey="label"
+                  angle={-45}
+                  textAnchor="end"
+                  interval="preserveStartEnd"
+                  height={80}
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                />
                 {salesChartMetric === 'collected' ? (
                   <YAxis
                     yAxisId="left"
+                    stroke="#94a3b8"
+                    fontSize={10}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: chartTickColor, fontSize: 12 }}
+                    tick={{ fill: '#94a3b8', fontSize: 10 }}
                     tickFormatter={(val) => `₱${Number(val) / 1000}k`}
                   />
                 ) : (
                   <YAxis
                     yAxisId="left"
+                    stroke="#94a3b8"
+                    fontSize={10}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: chartTickColor, fontSize: 12 }}
+                    tick={{ fill: '#94a3b8', fontSize: 10 }}
                     allowDecimals={false}
                   />
                 )}
@@ -637,22 +670,29 @@ export function DashboardView() {
                       ? { fill: chartCursorColor }
                       : { stroke: chartGridColor, strokeWidth: 1, strokeDasharray: '4 4' }
                   }
-                  formatter={(val: number, name: string) =>
-                    salesChartMetric === 'newLeases' || name === t('views.dashboard.charts.newLeasesLabel')
-                      ? [val, name]
-                      : [`₱${val.toLocaleString()}`, name]
-                  }
+                  formatter={(val, name) => {
+                    const n = Number(val ?? 0);
+                    const label = String(name ?? '');
+                    return salesChartMetric === 'newLeases' || label === t('views.dashboard.charts.newLeasesLabel')
+                      ? [n, label]
+                      : [`₱${n.toLocaleString()}`, label];
+                  }}
                 />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend
+                  verticalAlign="top"
+                  align="center"
+                  iconType="rect"
+                  wrapperStyle={{ paddingBottom: '20px', fontSize: '10px', color: '#94a3b8' }}
+                />
                 {salesChartMetric === 'collected' &&
                   (salesChartStyle === 'bar' ? (
                     <Bar
                       yAxisId="left"
                       dataKey="collected"
                       name={t('views.dashboard.charts.profitLabel')}
-                      fill="#4f46e5"
-                      radius={[5, 5, 0, 0]}
-                      maxBarSize={36}
+                      fill="#4B89CD"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
                     />
                   ) : (
                     <Line
@@ -660,7 +700,7 @@ export function DashboardView() {
                       type="monotone"
                       dataKey="collected"
                       name={t('views.dashboard.charts.profitLabel')}
-                      stroke="#4f46e5"
+                      stroke="#4B89CD"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       activeDot={{ r: 4 }}
@@ -672,9 +712,9 @@ export function DashboardView() {
                       yAxisId="left"
                       dataKey="newLeases"
                       name={t('views.dashboard.charts.newLeasesLabel')}
-                      fill="#10b981"
-                      radius={[5, 5, 0, 0]}
-                      maxBarSize={36}
+                      fill="#4B89CD"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
                     />
                   ) : (
                     <Line
@@ -682,7 +722,7 @@ export function DashboardView() {
                       type="monotone"
                       dataKey="newLeases"
                       name={t('views.dashboard.charts.newLeasesLabel')}
-                      stroke="#10b981"
+                      stroke="#4B89CD"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       activeDot={{ r: 4 }}
@@ -690,44 +730,53 @@ export function DashboardView() {
                   ))}
               </ComposedChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('views.dashboard.charts.unitStatusTitle')}</CardTitle>
-            <CardDescription>{t('views.dashboard.charts.unitStatusDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] flex flex-col items-center justify-center">
-            <ResponsiveContainer width="100%" height="78%">
+        <section className="flex h-[420px] flex-col rounded-lg border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:h-[480px]">
+          <div className="shrink-0 border-b border-slate-50 p-4 dark:border-slate-800">
+            <h3 className="text-sm font-bold uppercase text-brand-blue">
+              {t('views.dashboard.charts.unitStatusTitle')}
+            </h3>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={pieSlices}
                   cx="50%"
                   cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
-                  paddingAngle={4}
+                  outerRadius={100}
                   dataKey="value"
+                  nameKey="name"
+                  stroke="#fff"
+                  strokeWidth={2}
                 >
-                  {pieSlices.map((entry, index) => (
-                    <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
+                  {pieSlices.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(val: number, name: string) => [val, name]} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(val, name) => [Number(val ?? 0), String(name ?? '')]}
+                />
+                <Legend
+                  verticalAlign="top"
+                  align="center"
+                  iconType="rect"
+                  wrapperStyle={{ paddingTop: '20px', fontSize: '10px', color: '#94a3b8' }}
+                  formatter={(value) => <span className="text-slate-500">{value}</span>}
+                  payload={pieSlices.map((s) => ({
+                    value: s.name,
+                    type: 'rect' as const,
+                    color: s.color,
+                    id: s.name,
+                  }))}
+                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2">
-              {pieSlices.map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                  <span>{entry.name}</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{entry.value}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
 
       {/* Tables Section */}
@@ -749,8 +798,7 @@ export function DashboardView() {
                 columns={vacancyColumns}
                 keyExtractor={(c) => c.id}
                 embedded
-                highlightFirstColumn={false}
-              />
+                              />
             )}
           </CardContent>
         </Card>
@@ -772,8 +820,7 @@ export function DashboardView() {
                 columns={paymentColumns}
                 keyExtractor={(p) => p.id}
                 embedded
-                highlightFirstColumn={false}
-              />
+                              />
             )}
           </CardContent>
         </Card>
@@ -795,8 +842,7 @@ export function DashboardView() {
                 columns={agentColumns}
                 keyExtractor={(a) => a.id}
                 embedded
-                highlightFirstColumn={false}
-              />
+                              />
             )}
           </CardContent>
         </Card>

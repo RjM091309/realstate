@@ -32,7 +32,7 @@ function actionBadgeClass(action: string): string {
   if (normalized.includes('create') || normalized.includes('upload') || normalized.includes('issue')) {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30';
   }
-  return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30';
+  return 'bg-brand-blue/10 text-brand-blue border-brand-blue/20 dark:bg-brand-blue/15 dark:text-brand-blue dark:border-brand-blue/30';
 }
 
 function StatCard({
@@ -51,7 +51,7 @@ function StatCard({
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
           <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/15 dark:text-brand-blue">
           {icon}
         </div>
       </CardContent>
@@ -173,7 +173,7 @@ export function AuditLogsView() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1 text-xs font-medium text-brand-blue dark:border-brand-blue/20 dark:bg-brand-blue/10 dark:text-brand-blue">
             <ShieldCheck className="h-3.5 w-3.5" />
             {t('views.auditLogs.badge')}
           </div>
@@ -182,7 +182,7 @@ export function AuditLogsView() {
         </div>
         <Button
           type="button"
-          className="w-full bg-indigo-600 text-white hover:bg-indigo-700 sm:w-auto dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          className="w-full bg-brand-blue text-white hover:bg-[#3d7ab8] sm:w-auto dark:bg-brand-blue dark:hover:bg-[#3d7ab8]"
           onClick={() => void loadLogs('refresh')}
           disabled={loading || refreshing}
         >
@@ -202,7 +202,7 @@ export function AuditLogsView() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Activity className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <Activity className="h-5 w-5 text-brand-blue dark:text-brand-blue" />
                 {t('views.auditLogs.activityTitle')}
               </CardTitle>
               <CardDescription>{t('views.auditLogs.activityDesc')}</CardDescription>
@@ -220,7 +220,7 @@ export function AuditLogsView() {
               <select
                 value={moduleFilter}
                 onChange={(e) => setModuleFilter(e.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-900/40"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition-colors focus:border-brand-blue/30 focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-blue dark:focus:ring-brand-blue/40"
               >
                 <option value="all">{t('views.auditLogs.allModules')}</option>
                 {modules.map((moduleName) => (
@@ -232,7 +232,7 @@ export function AuditLogsView() {
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-900/40"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition-colors focus:border-brand-blue/30 focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-blue dark:focus:ring-brand-blue/40"
               >
                 <option value="all">{t('views.auditLogs.allActions')}</option>
                 {actions.map((action) => (
@@ -253,7 +253,7 @@ export function AuditLogsView() {
           ) : null}
           {loading ? (
             <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-brand-blue dark:text-brand-blue" />
               <p className="text-sm">{t('common.loading')}</p>
             </div>
           ) : (
@@ -261,8 +261,7 @@ export function AuditLogsView() {
               data={filteredLogs}
               columns={columns}
               keyExtractor={(log) => log.id}
-              highlightFirstColumn={false}
-              embedded
+                            embedded
             />
           )}
         </CardContent>

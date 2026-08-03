@@ -770,7 +770,7 @@ export function LeaseLedgerView() {
             {t('views.ledger.exportReport')}
           </Button>
           {(canCreate || canUpdate) && (
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openCreateModal}>
+            <Button className="bg-brand-blue hover:bg-[#3d7ab8] text-white" onClick={openCreateModal}>
               {t('views.ledger.monthlyPayments')}
             </Button>
           )}
@@ -870,7 +870,7 @@ export function LeaseLedgerView() {
                             key={payment.id}
                             className={cn(
                               'bg-white dark:bg-slate-950',
-                              highlighted && 'bg-indigo-50/80 dark:bg-indigo-500/10',
+                              highlighted && 'bg-brand-blue/10 dark:bg-brand-blue/10',
                             )}
                           >
                             <td className="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-100">
@@ -907,7 +907,7 @@ export function LeaseLedgerView() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="h-8 rounded-lg bg-indigo-600 px-2.5 text-xs text-white hover:bg-indigo-700"
+                                  className="h-8 rounded-lg bg-brand-blue px-2.5 text-xs text-white hover:bg-[#3d7ab8]"
                                   disabled={busy}
                                   onClick={() => void handleQuickMarkPaid(payment)}
                                 >
@@ -946,7 +946,7 @@ export function LeaseLedgerView() {
                         setScheduleContractId(card.id);
                         setHighlightPaymentId(null);
                       }}
-                      className="rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-indigo-500/50"
+                      className="rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-sm transition hover:border-brand-blue/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-brand-blue/50"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -1017,7 +1017,7 @@ export function LeaseLedgerView() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             placeholder={t('views.ledger.searchPlaceholder')}
-            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100 transition-all text-sm"
+            className="h-10 rounded-xl pl-10 pr-4 border border-slate-200 bg-white shadow-sm hover:border-slate-300 focus:border-brand-blue/30 focus-visible:ring-2 focus-visible:ring-brand-blue/20 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -1030,14 +1030,14 @@ export function LeaseLedgerView() {
                 size="sm"
                 className={cn(
                   'h-10 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm',
-                  ledgerFilterActive && 'border-indigo-300 bg-indigo-50/60 text-indigo-900 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100',
+                  ledgerFilterActive && 'border-brand-blue/30 bg-brand-blue/10 text-brand-blue dark:border-brand-blue/50 dark:bg-brand-blue/20 dark:text-blue-100',
                 )}
               >
                 <Filter className="w-4 h-4 mr-2" />
                 {t('views.ledger.filter')}
                 {ledgerFilterActive ? (
                   <span
-                    className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600"
+                    className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-blue"
                     title={t('views.ledger.filterActiveHint')}
                   />
                 ) : null}
@@ -1114,8 +1114,7 @@ export function LeaseLedgerView() {
                 columns={upcomingColumns}
                 keyExtractor={(p) => `up-${p.id}`}
                 embedded
-                highlightFirstColumn={false}
-                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
+                                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
               />
             </CardContent>
           </Card>
@@ -1131,8 +1130,7 @@ export function LeaseLedgerView() {
                 columns={collectionColumns}
                 keyExtractor={(p) => p.id}
                 embedded
-                highlightFirstColumn={false}
-                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
+                                onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
               />
             </CardContent>
           </Card>

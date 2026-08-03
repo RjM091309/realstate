@@ -12,11 +12,11 @@ export const statusBadgeVariants = {
   danger:
     'bg-rose-100 text-rose-800 border-rose-300/80 hover:bg-rose-100 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/45 dark:hover:bg-rose-500/20',
   info:
-    'bg-indigo-100 text-indigo-800 border-indigo-300/80 hover:bg-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/40 dark:hover:bg-indigo-500/20',
+    'bg-brand-blue/10 text-brand-blue border-brand-blue/30 hover:bg-brand-blue/10 dark:bg-brand-blue/20 dark:text-blue-200 dark:border-brand-blue/40 dark:hover:bg-brand-blue/20',
   neutral:
     'bg-slate-100 text-slate-700 border-slate-300/80 hover:bg-slate-100 dark:bg-slate-800/80 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-800/80',
   violet:
-    'bg-violet-100 text-violet-900 border-violet-300/80 hover:bg-violet-100 dark:bg-violet-500/20 dark:text-violet-100 dark:border-violet-500/45 dark:hover:bg-violet-500/25',
+    'bg-brand-blue/10 text-brand-blue border-brand-blue/30 hover:bg-brand-blue/10 dark:bg-brand-blue/20 dark:text-blue-100 dark:border-brand-blue/45 dark:hover:bg-brand-blue/25',
   sky:
     'bg-sky-100 text-sky-900 border-sky-300/80 hover:bg-sky-100 dark:bg-sky-500/20 dark:text-sky-100 dark:border-sky-500/45 dark:hover:bg-sky-500/25',
 } as const;

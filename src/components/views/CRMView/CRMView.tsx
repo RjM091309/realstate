@@ -73,9 +73,9 @@ const CRM_TABLE_ACTION_BTN =
   'h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5';
 
 const CRM_TABLE_ID_CELL = 'font-mono text-xs text-slate-500 uppercase dark:text-slate-400';
-const CRM_TABLE_NAME_CELL = 'block min-w-[7rem] font-medium text-slate-700 dark:text-slate-200';
-const CRM_TABLE_TEXT_CELL = 'text-sm text-slate-600 dark:text-slate-300';
-const CRM_TABLE_UNIT_CELL = 'block min-w-[5rem] font-semibold text-slate-900 dark:text-slate-100';
+const CRM_TABLE_NAME_CELL = 'block min-w-[7rem] text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100';
+const CRM_TABLE_TEXT_CELL = 'text-[12px] font-bold uppercase tracking-tight text-slate-600 dark:text-slate-300';
+const CRM_TABLE_UNIT_CELL = 'block min-w-[5rem] text-[13px] font-black uppercase tracking-tight text-brand-blue';
 
 function parseCrmDateTime(value?: string): Date | null {
   if (!value?.trim()) return null;
@@ -102,16 +102,16 @@ function formatCrmDateTimeLabel(value?: string) {
 }
 
 const CRM_FORM_INPUT =
-  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const CRM_FORM_DATEPICKER =
-  'unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'unit-form-datepicker-input h-12 !rounded-xl border border-slate-200 bg-white text-sm shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const CRM_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 const CRM_TENANT_INPUT =
-  'h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 const CRM_TENANT_DATEPICKER =
-  'unit-form-datepicker-input h-9 !rounded-lg border border-slate-200 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'unit-form-datepicker-input h-9 !rounded-lg border border-slate-200 bg-white text-sm shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 const CRM_TENANT_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-9 [&_.unit-form-select-control]:!h-9';
 
 const CRM_TAB_TRIGGER =
@@ -127,9 +127,9 @@ function TenantFormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-indigo-100/70 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80">
-      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+    <section className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
+      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-brand-blue">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-blue text-white shadow-md">
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
         {title}
@@ -152,7 +152,7 @@ function TenantFormField({
 }) {
   return (
     <div className={cn('min-w-0 space-y-1', span === 2 && 'sm:col-span-2', className)}>
-      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
         {label}
       </label>
       {children}
@@ -1082,13 +1082,13 @@ export function CRMView() {
                   onDrop={handleDropIdImage}
                   disabled={idUploading || isScanning}
                   className={cn(
-                    'relative flex min-h-28 w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-indigo-300/80 bg-gradient-to-br from-indigo-50/70 via-white to-violet-50/80 px-4 py-5 text-center shadow-sm transition-all',
-                    'hover:border-indigo-400 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-500/15',
-                    'dark:border-indigo-500/40 dark:from-indigo-950/25 dark:via-slate-950 dark:to-violet-950/25',
+                    'relative flex min-h-28 w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-brand-blue/30 bg-gradient-to-br from-brand-blue/10 via-white to-brand-blue/10 px-4 py-5 text-center shadow-sm transition-all',
+                    'hover:border-brand-blue hover:shadow-md focus:outline-none focus:ring-4 focus:ring-brand-blue/15',
+                    'dark:border-brand-blue/40 dark:from-brand-blue/20 dark:via-slate-950 dark:to-brand-blue/15',
                     (isScanning || idUploading) && 'cursor-wait',
                   )}
                 >
-                  <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-100 dark:bg-slate-900 dark:text-indigo-300 dark:ring-indigo-500/30">
+                  <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-blue shadow-sm ring-1 ring-brand-blue/20 dark:bg-slate-900 dark:text-brand-blue dark:ring-brand-blue/30">
                     {isScanning ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Upload className="h-5 w-5" aria-hidden />}
                   </span>
                   <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -1102,7 +1102,7 @@ export function CRMView() {
                 <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
                   {isScanning ? (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-950/70">
-                      <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-300" aria-hidden />
+                      <Loader2 className="h-5 w-5 animate-spin text-brand-blue dark:text-brand-blue" aria-hidden />
                     </div>
                   ) : null}
                   <div className="flex items-center gap-3">
@@ -1269,7 +1269,7 @@ export function CRMView() {
                   <input
                     id="crm-kyc"
                     type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 accent-indigo-600"
+                    className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
                     checked={form.kycVerified}
                     onChange={(e) => setForm((f) => ({ ...f, kycVerified: e.target.checked }))}
                   />
@@ -1279,7 +1279,7 @@ export function CRMView() {
                   <input
                     id="crm-bl"
                     type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 accent-indigo-600"
+                    className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
                     checked={form.isBlacklisted}
                     onChange={(e) => setForm((f) => ({ ...f, isBlacklisted: e.target.checked }))}
                   />
@@ -1397,7 +1397,7 @@ export function CRMView() {
                 />
               </div>
               {canCreate && activeTab === 'tenants' ? (
-                <Button type="button" className="h-9 shrink-0 rounded-xl bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" onClick={openRegister}>
+                <Button type="button" className="h-9 shrink-0 rounded-xl bg-brand-blue text-white shadow-sm hover:bg-[#3d7ab8]" onClick={openRegister}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t('views.crm.registerTenant')}
                 </Button>
@@ -1417,8 +1417,7 @@ export function CRMView() {
               columns={tenantColumns}
               keyExtractor={(tenant) => tenant.id}
               onRowClick={(tenant) => openViewDetails(tenant)}
-              highlightFirstColumn={false}
-            />
+                          />
           )}
         </TabsContent>
 

@@ -197,9 +197,9 @@ export function NotificationPanel({
                       'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60',
                       notification.unread
                         ? [
-                            'bg-indigo-50/90 border-indigo-200/80',
+                            'bg-brand-blue/10 border-brand-blue/20',
                             'shadow-[0_4px_20px_-10px_rgba(79,70,229,0.3)]',
-                            'dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:shadow-none',
+                            'dark:bg-brand-blue/10 dark:border-brand-blue/30 dark:shadow-none',
                           ].join(' ')
                         : 'bg-white/40 border-transparent dark:bg-slate-950/20 opacity-80',
                     )}
@@ -222,7 +222,7 @@ export function NotificationPanel({
                             {notification.title}
                           </h4>
                           {notification.unread && (
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 dark:bg-indigo-300" />
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue dark:bg-brand-blue" />
                           )}
                         </div>
                         <p className="text-xs leading-relaxed text-brand-muted dark:text-slate-300/80 line-clamp-2">

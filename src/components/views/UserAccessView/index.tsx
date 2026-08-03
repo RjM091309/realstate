@@ -32,9 +32,9 @@ function AccessToggle({
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2',
         checked
-          ? 'bg-indigo-600 shadow-sm shadow-indigo-900/10'
+          ? 'bg-brand-blue shadow-sm shadow-brand-blue/10'
           : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600',
       )}
     >
@@ -247,7 +247,7 @@ export function UserAccessView() {
             ) : null}
             <Button
               type="button"
-              className="shrink-0 rounded-xl bg-indigo-600 px-5 hover:bg-indigo-700"
+              className="shrink-0 rounded-xl bg-brand-blue px-5 hover:bg-[#3d7ab8]"
               disabled={!roleSectionDirty || savingRole || roleId === null || initialLoading}
               onClick={() => void saveRole()}
             >
@@ -305,13 +305,13 @@ export function UserAccessView() {
                             className={cn(
                               'relative flex w-full items-center justify-between gap-2 rounded-lg py-2.5 pl-3 pr-2 text-left text-sm transition-colors',
                               active
-                                ? 'bg-violet-50 dark:bg-violet-500/15 text-violet-950 dark:text-violet-100 shadow-sm ring-1 ring-violet-200/80 dark:ring-violet-500/40'
+                                ? 'bg-brand-blue/10 dark:bg-brand-blue/15 text-brand-blue dark:text-blue-100 shadow-sm ring-1 ring-brand-blue/30 dark:ring-brand-blue/40'
                                 : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
                             )}
                           >
                             {active ? (
                               <span
-                                className="absolute left-0 top-1/2 h-[60%] w-1 -translate-y-1/2 rounded-full bg-violet-600"
+                                className="absolute left-0 top-1/2 h-[60%] w-1 -translate-y-1/2 rounded-full bg-brand-blue"
                                 aria-hidden
                               />
                             ) : null}
@@ -324,7 +324,7 @@ export function UserAccessView() {
                               className={cn(
                                 'inline-flex min-w-[1.75rem] shrink-0 justify-end tabular-nums',
                                 active
-                                  ? 'rounded-full bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:text-violet-200'
+                                  ? 'rounded-full bg-brand-blue/10 dark:bg-brand-blue/20 px-2 py-0.5 text-[11px] font-semibold text-brand-blue dark:text-blue-200'
                                   : 'text-transparent',
                               )}
                               aria-hidden={!active}

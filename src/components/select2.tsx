@@ -81,8 +81,8 @@ export const Select2: React.FC<Select2Props> = ({
                 : '!unit-form-select-control !border !border-slate-300 dark:!border-slate-600',
               state.isFocused
                 ? borderless
-                  ? '!border-transparent !ring-2 !ring-indigo-500/25'
-                  : '!unit-form-select-control !border-indigo-500 !ring-2 !ring-indigo-500/25'
+                  ? '!border-transparent !ring-2 !ring-brand-blue/25'
+                  : '!unit-form-select-control !border-brand-blue !ring-2 !ring-brand-blue/25'
                 : '!ring-0',
               disabled ? '!opacity-60 !cursor-not-allowed' : undefined,
             ),
@@ -98,9 +98,9 @@ export const Select2: React.FC<Select2Props> = ({
           option: ({ isSelected, isFocused }) => cn(
             '!py-2.5 !px-4 !text-sm !cursor-pointer !transition-colors',
             isSelected
-              ? '!bg-indigo-500/15 !text-indigo-700 dark:!text-indigo-200 !font-bold'
+              ? '!bg-brand-blue/15 !text-brand-blue dark:!text-blue-200 !font-bold'
               : isFocused
-                ? '!bg-indigo-500/10 !text-slate-900 dark:!text-slate-50'
+                ? '!bg-brand-blue/10 !text-slate-900 dark:!text-slate-50'
                 : '!text-slate-900 dark:!text-slate-50'
           ),
           valueContainer: () => '!px-3 !py-1',

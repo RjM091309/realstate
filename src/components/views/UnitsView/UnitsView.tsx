@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -11,7 +10,6 @@ import {
   MapPin,
   LayoutGrid,
   List as ListIcon,
-  History,
   Loader2,
   Pencil,
   Trash2,
@@ -24,8 +22,8 @@ import {
   CircleDollarSign,
   Home,
   Check,
-  MessageSquare,
   Ruler,
+  ChevronDown,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, modalActionButtonClass, modalDismissButtonClass, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
@@ -40,8 +38,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { DataTable, type ColumnDef } from '@/components/data-table';
+import { DataTable, type ColumnDef, meritCellAccentClass, meritCellPrimaryClass, meritCellMetaClass, meritStatusPillClass } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
@@ -50,130 +47,13 @@ import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
 import { toWebpDataUrl } from '@/lib/imageWebp';
+import { resolveUnitFloorTower } from '@/lib/unitFormUtils';
 import { cn } from '@/lib/utils';
 import type { Contract, InventoryItem, Tenant, Unit, UnitStatus, UnitType } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
-const UNIT_TYPES: UnitType[] = [
-  'House and Lot',
-  'Condominium',
-  'Apartment',
-  'Commercial Building',
-  'Warehouse',
-  'Hotel',
-  'Office Space',
-  // Legacy types (kept for existing saved units)
-  'Studio',
-  '1BR',
-  '2BR',
-  '3BR',
-  'Loft',
-  'Penthouse',
-];
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
-
-const UNIT_DETAIL_STAT_CARD =
-  'rounded-xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-600 dark:bg-slate-950/80';
-
-const UNIT_DETAIL_VALUE_BOX =
-  'rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950/80';
-
-const UNIT_DETAIL_TENANT_CARD =
-  'rounded-xl border border-indigo-100 bg-white px-4 py-4 dark:border-indigo-500/20 dark:bg-slate-950/80';
-const AREA_CITIES_LUZON: string[] = [
-  'Manila',
-  'Caloocan City',
-  'Las Pinas City',
-  'Makati City',
-  'Malabon City',
-  'Mandaluyong City',
-  'Marikina City',
-  'Muntinlupa City',
-  'Navotas City',
-  'Paranaque City',
-  'Pasay City',
-  'Pasig City',
-  'Quezon City',
-  'San Juan City',
-  'Taguig City',
-  'Valenzuela City',
-  'Pateros',
-  'Baguio City',
-  'Tabuk City',
-  'Alaminos City',
-  'Candon City',
-  'Dagupan City',
-  'Laoag City',
-  'San Carlos City (Pangasinan)',
-  'Urdaneta City',
-  'Vigan City',
-  'Tuguegarao City',
-  'Cauayan City',
-  'Ilagan City',
-  'Santiago City',
-  'Angeles City',
-  'Balanga City',
-  'Cabanatuan City',
-  'Gapan City',
-  'Malolos City',
-  'Meycauayan City',
-  'Munoz City',
-  'Olongapo City',
-  'Palayan City',
-  'San Fernando City (Pampanga)',
-  // Pampanga — area field: city / municipality names only (no province suffix)
-  'Mabalacat City',
-  'Apalit',
-  'Arayat',
-  'Bacolor',
-  'Candaba',
-  'Floridablanca',
-  'Guagua',
-  'Lubao',
-  'Macabebe',
-  'Magalang',
-  'Masantol',
-  'Mexico',
-  'Minalin',
-  'Porac',
-  'San Luis',
-  'San Simon',
-  'Santa Ana',
-  'Santa Rita',
-  'Santo Tomas',
-  'Sasmuan',
-  'San Jose del Monte City',
-  'Tarlac City',
-  'Antipolo City',
-  'Bacoor City',
-  'Batangas City',
-  'Binan City',
-  'Cabuyao City',
-  'Calamba City',
-  'Cavite City',
-  'Dasmarinas City',
-  'General Trias City',
-  'Imus City',
-  'Lipa City',
-  'Lucena City',
-  'San Pablo City',
-  'San Pedro City',
-  'Santa Rosa City',
-  'Santo Tomas City',
-  'Tagaytay City',
-  'Tanauan City',
-  'Trece Martires City',
-  'Calapan City',
-  'Puerto Princesa City',
-  'Iriga City',
-  'Legazpi City',
-  'Ligao City',
-  'Masbate City',
-  'Naga City',
-  'Sorsogon City',
-  'Tabaco City',
-];
 
 type AddUnitForm = {
   unitNumber: string;
@@ -188,6 +68,7 @@ type AddUnitForm = {
   bedrooms: string;
   bathrooms: string;
   monthlyRate: string;
+  moreDetails: string;
   specialRemarks: string;
 };
 
@@ -206,6 +87,7 @@ function defaultAddForm(): AddUnitForm {
     bedrooms: String(metrics.beds),
     bathrooms: String(metrics.baths),
     monthlyRate: '',
+    moreDetails: '',
     specialRemarks: '',
   };
 }
@@ -254,58 +136,6 @@ function resolveUnitAddressBase(unit: Pick<Unit, 'legalAddress' | 'commonAddress
   return '';
 }
 
-function addressContainsPart(address: string, part: string): boolean {
-  const needle = String(part ?? '').trim().toLowerCase();
-  if (!needle) return true;
-  return address.toLowerCase().includes(needle);
-}
-
-function resolveUnitFullAddress(
-  unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName' | 'tower' | 'floor' | 'area'>,
-  floorWord = 'Floor',
-): string {
-  const base = resolveUnitAddressBase(unit);
-  if (!base) return '—';
-
-  const parts = [base];
-  const tower = String(unit.tower ?? '').trim();
-  if (!isPlaceholderField(tower) && !addressContainsPart(base, tower)) {
-    parts.push(tower);
-  }
-
-  const floor = String(unit.floor ?? '').trim();
-  if (!isPlaceholderField(floor)) {
-    const floorLabel = floorLabelForCard(floor, floorWord);
-    if (!addressContainsPart(base, floor) && !addressContainsPart(base, floorLabel)) {
-      parts.push(floorLabel);
-    }
-  }
-
-  const area = normalizeAreaForForm(unit.area ?? '');
-  if (area && !addressContainsPart(base, area)) {
-    parts.push(area);
-  }
-
-  return parts.join(', ');
-}
-
-/** Short location line for modal header / cards — avoids repeating the full legal address. */
-function resolveUnitHeaderSubtitle(
-  unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName' | 'tower' | 'floor'>,
-  floorWord = 'Floor',
-): string {
-  const building = deriveBuildingName(resolveUnitAddressBase(unit), unit.buildingName);
-  const tower = String(unit.tower ?? '').trim();
-  const floorPart = floorLabelForCard(unit.floor, floorWord);
-
-  const parts: string[] = [];
-  if (!isPlaceholderField(building)) parts.push(building);
-  if (!isPlaceholderField(tower)) parts.push(tower);
-  if (floorPart !== '—') parts.push(floorPart);
-
-  return parts.length ? parts.join(' · ') : '—';
-}
-
 function deriveBuildingName(addressOrBuilding: string, fallbackBuilding = ''): string {
   const raw = String(addressOrBuilding ?? '').trim();
   const fallback = String(fallbackBuilding ?? '').trim();
@@ -329,22 +159,23 @@ function formToWriteBody(
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
-  const buildingName = deriveBuildingName(commonAddress, form.buildingName);
+  const buildingName = deriveBuildingName(commonAddress, form.buildingName) || '—';
   return {
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
-    buildingName: buildingName.trim(),
-    commonAddress: commonAddress || '—',
-    legalAddress: legalAddress || commonAddress || '—',
+    buildingName: buildingName.trim() || '—',
+    commonAddress: commonAddress || buildingName || '—',
+    legalAddress: legalAddress || commonAddress || buildingName || '—',
     type: form.type,
     status: form.status,
-    area: form.area.trim(),
+    area: form.area.trim() || '—',
     areaSqm: parseMetricInput(form.areaSqm),
     bedrooms: parseMetricInput(form.bedrooms),
     bathrooms: parseMetricInput(form.bathrooms),
     monthlyRate: rate,
     photoDataUrl,
+    moreDetails: form.moreDetails.trim() || undefined,
     specialRemarks: form.specialRemarks.trim() || undefined,
     inventory,
   };
@@ -375,7 +206,7 @@ async function notifyUnitSaveError(title: string, message: string, confirmLabel:
     title,
     text: message,
     confirmButtonText: confirmLabel,
-    confirmButtonColor: '#4f46e5',
+    confirmButtonColor: '#4B89CD',
     buttonsStyling: true,
   });
 }
@@ -395,6 +226,7 @@ function unitToForm(u: Unit): AddUnitForm {
     bedrooms: String(u.bedrooms ?? metrics.beds),
     bathrooms: String(u.bathrooms ?? metrics.baths),
     monthlyRate: String(u.monthlyRate),
+    moreDetails: u.moreDetails ?? '',
     specialRemarks: u.specialRemarks ?? '',
   };
 }
@@ -550,7 +382,7 @@ function formToUnit(
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = form.legalAddress.trim();
   const commonAddress = legalAddress || form.buildingName.trim();
-  const buildingName = deriveBuildingName(commonAddress, form.buildingName);
+  const buildingName = deriveBuildingName(commonAddress, form.buildingName) || '—';
   const areaSqm = parseMetricInput(form.areaSqm);
   const bedrooms = parseMetricInput(form.bedrooms);
   const bathrooms = parseMetricInput(form.bathrooms);
@@ -559,45 +391,21 @@ function formToUnit(
     unitNumber: form.unitNumber.trim(),
     floor: form.floor.trim() || '—',
     tower: form.tower.trim() || '—',
-    buildingName: buildingName.trim(),
-    commonAddress: commonAddress || '—',
-    legalAddress: legalAddress || commonAddress || '—',
+    buildingName: buildingName.trim() || '—',
+    commonAddress: commonAddress || buildingName || '—',
+    legalAddress: legalAddress || commonAddress || buildingName || '—',
     type: form.type,
     status: form.status,
-    area: form.area.trim(),
+    area: form.area.trim() || '—',
     areaSqm: areaSqm ?? undefined,
     bedrooms: bedrooms ?? undefined,
     bathrooms: bathrooms ?? undefined,
     monthlyRate: Number.isFinite(rate) ? rate : 0,
     photoDataUrl,
+    moreDetails: form.moreDetails.trim() || undefined,
     specialRemarks: form.specialRemarks.trim() || undefined,
     inventory,
   };
-}
-
-function formatContractPeriod(c: Contract): string {
-  try {
-    const a = parseISO(c.startDate);
-    const b = parseISO(c.endDate);
-    return `${format(a, 'MMM dd, yyyy')} — ${format(b, 'MMM dd, yyyy')}`;
-  } catch {
-    return `${c.startDate} – ${c.endDate}`;
-  }
-}
-
-function formatContractDate(value: string): string {
-  try {
-    return format(parseISO(value), 'MMM dd, yyyy');
-  } catch {
-    return value || '—';
-  }
-}
-
-function contractStatusLabel(c: Contract, t: (k: string) => string): string {
-  if (c.status === 'Active') return t('views.contracts.statuses.active');
-  if (c.status === 'Expired') return t('views.contracts.statuses.expired');
-  if (c.status === 'Terminated') return t('views.contracts.statuses.terminated');
-  return c.status;
 }
 
 export function UnitsView() {
@@ -620,10 +428,9 @@ export function UnitsView() {
   const [addForm, setAddForm] = useState<AddUnitForm>(defaultAddForm);
   const addUnitPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [addUnitPhotoPreview, setAddUnitPhotoPreview] = useState('');
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
   const [photoPreviewTitle, setPhotoPreviewTitle] = useState('');
-  const [detailHeaderPhotoPeek, setDetailHeaderPhotoPeek] = useState(false);
-  const detailPhotoPeekCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
   const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
@@ -636,21 +443,6 @@ export function UnitsView() {
   const [inventoryAddName, setInventoryAddName] = useState('');
   const [inventoryAddQty, setInventoryAddQty] = useState(1);
   const [inventoryAddCondition, setInventoryAddCondition] = useState<InventoryItem['condition']>('Good');
-
-  const clearDetailPhotoPeekCloseTimer = useCallback(() => {
-    if (detailPhotoPeekCloseTimer.current) {
-      clearTimeout(detailPhotoPeekCloseTimer.current);
-      detailPhotoPeekCloseTimer.current = null;
-    }
-  }, []);
-
-  const scheduleDetailPhotoPeekClose = useCallback(() => {
-    clearDetailPhotoPeekCloseTimer();
-    detailPhotoPeekCloseTimer.current = setTimeout(() => {
-      setDetailHeaderPhotoPeek(false);
-      detailPhotoPeekCloseTimer.current = null;
-    }, 280);
-  }, [clearDetailPhotoPeekCloseTimer]);
 
   const reloadUnits = useCallback(async () => {
     setUnitsLoading(true);
@@ -692,45 +484,12 @@ export function UnitsView() {
     };
   }, []);
 
-  const historicalContractsForSelectedUnit = useMemo(() => {
-    if (!selectedUnit) return [];
-    const rows = branchContracts.filter(
-      (c) => c.unitId === selectedUnit.id && (c.status === 'Expired' || c.status === 'Terminated'),
-    );
-    return [...rows].sort((a, b) => {
-      try {
-        return parseISO(b.endDate).getTime() - parseISO(a.endDate).getTime();
-      } catch {
-        return 0;
-      }
-    });
-  }, [selectedUnit, branchContracts]);
-
-  const activeContractForSelectedUnit = useMemo(() => {
-    if (!selectedUnit) return null;
-    return activeContractForUnit(selectedUnit.id, branchContracts);
-  }, [selectedUnit, branchContracts]);
-
-  const activeTenantForSelectedUnit = useMemo(() => {
-    if (!activeContractForSelectedUnit) return null;
-    return tenantsList.find((x) => x.id === activeContractForSelectedUnit.tenantId) ?? null;
-  }, [activeContractForSelectedUnit, tenantsList]);
-
   const unitRemarksDisplay = selectedUnit?.specialRemarks?.trim() || null;
 
   useEffect(() => {
     if ((!isDetailsOpen && !isManageInventoryOpen) || !selectedUnit) return;
     setDetailInventoryDraft(normalizeInventoryDraft(selectedUnit.inventory));
   }, [isDetailsOpen, isManageInventoryOpen, selectedUnit]);
-
-  useEffect(() => {
-    if (!isDetailsOpen) {
-      clearDetailPhotoPeekCloseTimer();
-      setDetailHeaderPhotoPeek(false);
-    }
-  }, [isDetailsOpen, clearDetailPhotoPeekCloseTimer]);
-
-  useEffect(() => () => clearDetailPhotoPeekCloseTimer(), [clearDetailPhotoPeekCloseTimer]);
 
   useEffect(() => {
     if (!isDetailsOpen && !isManageInventoryOpen) {
@@ -938,6 +697,7 @@ export function UnitsView() {
     setAddUnitPhotoPreview('');
     if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
     setAddForm(defaultAddForm());
+    setShowMoreDetails(false);
     setIsAddUnitOpen(true);
   }, []);
 
@@ -949,6 +709,7 @@ export function UnitsView() {
     setAddForm(unitToForm(unit));
     setAddUnitPhotoPreview(unit.photoDataUrl ?? '');
     if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
+    setShowMoreDetails(false);
     setIsAddUnitOpen(true);
   }, []);
 
@@ -958,6 +719,7 @@ export function UnitsView() {
     setEditingId(null);
     setAddForm(defaultAddForm());
     setAddUnitPhotoPreview('');
+    setShowMoreDetails(false);
     if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
   }, []);
 
@@ -997,13 +759,8 @@ export function UnitsView() {
 
   const handleSaveUnit = useCallback(async () => {
     const rate = Number(String(addForm.monthlyRate).replace(/,/g, ''));
-    const addressOrBuilding = addForm.legalAddress.trim() || addForm.buildingName.trim();
-    if (!addForm.unitNumber.trim() || !addressOrBuilding) {
+    if (!addForm.unitNumber.trim()) {
       toast.error(t('views.units.addModal.validationRequired'));
-      return;
-    }
-    if (!addForm.area.trim()) {
-      toast.error('Select an area city.');
       return;
     }
     if (!Number.isFinite(rate) || rate < 0) {
@@ -1120,42 +877,23 @@ export function UnitsView() {
     [t, unitsBackedByApi, selectedUnit],
   );
 
-  const addTypeOptions = useMemo(
-    () => UNIT_TYPES.map((ut) => ({ value: ut, label: ut })),
-    [],
-  );
-
   const addStatusOptions = useMemo(
     () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
     [statusLabel],
-  );
-
-  const addAreaOptions = useMemo(
-    () => AREA_CITIES_LUZON.map((city) => ({ value: city, label: city })),
-    [],
-  );
-
-  const addFloorOptions = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => {
-        const floor = `${ordinalFloor(i + 1)} floor`;
-        return { value: floor, label: floor };
-      }),
-    [],
   );
 
   const columns: ColumnDef<Unit>[] = useMemo(
     () => [
       {
         header: t('views.units.table.unit'),
-        render: (unit) => <span className="font-bold text-slate-900">{unit.unitNumber}</span>,
+        render: (unit) => <span className={meritCellAccentClass}>{unit.unitNumber}</span>,
       },
       {
         header: t('views.units.table.building'),
         render: (unit) => (
           <div className="flex flex-col">
-            <span className="font-medium text-slate-700">{unit.buildingName}</span>
-            <span className="text-xs text-slate-500">
+            <span className={meritCellPrimaryClass}>{unit.buildingName}</span>
+            <span className={meritCellMetaClass}>
               {unit.tower},{' '}
               {/\bfloor\b/i.test(String(unit.floor ?? ''))
                 ? unit.floor
@@ -1167,7 +905,7 @@ export function UnitsView() {
       {
         header: t('views.units.table.area'),
         render: (unit) => (
-          <div className="flex items-center gap-1 text-slate-600">
+          <div className="flex items-center gap-1 text-xs font-bold uppercase tracking-tight text-slate-600">
             <MapPin className="w-3 h-3" />
             {areaDisplayLabel(unit.area)}
           </div>
@@ -1175,7 +913,7 @@ export function UnitsView() {
       },
       {
         header: t('views.units.table.type'),
-        render: (unit) => <Badge variant="outline" className="font-normal">{unit.type}</Badge>,
+        render: (unit) => <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest">{unit.type}</Badge>,
       },
       {
         header: t('views.units.table.status'),
@@ -1183,13 +921,14 @@ export function UnitsView() {
           <Badge
             variant="outline"
             className={cn(
-              'font-medium border shadow-none',
+              meritStatusPillClass,
+              'border shadow-none',
               unit.status === 'Available' &&
-                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50',
+                'border-brand-green/20 bg-brand-green/10 text-brand-green hover:bg-brand-green/10',
               unit.status === 'Occupied' &&
-                'border-red-200 bg-red-50 text-red-800 hover:bg-red-50',
+                'border-brand-blue/20 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/10',
               unit.status === 'Maintenance' &&
-                'border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-100',
+                'border-brand-orange/20 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/10',
               unit.status === 'Reserved' &&
                 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100',
             )}
@@ -1200,7 +939,7 @@ export function UnitsView() {
       },
       {
         header: t('views.units.table.monthlyRate'),
-        render: (unit) => <span className="font-semibold">₱{unit.monthlyRate.toLocaleString()}</span>,
+        render: (unit) => <span className="text-sm font-black tabular-nums text-slate-800">₱{unit.monthlyRate.toLocaleString()}</span>,
       },
       {
         header: t('views.units.table.actions'),
@@ -1295,7 +1034,7 @@ export function UnitsView() {
             {canCreate && (
               <Button
                 type="button"
-                className="h-10 shrink-0 rounded-xl bg-indigo-600 shadow-sm hover:bg-indigo-700"
+                className="h-10 shrink-0 rounded-xl bg-brand-blue shadow-sm hover:bg-[#3d7ab8]"
                 onClick={openAddUnitModal}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1533,6 +1272,9 @@ export function UnitsView() {
                       <h3 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                         {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
                       </h3>
+                      <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {unit.type}
+                      </p>
                       <p
                         className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-600 dark:text-slate-300"
                         title={locationSubtitle}
@@ -1553,7 +1295,7 @@ export function UnitsView() {
                   <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
                     <span className="inline-flex items-center gap-1.5 tabular-nums">
                       <BedDouble className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                      {unit.type}
+                      {metrics.beds}
                     </span>
                     <span className="inline-flex items-center gap-1.5 tabular-nums">
                       <Maximize2 className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
@@ -1672,58 +1414,11 @@ export function UnitsView() {
         isOpen={isDetailsOpen && !isAddUnitOpen}
         onClose={() => setIsDetailsOpen(false)}
         title={
-          selectedUnit ? (
-            <div className="flex min-w-0 items-start gap-4">
-              <div className="relative shrink-0" onMouseLeave={scheduleDetailPhotoPeekClose}>
-                <div
-                  className="h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800"
-                  onMouseEnter={() => {
-                    clearDetailPhotoPeekCloseTimer();
-                    if (selectedUnit.photoDataUrl) setDetailHeaderPhotoPeek(true);
-                  }}
-                >
-                  {selectedUnit.photoDataUrl ? (
-                    <img
-                      src={selectedUnit.photoDataUrl}
-                      alt={`${selectedUnit.unitNumber} photo`}
-                      className="h-full w-full object-cover object-center"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-slate-400">
-                      <Building2 className="h-7 w-7" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="min-w-0 flex-1 pt-0.5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="text-2xl font-bold leading-tight text-slate-900 dark:text-slate-50">
-                    {t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })}
-                  </span>
-                  <Badge
-                    className={cn(
-                      'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                      selectedUnit.status === 'Available' && 'bg-emerald-500 text-white',
-                      selectedUnit.status === 'Occupied' && 'bg-indigo-500 text-white',
-                      selectedUnit.status === 'Maintenance' && 'bg-rose-500 text-white',
-                      selectedUnit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
-                    )}
-                  >
-                    {statusLabel(selectedUnit.status)}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                  {selectedUnit
-                    ? resolveUnitHeaderSubtitle(selectedUnit, t('views.units.table.floor'))
-                    : '—'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            ''
-          )
+          selectedUnit
+            ? t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })
+            : t('views.units.table.viewDetails')
         }
-        maxWidth="4xl"
+        maxWidth="lg"
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2 w-full">
             <Button
@@ -1746,244 +1441,137 @@ export function UnitsView() {
         }
         variant="default"
       >
-        <ScrollArea className="max-h-[min(68vh,42rem)] pr-1">
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className={UNIT_DETAIL_STAT_CARD}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-300/80">
-                      {t('views.units.details.monthlyRate')}
-                    </p>
-                    <p className="mt-2 text-2xl font-bold tabular-nums leading-none text-slate-900 dark:text-slate-50">
-                      ₱{selectedUnit?.monthlyRate.toLocaleString()}
-                    </p>
-                    <p className="mt-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {t('views.units.card.perMonth')}
-                    </p>
-                  </div>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                    <CircleDollarSign className="h-5 w-5" aria-hidden />
-                  </span>
+        {selectedUnit ? (
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[16/9] dark:border-slate-700 dark:bg-slate-900/40">
+              {selectedUnit.photoDataUrl ? (
+                <img
+                  src={selectedUnit.photoDataUrl}
+                  alt={selectedUnit.unitNumber}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-slate-300">
+                  <Building2 className="h-12 w-12" />
                 </div>
-              </div>
-
-              <div className={UNIT_DETAIL_STAT_CARD}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/80 dark:text-indigo-300/80">
-                      {t('views.units.details.unitType')}
-                    </p>
-                    <p className="mt-2 text-2xl font-bold leading-none text-slate-900 dark:text-slate-50">
-                      {selectedUnit?.type || '—'}
-                    </p>
-                    {selectedUnit ? (
-                      <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        <span className="inline-flex items-center gap-1.5">
-                          <BedDouble className="h-4 w-4" aria-hidden />
-                          {resolveUnitMetrics(selectedUnit).beds}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Bath className="h-4 w-4" aria-hidden />
-                          {resolveUnitMetrics(selectedUnit).baths}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Maximize2 className="h-4 w-4" aria-hidden />
-                          {resolveUnitMetrics(selectedUnit).sqm} {t('views.units.card.sqm')}
-                        </span>
-                      </p>
-                    ) : null}
-                  </div>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                    <BedDouble className="h-5 w-5" aria-hidden />
-                  </span>
-                </div>
-              </div>
-
-              <div className={UNIT_DETAIL_STAT_CARD}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-300/80">
-                      {t('views.units.table.area')}
-                    </p>
-                    <p className="mt-2 text-lg font-bold leading-snug text-slate-900 dark:text-slate-50">
-                      {areaDisplayLabel(selectedUnit?.area ?? '')}
-                    </p>
-                  </div>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                    <MapPin className="h-5 w-5" aria-hidden />
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <div className="space-y-5">
-                {activeContractForSelectedUnit && activeTenantForSelectedUnit ? (
-                  <section className={UNIT_DETAIL_TENANT_CARD}>
-                    <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                        <User className="h-4 w-4" />
-                      </span>
-                      {t('views.units.details.currentTenant')}
-                    </h4>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-slate-50">{activeTenantForSelectedUnit.name}</p>
-                      <div className="mt-3 grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {t('views.units.details.leaseStart')}
-                          </p>
-                          <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                            {formatContractDate(activeContractForSelectedUnit.startDate)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {t('views.units.details.leaseEnd')}
-                          </p>
-                          <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                            {formatContractDate(activeContractForSelectedUnit.endDate)}
-                          </p>
-                        </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                  selectedUnit.status === 'Available' && 'bg-emerald-500 text-white',
+                  selectedUnit.status === 'Occupied' && 'bg-brand-blue text-white',
+                  selectedUnit.status === 'Maintenance' && 'bg-rose-500 text-white',
+                  selectedUnit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
+                )}
+              >
+                {statusLabel(selectedUnit.status)}
+              </Badge>
+              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                {selectedUnit.type}
+              </span>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.addUnitByLocation.panels.location')}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
+                    {areaDisplayLabel(selectedUnit.area)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.addUnitByLocation.panels.building')}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
+                    {selectedUnit.buildingName || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.addModal.floor')}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {resolveUnitFloorTower(selectedUnit).floor || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.addModal.tower')}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {resolveUnitFloorTower(selectedUnit).tower || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.table.monthlyRate')}
+                  </p>
+                  <p className="mt-1 text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                    ₱{Number(selectedUnit.monthlyRate).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.addModal.layoutMetrics')}
+                  </p>
+                  {(() => {
+                    const metrics = resolveUnitMetrics(selectedUnit);
+                    return (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        <span className="inline-flex items-center gap-1.5" title={t('views.units.card.sqm')}>
+                          <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
+                          <span className="tabular-nums">{metrics.sqm}</span>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title={t('views.units.addModal.bedrooms')}
+                        >
+                          <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
+                          <span className="tabular-nums">{metrics.beds}</span>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title={t('views.units.addModal.bathrooms')}
+                        >
+                          <Bath className="h-4 w-4 text-slate-500" aria-hidden />
+                          <span className="tabular-nums">{metrics.baths}</span>
+                        </span>
                       </div>
-                    </div>
-                  </section>
-                ) : null}
-
-                <section>
-                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
-                      <MapPin className="h-4 w-4" />
-                    </span>
-                    {t('views.units.details.buildingAndAddress')}
-                  </h4>
-                  <div className={cn(UNIT_DETAIL_VALUE_BOX, 'leading-relaxed text-slate-600 dark:text-slate-300')}>
-                    {selectedUnit
-                      ? resolveUnitFullAddress(selectedUnit, t('views.units.table.floor'))
-                      : '—'}
-                  </div>
-                </section>
-
-                <section>
-                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
-                      <MessageSquare className="h-4 w-4" />
-                    </span>
-                    {t('views.units.details.specialRequests')}
-                  </h4>
-                  <div className={UNIT_DETAIL_VALUE_BOX}>
-                    {unitRemarksDisplay ? (
-                      <p className="whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-200">
-                        {unitRemarksDisplay}
-                      </p>
-                    ) : (
-                      <p className="text-slate-500 dark:text-slate-400">{t('views.units.details.noRemarks')}</p>
-                    )}
-                  </div>
-                </section>
+                    );
+                  })()}
+                </div>
               </div>
 
-              <div className="space-y-5">
-                <section>
-                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400">
-                      <LayoutGrid className="h-4 w-4" />
-                    </span>
-                    {t('views.units.details.inventoryAssets')}
-                  </h4>
-                  <div className={cn(UNIT_DETAIL_VALUE_BOX, 'overflow-hidden p-0')}>
-                    {!selectedUnit?.inventory?.length ? (
-                      <p className="px-4 py-5 text-center text-sm text-slate-500 dark:text-slate-400">
-                        {t('views.units.inventoryEmpty')}
-                      </p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-transparent hover:bg-transparent [&>th]:h-10">
-                            <TableHead className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                              {t('views.units.details.inventoryItemName')}
-                            </TableHead>
-                            <TableHead className="w-16 px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                              {t('views.units.details.inventoryQty')}
-                            </TableHead>
-                            <TableHead className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                              {t('views.units.details.inventoryCondition')}
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedUnit.inventory.map((inv) => (
-                            <TableRow key={inv.id} className="bg-transparent hover:bg-white/50 dark:hover:bg-slate-900/30">
-                              <TableCell className="px-4 py-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-                                {inv.name}
-                              </TableCell>
-                              <TableCell className="px-4 py-2 text-center text-sm text-slate-700 dark:text-slate-300">
-                                {inv.quantity}
-                              </TableCell>
-                              <TableCell className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300">
-                                {inv.condition === 'New'
-                                  ? t('views.units.details.conditionNew')
-                                  : inv.condition === 'Good'
-                                    ? t('views.units.details.conditionGood')
-                                    : inv.condition === 'Fair'
-                                      ? t('views.units.details.conditionFair')
-                                      : t('views.units.details.conditionPoor')}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
-                </section>
+              {selectedUnit.moreDetails?.trim() ? (
+                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.addModal.moreDetails')}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                    {selectedUnit.moreDetails}
+                  </p>
+                </div>
+              ) : null}
 
-                <section>
-                  <h4 className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      <History className="h-4 w-4" />
-                    </span>
-                    {t('views.units.details.historicalTenants')}
-                  </h4>
-                  <div className="space-y-2">
-                    {historicalContractsForSelectedUnit.length > 0 ? (
-                      historicalContractsForSelectedUnit.map((c) => {
-                        const tenantName = tenantsList.find((x) => x.id === c.tenantId)?.name ?? '—';
-                        return (
-                          <div
-                            key={c.id}
-                            className={cn(UNIT_DETAIL_VALUE_BOX, 'flex items-start gap-3 px-3.5 py-3')}
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                              {tenantName !== '—' ? tenantName.charAt(0).toUpperCase() : '?'}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                  {tenantName}
-                                </span>
-                                <Badge variant="outline" className="h-5 border-transparent bg-white/80 text-[10px] dark:bg-slate-900/80">
-                                  {contractStatusLabel(c, t)}
-                                </Badge>
-                              </div>
-                              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {formatContractPeriod(c)}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className={cn(UNIT_DETAIL_VALUE_BOX, 'px-4 py-5 text-center text-slate-500 dark:text-slate-400')}>
-                        {t('views.units.details.noHistorical')}
-                      </p>
-                    )}
-                  </div>
-                </section>
-              </div>
+              {unitRemarksDisplay ? (
+                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t('views.units.addModal.specialRemarks')}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                    {unitRemarksDisplay}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
-        </ScrollArea>
+        ) : null}
       </Modal>
 
       <Modal
@@ -2010,7 +1598,7 @@ export function UnitsView() {
               <Button
                 type="button"
                 size="sm"
-                className="h-9 rounded-lg border-indigo-200 bg-indigo-50 px-4 font-medium text-indigo-700 shadow-none hover:bg-indigo-100"
+                className="h-9 rounded-lg border-brand-blue/20 bg-brand-blue/10 px-4 font-medium text-brand-blue shadow-none hover:bg-brand-blue/10"
                 onClick={openInventoryAddModal}
               >
                 <Plus className="w-4 h-4 mr-1.5" aria-hidden />
@@ -2346,67 +1934,38 @@ export function UnitsView() {
               value={addForm.unitNumber}
               onChange={(e) => setAddForm((f) => ({ ...f, unitNumber: e.target.value }))}
               placeholder="e.g. 1201"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.units.addModal.floor')}</Label>
-            <Select2
-              options={addFloorOptions}
-              value={addForm.floor || null}
-              onChange={(v) => setAddForm((f) => ({ ...f, floor: String(v ?? '') }))}
-              placeholder="Select floor"
-              borderless={false}
-              className="[&_.unit-form-select-control]:!min-h-12"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="add-tower">{t('views.units.addModal.tower')}</Label>
-            <Input
-              id="add-tower"
-              value={addForm.tower}
-              onChange={(e) => setAddForm((f) => ({ ...f, tower: e.target.value }))}
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-legal">{t('views.units.addModal.buildingAndAddress')}</Label>
-            <Input
-              id="add-legal"
-              value={addForm.legalAddress}
-              onChange={(e) => {
-                const next = e.target.value;
-                setAddForm((f) => ({
-                  ...f,
-                  legalAddress: next,
-                  // Keep storing a concise building name for cards/subtitles.
-                  buildingName: deriveBuildingName(next, f.buildingName),
-                }));
-              }}
-              placeholder={t('views.units.addModal.buildingAndAddressPlaceholder')}
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.units.addModal.categoryType')}</Label>
-            <Select2
-              options={addTypeOptions}
-              value={addForm.type}
-              onChange={(v) => {
-                const nextType = (v ?? 'Condominium') as UnitType;
-                const m = unitDisplayMetrics(nextType);
-                setAddForm((f) => ({
-                  ...f,
-                  type: nextType,
-                  // Prefill sensible defaults for the chosen category (still editable below).
-                  areaSqm: String(m.sqm),
-                  bedrooms: String(m.beds),
-                  bathrooms: String(m.baths),
-                }));
-              }}
-              borderless={false}
-              className="[&_.unit-form-select-control]:!min-h-12"
-            />
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900/50 dark:hover:bg-slate-900"
+              onClick={() => setShowMoreDetails((v) => !v)}
+              aria-expanded={showMoreDetails}
+            >
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {t('views.units.addModal.moreDetails')}
+              </span>
+              <ChevronDown
+                className={cn(
+                  'h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200',
+                  showMoreDetails && 'rotate-180',
+                )}
+              />
+            </button>
+            {showMoreDetails ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-950/40">
+                <Textarea
+                  id="add-more-details"
+                  value={addForm.moreDetails}
+                  onChange={(e) => setAddForm((f) => ({ ...f, moreDetails: e.target.value }))}
+                  placeholder={t('views.units.addModal.moreDetailsPlaceholder')}
+                  rows={3}
+                  className="min-h-[88px] resize-y rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
+                />
+              </div>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>{t('views.units.addModal.status')}</Label>
@@ -2421,19 +1980,6 @@ export function UnitsView() {
             />
           </div>
           <div className="space-y-2">
-            <Label>{t('views.units.addModal.area')}</Label>
-            <Select2
-              options={addAreaOptions}
-              value={addForm.area || null}
-              onChange={(v) =>
-                setAddForm((f) => ({ ...f, area: String(v ?? '') }))
-              }
-              placeholder="Type city to search..."
-              borderless={false}
-              className="[&_.unit-form-select-control]:!min-h-12"
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="add-rate">{t('views.units.addModal.monthlyRate')}</Label>
             <Input
               id="add-rate"
@@ -2442,7 +1988,7 @@ export function UnitsView() {
               value={addForm.monthlyRate}
               onChange={(e) => setAddForm((f) => ({ ...f, monthlyRate: e.target.value }))}
               placeholder="35000"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -2458,7 +2004,7 @@ export function UnitsView() {
                   onChange={(e) => setAddForm((f) => ({ ...f, areaSqm: e.target.value }))}
                   placeholder={t('views.units.addModal.sqm')}
                   aria-label={t('views.units.addModal.sqm')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
                 />
               </div>
               <div className="relative">
@@ -2471,7 +2017,7 @@ export function UnitsView() {
                   onChange={(e) => setAddForm((f) => ({ ...f, bedrooms: e.target.value }))}
                   placeholder={t('views.units.addModal.bedrooms')}
                   aria-label={t('views.units.addModal.bedrooms')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
                 />
               </div>
               <div className="relative">
@@ -2484,13 +2030,10 @@ export function UnitsView() {
                   onChange={(e) => setAddForm((f) => ({ ...f, bathrooms: e.target.value }))}
                   placeholder={t('views.units.addModal.bathrooms')}
                   aria-label={t('views.units.addModal.bathrooms')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
                 />
               </div>
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              {t('views.units.addModal.layoutMetricsHint')}
-            </p>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="add-special-remarks">{t('views.units.addModal.specialRemarks')}</Label>
@@ -2500,7 +2043,7 @@ export function UnitsView() {
               onChange={(e) => setAddForm((f) => ({ ...f, specialRemarks: e.target.value }))}
               placeholder={t('views.units.addModal.specialRemarksPlaceholder')}
               rows={3}
-              className="rounded-xl border border-slate-200 bg-white shadow-sm resize-y min-h-[88px] focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80"
+              className="rounded-xl border border-slate-200 bg-white shadow-sm resize-y min-h-[88px] focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
             />
           </div>
         </div>
@@ -2526,27 +2069,6 @@ export function UnitsView() {
           ) : null}
         </div>
       </Modal>
-
-      {typeof document !== 'undefined' &&
-        detailHeaderPhotoPeek &&
-        selectedUnit?.photoDataUrl &&
-        createPortal(
-          <div
-            role="presentation"
-            className="pointer-events-auto fixed left-1/2 top-1/2 z-[160] flex max-h-[min(90vh,52rem)] w-[min(94vw,44rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-            onMouseEnter={clearDetailPhotoPeekCloseTimer}
-            onMouseLeave={scheduleDetailPhotoPeekClose}
-          >
-            <div className="animate-in fade-in zoom-in-95 flex w-full max-h-[min(90vh,52rem)] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-2xl ring-4 ring-black/5 duration-150 sm:p-5">
-              <img
-                src={selectedUnit.photoDataUrl}
-                alt=""
-                className="mx-auto max-h-[min(86vh,48rem)] w-auto max-w-full object-contain object-center"
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }

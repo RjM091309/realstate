@@ -39,6 +39,7 @@ export interface Unit {
   monthlyRate: number;
   photoDataUrl?: string | null;
   marketValue?: number;
+  moreDetails?: string;
   specialRemarks?: string;
   inventory: InventoryItem[];
 }

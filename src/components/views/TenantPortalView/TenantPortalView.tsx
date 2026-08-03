@@ -503,7 +503,7 @@ export function TenantPortalView() {
   if (pageLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden />
+        <Loader2 className="h-10 w-10 animate-spin text-brand-blue dark:text-brand-blue" aria-hidden />
         <p className="text-sm">{t('views.portal.loading')}</p>
       </div>
     );
@@ -541,7 +541,7 @@ export function TenantPortalView() {
     }
     if (s === 'in_progress' || s === 'in progress') {
       return (
-        <Badge variant="outline" className="border-indigo-200 text-indigo-700 dark:border-indigo-400/50 dark:text-indigo-300">
+        <Badge variant="outline" className="border-brand-blue/20 text-brand-blue dark:border-brand-blue/50 dark:text-brand-blue">
           In Progress
         </Badge>
       );
@@ -586,7 +586,7 @@ export function TenantPortalView() {
 
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="relative overflow-hidden bg-gradient-to-br from-violet-800 via-indigo-700 to-indigo-950 text-white shadow-[inset_0_-1px_0_0_rgb(255_255_255/0.08)]">
+      <header className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-brand-blue to-slate-950 text-white shadow-[inset_0_-1px_0_0_rgb(255_255_255/0.08)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_-20%,rgb(196_181_253/0.35),transparent)]" aria-hidden />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-0">
@@ -606,7 +606,7 @@ export function TenantPortalView() {
             </div>
             <div className="flex flex-wrap gap-2 lg:min-w-[min(100%,20rem)] lg:flex-col lg:justify-center lg:pl-10 xl:min-w-[22rem] xl:flex-row xl:flex-wrap xl:items-center">
               <Button
-                className="h-9 border border-white/40 !bg-white !text-indigo-700 shadow-sm hover:!bg-indigo-50 hover:!text-indigo-800 dark:border-white/50 dark:!bg-white dark:!text-indigo-800 dark:hover:!bg-indigo-50 dark:hover:!text-indigo-900"
+                className="h-9 border border-white/40 !bg-white !text-brand-blue shadow-sm hover:!bg-brand-blue/10 hover:!text-brand-blue dark:border-white/50 dark:!bg-white dark:!text-brand-blue dark:hover:!bg-brand-blue/10 dark:hover:!text-brand-blue"
                 onClick={handleQuickPayFromHero}
               >
                 <CreditCard className="mr-2 h-4 w-4" aria-hidden />
@@ -642,7 +642,7 @@ export function TenantPortalView() {
             <Card className="border border-slate-200/80 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4 text-indigo-700" aria-hidden />
+                <FileText className="h-4 w-4 text-brand-blue" aria-hidden />
                 Lease Info
               </CardTitle>
               <CardDescription>Unit, rent, contract dates, and status.</CardDescription>
@@ -683,7 +683,7 @@ export function TenantPortalView() {
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">KYC</div>
                 <div className="mt-1 flex items-center justify-between">
                   <div className="text-lg font-bold dark:text-slate-100">{verificationProgress}%</div>
-                  <Badge variant="outline" className="border-indigo-200 text-indigo-700 dark:border-indigo-400/50 dark:text-indigo-300">
+                  <Badge variant="outline" className="border-brand-blue/20 text-brand-blue dark:border-brand-blue/50 dark:text-brand-blue">
                     {tenant.kycVerified ? 'Verified' : 'Pending'}
                   </Badge>
                 </div>
@@ -710,7 +710,7 @@ export function TenantPortalView() {
                       href={toAbsoluteAssetUrl(kycDocUrl)}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-indigo-700 hover:underline dark:text-indigo-400"
+                      className="text-xs text-brand-blue hover:underline dark:text-brand-blue"
                     >
                       View uploaded file
                     </a>
@@ -725,13 +725,13 @@ export function TenantPortalView() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-indigo-700" aria-hidden />
+                    <CreditCard className="h-4 w-4 text-brand-blue" aria-hidden />
                     Payments
                   </CardTitle>
                   <CardDescription>Current balance + payment history.</CardDescription>
                 </div>
                 <Button
-                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                  className="bg-brand-blue text-white hover:bg-[#3d7ab8]"
                   onClick={() => void handlePayNow()}
                   disabled={paySubmitting || currentBalance <= 0}
                 >
@@ -741,17 +741,17 @@ export function TenantPortalView() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-500/25 dark:bg-indigo-950/50">
+              <div className="rounded-2xl border border-brand-blue/20 bg-brand-blue/10 p-4 dark:border-brand-blue/25 dark:bg-brand-blue/20">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">Current Balance</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-brand-blue dark:text-blue-200">Current Balance</div>
                   {currentBalance > 0 ? (
                     <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">Due</Badge>
                   ) : (
                     <Badge className="bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
                   )}
                 </div>
-                <div className="mt-1 text-2xl font-black text-indigo-900 dark:text-indigo-100">₱{Number(currentBalance).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-indigo-700/80 dark:text-indigo-200/80">
+                <div className="mt-1 text-2xl font-black text-brand-blue dark:text-blue-100">₱{Number(currentBalance).toLocaleString()}</div>
+                <div className="mt-1 text-xs text-brand-blue/80 dark:text-blue-200/80">
                   {currentBalance > 0 ? 'Includes pending/overdue items.' : 'You are all set.'}
                 </div>
               </div>
@@ -761,8 +761,7 @@ export function TenantPortalView() {
                   columns={paymentColumns}
                   keyExtractor={(p) => p.id}
                   embedded
-                  highlightFirstColumn={false}
-                />
+                                  />
               </div>
             </CardContent>
           </Card>
@@ -772,7 +771,7 @@ export function TenantPortalView() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Wrench className="h-4 w-4 text-indigo-700" aria-hidden />
+                    <Wrench className="h-4 w-4 text-brand-blue" aria-hidden />
                     Maintenance
                   </CardTitle>
                   <CardDescription>Requests with status.</CardDescription>
@@ -780,7 +779,7 @@ export function TenantPortalView() {
                 <Button
                   variant="outline"
                   onClick={() => setMaintenanceOpen((v) => !v)}
-                  className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/40 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
+                  className="border-brand-blue/20 text-brand-blue hover:bg-brand-blue/10 dark:border-brand-blue/40 dark:text-blue-200 dark:hover:bg-brand-blue/20"
                 >
                   <Wrench className="mr-2 h-4 w-4" aria-hidden />
                   {maintenanceOpen ? 'Close Form' : 'Request Maintenance'}
@@ -805,7 +804,7 @@ export function TenantPortalView() {
                       </Button>
                       <Button
                         type="button"
-                        className="bg-indigo-600 text-white hover:bg-indigo-700"
+                        className="bg-brand-blue text-white hover:bg-[#3d7ab8]"
                         onClick={() => void submitMaintenance()}
                         disabled={maintenanceSaving}
                       >
@@ -847,7 +846,7 @@ export function TenantPortalView() {
           <Card id="documents" className="border border-slate-200/80 shadow-sm scroll-mt-6 transition-all hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300/80 dark:border-slate-700/90 dark:bg-slate-900/50 dark:hover:border-slate-600">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Download className="h-4 w-4 text-indigo-700" aria-hidden />
+                <Download className="h-4 w-4 text-brand-blue" aria-hidden />
                 Documents
               </CardTitle>
               <CardDescription>Contract and receipts.</CardDescription>
@@ -855,7 +854,7 @@ export function TenantPortalView() {
             <CardContent>
               {portalDocumentsLoading ? (
                 <div className="flex items-center gap-2 py-6 text-sm text-slate-500 dark:text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" aria-hidden />
+                  <Loader2 className="h-4 w-4 animate-spin text-brand-blue" aria-hidden />
                   Loading documents…
                 </div>
               ) : portalDocuments && portalDocuments.length > 0 ? (
@@ -918,7 +917,7 @@ export function TenantPortalView() {
             <section className="space-y-3">
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
-                  <Bell className="h-4 w-4 text-indigo-700 dark:text-indigo-400" aria-hidden />
+                  <Bell className="h-4 w-4 text-brand-blue dark:text-brand-blue" aria-hidden />
                   Notifications
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Recent updates and reminders.</p>
@@ -942,7 +941,7 @@ export function TenantPortalView() {
                           <div className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">{n.message}</div>
                           <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{n.time}</div>
                         </div>
-                        {n.unread ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600 dark:bg-indigo-400" /> : null}
+                        {n.unread ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-blue dark:bg-brand-blue" /> : null}
                       </div>
                     </div>
                   ))
@@ -957,7 +956,7 @@ export function TenantPortalView() {
               </div>
               <div className="space-y-2">
                 <Button
-                  className="w-full justify-start !bg-indigo-600 !text-white hover:!bg-indigo-700 dark:!bg-indigo-600 dark:!text-white dark:hover:!bg-indigo-500"
+                  className="w-full justify-start !bg-brand-blue !text-white hover:!bg-[#3d7ab8] dark:!bg-brand-blue dark:!text-white dark:hover:!bg-brand-blue"
                   onClick={() => {
                     scrollToPayments();
                     window.setTimeout(() => void handlePayNow(), 320);
@@ -970,7 +969,7 @@ export function TenantPortalView() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/50 dark:!bg-transparent dark:!text-indigo-200 dark:hover:!bg-indigo-500/15 dark:hover:!text-indigo-100"
+                  className="w-full justify-start border-brand-blue/20 text-brand-blue hover:bg-brand-blue/10 dark:border-brand-blue/50 dark:!bg-transparent dark:!text-blue-200 dark:hover:!bg-brand-blue/15 dark:hover:!text-blue-100"
                   onClick={() => {
                     setMaintenanceOpen(true);
                     scrollToMaintenance();
@@ -1013,7 +1012,7 @@ export function TenantPortalView() {
           <p>
             Billing and lease questions:{' '}
             <a
-              className="font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+              className="font-semibold text-brand-blue underline decoration-brand-blue/40 underline-offset-2 hover:text-brand-blue dark:text-brand-blue dark:hover:text-brand-blue"
               href={`mailto:${supportInboxEmail}?subject=${encodeURIComponent('Tenant portal — inquiry')}`}
             >
               {supportInboxEmail}
@@ -1028,7 +1027,7 @@ export function TenantPortalView() {
                 <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
                   <dt className="shrink-0 text-xs text-slate-500 dark:text-slate-400">Email</dt>
                   <dd className="min-w-0">
-                    <a href={`mailto:${tenant.email}`} className="break-all text-indigo-700 hover:underline dark:text-indigo-400">
+                    <a href={`mailto:${tenant.email}`} className="break-all text-brand-blue hover:underline dark:text-brand-blue">
                       {tenant.email}
                     </a>
                   </dd>
@@ -1040,7 +1039,7 @@ export function TenantPortalView() {
                   <dd>
                     <a
                       href={`tel:${String(tenant.phone).replace(/[^\d+]/g, '')}`}
-                      className="text-indigo-700 hover:underline dark:text-indigo-400"
+                      className="text-brand-blue hover:underline dark:text-brand-blue"
                     >
                       {tenant.phone}
                     </a>
@@ -1070,7 +1069,7 @@ export function TenantPortalView() {
             <Button
               type="button"
               size="sm"
-              className="rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              className="rounded-lg bg-brand-blue text-white hover:bg-[#3d7ab8]"
               onClick={() => {
                 window.location.href = `mailto:${supportInboxEmail}?subject=${encodeURIComponent('Tenant portal — inquiry')}`;
               }}

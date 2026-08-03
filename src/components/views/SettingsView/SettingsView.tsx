@@ -345,7 +345,7 @@ export function SettingsView() {
                       <Button
                         type="submit"
                         disabled={profileSaving || !profileDirty}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5"
+                        className="bg-brand-blue hover:bg-[#3d7ab8] text-white rounded-xl px-5"
                       >
                         {profileSaving ? 'Saving…' : 'Save changes'}
                       </Button>
@@ -534,7 +534,7 @@ export function SettingsView() {
                     <Button
                       type="submit"
                       disabled={passwordSaving}
-                      className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="rounded-xl bg-brand-blue hover:bg-[#3d7ab8] text-white"
                     >
                       {passwordSaving ? 'Updating…' : 'Update password'}
                     </Button>
@@ -560,7 +560,7 @@ export function SettingsView() {
                       variant={appearanceMode === 'light' ? 'default' : 'outline'}
                       className={cn(
                         'rounded-xl gap-2',
-                        appearanceMode === 'light' && 'bg-indigo-600 hover:bg-indigo-700 text-white',
+                        appearanceMode === 'light' && 'bg-brand-blue hover:bg-[#3d7ab8] text-white',
                       )}
                       onClick={() => applyAppearanceMode('light')}
                     >
@@ -572,7 +572,7 @@ export function SettingsView() {
                       variant={appearanceMode === 'dark' ? 'default' : 'outline'}
                       className={cn(
                         'rounded-xl gap-2',
-                        appearanceMode === 'dark' && 'bg-indigo-600 hover:bg-indigo-700 text-white',
+                        appearanceMode === 'dark' && 'bg-brand-blue hover:bg-[#3d7ab8] text-white',
                       )}
                       onClick={() => applyAppearanceMode('dark')}
                     >

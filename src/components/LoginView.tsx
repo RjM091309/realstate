@@ -25,7 +25,7 @@ export function LoginView() {
   };
 
   return (
-    <div className="min-h-screen font-sans text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen font-sans text-slate-100 selection:bg-brand-blue/30 selection:text-blue-100 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="fixed inset-0 z-0">
         <motion.img
           initial={{ scale: 1.1 }}
@@ -39,7 +39,7 @@ export function LoginView() {
         <div className="absolute inset-0 bg-[#0d121f]/80 backdrop-blur-[4px]" />
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 rounded-full blur-[120px] animate-pulse" />
         <div
-          className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse"
+          className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-brand-blue/10 rounded-full blur-[120px] animate-pulse"
           style={{ animationDelay: '2s' }}
         />
       </div>
@@ -76,7 +76,7 @@ export function LoginView() {
                     className="flex items-center gap-3 text-slate-400 text-sm"
                   >
                     <div className="p-1.5 bg-slate-800/50 rounded-md">
-                      <item.icon size={14} className="text-indigo-400" />
+                      <item.icon size={14} className="text-brand-blue" />
                     </div>
                     <span>{item.text}</span>
                   </motion.div>
@@ -113,14 +113,14 @@ export function LoginView() {
               </label>
               <div className="relative group">
                 <Mail
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-blue transition-colors"
                   size={18}
                 />
                 <input
                   id="username"
                   autoComplete="username"
                   required
-                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-4 text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-400/15 focus:border-indigo-400 transition-all placeholder:text-slate-500 text-sm"
+                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-4 text-slate-100 focus:outline-none focus:ring-4 focus:ring-brand-blue/15 focus:border-brand-blue transition-all placeholder:text-slate-500 text-sm"
                   placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -136,7 +136,7 @@ export function LoginView() {
               </div>
               <div className="relative group">
                 <Lock
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-blue transition-colors"
                   size={18}
                 />
                 <input
@@ -144,7 +144,7 @@ export function LoginView() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-12 text-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-400/15 focus:border-indigo-400 transition-all placeholder:text-slate-500 text-sm"
+                  className="w-full bg-slate-900/40 border border-slate-700/80 rounded-xl py-4 pl-12 pr-12 text-slate-100 focus:outline-none focus:ring-4 focus:ring-brand-blue/15 focus:border-brand-blue transition-all placeholder:text-slate-500 text-sm"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -152,7 +152,7 @@ export function LoginView() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-brand-blue transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -179,7 +179,7 @@ export function LoginView() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <div className="absolute inset-0 bg-indigo-600 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out -z-10" />
+              <div className="absolute inset-0 bg-brand-blue -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out -z-10" />
             </button>
           </form>
 

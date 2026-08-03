@@ -4,6 +4,7 @@ import { parseISO, formatDistanceToNow } from 'date-fns';
 import {
   LayoutDashboard,
   Building2,
+  MapPinned,
   Users,
   FilePen,
   BookOpen,
@@ -88,6 +89,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
     () => [
       { id: 'dashboard', label: t('nav.menu.dashboard'), icon: LayoutDashboard },
       { id: 'units', label: t('nav.menu.units'), icon: Building2 },
+      { id: 'addUnitByLocation', label: t('nav.menu.addUnitByLocation'), icon: MapPinned },
       { id: 'contracts', label: t('nav.menu.contracts'), icon: FilePen },
       { id: 'crm', label: t('nav.menu.crm'), icon: Users },
       { id: 'ledger', label: t('nav.menu.ledger'), icon: BookOpen },
@@ -103,6 +105,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   const visibleOperational = hasAllowedTabs
     ? operationalItems.filter((item) => {
       if (item.id === 'userManagement') return Boolean(isAdmin);
+      if (item.id === 'addUnitByLocation') return allowedTabIds.includes('units');
       return allowedTabIds.includes(item.id);
     })
     : operationalItems.filter((item) => item.id !== 'userManagement' || Boolean(isAdmin));
@@ -129,14 +132,14 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
   return (
     <div
       className={cn(
-        'relative flex flex-col h-full bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-300 transition-all duration-300 ease-in-out shrink-0',
-        isCollapsed ? 'w-[72px]' : 'w-64'
+        'relative flex flex-col h-full bg-slate-900 text-slate-400 border-r border-slate-800 transition-all duration-300 ease-in-out shrink-0',
+        isCollapsed ? 'w-[72px]' : 'w-64',
       )}
     >
       {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3.5 top-7 flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-white text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white transition-all z-50 shadow-lg"
+        className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-400 shadow-lg transition-all hover:text-white"
       >
         {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
@@ -145,15 +148,15 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       <div className={cn('transition-all duration-300', isCollapsed ? 'px-4 pt-5 pb-4' : 'px-5 pt-6 pb-4')}>
         <div className={cn('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 dark:shadow-emerald-950/50 ring-1 ring-black/5 dark:ring-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-orange text-white shadow-lg shadow-brand-orange/20"
             aria-hidden
           >
             <Building2 className="h-[18px] w-[18px]" strokeWidth={2} />
           </div>
           <span
             className={cn(
-              'text-lg font-bold text-slate-900 dark:text-white tracking-tight overflow-hidden transition-all duration-300',
-              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+              'text-lg font-bold tracking-tight text-white overflow-hidden transition-all duration-300',
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
             )}
           >
             {t('nav.appName')}
@@ -161,12 +164,16 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="mx-4 h-px bg-slate-200/70 dark:bg-slate-800/60" />
+      <div className="mx-4 h-px bg-slate-800" />
 
       {/* Nav items */}
-      <div className="flex-1 overflow-y-auto transition-all duration-300 py-3 px-3">
-        <nav className="space-y-0.5" aria-label="Main">
+      <div className="sidebar-scroll flex-1 overflow-y-auto py-3 transition-all duration-300">
+        {!isCollapsed && (
+          <h3 className="mb-3 px-6 text-[11px] font-bold uppercase tracking-widest text-brand-orange">
+            Menu
+          </h3>
+        )}
+        <nav className="space-y-1" aria-label="Main">
           {navItems.map((item) => {
             if (item.id === 'userManagement') {
               const umActive = activeTab === 'userManagement';
@@ -186,47 +193,42 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                     title={item.label}
                     onClick={() => void navigate(USER_MGMT_PATHS.info)}
                     className={cn(
-                      'relative w-full flex items-center justify-center rounded-lg p-2.5 text-sm font-medium transition-all duration-150',
-                      umActive
-                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
+                      'relative flex w-full items-center justify-center py-3.5 text-sm font-medium transition-all',
+                      umActive ? 'text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                     )}
                   >
-                    {umActive ? (
-                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
-                    ) : null}
-                    <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-indigo-600 dark:text-indigo-400' : '')} />
+                    {umActive ? <span className="absolute bottom-0 left-0 top-0 w-1 bg-brand-orange" /> : null}
+                    <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-white' : 'text-slate-400')} />
                   </button>
                 );
               }
 
               return (
-                <div key={item.id} className="space-y-0.5">
+                <div key={item.id}>
                   <button
                     type="button"
                     onClick={() => setUserMgmtOpen((o) => !o)}
                     className={cn(
-                      'relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-all duration-150',
+                      'relative flex w-full items-center justify-between py-3.5 pl-6 pr-6 text-left text-sm font-medium transition-all',
                       umActive
-                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
+                        ? 'mr-3 rounded-r-full bg-brand-orange text-white shadow-md shadow-brand-orange/20'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                     )}
                   >
-                    {umActive ? (
-                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
-                    ) : null}
-                    <Icon className={cn('h-[17px] w-[17px] shrink-0', umActive ? 'text-indigo-600 dark:text-indigo-400' : '')} />
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Icon className={cn('h-5 w-5 shrink-0', umActive ? 'text-white' : 'text-slate-400')} />
+                      <span className="truncate">{item.label}</span>
+                    </span>
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200',
+                        'h-4 w-4 shrink-0 transition-transform duration-200',
                         userMgmtOpen ? 'rotate-180' : '',
                       )}
                       aria-hidden
                     />
                   </button>
                   {userMgmtOpen ? (
-                    <div className="ml-3 space-y-0.5 border-l border-transparent pl-2.5 pt-0.5">
+                    <div className="bg-slate-800/50 py-1">
                       {subLinks.map(({ path, label }) => {
                         const subActive = location.pathname === path;
                         return (
@@ -235,15 +237,13 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                             type="button"
                             onClick={() => void navigate(path)}
                             className={cn(
-                              'relative flex w-full items-center gap-2 rounded-md py-1.5 pl-1 pr-2 text-left text-[13px] transition-colors',
-                              subActive ? 'text-indigo-700 dark:text-indigo-200' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200',
+                              'w-full py-2.5 text-sm transition-all duration-300 hover:text-brand-orange',
+                              subActive
+                                ? 'bg-brand-orange/5 text-center font-black text-brand-orange'
+                                : 'pl-14 text-left text-slate-400 hover:text-slate-200',
                             )}
                           >
-                            <span
-                              className="h-1 w-1 shrink-0 rounded-full bg-current opacity-60"
-                              aria-hidden
-                            />
-                            <span className="min-w-0 truncate">{label}</span>
+                            {label}
                           </button>
                         );
                       })}
@@ -278,26 +278,27 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
                   setActiveTab(item.id);
                 }}
                 className={cn(
-                  'relative w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150',
-                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
-                  isActive
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-100',
+                  'relative flex w-full items-center text-sm font-medium transition-all',
+                  isCollapsed ? 'justify-center py-3.5' : 'gap-3 py-3.5 pl-6 pr-6',
+                  isActive && !isCollapsed
+                    ? 'mr-3 rounded-r-full bg-brand-orange text-white shadow-md shadow-brand-orange/20'
+                    : isActive
+                      ? 'text-white'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                 )}
               >
-                {isActive && !isCollapsed && (
-                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
-                )}
+                {isActive && isCollapsed ? (
+                  <span className="absolute bottom-0 left-0 top-0 w-1 bg-brand-orange" />
+                ) : null}
                 <item.icon
                   className={cn(
-                    'shrink-0 transition-colors',
-                    isCollapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
-                    isActive ? 'text-indigo-600 dark:text-indigo-400' : '',
+                    'h-5 w-5 shrink-0 transition-colors',
+                    isActive ? 'text-white' : 'text-slate-400',
                   )}
                 />
                 <span
                   className={cn(
-                    'truncate transition-all duration-300 overflow-hidden',
+                    'truncate overflow-hidden transition-all duration-300',
                     isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
                   )}
                 >
@@ -310,21 +311,24 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       </div>
 
       {/* Bottom section */}
-      <div className="h-px bg-slate-200/70 dark:bg-slate-800/60">
-        {/* User profile card */}
-        <div className={cn(
-          'flex items-center gap-3 transition-all duration-300',
-          isCollapsed ? 'justify-center p-3' : 'px-4 py-3.5'
-        )}>
-          <div className="h-8 w-8 shrink-0 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 text-xs font-bold dark:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300">
+      <div className="border-t border-slate-800">
+        <div
+          className={cn(
+            'flex items-center gap-3 transition-all duration-300',
+            isCollapsed ? 'justify-center p-3' : 'px-4 py-3.5',
+          )}
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-blue/20 text-xs font-bold text-brand-blue">
             {userInitials}
           </div>
-          <div className={cn(
-            'min-w-0 overflow-hidden transition-all duration-300',
-            isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
-          )}>
-            <p className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate">{userName}</p>
-            <p className="text-[10px] text-slate-500 truncate">{userRole}</p>
+          <div
+            className={cn(
+              'min-w-0 overflow-hidden transition-all duration-300',
+              isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100',
+            )}
+          >
+            <p className="truncate text-xs font-semibold text-white">{userName}</p>
+            <p className="truncate text-[10px] text-slate-500">{userRole}</p>
           </div>
         </div>
       </div>
@@ -411,7 +415,8 @@ export function TopNav({
         void refreshNotifications();
       });
 
-      socket.on('access:changed', (payload: { roleId?: number } | undefined) => {
+      socket.on('access:changed', (raw) => {
+        const payload = raw as { roleId?: number } | undefined;
         const changedRoleId = Number(payload?.roleId);
         const myRoleId = Number(session.role?.id);
         if (!Number.isFinite(changedRoleId) || changedRoleId < 1) return;
@@ -585,7 +590,7 @@ export function TopNav({
             className={cn(
               'h-8 px-2',
               currentLanguage === 'en' &&
-                'bg-indigo-600 text-white hover:bg-indigo-700 hover:text-white dark:bg-indigo-500 dark:hover:bg-indigo-600',
+                'bg-brand-blue text-white hover:bg-[#3d7ab8] hover:text-white dark:bg-brand-blue dark:hover:bg-[#3d7ab8]',
             )}
             onClick={() => i18n.changeLanguage('en')}
           >
@@ -597,7 +602,7 @@ export function TopNav({
             className={cn(
               'h-8 px-2',
               currentLanguage === 'ko' &&
-                'bg-indigo-600 text-white hover:bg-indigo-700 hover:text-white dark:bg-indigo-500 dark:hover:bg-indigo-600',
+                'bg-brand-blue text-white hover:bg-[#3d7ab8] hover:text-white dark:bg-brand-blue dark:hover:bg-[#3d7ab8]',
             )}
             onClick={() => i18n.changeLanguage('ko')}
           >
@@ -671,7 +676,7 @@ export function TopNav({
                 type="button"
                 className={cn(
                   'group flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md px-2 py-1.5 shadow-sm hover:shadow-md transition-all',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
                 )}
               >
                 <Avatar className="h-8 w-8">

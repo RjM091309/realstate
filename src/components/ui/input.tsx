@@ -3,7 +3,11 @@ import { Input as InputPrimitive } from "@base-ui/react/input"
 
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+type InputProps = React.ComponentProps<"input"> & {
+  onValueChange?: (value: string) => void
+}
+
+function Input({ className, type, onChange, onValueChange, ...props }: InputProps) {
   return (
     <InputPrimitive
       type={type}
@@ -19,6 +23,21 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         className
       )}
       {...props}
+      onChange={onChange}
+      onValueChange={(value, eventDetails) => {
+        onValueChange?.(value)
+        // Keep legacy React onChange callers working with Base UI controlled inputs.
+        if (onChange) {
+          const nativeEvent = eventDetails?.event as Event | undefined
+          const target =
+            (nativeEvent?.target as HTMLInputElement | null) ??
+            ({ value } as HTMLInputElement)
+          onChange({
+            target,
+            currentTarget: target,
+          } as React.ChangeEvent<HTMLInputElement>)
+        }
+      }}
     />
   )
 }

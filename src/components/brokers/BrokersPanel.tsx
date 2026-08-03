@@ -214,7 +214,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
         sortValue: (a) => a.name,
         className: BROKER_COL.name,
         cellClassName: BROKER_CELL,
-        render: (a) => <TruncatedText value={a.name} className="font-medium text-slate-800 dark:text-slate-100" />,
+        render: (a) => <TruncatedText value={a.name} className="text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100" />,
       },
       {
         id: 'broker',
@@ -223,7 +223,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
         sortValue: (a) => a.contactPerson,
         className: BROKER_COL.broker,
         cellClassName: BROKER_CELL,
-        render: (a) => <TruncatedText value={a.contactPerson || '—'} className="text-slate-600 dark:text-slate-300" />,
+        render: (a) => <TruncatedText value={a.contactPerson || '—'} className="text-[12px] font-black uppercase tracking-tight text-slate-700 dark:text-slate-200" />,
       },
       {
         id: 'city',
@@ -360,7 +360,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label={t('views.crm.brokers.summary.total')} value={summary.totalAgencies} icon={Building2} accent="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300" />
+        <SummaryCard label={t('views.crm.brokers.summary.total')} value={summary.totalAgencies} icon={Building2} accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue" />
         <SummaryCard label={t('views.crm.brokers.summary.active')} value={summary.activeAgencies} icon={Users} accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300" />
         <SummaryCard label={t('views.crm.brokers.summary.pending')} value={summary.pendingVerification} icon={Clock3} accent="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300" />
         <SummaryCard label={t('views.crm.brokers.summary.expiring')} value={summary.expiringContracts} icon={ShieldAlert} accent="bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300" />
@@ -420,7 +420,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
             ]}
           />
           {canCreate ? (
-            <Button type="button" className="h-10 shrink-0 rounded-xl bg-indigo-600 px-4 text-white shadow-sm hover:bg-indigo-700" onClick={openCreate}>
+            <Button type="button" className="h-10 shrink-0 rounded-xl bg-brand-blue px-4 text-white shadow-sm hover:bg-[#3d7ab8]" onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
               {t('views.crm.brokers.addAgency')}
             </Button>
@@ -434,13 +434,13 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl bg-white p-12 text-center shadow-sm dark:bg-slate-900">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10">
             <Building2 className="h-8 w-8" aria-hidden />
           </div>
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('views.crm.brokers.empty')}</p>
           <p className="mt-1 text-xs text-slate-500">{t('views.crm.brokers.emptyHint')}</p>
           {canCreate ? (
-            <Button type="button" className="mt-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={openCreate}>
+            <Button type="button" className="mt-4 rounded-xl bg-brand-blue text-white hover:bg-[#3d7ab8]" onClick={openCreate}>
               {t('views.crm.brokers.addAgency')}
             </Button>
           ) : null}
@@ -451,8 +451,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
           columns={columns}
           keyExtractor={(a) => a.id}
           onRowClick={(a) => openProfile(a)}
-          highlightFirstColumn={false}
-          stickyHeader
+                    stickyHeader
           compact
           fitWidth
         />

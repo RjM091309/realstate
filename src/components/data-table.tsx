@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SortDirection = 'asc' | 'desc';
@@ -30,8 +30,8 @@ interface DataTableProps<T> {
   /** Page-size dropdown values. Default [10, 25, 50, 100]. */
   pageSizeOptions?: number[];
   /**
-   * When false, the first column uses the same neutral styling as other columns
-   * (no violet highlight stripe). Default true for backward compatibility.
+   * When true (default), freezes the first 1–2 columns with Merit `#F8F9FF` tint
+   * (matches Merit DataTable frozen-band pattern). Pass false for compact/embedded tables.
    */
   highlightFirstColumn?: boolean;
   /**
@@ -80,47 +80,40 @@ function compareSortValues(
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }) * mul;
 }
 
-function ColumnSortControl({
-  direction,
-  onAsc,
-  onDesc,
-}: {
-  direction: SortDirection | null;
-  onAsc: () => void;
-  onDesc: () => void;
-}) {
-  return (
-    <span className="ml-1.5 inline-flex flex-col items-center justify-center leading-none">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAsc();
-        }}
-        className={cn(
-          'rounded p-0.5 transition-colors hover:bg-slate-200/80 dark:hover:bg-slate-700/80',
-          direction === 'asc' ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500',
-        )}
-        aria-label="Sort ascending"
-      >
-        <ChevronUp className="h-3 w-3" strokeWidth={2.5} />
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDesc();
-        }}
-        className={cn(
-          '-mt-1 rounded p-0.5 transition-colors hover:bg-slate-200/80 dark:hover:bg-slate-700/80',
-          direction === 'desc' ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500',
-        )}
-        aria-label="Sort descending"
-      >
-        <ChevronDown className="h-3 w-3" strokeWidth={2.5} />
-      </button>
-    </span>
-  );
+/** Merit primary cell text (IDs, names in list tables) */
+export const meritCellPrimaryClass =
+  'text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100';
+
+/** Merit accent cell text (building / key id in brand blue) */
+export const meritCellAccentClass =
+  'text-[13px] font-black uppercase tracking-tight text-brand-blue';
+
+/** Merit muted meta under a primary cell */
+export const meritCellMetaClass =
+  'text-[11px] font-bold uppercase tracking-wider text-slate-400';
+
+/** Merit status pill */
+export const meritStatusPillClass =
+  'inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest';
+
+function frozenColCount(columns: { header: string }[], highlightFirstColumn: boolean): number {
+  if (!highlightFirstColumn) return 0;
+  // Merit: first 2 cols frozen, or first 3 when leading col is empty/checkbox
+  return columns[0]?.header === '' ? 3 : 2;
+}
+
+function isFrozenCol(frozenCount: number, index: number): boolean {
+  return index < frozenCount;
+}
+
+function MeritPlainCell({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
+  if (children == null || children === '') return null;
+  if (typeof children === 'string' || typeof children === 'number') {
+    return (
+      <span className={accent ? meritCellAccentClass : meritCellPrimaryClass}>{children}</span>
+    );
+  }
+  return <>{children}</>;
 }
 
 export function DataTable<T>({
@@ -128,7 +121,7 @@ export function DataTable<T>({
   columns,
   keyExtractor,
   onRowClick,
-  highlightFirstColumn = false,
+  highlightFirstColumn = true,
   embedded = false,
   stickyHeader = false,
   tableClassName,
@@ -145,6 +138,8 @@ export function DataTable<T>({
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection | null>(null);
 
+  const frozenCount = frozenColCount(columns, highlightFirstColumn);
+
   const sortedData = useMemo(() => {
     if (!sortColumn || !sortDirection) return data;
     const col = columns.find((c) => columnSortKey(c) === sortColumn);
@@ -152,7 +147,6 @@ export function DataTable<T>({
     return [...data].sort((a, b) => compareSortValues(getSortValue(col, a), getSortValue(col, b), sortDirection));
   }, [columns, data, sortColumn, sortDirection]);
 
-  // Pagination logic
   const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -161,18 +155,6 @@ export function DataTable<T>({
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
-
-  const applySort = (col: ColumnDef<T>, direction: SortDirection) => {
-    const key = columnSortKey(col);
-    if (sortColumn === key && sortDirection === direction) {
-      setSortColumn(null);
-      setSortDirection(null);
-    } else {
-      setSortColumn(key);
-      setSortDirection(direction);
-    }
-    setCurrentPage(1);
-  };
 
   const cycleSort = (col: ColumnDef<T>) => {
     const key = columnSortKey(col);
@@ -188,11 +170,15 @@ export function DataTable<T>({
     setCurrentPage(1);
   };
 
+  const cellPad = compact ? 'px-2.5 py-2' : 'px-4 py-3';
+
   return (
     <div
       className={cn(
         'data-table w-full overflow-hidden font-sans',
-        embedded ? '' : 'rounded-2xl bg-white dark:bg-slate-900 shadow-sm',
+        embedded
+          ? ''
+          : 'rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/50 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none',
       )}
     >
       <div
@@ -204,78 +190,100 @@ export function DataTable<T>({
       >
         <table className={cn('w-full border-collapse text-left', fitWidth && 'table-fixed', tableClassName)}>
           <thead className={cn(stickyHeader && 'sticky top-0 z-10')}>
-            <tr className="data-table-head-row border-b bg-white dark:bg-slate-900">
+            <tr className="data-table-head-row">
               {columns.map((col, i) => {
                 const sortKey = columnSortKey(col);
                 const isSorted = sortColumn === sortKey;
+                const frozen = isFrozenCol(frozenCount, i);
                 return (
-                <th
-                  key={sortKey}
-                  onClick={col.sortable ? () => cycleSort(col) : undefined}
-                  className={cn(
-                    'font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400',
-                    compact ? 'px-2.5 py-2 text-[10px] leading-tight' : 'px-6 py-3.5 text-xs whitespace-nowrap',
-                    highlightFirstColumn && !compact && 'py-4',
-                    col.sortable && 'cursor-pointer select-none',
-                    highlightFirstColumn && i === 0
-                      ? 'bg-violet-50 text-brand-text dark:bg-indigo-500/10 dark:text-slate-200'
-                      : 'bg-white dark:bg-slate-900',
-                    col.className,
-                    col.headerClassName,
-                    highlightFirstColumn && i === 0 && 'border-r-[3px] border-transparent',
-                  )}
-                >
-                  <div className="inline-flex items-center">
-                    <span>{col.header}</span>
-                    {col.sortable ? (
-                      <ColumnSortControl
-                        direction={isSorted ? sortDirection : null}
-                        onAsc={() => applySort(col, 'asc')}
-                        onDesc={() => applySort(col, 'desc')}
-                      />
-                    ) : null}
-                  </div>
-                </th>
-              );
+                  <th
+                    key={sortKey}
+                    onClick={col.sortable ? () => cycleSort(col) : undefined}
+                    className={cn(
+                      cellPad,
+                      'text-[10px] font-black whitespace-nowrap uppercase tracking-[0.1em]',
+                      col.sortable && 'cursor-pointer select-none hover:text-brand-blue',
+                      frozen
+                        ? 'bg-[#F8F9FF] text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+                        : 'bg-white text-slate-400 dark:bg-slate-900 dark:text-slate-500',
+                      col.className,
+                      col.headerClassName,
+                    )}
+                    aria-sort={
+                      isSorted
+                        ? sortDirection === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : col.sortable
+                          ? 'none'
+                          : undefined
+                    }
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {col.header}
+                      {col.sortable ? (
+                        isSorted ? (
+                          sortDirection === 'asc' ? (
+                            <ChevronUp className="h-3.5 w-3.5 text-brand-blue" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 text-brand-blue" />
+                          )
+                        ) : (
+                          <ChevronsUpDown className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600" />
+                        )
+                      ) : null}
+                    </span>
+                  </th>
+                );
               })}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
             {currentData.map((item) => (
               <tr
                 key={keyExtractor(item)}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
                 className={cn(
-                  'data-table-row group border-b transition-colors',
+                  'data-table-row group text-sm transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/40',
                   onRowClick ? 'cursor-pointer' : '',
                 )}
               >
-                {columns.map((col, i) => (
-                  <td
-                    key={i}
-                    className={cn(
-                      'text-sm font-normal leading-5 text-brand-text dark:text-slate-200',
-                      compact ? 'px-2.5 py-2 align-middle' : 'px-6',
-                      !compact && (highlightFirstColumn ? 'py-4 align-top' : 'py-3 align-middle'),
-                      highlightFirstColumn && i === 0
-                        ? 'border-r-[3px] border-transparent bg-violet-50 font-medium group-hover:bg-violet-100 dark:bg-indigo-500/10 dark:group-hover:bg-indigo-500/20'
-                        : 'bg-white group-hover:bg-slate-50/80 dark:bg-slate-900 dark:group-hover:bg-slate-800/70',
-                      col.className,
-                      col.cellClassName,
-                    )}
-                  >
-                    {col.render
-                      ? col.render(item)
-                      : col.accessorKey
-                        ? (item[col.accessorKey] as React.ReactNode)
-                        : null}
-                  </td>
-                ))}
+                {columns.map((col, i) => {
+                  const frozen = isFrozenCol(frozenCount, i);
+                  const content = col.render
+                    ? col.render(item)
+                    : col.accessorKey
+                      ? (item[col.accessorKey] as React.ReactNode)
+                      : null;
+                  return (
+                    <td
+                      key={i}
+                      className={cn(
+                        cellPad,
+                        'transition-colors duration-150',
+                        frozen
+                          ? 'border-r border-slate-50/50 bg-[#F8F9FF] text-brand-text group-hover:bg-[#e2e7ff] dark:border-slate-700/50 dark:bg-slate-800 dark:text-slate-100 dark:group-hover:bg-slate-700'
+                          : 'bg-white text-brand-text group-hover:bg-blue-50/50 dark:bg-slate-900 dark:text-slate-200 dark:group-hover:bg-slate-800/70',
+                        col.className,
+                        col.cellClassName,
+                      )}
+                    >
+                      {col.render ? (
+                        content
+                      ) : (
+                        <MeritPlainCell accent={frozen && i === 0}>{content}</MeritPlainCell>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             {currentData.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-8 text-center text-brand-muted dark:text-slate-400">
+                <td
+                  colSpan={columns.length}
+                  className="px-8 py-12 text-center text-slate-400 font-medium italic dark:text-slate-500"
+                >
                   {t('datatable.no_data')}
                 </td>
               </tr>
@@ -283,7 +291,7 @@ export function DataTable<T>({
           </tbody>
           {footerRow && sortedData.length > 0 ? (
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-800/80">
+              <tr className="border-t border-slate-50 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-800/80">
                 {footerRow}
               </tr>
             </tfoot>
@@ -291,33 +299,33 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Pagination Container */}
+      {/* Pagination — Merit style */}
       <div
         className={cn(
-          'data-table-footer flex items-center justify-between border-t',
-          compact ? 'px-3 py-3' : 'px-6 py-4',
+          'data-table-footer flex flex-col gap-3 border-t border-slate-50 sm:flex-row sm:items-center sm:justify-between',
+          compact ? 'px-3 py-3' : 'px-4 py-4 sm:px-6 lg:px-8 sm:py-5',
           embedded ? 'bg-slate-50/60 dark:bg-slate-800/90' : 'bg-white dark:bg-slate-900',
         )}
       >
-        <div className="flex items-center gap-2 text-sm font-normal text-brand-muted dark:text-slate-300">
+        <div className="flex w-full items-center gap-3 text-[13px] font-bold text-slate-400 sm:w-auto">
           <span>{t('datatable.show')}</span>
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none">
             <button
               type="button"
               onClick={() => setPerPageOpen(!perPageOpen)}
-              className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-transparent hover:border-transparent transition-all text-brand-text dark:text-slate-100 font-medium min-w-[60px] justify-between"
+              className="flex min-w-[70px] w-full items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white px-4 py-2 font-black text-slate-700 shadow-sm transition-all hover:border-brand-blue/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:w-auto"
             >
               {itemsPerPage}
               <ChevronDown
-                size={14}
-                className={cn("text-brand-muted dark:text-slate-400 transition-transform", perPageOpen && "rotate-180")}
+                size={16}
+                className={cn('text-slate-300 transition-transform', perPageOpen && 'rotate-180')}
               />
             </button>
 
             {perPageOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setPerPageOpen(false)} aria-hidden />
-                <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-slate-900 border border-transparent rounded-lg shadow-lg z-20 py-1 overflow-hidden">
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-full overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                   {pageSizeOptions.map((num) => (
                     <button
                       type="button"
@@ -328,10 +336,10 @@ export function DataTable<T>({
                         setPerPageOpen(false);
                       }}
                       className={cn(
-                        "w-full text-left px-3 py-1.5 text-sm hover:bg-brand-primary/5 transition-colors",
+                        'w-full px-4 py-2.5 text-left text-xs font-bold transition-colors hover:bg-brand-blue/5',
                         itemsPerPage === num
-                          ? "text-brand-orange font-bold bg-brand-orange/5"
-                          : "text-brand-text dark:text-slate-200"
+                          ? 'bg-brand-blue/5 text-brand-blue'
+                          : 'text-slate-600 dark:text-slate-300',
                       )}
                     >
                       {num}
@@ -343,35 +351,36 @@ export function DataTable<T>({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sm">
-          <span className="mr-4 text-brand-muted dark:text-slate-400 tabular-nums">
+        <div className="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row sm:gap-6">
+          <span className="text-center text-[12px] font-bold text-slate-400 tabular-nums sm:text-left sm:text-[13px]">
             {t('datatable.showing_info', {
               from: sortedData.length > 0 ? startIndex + 1 : 0,
               to: Math.min(endIndex, sortedData.length),
-              total: sortedData.length
+              total: sortedData.length,
             })}
           </span>
-          <div className="flex items-center gap-1">
+
+          <div className="flex items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1 || sortedData.length === 0}
-              className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-all hover:bg-brand-blue/5 hover:text-brand-blue disabled:opacity-30"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={20} />
             </button>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                 <button
                   type="button"
                   key={page}
                   onClick={() => setCurrentPage(page)}
                   className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center font-medium transition-all",
+                    'flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-black transition-all',
                     currentPage === page
-                      ? "bg-brand-primary text-white shadow-md shadow-brand-primary/20"
-                      : "text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-brand-text dark:hover:text-slate-200"
+                      ? 'bg-[#4B89CD] text-white'
+                      : 'text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
                   )}
                 >
                   {page}
@@ -383,9 +392,9 @@ export function DataTable<T>({
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages || sortedData.length === 0}
-              className="p-1.5 rounded-lg text-brand-muted dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-all hover:bg-brand-blue/5 hover:text-brand-blue disabled:opacity-30"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={20} />
             </button>
           </div>
         </div>

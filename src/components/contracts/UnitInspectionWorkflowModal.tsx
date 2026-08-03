@@ -108,7 +108,7 @@ function SummaryCard({
         compact ? 'px-3 py-2.5' : 'p-4',
       )}
     >
-      <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-300">{title}</div>
+      <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-300">{title}</div>
       {valueTone === 'status' && value ? (
         <StatusBadge tone={inspectionStatusVariant(statusKey ?? value)} className="mt-1 w-fit text-[10px]">
           {value}
@@ -146,9 +146,9 @@ function StepperProgress({
                   className={cn(
                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
                     done
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-brand-blue text-white'
                       : active
-                        ? 'border-2 border-indigo-500 bg-white text-indigo-700 dark:bg-slate-900 dark:text-indigo-200'
+                        ? 'border-2 border-brand-blue bg-white text-brand-blue dark:bg-slate-900 dark:text-blue-200'
                         : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-400',
                   )}
                 >
@@ -157,7 +157,7 @@ function StepperProgress({
                 <span
                   className={cn(
                     'hidden text-[10px] font-semibold lg:inline',
-                    active ? 'text-indigo-700 dark:text-indigo-200' : 'text-slate-500 dark:text-slate-400',
+                    active ? 'text-brand-blue dark:text-blue-200' : 'text-slate-500 dark:text-slate-400',
                   )}
                 >
                   {t(`views.inspection.${step.labelKey}`)}
@@ -167,7 +167,7 @@ function StepperProgress({
                 <div
                   className={cn(
                     'h-0.5 w-3 rounded-full sm:w-6',
-                    idx < activeIdx ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-700',
+                    idx < activeIdx ? 'bg-brand-blue' : 'bg-slate-200 dark:bg-slate-700',
                   )}
                 />
               ) : null}
@@ -360,7 +360,7 @@ export function UnitInspectionWorkflowModal({
         title: t('views.inspection.readyTitle'),
         text: t('views.inspection.approved'),
         confirmButtonText: t('common.close'),
-        confirmButtonColor: '#4f46e5',
+        confirmButtonColor: '#4B89CD',
         buttonsStyling: true,
       });
       setTab('approval');
@@ -542,7 +542,7 @@ export function UnitInspectionWorkflowModal({
         showCancelButton: true,
         confirmButtonText: t('views.inspection.confirmContinue'),
         cancelButtonText: t('views.inspection.cancel'),
-        confirmButtonColor: '#4f46e5',
+        confirmButtonColor: '#4B89CD',
         buttonsStyling: true,
         reverseButtons: true,
       });
@@ -592,7 +592,7 @@ export function UnitInspectionWorkflowModal({
                   className={cn(
                     'flex shrink-0 items-center justify-between rounded-xl border border-transparent px-3 py-2 text-left text-xs font-semibold leading-snug transition-all lg:w-full',
                     tab === item.key
-                      ? 'border-indigo-200 bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-100 dark:border-indigo-800 dark:bg-slate-950 dark:text-indigo-200 dark:ring-indigo-900/60'
+                      ? 'border-brand-blue/20 bg-white text-brand-blue shadow-sm ring-1 ring-brand-blue/20 dark:border-brand-blue/40 dark:bg-slate-950 dark:text-blue-200 dark:ring-brand-blue/40'
                       : 'text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900 hover:shadow-sm dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100',
                   )}
                 >
@@ -600,7 +600,7 @@ export function UnitInspectionWorkflowModal({
                   <ChevronRight
                     className={cn(
                       'ml-1 hidden h-3 w-3 shrink-0 lg:block',
-                      tab === item.key ? 'text-indigo-700 dark:text-indigo-300' : 'text-transparent',
+                      tab === item.key ? 'text-brand-blue dark:text-brand-blue' : 'text-transparent',
                     )}
                   />
                 </button>
@@ -617,7 +617,7 @@ export function UnitInspectionWorkflowModal({
               <>
                 {tab === 'overview' ? (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-indigo-100 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80">
+                    <div className="rounded-xl border border-brand-blue/20 bg-white p-3 dark:border-brand-blue/20 dark:bg-slate-950/80">
                       <div>
                         <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {t('views.inspection.overviewTitle')}
@@ -650,7 +650,7 @@ export function UnitInspectionWorkflowModal({
                         <Button
                           type="button"
                           size="sm"
-                          className="h-7 bg-indigo-600 text-xs text-white hover:bg-indigo-700"
+                          className="h-7 bg-brand-blue text-xs text-white hover:bg-[#3d7ab8]"
                           disabled={busy}
                           onClick={() => void handleStartInspection()}
                         >
@@ -677,13 +677,13 @@ export function UnitInspectionWorkflowModal({
                             })}
                           </div>
                         </div>
-                        <span className="shrink-0 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
+                        <span className="shrink-0 text-[10px] font-semibold text-brand-blue dark:text-brand-blue">
                           {Math.round(checklistPct)}%
                         </span>
                       </div>
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                         <div
-                          className="h-full rounded-full bg-indigo-600 transition-all"
+                          className="h-full rounded-full bg-brand-blue transition-all"
                           style={{ width: `${checklistPct}%` }}
                         />
                       </div>
@@ -777,7 +777,7 @@ export function UnitInspectionWorkflowModal({
                                     title={t('views.inspection.remarks')}
                                     className={cn(
                                       'inspection-icon-btn inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900',
-                                      showRemarks && 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-700',
+                                      showRemarks && 'border-brand-blue/30 bg-brand-blue/10 text-brand-blue dark:border-brand-blue',
                                     )}
                                     onClick={() =>
                                       setRemarksOpen((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
@@ -820,13 +820,13 @@ export function UnitInspectionWorkflowModal({
                             {t('views.inspection.inventoryProgress', { pct: Math.round(inventoryPct) })}
                           </div>
                         </div>
-                        <span className="shrink-0 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
+                        <span className="shrink-0 text-[10px] font-semibold text-brand-blue dark:text-brand-blue">
                           {Math.round(inventoryPct)}%
                         </span>
                       </div>
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                         <div
-                          className="h-full rounded-full bg-indigo-600 transition-all"
+                          className="h-full rounded-full bg-brand-blue transition-all"
                           style={{ width: `${inventoryPct}%` }}
                         />
                       </div>
@@ -907,7 +907,7 @@ export function UnitInspectionWorkflowModal({
                         <Button
                           type="button"
                           size="sm"
-                          className="h-8 shrink-0 bg-indigo-600 text-xs text-white hover:bg-indigo-700"
+                          className="h-8 shrink-0 bg-brand-blue text-xs text-white hover:bg-[#3d7ab8]"
                           disabled={busy || !canProceedToApproval}
                           onClick={() => void handleSkipPhotosToApproval()}
                         >
@@ -947,7 +947,7 @@ export function UnitInspectionWorkflowModal({
                                       }
                                     }}
                                   />
-                                  <span className="inline-flex h-6 items-center gap-1 rounded bg-indigo-600 px-2 text-[10px] text-white hover:bg-indigo-700">
+                                  <span className="inline-flex h-6 items-center gap-1 rounded bg-brand-blue px-2 text-[10px] text-white hover:bg-[#3d7ab8]">
                                     <Upload className="h-3 w-3" />
                                     {t('views.inspection.upload')}
                                   </span>
@@ -1008,7 +1008,7 @@ export function UnitInspectionWorkflowModal({
                               <Button
                                 type="button"
                                 size="sm"
-                                className="h-7 bg-indigo-600 text-xs text-white hover:bg-indigo-700"
+                                className="h-7 bg-brand-blue text-xs text-white hover:bg-[#3d7ab8]"
                                 disabled={busy || !moveInDate}
                                 onClick={() => void handleScheduleMoveIn()}
                               >
@@ -1103,7 +1103,7 @@ export function UnitInspectionWorkflowModal({
                             {idx < logs.length - 1 ? (
                               <div className="absolute left-[5px] top-3 h-full w-px bg-slate-200 dark:bg-slate-700" />
                             ) : null}
-                            <div className="relative z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-indigo-500 bg-white dark:bg-slate-900" />
+                            <div className="relative z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-brand-blue bg-white dark:bg-slate-900" />
                             <div className="min-w-0 flex-1">
                               <div className="text-[10px] text-slate-400">{log.createdAt || '—'}</div>
                               <div className="text-xs font-medium text-slate-900 dark:text-slate-100">{log.message}</div>

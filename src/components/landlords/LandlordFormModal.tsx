@@ -40,10 +40,10 @@ export type LandlordFormModalProps = {
 };
 
 const FIELD_INPUT =
-  'h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 const FIELD_TEXTAREA =
-  'min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:border-indigo-500 focus-visible:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-950/80';
+  'min-h-[80px] resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
 
 function FormField({
   label,
@@ -65,7 +65,7 @@ function FormField({
         className,
       )}
     >
-      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
         {label}
       </label>
       {children}
@@ -88,10 +88,10 @@ function FileUploadField({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="flex h-9 w-full items-center justify-between rounded-lg border border-dashed border-slate-200 bg-white px-3 text-left text-sm text-slate-500 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-400"
+        className="flex h-9 w-full items-center justify-between rounded-lg border border-dashed border-slate-200 bg-white px-3 text-left text-sm text-slate-500 shadow-sm transition hover:border-brand-blue/30 hover:bg-brand-blue/10 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-400"
       >
         <span className="truncate">{fileName || 'Choose file…'}</span>
-        <Upload className="h-3.5 w-3.5 shrink-0 text-indigo-500" aria-hidden />
+        <Upload className="h-3.5 w-3.5 shrink-0 text-brand-blue" aria-hidden />
       </button>
       <input
         ref={inputRef}
@@ -122,12 +122,12 @@ function FormSection({
   return (
     <section
       className={cn(
-        'rounded-xl border border-indigo-100/70 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80',
+        'rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80',
         className,
       )}
     >
-      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-brand-blue">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-blue text-white shadow-md">
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
         {title}

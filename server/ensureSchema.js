@@ -299,6 +299,21 @@ export async function ensureSchema() {
       );
     }
 
+    const [moreDetailsRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'more_details'
+      `,
+    );
+    if (moreDetailsRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`more_details\` TEXT NULL AFTER \`special_remarks\``,
+      );
+    }
+
     const [metricRows] = await pool.query(
       `
       SELECT column_name
@@ -699,9 +714,41 @@ export async function ensureSchema() {
   await pool.query(`DELETE FROM \`user_role_crud_permissions\` WHERE \`module_key\` = 'user_management'`);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`city\` (
+      \`city_id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`name\` VARCHAR(180) NOT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`city_id\`),
+      UNIQUE KEY \`uk_city_branch_name\` (\`branch_id\`, \`name\`),
+      KEY \`idx_city_branch_active\` (\`branch_id\`, \`active\`),
+      CONSTRAINT \`fk_city_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`brgy\` (
+      \`brgy_id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`city_id\` BIGINT UNSIGNED NOT NULL,
+      \`name\` VARCHAR(180) NOT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`brgy_id\`),
+      UNIQUE KEY \`uk_brgy_city_name\` (\`city_id\`, \`name\`),
+      KEY \`idx_brgy_city_active\` (\`city_id\`, \`active\`),
+      CONSTRAINT \`fk_brgy_city\` FOREIGN KEY (\`city_id\`) REFERENCES \`city\` (\`city_id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS \`area\` (
       \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       \`branch_id\` INT UNSIGNED NULL DEFAULT NULL,
+      \`city_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
+      \`brgy_id\` BIGINT UNSIGNED NULL DEFAULT NULL,
       \`name\` VARCHAR(120) NOT NULL,
       \`city\` VARCHAR(120) NULL DEFAULT NULL,
       \`district\` VARCHAR(120) NULL DEFAULT NULL,
@@ -711,9 +758,65 @@ export async function ensureSchema() {
       PRIMARY KEY (\`id\`),
       UNIQUE KEY \`uk_area_branch_name\` (\`branch_id\`, \`name\`),
       KEY \`idx_area_city\` (\`city\`),
+      KEY \`idx_area_city_id\` (\`city_id\`),
+      KEY \`idx_area_brgy_id\` (\`brgy_id\`),
       CONSTRAINT \`fk_area_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  // Existing DBs: add city_id / brgy_id on area and wire FKs when missing.
+  try {
+    const [areaCols] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'area'
+        AND column_name IN ('city_id', 'brgy_id')
+      `,
+    );
+    const areaColSet = new Set(areaCols.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    if (!areaColSet.has('city_id')) {
+      await pool.query(
+        `ALTER TABLE \`area\` ADD COLUMN \`city_id\` BIGINT UNSIGNED NULL DEFAULT NULL AFTER \`branch_id\``,
+      );
+    }
+    if (!areaColSet.has('brgy_id')) {
+      await pool.query(
+        `ALTER TABLE \`area\` ADD COLUMN \`brgy_id\` BIGINT UNSIGNED NULL DEFAULT NULL AFTER \`city_id\``,
+      );
+    }
+  } catch (e) {
+    if (e?.code !== 'ER_DUP_FIELDNAME') {
+      console.error('[ensureSchema] area city_id/brgy_id columns skipped:', e);
+    }
+  }
+
+  try {
+    const [areaKeys] = await pool.query(
+      `
+      SELECT CONSTRAINT_NAME AS name
+      FROM information_schema.TABLE_CONSTRAINTS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'area'
+        AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+        AND CONSTRAINT_NAME IN ('fk_area_city', 'fk_area_brgy')
+      `,
+    );
+    const keySet = new Set(areaKeys.map((r) => String(r.name)));
+    if (!keySet.has('fk_area_city')) {
+      await pool.query(
+        `ALTER TABLE \`area\` ADD CONSTRAINT \`fk_area_city\` FOREIGN KEY (\`city_id\`) REFERENCES \`city\` (\`city_id\`)`,
+      );
+    }
+    if (!keySet.has('fk_area_brgy')) {
+      await pool.query(
+        `ALTER TABLE \`area\` ADD CONSTRAINT \`fk_area_brgy\` FOREIGN KEY (\`brgy_id\`) REFERENCES \`brgy\` (\`brgy_id\`)`,
+      );
+    }
+  } catch (e) {
+    console.error('[ensureSchema] area FK city/brgy skipped:', e);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`property\` (
@@ -737,6 +840,62 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_property_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`deleted_building\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`location_name\` VARCHAR(180) NOT NULL,
+      \`building_name\` VARCHAR(180) NOT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1 = soft-deleted / hidden from panels',
+      \`deleted_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uk_deleted_building_branch_loc_name\` (\`branch_id\`, \`location_name\`, \`building_name\`),
+      KEY \`idx_deleted_building_branch_active\` (\`branch_id\`, \`active\`),
+      CONSTRAINT \`fk_deleted_building_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`location_building\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`location_name\` VARCHAR(180) NOT NULL COMMENT 'City / area panel name',
+      \`building_name\` VARCHAR(180) NOT NULL COMMENT 'Barangay / building panel name',
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '0 = soft-deleted',
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uk_location_building_branch_names\` (\`branch_id\`, \`location_name\`, \`building_name\`),
+      KEY \`idx_location_building_branch_active\` (\`branch_id\`, \`active\`),
+      KEY \`idx_location_building_location\` (\`branch_id\`, \`location_name\`),
+      CONSTRAINT \`fk_location_building_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  try {
+    const { seedLocationBuildingsForAllBranches, migrateDeletedBuildingIntoLocationBuilding } =
+      await import('./locationBuildings/locationBuildingsModel.js');
+    await seedLocationBuildingsForAllBranches();
+    await migrateDeletedBuildingIntoLocationBuilding();
+  } catch (e) {
+    console.error('[ensureSchema] location_building seed/migrate skipped:', e);
+  }
+
+  try {
+    const {
+      seedCitiesAndBrgysForAllBranches,
+      migrateLocationBuildingIntoCityBrgy,
+      backfillAreaCityBrgyIds,
+    } = await import('./locations/locationsModel.js');
+    await seedCitiesAndBrgysForAllBranches();
+    await migrateLocationBuildingIntoCityBrgy();
+    // Do not strip ordinal prefixes — names like "1. Angeles City" are allowed.
+    await backfillAreaCityBrgyIds();
+  } catch (e) {
+    console.error('[ensureSchema] city/brgy/area seed/migrate skipped:', e);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`unit\` (

@@ -220,7 +220,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
             <Download className="w-4 h-4 mr-2" />
             PDF
           </Button>
-          <Button variant="default" size="sm" className="h-8 bg-indigo-600" onClick={() => window.print()}>
+          <Button variant="default" size="sm" className="h-8 bg-brand-blue" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-2" />
             Print
           </Button>
@@ -253,7 +253,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
             <div className="space-y-8">
               <div className="text-center space-y-4">
                 <div className="flex justify-center mb-4">
-                  <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                  <div className="w-16 h-16 bg-brand-blue rounded-xl flex items-center justify-center text-white">
                     <FileText className="w-8 h-8" />
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
             <div className="font-sans space-y-12">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
-                  <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center text-white mb-4">
+                  <div className="w-12 h-12 bg-brand-blue rounded-lg flex items-center justify-center text-white mb-4">
                     <FileText className="w-6 h-6" />
                   </div>
                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter">INVOICE</h2>
@@ -323,7 +323,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
 
               <div className="grid grid-cols-2 gap-12 py-8 border-y border-slate-100">
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Billing To</p>
+                  <p className="text-[10px] font-black uppercase text-brand-blue tracking-widest">Billing To</p>
                   <div>
                     <p className="font-bold text-lg text-slate-900">{tenant?.name}</p>
                     <p className="text-sm text-slate-600">Unit {unit?.unitNumber}</p>
@@ -332,7 +332,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                   </div>
                 </div>
                 <div className="space-y-3 text-right">
-                  <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Payment Instructions</p>
+                  <p className="text-[10px] font-black uppercase text-brand-blue tracking-widest">Payment Instructions</p>
                   <div className="text-sm text-slate-600 space-y-1">
                     <p><span className="font-bold text-slate-900">Bank:</span> BDO Unibank</p>
                     <p><span className="font-bold text-slate-900">Account Name:</span> 3CORE Corp</p>
@@ -344,18 +344,18 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
 
               <div className="space-y-6">
                 {monthlyRent > 0 ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-blue/20 bg-brand-blue/10 px-4 py-3 dark:border-brand-blue/30 dark:bg-brand-blue/10">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-brand-blue dark:text-brand-blue">
                         Monthly payment
                       </p>
                       <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
                         Recurring rent due each billing cycle
                       </p>
                     </div>
-                    <p className="text-xl font-black tabular-nums text-indigo-700 dark:text-indigo-200">
+                    <p className="text-xl font-black tabular-nums text-brand-blue dark:text-blue-200">
                       ₱{monthlyRent.toLocaleString()}
-                      <span className="ml-1 text-sm font-semibold text-indigo-500">/ mo</span>
+                      <span className="ml-1 text-sm font-semibold text-brand-blue">/ mo</span>
                     </p>
                   </div>
                 ) : null}
@@ -424,7 +424,7 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                     ) : null}
                     <div className="flex justify-between items-center pt-3 border-t-2 border-slate-900">
                       <span className="text-lg font-black uppercase text-slate-900">Total Due</span>
-                      <span className="text-2xl font-black text-indigo-600">₱{Number(total).toLocaleString()}</span>
+                      <span className="text-2xl font-black text-brand-blue">₱{Number(total).toLocaleString()}</span>
                     </div>
                     {monthlyRent > 0 ? (
                       <p className="pt-1 text-right text-[11px] text-slate-500">

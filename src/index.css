@@ -1,19 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @theme {
-  --font-sans: "Inter", "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  /* shared UI tokens (DataTable, Select2, Modal, react-datepicker) */
-  --color-brand-primary: #4f46e5;
-  --color-brand-orange: #f97316;
+  /* Merit design tokens (DataTable, Select2, Modal, react-datepicker) */
+  --color-brand-primary: #4B89CD;
+  --color-brand-blue: #4B89CD;
+  --color-brand-orange: #f08135;
+  --color-brand-green: #43A751;
   --color-brand-maintenance: #dc2626;
   --color-brand-maintenance-soft: #fef2f2;
   --color-brand-utilities: #92400e;
   --color-brand-utilities-soft: #fef3c7;
-  --color-brand-bg: #f8fafc;
+  --color-brand-bg: #F4F7F9;
   --color-brand-card: #ffffff;
   --color-brand-text: #0f172a;
   --color-brand-muted: #64748b;
@@ -52,12 +54,42 @@
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-600 hover:bg-slate-500;
   }
+
+  /* Merit dark sidebar scrollbar */
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: #334155;
+    border-radius: 10px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #475569;
+  }
+
+  /* Merit light panel scrollbar */
+  .light-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+  .light-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .light-scroll::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+  }
+  .light-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+  }
 }
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: "Inter", "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -116,21 +148,21 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: transparent;
     --input: transparent;
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --ring: #4B89CD;
+    --chart-1: #4B89CD;
+    --chart-2: #74A6DC;
+    --chart-3: #A8C9ED;
+    --chart-4: #f08135;
+    --chart-5: #43A751;
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: #0f172a;
+    --sidebar-foreground: #cbd5e1;
+    --sidebar-primary: #f08135;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #f1f5f9;
+    --sidebar-border: #1e293b;
+    --sidebar-ring: #4B89CD;
 }
 
 .dark {
@@ -151,20 +183,20 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: transparent;
     --input: transparent;
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --ring: #4B89CD;
+    --chart-1: #4B89CD;
+    --chart-2: #74A6DC;
+    --chart-3: #A8C9ED;
+    --chart-4: #f08135;
+    --chart-5: #43A751;
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary: #f08135;
     --sidebar-primary-foreground: oklch(0.985 0 0);
     --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar-ring: #4B89CD;
 }
 
 /* App-wide dark overrides for views that still use fixed light utility classes */
@@ -200,17 +232,17 @@
   border-color: transparent !important;
 }
 
-/* Data table row separators (scoped override for borderless UI) */
+/* Data table row separators — Merit soft slate-50 dividers */
 #root .data-table .data-table-head-row {
-  border-bottom: 1px solid rgb(226 232 240) !important;
+  border-bottom: 1px solid rgb(248 250 252) !important;
 }
 
 #root .data-table .data-table-row {
-  border-bottom: 1px solid rgb(241 245 249) !important;
+  border-bottom: 1px solid rgb(248 250 252) !important;
 }
 
 #root .data-table .data-table-row:last-child {
-  border-bottom: 1px solid rgb(241 245 249) !important;
+  border-bottom: 1px solid rgb(248 250 252) !important;
 }
 
 /* Calendar month grid lines (override borderless UI) */
@@ -236,7 +268,7 @@
 }
 
 #root .data-table .data-table-footer {
-  border-top: 1px solid rgb(226 232 240) !important;
+  border-top: 1px solid rgb(248 250 252) !important;
 }
 
 .dark #root .data-table .data-table-head-row {
@@ -287,7 +319,7 @@
 #root .unit-form-fields [data-slot="textarea"]:focus-visible,
 #root .unit-form-fields .unit-form-select-control:focus-within,
 #root .unit-form-fields .unit-form-datepicker-input:focus {
-  border-color: rgb(99 102 241) !important;
+  border-color: rgb(75 137 205) !important;
 }
 
 /* Re-apply borders inside unit inspection workflow modal */
@@ -420,6 +452,41 @@
   border-color: rgb(71 85 105) !important;
 }
 
+/* Simple Add Line–style modal (Add Location, etc.) */
+#root .gd-simple-modal-shell {
+  border-radius: 0.5rem !important;
+  max-width: 28rem !important;
+}
+
+#root .gd-simple-modal-shell .app-modal-header {
+  background: #1a2b48 !important;
+  border-bottom: 1px solid rgb(30 41 59) !important;
+  padding: 0.85rem 1rem !important;
+}
+
+#root .gd-simple-modal-shell .app-modal-header h3 {
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  color: #ffffff !important;
+}
+
+#root .gd-simple-modal-shell .app-modal-header button {
+  color: #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+#root .gd-simple-modal-shell .app-modal-header button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+#root .gd-simple-modal-shell .app-modal-footer {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.85rem !important;
+}
+
 /* CRM form modals: seamless header/body/footer (no divider lines) */
 #root .crm-form-modal-shell .app-modal-header {
   border-bottom-width: 0 !important;
@@ -432,11 +499,13 @@
 #root .renew-lease-modal [data-slot="input"]:focus-visible,
 #root .renew-lease-modal [data-slot="textarea"]:focus-visible,
 #root .renew-lease-modal .unit-form-datepicker-input:focus {
-  border-color: rgb(99 102 241) !important;
+  border-color: rgb(75 137 205) !important;
 }
 
-/* Indigo CTA buttons: white label in dark mode (Button default uses dark primary-foreground) */
+/* Brand-blue CTA buttons: white label in dark mode (Button default uses dark primary-foreground) */
+.dark button.bg-brand-blue,
 .dark button.bg-indigo-600,
+.dark [data-slot="button"].bg-brand-blue,
 .dark [data-slot="button"].bg-indigo-600 {
   color: #ffffff !important;
 }

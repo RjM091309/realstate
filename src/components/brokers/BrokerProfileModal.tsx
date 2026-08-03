@@ -11,8 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { Modal } from '@/components/modal';
+import { Modal, ModalDetailField, modalSectionTitleClass } from '@/components/modal';
 import { Input } from '@/components/ui/input';
 import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
@@ -40,12 +39,9 @@ import type { BrokerAgency } from '@/types';
 type ProfileTab = 'overview' | 'contacts' | 'documents' | 'contracts' | 'activity';
 
 const TAB_TRIGGER =
-  '!flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-1.5 text-xs font-medium text-slate-500 shadow-none data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
+  '!flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-none data-[active]:bg-white data-[active]:font-black data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
 
-const PROFILE_VALUE =
-  'flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100';
-
-const BROKER_BADGE = '!px-2 !py-0.5 !text-[10px]';
+const BROKER_BADGE = '!px-2 !py-0.5 !text-[10px] font-black uppercase tracking-wider';
 
 export type BrokerProfileModalProps = {
   isOpen: boolean;
@@ -65,9 +61,9 @@ function ProfileSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-indigo-100/70 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80">
-      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+    <section className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
+      <h3 className={modalSectionTitleClass}>
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-blue text-white shadow-md">
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
         {title}
@@ -86,14 +82,7 @@ function DetailField({
   value: React.ReactNode;
   span?: 1 | 2 | 3;
 }) {
-  return (
-    <div className={cn('min-w-0 space-y-1', span === 2 && 'sm:col-span-2', span === 3 && 'sm:col-span-3')}>
-      <p className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-      <div className={PROFILE_VALUE}>
-        {typeof value === 'string' || typeof value === 'number' ? <span className="truncate">{value}</span> : value}
-      </div>
-    </div>
-  );
+  return <ModalDetailField label={label} value={value} span={span} />;
 }
 
 type ContactRow = {
@@ -261,7 +250,7 @@ export function BrokerProfileModal({
     >
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-9 w-9 animate-spin text-indigo-600" aria-hidden />
+          <Loader2 className="h-9 w-9 animate-spin text-brand-blue" aria-hidden />
         </div>
       ) : profile ? (
         <div className="broker-profile-modal max-h-[min(68vh,36rem)] space-y-3 overflow-y-auto pr-1">
@@ -326,14 +315,14 @@ export function BrokerProfileModal({
               <ProfileSection title={t('views.crm.brokers.profile.tabs.documents')} icon={Upload}>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="min-w-0 space-y-1 sm:col-span-2">
-                    <p className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{t('views.crm.brokers.profile.uploadDocument')}</p>
+                    <p className="block text-[10px] font-black uppercase tracking-widest text-slate-400">{t('views.crm.brokers.profile.uploadDocument')}</p>
                     <button
                       type="button"
                       onClick={() => docInputRef.current?.click()}
-                      className="flex h-9 w-full items-center justify-between rounded-lg border border-dashed border-slate-200 bg-white px-3 text-sm text-slate-500 shadow-sm hover:border-indigo-300 dark:border-slate-600 dark:bg-slate-950/80"
+                      className="flex h-9 w-full items-center justify-between rounded-lg border border-dashed border-slate-200 bg-white px-3 text-sm text-slate-500 shadow-sm hover:border-brand-blue/30 dark:border-slate-600 dark:bg-slate-950/80"
                     >
                       <span className="truncate">{docFile?.name || t('views.crm.brokers.profile.chooseFile')}</span>
-                      <Upload className="h-3.5 w-3.5 shrink-0 text-indigo-500" aria-hidden />
+                      <Upload className="h-3.5 w-3.5 shrink-0 text-brand-blue" aria-hidden />
                     </button>
                     <input ref={docInputRef} type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
                   </div>
@@ -358,7 +347,7 @@ export function BrokerProfileModal({
                         </p>
                       </div>
                       {showFile && profile.filePath ? (
-                        <a href={resolveUploadUrl(profile.filePath)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-indigo-600 hover:underline">
+                        <a href={resolveUploadUrl(profile.filePath)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-blue hover:underline">
                           {t('views.crm.brokers.profile.download')}
                         </a>
                       ) : (

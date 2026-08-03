@@ -15,6 +15,8 @@ import { setIO } from './realtime/io.js';
 import { authRouter } from './routes/authRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
 import { unitsRouter } from './routes/unitsRoutes.js';
+import { locationBuildingsRouter } from './locationBuildings/locationBuildingsRoutes.js';
+import { locationsRouter } from './locations/locationsRoutes.js';
 import { tenantsRouter } from './routes/tenantsRoutes.js';
 import { contractsRouter } from './routes/contractsRoutes.js';
 import { paymentsRouter } from './routes/paymentsRoutes.js';
@@ -110,6 +112,8 @@ app.post('/api/system/theme', async (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/units', unitsRouter);
+app.use('/api/location-buildings', locationBuildingsRouter);
+app.use('/api/locations', locationsRouter);
 app.use('/api/tenants', tenantsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/payments', paymentsRouter);

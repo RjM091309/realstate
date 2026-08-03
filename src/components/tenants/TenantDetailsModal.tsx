@@ -11,8 +11,7 @@ import {
   ShieldCheck,
   User,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Modal } from '@/components/modal';
+import { Modal, ModalDetailField, modalSectionTitleClass } from '@/components/modal';
 import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -65,12 +64,9 @@ export type TenantDetailsModalProps = {
 type ProfileTab = 'overview' | 'documents';
 
 const TAB_TRIGGER =
-  '!flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-1.5 text-xs font-medium text-slate-500 shadow-none data-[active]:bg-white data-[active]:font-semibold data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
+  '!flex-none gap-1.5 whitespace-nowrap rounded-md border-0 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-none data-[active]:bg-white data-[active]:font-black data-[active]:text-slate-900 data-[active]:shadow-sm dark:text-slate-400 dark:data-[active]:bg-slate-950 dark:data-[active]:text-white';
 
-const FIELD_VALUE =
-  'flex min-h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100';
-
-const TENANT_BADGE = '!px-2 !py-0.5 !text-[10px]';
+const TENANT_BADGE = '!px-2 !py-0.5 !text-[10px] font-black uppercase tracking-wider';
 
 function formatPhp(amount: number | undefined) {
   const n = Number(amount);
@@ -109,9 +105,9 @@ function ProfileSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-indigo-100/70 bg-white p-3 dark:border-indigo-500/20 dark:bg-slate-950/80">
-      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+    <section className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
+      <h3 className={modalSectionTitleClass}>
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-blue text-white shadow-md">
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
         {title}
@@ -130,26 +126,7 @@ function DetailField({
   value: React.ReactNode;
   span?: 1 | 2 | 3;
 }) {
-  return (
-    <div
-      className={cn(
-        'min-w-0 space-y-1',
-        span === 2 && 'sm:col-span-2',
-        span === 3 && 'sm:col-span-3',
-      )}
-    >
-      <p className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-        {label}
-      </p>
-      <div className={FIELD_VALUE}>
-        {typeof value === 'string' || typeof value === 'number' ? (
-          <span className="truncate">{value}</span>
-        ) : (
-          value
-        )}
-      </div>
-    </div>
-  );
+  return <ModalDetailField label={label} value={value} span={span} />;
 }
 
 export function TenantDetailsModal({
@@ -324,7 +301,7 @@ export function TenantDetailsModal({
                         className="flex items-center justify-between gap-3 bg-white px-3 py-2.5 text-sm dark:bg-slate-950/80"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <Icon className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden />
+                          <Icon className="h-4 w-4 shrink-0 text-brand-blue dark:text-brand-blue" aria-hidden />
                           <div className="min-w-0">
                             <p className="truncate font-medium text-slate-900 dark:text-slate-100">{doc.name}</p>
                             <p className="text-xs text-slate-500">
@@ -337,7 +314,7 @@ export function TenantDetailsModal({
                           {canDownload ? (
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 dark:text-brand-blue dark:hover:bg-brand-blue/10"
                               onClick={() => {
                                 if (doc.onDownload) doc.onDownload();
                                 else if (doc.href) window.open(doc.href, '_blank', 'noopener,noreferrer');
@@ -350,7 +327,7 @@ export function TenantDetailsModal({
                           {canPreview ? (
                             <button
                               type="button"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-blue"
                               title={t('views.crm.details.preview')}
                               onClick={() => {
                                 if (doc.onPreview) doc.onPreview();
