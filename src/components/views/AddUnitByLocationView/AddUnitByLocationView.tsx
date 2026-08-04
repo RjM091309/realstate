@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
-import { Bath, BedDouble, Building2, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Ruler, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Bath, BedDouble, Building2, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Ruler, Search, Trash2 } from 'lucide-react';
 import { Button, modalDismissButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -59,12 +59,17 @@ import {
   type LocationCity,
 } from '@/lib/locationsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
-import { formatUnitFloorTowerMeta, formatUnitNumberDisplay, unitToFormState, resolveUnitFloorTower, type UnitFormState } from '@/lib/unitFormUtils';
-import { normalizeLocationLabel, normalizeLocationAliasLabel } from '@/lib/locationNames';
+import { UNIT_FORM_TYPES, formatUnitFloorTowerMeta, formatUnitNumberDisplay, unitToFormState, resolveUnitFloorTower, type UnitFormState } from '@/lib/unitFormUtils';
+import { normalizeLocationLabel, normalizeLocationAliasLabel, stripLocationOrdinalPrefix } from '@/lib/locationNames';
 import { cn } from '@/lib/utils';
-import type { Unit } from '@/types';
+import type { Unit, UnitStatus } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+
+type UnitSortField = 'unit' | 'type' | 'sqm' | 'beds' | 'status' | 'rate';
+type UnitSortDir = 'asc' | 'desc';
+
+const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 
 function locationKey(unit: Unit): string {
   return String(unit.area ?? '').trim() || '—';
@@ -173,6 +178,18 @@ export function AddUnitByLocationView() {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | UnitStatus>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
+  const [sortField, setSortField] = useState<UnitSortField>('unit');
+  const [sortDir, setSortDir] = useState<UnitSortDir>('asc');
+
+  useEffect(() => {
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setSortField('unit');
+    setSortDir('asc');
+    setSearch('');
+  }, [selectedLocation, selectedBuilding]);
   const [fileMaintenanceOpen, setFileMaintenanceOpen] = useState(false);
   const [categories, setCategories] = useState<FileMaintenanceCategory[]>(() =>
     loadFileMaintenanceCategories(),
@@ -957,19 +974,141 @@ export function AddUnitByLocationView() {
       // Match barangay, or orphan units (saved as —) under this city so BRGY can sync visually.
       return key === brgy || isBlankBuilding(key);
     });
+    if (statusFilter !== 'all') {
+      list = list.filter((u) => u.status === statusFilter);
+    }
+    if (typeFilter !== 'all') {
+      list = list.filter((u) => u.type === typeFilter);
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter((u) =>
-        [u.unitNumber, u.buildingName, u.tower, u.floor, u.type, u.status, u.area]
+        [
+          u.unitNumber,
+          u.buildingName,
+          u.tower,
+          u.floor,
+          u.type,
+          u.status,
+          u.area,
+          u.areaSqm,
+          u.bedrooms,
+          u.monthlyRate,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(q),
       );
     }
-    return [...list].sort((a, b) =>
-      a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true }),
+    const num = (v: number | null | undefined) => {
+      const n = Number(v);
+      return v == null || !Number.isFinite(n) ? Number.NEGATIVE_INFINITY : n;
+    };
+    const statusRank: Record<string, number> = {
+      Available: 0,
+      Reserved: 1,
+      Occupied: 2,
+      Maintenance: 3,
+    };
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'type':
+          cmp = String(a.type).localeCompare(String(b.type));
+          break;
+        case 'sqm':
+          cmp = num(a.areaSqm) - num(b.areaSqm);
+          break;
+        case 'beds':
+          cmp = num(a.bedrooms) - num(b.bedrooms);
+          break;
+        case 'status':
+          cmp = (statusRank[a.status] ?? 99) - (statusRank[b.status] ?? 99);
+          break;
+        case 'rate':
+          cmp = (Number(a.monthlyRate) || 0) - (Number(b.monthlyRate) || 0);
+          break;
+        case 'unit':
+        default:
+          cmp = a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true });
+          break;
+      }
+      if (cmp !== 0) return cmp * dir;
+      // Stable tie-breaker so sort always visibly reorders when primary values match.
+      return a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true }) * dir;
+    });
+  }, [
+    units,
+    selectedLocation,
+    selectedBuilding,
+    search,
+    statusFilter,
+    typeFilter,
+    sortField,
+    sortDir,
+  ]);
+
+  const typeFilterOptions = useMemo(() => {
+    const set = new Set<string>(UNIT_FORM_TYPES);
+    for (const u of units) {
+      if (u.type) set.add(String(u.type));
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [units]);
+
+  const toggleSort = useCallback((field: UnitSortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDir('asc');
+      return field;
+    });
+  }, []);
+
+  const renderSortTh = (
+    field: UnitSortField,
+    label: string,
+    align: 'left' | 'right' | 'center' = 'left',
+    className?: string,
+  ) => {
+    const active = sortField === field;
+    return (
+      <th
+        className={cn(
+          'whitespace-nowrap px-3 py-2.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-slate-500',
+          align === 'right' && 'text-right',
+          align === 'center' && 'text-center',
+          className,
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(field)}
+          className={cn(
+            'inline-flex max-w-full items-center gap-1 transition hover:text-slate-800 dark:hover:text-slate-100',
+            align === 'right' && 'w-full justify-end',
+            align === 'center' && 'w-full justify-center',
+            active && 'text-brand-blue',
+          )}
+          title={`${t('views.units.sort.label')}: ${label}`}
+        >
+          <span className="whitespace-nowrap">{label}</span>
+          {active ? (
+            sortDir === 'asc' ? (
+              <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+            ) : (
+              <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+            )
+          ) : (
+            <ArrowUpDown className="h-3 w-3 shrink-0 opacity-35" aria-hidden />
+          )}
+        </button>
+      </th>
     );
-  }, [units, selectedLocation, selectedBuilding, search]);
+  };
 
   const totalMonthlyRate = useMemo(
     () => filteredUnits.reduce((sum, unit) => sum + (Number(unit.monthlyRate) || 0), 0),
@@ -1007,7 +1146,6 @@ export function AddUnitByLocationView() {
       setAddInitialPhoto(null);
       setAddInitial({
         area,
-        legalAddress: building,
         buildingName: building,
       });
       setAddOpen(true);
@@ -1038,13 +1176,18 @@ export function AddUnitByLocationView() {
           : selectedLocation && selectedLocation !== '—'
             ? selectedLocation
             : base.area;
+      // Prefer the full Village/Building Name the user typed (legal/common address).
+      const savedVillage =
+        [unit.legalAddress, unit.commonAddress, base.legalAddress]
+          .map((v) => String(v ?? '').trim())
+          .find((v) => v && v !== '—' && v !== '-') || '';
       setFormMode('edit');
       setEditingUnitId(unit.id);
       setAddInitial({
         ...base,
         area,
         buildingName: building,
-        legalAddress: building || base.legalAddress,
+        legalAddress: savedVillage || building,
       });
       setAddInitialPhoto(unit.photoDataUrl ?? null);
       setDetailUnit(null);
@@ -1061,21 +1204,31 @@ export function AddUnitByLocationView() {
           const s = String(v ?? '').trim();
           return !s || s === '—' || s === '-';
         };
-        // Always sync City / Brgy from the selected panels (source of truth).
+        // Prefer values from the form (already auto-synced from panels; user may override).
+        // Fall back to selected panels only when the form field is blank.
+        const area = !isBlank(body.area)
+          ? body.area.trim()
+          : selectedLocation && selectedLocation !== '—'
+            ? selectedLocation
+            : body.area;
+        const brgy = !isBlank(body.buildingName)
+          ? body.buildingName.trim()
+          : selectedBuilding && selectedBuilding !== '—'
+            ? selectedBuilding
+            : body.buildingName;
+        // Keep the full Village/Building Name the user typed (do not overwrite with brgy).
+        const village =
+          !isBlank(body.legalAddress)
+            ? body.legalAddress.trim()
+            : !isBlank(body.commonAddress)
+              ? body.commonAddress.trim()
+              : brgy;
         const patched: UnitWriteBody = {
           ...body,
-          area:
-            selectedLocation && selectedLocation !== '—'
-              ? selectedLocation
-              : !isBlank(body.area)
-                ? body.area.trim()
-                : body.area,
-          buildingName:
-            selectedBuilding && selectedBuilding !== '—'
-              ? selectedBuilding
-              : !isBlank(body.buildingName)
-                ? body.buildingName.trim()
-                : body.buildingName,
+          area,
+          buildingName: brgy,
+          legalAddress: village,
+          commonAddress: village,
         };
         if (isBlank(patched.buildingName) && body.unitNumber) {
           // Last resort: text after unit# / floor in the unit number field.
@@ -1085,10 +1238,6 @@ export function AddUnitByLocationView() {
             .replace(/\s+/g, ' ')
             .trim();
           if (leftover) patched.buildingName = leftover;
-        }
-        if (!isBlank(patched.buildingName)) {
-          patched.commonAddress = patched.buildingName;
-          patched.legalAddress = patched.buildingName;
         }
         if (isBlank(patched.area) || isBlank(patched.buildingName)) {
           toast.message(
@@ -1349,6 +1498,40 @@ export function AddUnitByLocationView() {
               bodyClassName="max-h-[min(720px,65vh)]"
               actions={
                 <>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) =>
+                      setStatusFilter(e.target.value as 'all' | UnitStatus)
+                    }
+                    aria-label={t('views.units.filters.status')}
+                    className="hidden h-8 max-w-[8.5rem] rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 shadow-none sm:block dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    <option value="all">{t('views.units.filters.statusPh')}</option>
+                    {UNIT_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s === 'Available'
+                          ? t('views.units.statuses.available')
+                          : s === 'Occupied'
+                            ? t('views.units.statuses.occupied')
+                            : s === 'Maintenance'
+                              ? t('views.units.statuses.maintenance')
+                              : t('views.units.statuses.reserved')}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    aria-label={t('views.units.filters.type')}
+                    className="hidden h-8 max-w-[12rem] rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 shadow-none sm:block dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    <option value="all">{t('views.units.filters.typePh')}</option>
+                    {typeFilterOptions.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
                   <div className="relative hidden min-w-[11rem] sm:block">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <Input
@@ -1373,7 +1556,7 @@ export function AddUnitByLocationView() {
                 </>
               }
             >
-              <div className="mb-2 sm:hidden">
+              <div className="mb-2 space-y-2 sm:hidden">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -1383,9 +1566,43 @@ export function AddUnitByLocationView() {
                     className="h-9 rounded-lg border-slate-200 bg-white pl-8 text-xs dark:border-slate-600 dark:bg-slate-950"
                   />
                 </div>
-              </div>
-
-              {!selectedLocation ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) =>
+                      setStatusFilter(e.target.value as 'all' | UnitStatus)
+                    }
+                    aria-label={t('views.units.filters.status')}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    <option value="all">{t('views.units.filters.statusPh')}</option>
+                    {UNIT_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s === 'Available'
+                          ? t('views.units.statuses.available')
+                          : s === 'Occupied'
+                            ? t('views.units.statuses.occupied')
+                            : s === 'Maintenance'
+                              ? t('views.units.statuses.maintenance')
+                              : t('views.units.statuses.reserved')}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    aria-label={t('views.units.filters.type')}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    <option value="all">{t('views.units.filters.typePh')}</option>
+                    {typeFilterOptions.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>              {!selectedLocation ? (
                 <LocEmpty>
                   {t('views.addUnitByLocation.selectPanelForUnits', {
                     panel: panelLocation.toUpperCase(),
@@ -1401,122 +1618,169 @@ export function AddUnitByLocationView() {
                 <LocEmpty>{t('views.addUnitByLocation.emptyUnits')}</LocEmpty>
               ) : (
                 <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
+                    <colgroup>
+                      <col className="w-[10%]" />
+                      <col className="w-[28%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[10%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
-                        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500">
-                          {t('views.units.table.unit')}
-                        </th>
-                        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500">
+                        {renderSortTh('unit', t('views.units.table.unit'))}
+                        <th className="whitespace-nowrap px-3 py-2.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                           {t('views.units.table.area')}
                         </th>
-                        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500">
-                          {t('views.units.table.type')}
-                        </th>
-                        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide text-slate-500">
-                          {t('views.units.table.status')}
-                        </th>
-                        <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-500">
-                          {t('views.units.table.monthlyRate')}
-                        </th>
-                        <th className="px-3 py-2.5 text-center font-semibold uppercase tracking-wide text-slate-500">
+                        {renderSortTh('type', t('views.units.table.type'))}
+                        {renderSortTh('sqm', t('views.units.addModal.sqm'), 'center')}
+                        {renderSortTh('beds', t('views.units.addModal.bedrooms'), 'center')}
+                        {renderSortTh('status', t('views.units.table.status'), 'center')}
+                        {renderSortTh('rate', t('views.units.table.monthlyRate'), 'right')}
+                        <th className="whitespace-nowrap px-3 py-2.5 text-center align-middle text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                           {t('views.units.table.actions')}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUnits.map((unit) => (
-                        <tr
-                          key={unit.id}
-                          className="border-b border-slate-100 last:border-b-0 even:bg-slate-50/60 hover:bg-slate-50 dark:border-slate-800 dark:even:bg-slate-900/40"
-                        >
-                          <td className="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-100">
-                            {formatUnitNumberDisplay(unit)}
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
-                            <div className="font-semibold">
-                              {selectedBuilding && selectedBuilding !== '—'
-                                ? selectedBuilding
-                                : unit.buildingName &&
-                                    unit.buildingName !== '—' &&
-                                    unit.buildingName !== '-'
-                                  ? unit.buildingName
-                                  : '—'}
-                            </div>
-                            {(() => {
-                              const meta = formatUnitFloorTowerMeta(unit);
-                              return meta ? (
-                                <div className="text-[11px] text-slate-400">{meta}</div>
-                              ) : null;
-                            })()}
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{unit.type}</td>
-                          <td className="px-3 py-2.5">
-                            <Badge
-                              className={cn(
-                                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                unit.status === 'Available' && 'bg-emerald-500 text-white',
-                                unit.status === 'Occupied' && 'bg-brand-blue text-white',
-                                unit.status === 'Maintenance' && 'bg-rose-500 text-white',
-                                unit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
-                              )}
-                            >
-                              {unit.status === 'Available'
-                                ? t('views.units.statuses.available')
-                                : unit.status === 'Occupied'
-                                  ? t('views.units.statuses.occupied')
-                                  : unit.status === 'Maintenance'
-                                    ? t('views.units.statuses.maintenance')
-                                    : t('views.units.statuses.reserved')}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">
-                            ₱{Number(unit.monthlyRate).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex items-center justify-center gap-0.5">
-                              <button
-                                type="button"
-                                className={locBoard.editBtn}
-                                title={t('views.units.table.viewDetails')}
-                                onClick={() => setDetailUnit(unit)}
+                      {filteredUnits.map((unit) => {
+                        const villageName =
+                          [unit.legalAddress, unit.commonAddress]
+                            .map((v) => String(v ?? '').trim())
+                            .find((v) => v && v !== '—' && v !== '-') || '';
+                        const brgyLabel =
+                          selectedBuilding && selectedBuilding !== '—'
+                            ? stripLocationOrdinalPrefix(selectedBuilding)
+                            : unit.buildingName &&
+                                unit.buildingName !== '—' &&
+                                unit.buildingName !== '-'
+                              ? stripLocationOrdinalPrefix(unit.buildingName)
+                              : '';
+                        const cityLabel = stripLocationOrdinalPrefix(
+                          selectedLocation && selectedLocation !== '—'
+                            ? selectedLocation
+                            : unit.area || '',
+                        );
+                        const primaryLabel = villageName || brgyLabel || '—';
+                        const floorMeta = formatUnitFloorTowerMeta(unit);
+                        const villageLower = villageName.toLowerCase();
+                        const includesPart = (part: string) =>
+                          Boolean(part) &&
+                          villageLower.includes(part.toLowerCase());
+                        const secondaryParts = villageName
+                          ? [
+                              brgyLabel && !includesPart(brgyLabel) ? brgyLabel : null,
+                              cityLabel && !includesPart(cityLabel) ? cityLabel : null,
+                              floorMeta || null,
+                            ]
+                          : [cityLabel || null, floorMeta || null];
+                        const secondaryLabel = secondaryParts.filter(Boolean).join(' · ');
+                        const areaTitle = [primaryLabel, secondaryLabel]
+                          .filter(Boolean)
+                          .join(' · ');
+                        return (
+                          <tr
+                            key={unit.id}
+                            className="border-b border-slate-100 last:border-b-0 even:bg-slate-50/60 hover:bg-slate-50 dark:border-slate-800 dark:even:bg-slate-900/40"
+                          >
+                            <td className="px-3 py-2.5 align-middle font-bold text-slate-800 dark:text-slate-100">
+                              <span className="block break-words" title={formatUnitNumberDisplay(unit)}>
+                                {formatUnitNumberDisplay(unit)}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 align-middle text-slate-600 dark:text-slate-300">
+                              <div className="min-w-0 space-y-0.5" title={areaTitle}>
+                                <div className="whitespace-normal break-words font-semibold leading-snug">
+                                  {primaryLabel}
+                                </div>
+                                {secondaryLabel ? (
+                                  <div className="whitespace-normal break-words text-[11px] leading-snug text-slate-400">
+                                    {secondaryLabel}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 align-middle text-slate-600 dark:text-slate-300">
+                              <span className="block truncate" title={unit.type}>
+                                {unit.type}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 align-middle text-center tabular-nums text-slate-600 dark:text-slate-300">
+                              {unit.areaSqm != null ? unit.areaSqm : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 align-middle text-center tabular-nums text-slate-600 dark:text-slate-300">
+                              {unit.bedrooms != null ? unit.bedrooms : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 align-middle text-center">
+                              <Badge
+                                className={cn(
+                                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                  unit.status === 'Available' && 'bg-emerald-500 text-white',
+                                  unit.status === 'Occupied' && 'bg-brand-blue text-white',
+                                  unit.status === 'Maintenance' && 'bg-rose-500 text-white',
+                                  unit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
+                                )}
                               >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
-                              {canUpdate ? (
+                                {unit.status === 'Available'
+                                  ? t('views.units.statuses.available')
+                                  : unit.status === 'Occupied'
+                                    ? t('views.units.statuses.occupied')
+                                    : unit.status === 'Maintenance'
+                                      ? t('views.units.statuses.maintenance')
+                                      : t('views.units.statuses.reserved')}
+                              </Badge>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2.5 align-middle text-right font-semibold tabular-nums text-slate-700">
+                              ₱{Number(unit.monthlyRate).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2.5 align-middle">
+                              <div className="flex items-center justify-center gap-0.5">
                                 <button
                                   type="button"
                                   className={locBoard.editBtn}
-                                  title={t('views.units.table.editUnit')}
-                                  onClick={() => openEdit(unit)}
+                                  title={t('views.units.table.viewDetails')}
+                                  onClick={() => setDetailUnit(unit)}
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
+                                  <Eye className="h-3.5 w-3.5" />
                                 </button>
-                              ) : null}
-                              {canDelete ? (
-                                <button
-                                  type="button"
-                                  className={locBoard.deleteBtn}
-                                  title={t('views.units.table.delete')}
-                                  onClick={() => void handleDelete(unit)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                {canUpdate ? (
+                                  <button
+                                    type="button"
+                                    className={locBoard.editBtn}
+                                    title={t('views.units.table.editUnit')}
+                                    onClick={() => openEdit(unit)}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null}
+                                {canDelete ? (
+                                  <button
+                                    type="button"
+                                    className={locBoard.deleteBtn}
+                                    title={t('views.units.table.delete')}
+                                    onClick={() => void handleDelete(unit)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
                         <td
-                          colSpan={4}
-                          className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-500"
+                          colSpan={6}
+                          className="px-3 py-2.5 text-right align-middle font-semibold uppercase tracking-wide text-slate-500"
                         >
                           {t('views.units.table.totalAmount')}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
                           ₱{totalMonthlyRate.toLocaleString()}
                         </td>
                         <td />
@@ -1673,6 +1937,7 @@ export function AddUnitByLocationView() {
         contextArea={selectedLocation}
         contextBuilding={selectedBuilding}
         extraAreaOptions={cityAreaOptions}
+        extraBuildingOptions={buildings.map((b) => b.name)}
         saving={saving}
         onSubmit={handleSaveUnit}
       />
@@ -1738,107 +2003,152 @@ export function AddUnitByLocationView() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {panelLocation}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
-                    {detailUnit.area || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {panelBuilding}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
-                    {detailUnit.buildingName || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.floor')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {resolveUnitFloorTower(detailUnit).floor || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.tower')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {resolveUnitFloorTower(detailUnit).tower || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.table.monthlyRate')}
-                  </p>
-                  <p className="mt-1 text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
-                    ₱{Number(detailUnit.monthlyRate).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.layoutMetrics')}
-                  </p>
-                  {detailUnit.areaSqm != null ||
-                  detailUnit.bedrooms != null ||
-                  detailUnit.bathrooms != null ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {detailUnit.areaSqm != null ? (
-                        <span className="inline-flex items-center gap-1.5" title={t('views.units.card.sqm')}>
-                          <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{detailUnit.areaSqm}</span>
-                        </span>
-                      ) : null}
-                      {detailUnit.bedrooms != null ? (
-                        <span
-                          className="inline-flex items-center gap-1.5"
-                          title={t('views.units.addModal.bedrooms')}
-                        >
-                          <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{detailUnit.bedrooms}</span>
-                        </span>
-                      ) : null}
-                      {detailUnit.bathrooms != null ? (
-                        <span
-                          className="inline-flex items-center gap-1.5"
-                          title={t('views.units.addModal.bathrooms')}
-                        >
-                          <Bath className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{detailUnit.bathrooms}</span>
-                        </span>
-                      ) : null}
+              {(() => {
+                const villageName =
+                  [detailUnit.legalAddress, detailUnit.commonAddress]
+                    .map((v) => String(v ?? '').trim())
+                    .find((v) => v && v !== '—' && v !== '-') || '';
+                const cityLabel = stripLocationOrdinalPrefix(
+                  selectedLocation && selectedLocation !== '—'
+                    ? selectedLocation
+                    : detailUnit.area || '',
+                );
+                const brgyLabel =
+                  selectedBuilding && selectedBuilding !== '—'
+                    ? stripLocationOrdinalPrefix(selectedBuilding)
+                    : detailUnit.buildingName &&
+                        detailUnit.buildingName !== '—' &&
+                        detailUnit.buildingName !== '-'
+                      ? stripLocationOrdinalPrefix(detailUnit.buildingName)
+                      : '';
+                const floorTower = resolveUnitFloorTower(detailUnit);
+                const detailField = (label: string, value: React.ReactNode, fullWidth?: boolean) => (
+                  <div className={fullWidth ? 'sm:col-span-2' : undefined}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {label}
+                    </p>
+                    <div className="mt-1 whitespace-normal break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {value}
                     </div>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">—</p>
-                  )}
-                </div>
-              </div>
+                  </div>
+                );
+                return (
+                  <>
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                      {detailField(
+                        t('views.units.addModal.unitNumber'),
+                        villageName || '—',
+                        true,
+                      )}
+                      {detailField(
+                        t('views.units.addModal.unitName'),
+                        formatUnitNumberDisplay(detailUnit) || '—',
+                      )}
+                      {detailField(
+                        t('views.units.addModal.categoryType'),
+                        detailUnit.type || '—',
+                      )}
+                      {detailField(
+                        panelLocation,
+                        <span className="uppercase">{cityLabel || '—'}</span>,
+                      )}
+                      {detailField(
+                        panelBuilding,
+                        <span className="uppercase">{brgyLabel || '—'}</span>,
+                      )}
+                      {detailField(
+                        t('views.units.addModal.floor'),
+                        floorTower.floor || '—',
+                      )}
+                      {detailField(
+                        t('views.units.addModal.tower'),
+                        floorTower.tower || '—',
+                      )}
+                      {detailField(
+                        t('views.units.table.monthlyRate'),
+                        <span className="font-bold tabular-nums">
+                          ₱{Number(detailUnit.monthlyRate).toLocaleString()}
+                        </span>,
+                      )}
+                      {detailField(
+                        t('views.units.addModal.status'),
+                        detailUnit.status === 'Available'
+                          ? t('views.units.statuses.available')
+                          : detailUnit.status === 'Occupied'
+                            ? t('views.units.statuses.occupied')
+                            : detailUnit.status === 'Maintenance'
+                              ? t('views.units.statuses.maintenance')
+                              : t('views.units.statuses.reserved'),
+                      )}
+                      <div className="sm:col-span-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {t('views.units.addModal.layoutMetrics')}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={t('views.units.addModal.sqm')}
+                          >
+                            <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">
+                              {detailUnit.areaSqm != null ? detailUnit.areaSqm : '—'}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.sqm')}
+                            </span>
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={t('views.units.addModal.bedrooms')}
+                          >
+                            <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">
+                              {detailUnit.bedrooms != null ? detailUnit.bedrooms : '—'}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.bedrooms')}
+                            </span>
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={t('views.units.addModal.bathrooms')}
+                          >
+                            <Bath className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">
+                              {detailUnit.bathrooms != null ? detailUnit.bathrooms : '—'}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.bathrooms')}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-              {detailUnit.moreDetails ? (
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.moreDetails')}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
-                    {detailUnit.moreDetails}
-                  </p>
-                </div>
-              ) : null}
+                    <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {t('views.units.addModal.specialRemarks')}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+                        {detailUnit.specialRemarks?.trim()
+                          ? detailUnit.specialRemarks
+                          : t('views.units.details.noRemarks')}
+                      </p>
+                    </div>
 
-              {detailUnit.specialRemarks ? (
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.specialRemarks')}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
-                    {detailUnit.specialRemarks}
-                  </p>
-                </div>
-              ) : null}
+                    {detailUnit.moreDetails?.trim() ? (
+                      <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {t('views.units.addModal.moreDetails')}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+                          {detailUnit.moreDetails}
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
             </div>
           </div>
         ) : null}

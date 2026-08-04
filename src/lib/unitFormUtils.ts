@@ -316,7 +316,7 @@ export function unitToFormState(unit: Unit): UnitFormState {
     floor: unit.floor === '—' ? '' : unit.floor,
     tower: unit.tower === '—' ? '' : unit.tower,
     buildingName: unit.buildingName,
-    legalAddress: unit.legalAddress || unit.buildingName,
+    legalAddress: unit.legalAddress || unit.commonAddress || unit.buildingName,
     type: unit.type,
     status: unit.status,
     area: unit.area,

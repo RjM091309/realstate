@@ -47,7 +47,7 @@ import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
 import { toWebpDataUrl } from '@/lib/imageWebp';
-import { resolveUnitFloorTower } from '@/lib/unitFormUtils';
+import { UNIT_FORM_TYPES, resolveUnitFloorTower } from '@/lib/unitFormUtils';
 import { cn } from '@/lib/utils';
 import type { Contract, InventoryItem, Tenant, Unit, UnitStatus, UnitType } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -877,9 +877,23 @@ export function UnitsView() {
     [t, unitsBackedByApi, selectedUnit],
   );
 
+  const addTypeOptions = useMemo(
+    () => UNIT_FORM_TYPES.map((ut) => ({ value: ut, label: ut })),
+    [],
+  );
+
   const addStatusOptions = useMemo(
     () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
     [statusLabel],
+  );
+
+  const addFloorOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const floor = `${ordinalFloor(i + 1)} Floor`;
+        return { value: floor, label: floor };
+      }),
+    [],
   );
 
   const columns: ColumnDef<Unit>[] = useMemo(
@@ -1475,100 +1489,120 @@ export function UnitsView() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.addUnitByLocation.panels.location')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
-                    {areaDisplayLabel(selectedUnit.area)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.addUnitByLocation.panels.building')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold uppercase text-slate-800 dark:text-slate-100">
-                    {selectedUnit.buildingName || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.floor')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {resolveUnitFloorTower(selectedUnit).floor || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.tower')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {resolveUnitFloorTower(selectedUnit).tower || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.table.monthlyRate')}
-                  </p>
-                  <p className="mt-1 text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">
-                    ₱{Number(selectedUnit.monthlyRate).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.layoutMetrics')}
-                  </p>
-                  {(() => {
-                    const metrics = resolveUnitMetrics(selectedUnit);
-                    return (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        <span className="inline-flex items-center gap-1.5" title={t('views.units.card.sqm')}>
-                          <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{metrics.sqm}</span>
-                        </span>
-                        <span
-                          className="inline-flex items-center gap-1.5"
-                          title={t('views.units.addModal.bedrooms')}
-                        >
-                          <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{metrics.beds}</span>
-                        </span>
-                        <span
-                          className="inline-flex items-center gap-1.5"
-                          title={t('views.units.addModal.bathrooms')}
-                        >
-                          <Bath className="h-4 w-4 text-slate-500" aria-hidden />
-                          <span className="tabular-nums">{metrics.baths}</span>
-                        </span>
+              {(() => {
+                const villageName =
+                  [selectedUnit.legalAddress, selectedUnit.commonAddress]
+                    .map((v) => String(v ?? '').trim())
+                    .find((v) => v && v !== '—' && v !== '-') || '';
+                const floorTower = resolveUnitFloorTower(selectedUnit);
+                const detailField = (label: string, value: React.ReactNode, fullWidth?: boolean) => (
+                  <div className={fullWidth ? 'sm:col-span-2' : undefined}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {label}
+                    </p>
+                    <div className="mt-1 whitespace-normal break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {value}
+                    </div>
+                  </div>
+                );
+                const metrics = resolveUnitMetrics(selectedUnit);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                      {detailField(
+                        t('views.units.addModal.unitNumber'),
+                        villageName || '—',
+                        true,
+                      )}
+                      {detailField(
+                        t('views.units.addModal.unitName'),
+                        selectedUnit.unitNumber || '—',
+                      )}
+                      {detailField(
+                        t('views.units.addModal.categoryType'),
+                        selectedUnit.type || '—',
+                      )}
+                      {detailField(
+                        t('views.addUnitByLocation.panels.location'),
+                        <span className="uppercase">{areaDisplayLabel(selectedUnit.area)}</span>,
+                      )}
+                      {detailField(
+                        t('views.addUnitByLocation.panels.building'),
+                        <span className="uppercase">{selectedUnit.buildingName || '—'}</span>,
+                      )}
+                      {detailField(
+                        t('views.units.addModal.floor'),
+                        floorTower.floor || '—',
+                      )}
+                      {detailField(
+                        t('views.units.addModal.tower'),
+                        floorTower.tower || '—',
+                      )}
+                      {detailField(
+                        t('views.units.table.monthlyRate'),
+                        <span className="font-bold tabular-nums">
+                          ₱{Number(selectedUnit.monthlyRate).toLocaleString()}
+                        </span>,
+                      )}
+                      {detailField(t('views.units.addModal.status'), statusLabel(selectedUnit.status))}
+                      <div className="sm:col-span-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {t('views.units.addModal.layoutMetrics')}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          <span className="inline-flex items-center gap-1.5" title={t('views.units.card.sqm')}>
+                            <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">{metrics.sqm}</span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.sqm')}
+                            </span>
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={t('views.units.addModal.bedrooms')}
+                          >
+                            <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">{metrics.beds}</span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.bedrooms')}
+                            </span>
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={t('views.units.addModal.bathrooms')}
+                          >
+                            <Bath className="h-4 w-4 text-slate-500" aria-hidden />
+                            <span className="tabular-nums">{metrics.baths}</span>
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {t('views.units.addModal.bathrooms')}
+                            </span>
+                          </span>
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
-              </div>
+                    </div>
 
-              {selectedUnit.moreDetails?.trim() ? (
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.moreDetails')}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
-                    {selectedUnit.moreDetails}
-                  </p>
-                </div>
-              ) : null}
+                    <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {t('views.units.addModal.specialRemarks')}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+                        {unitRemarksDisplay || t('views.units.details.noRemarks')}
+                      </p>
+                    </div>
 
-              {unitRemarksDisplay ? (
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {t('views.units.addModal.specialRemarks')}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
-                    {unitRemarksDisplay}
-                  </p>
-                </div>
-              ) : null}
+                    {selectedUnit.moreDetails?.trim() ? (
+                      <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {t('views.units.addModal.moreDetails')}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+                          {selectedUnit.moreDetails}
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
             </div>
           </div>
         ) : null}
@@ -1955,15 +1989,47 @@ export function UnitsView() {
               />
             </button>
             {showMoreDetails ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-950/40">
-                <Textarea
-                  id="add-more-details"
-                  value={addForm.moreDetails}
-                  onChange={(e) => setAddForm((f) => ({ ...f, moreDetails: e.target.value }))}
-                  placeholder={t('views.units.addModal.moreDetailsPlaceholder')}
-                  rows={3}
-                  className="min-h-[88px] resize-y rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                />
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2 dark:border-slate-600 dark:bg-slate-950/40">
+                <div className="space-y-2">
+                  <Label>{t('views.units.addModal.floor')}</Label>
+                  <Select2
+                    options={addFloorOptions}
+                    value={addForm.floor || null}
+                    onChange={(v) => setAddForm((f) => ({ ...f, floor: String(v ?? '') }))}
+                    placeholder="Select floor"
+                    borderless={false}
+                    className="[&_.unit-form-select-control]:!min-h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-tower">{t('views.units.addModal.tower')}</Label>
+                  <Input
+                    id="add-tower"
+                    value={addForm.tower}
+                    onChange={(e) => setAddForm((f) => ({ ...f, tower: e.target.value }))}
+                    className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('views.units.addModal.categoryType')}</Label>
+                  <Select2
+                    options={addTypeOptions}
+                    value={addForm.type}
+                    onChange={(v) => {
+                      const nextType = (v ?? 'Condominium') as UnitType;
+                      const m = unitDisplayMetrics(nextType);
+                      setAddForm((f) => ({
+                        ...f,
+                        type: nextType,
+                        areaSqm: String(m.sqm),
+                        bedrooms: String(m.beds),
+                        bathrooms: String(m.baths),
+                      }));
+                    }}
+                    borderless={false}
+                    className="[&_.unit-form-select-control]:!min-h-12"
+                  />
+                </div>
               </div>
             ) : null}
           </div>

@@ -349,7 +349,11 @@
         "unitDesc": "유닛 번호 내림차순",
         "buildingAsc": "건물명 오름차순",
         "rateAsc": "월세 낮은 순",
-        "rateDesc": "월세 높은 순"
+        "rateDesc": "월세 높은 순",
+        "sqmAsc": "면적 낮은 순",
+        "sqmDesc": "면적 높은 순",
+        "bedsAsc": "침실 적은 순",
+        "bedsDesc": "침실 많은 순"
       },
       "card": {
         "view": "보기",
@@ -381,6 +385,8 @@
         "type": "유형",
         "status": "상태",
         "monthlyRate": "월 임대료",
+        "areaSqm": "면적 (sqm)",
+        "bedrooms": "침실",
         "totalAmount": "합계",
         "actions": "작업",
         "floor": "층",
@@ -434,7 +440,8 @@
       "addModal": {
         "title": "새 유닛 추가",
         "description": "유닛 정보를 입력하세요. 비품은 유닛 생성 후 관리할 수 있습니다.",
-        "unitNumber": "유닛 번호",
+        "unitNumber": "Village/ Building Name",
+        "unitName": "Unit Name",
         "floor": "층",
         "tower": "타워 / 동 (선택 사항)",
         "buildingName": "건물명",

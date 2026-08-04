@@ -9,19 +9,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toWebpDataUrl } from '@/lib/imageWebp';
+import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
 import { cn } from '@/lib/utils';
 import {
   UNIT_FORM_STATUSES,
+  UNIT_FORM_TYPES,
   defaultUnitForm,
   detectFloorAndTowerFromText,
+  ordinalFloor,
+  unitDisplayMetrics,
   unitFormToWriteBody,
   type UnitFormState,
 } from '@/lib/unitFormUtils';
 import type { UnitWriteBody } from '@/lib/unitsApi';
-import type { UnitStatus } from '@/types';
+import type { UnitStatus, UnitType } from '@/types';
 
 const FIELD =
   'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+/** Unit code from stored unit number — supports "101 Brgy City" or "Brgy City 101". */
+function extractUnitCode(raw: string): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const lead = s.match(/^(\d+[A-Za-z]?)\b/i);
+  if (lead) return lead[1];
+  const trail = s.match(/\b(\d+[A-Za-z]?)$/i);
+  return trail ? trail[1] : '';
+}
+
+/** Clean city/brgy label for display & save (drop "1." / "2." list prefixes). */
+function cleanLocationName(name: string): string {
+  return stripLocationOrdinalPrefix(String(name ?? '').trim());
+}
 
 export type UnitFormModalProps = {
   isOpen: boolean;
@@ -31,12 +50,14 @@ export type UnitFormModalProps = {
   initialValues?: Partial<UnitFormState>;
   /** Existing photo when editing. */
   initialPhoto?: string | null;
-  /** Live City panel selection — always synced into save payload. */
+  /** Live City panel selection — auto-synced into the form (hidden). */
   contextArea?: string | null;
-  /** Live Brgy panel selection — always synced into save payload + form. */
+  /** Live Brgy panel selection — auto-synced into the form (hidden). */
   contextBuilding?: string | null;
-  /** @deprecated Area field is hidden; kept for call-site compatibility. */
+  /** @deprecated City/Brgy fields are hidden; kept for call-site compatibility. */
   extraAreaOptions?: string[];
+  /** @deprecated City/Brgy fields are hidden; kept for call-site compatibility. */
+  extraBuildingOptions?: string[];
   saving?: boolean;
   onSubmit: (body: UnitWriteBody) => Promise<void> | void;
 };
@@ -55,7 +76,10 @@ export function UnitFormModal({
 }: UnitFormModalProps) {
   const { t } = useTranslation();
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const lastAutoVillageRef = useRef('');
   const [form, setForm] = useState<UnitFormState>(() => defaultUnitForm(initialValues));
+  const [unitCode, setUnitCode] = useState(() => extractUnitCode(initialValues?.unitNumber ?? ''));
+  const [villageBuilding, setVillageBuilding] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
@@ -65,50 +89,98 @@ export function UnitFormModal({
     return !s || s === '—' || s === '-';
   };
 
+  const autoVillageLabel = useCallback((brgy: string, city: string) => {
+    return [cleanLocationName(brgy), cleanLocationName(city)]
+      .filter((v) => !blank(v))
+      .join(' · ');
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
-    const area = !blank(initialValues?.area)
-      ? String(initialValues?.area)
-      : !blank(contextArea)
+    // Prefer selected City / Brgy panels (category source of truth).
+    const area = cleanLocationName(
+      !blank(contextArea)
         ? String(contextArea)
-        : '';
-    const building = !blank(initialValues?.buildingName)
-      ? String(initialValues?.buildingName)
-      : !blank(contextBuilding)
+        : !blank(initialValues?.area)
+          ? String(initialValues?.area)
+          : '',
+    );
+    const building = cleanLocationName(
+      !blank(contextBuilding)
         ? String(contextBuilding)
+        : !blank(initialValues?.buildingName)
+          ? String(initialValues?.buildingName)
+          : '',
+    );
+    const code = extractUnitCode(initialValues?.unitNumber ?? '');
+    const autoVillage = autoVillageLabel(building, area);
+    // Prefer full Village/Building Name from saved legal address (do not strip custom text).
+    const candidate = !blank(initialValues?.legalAddress)
+      ? String(initialValues?.legalAddress).trim()
+      : !blank(initialValues?.buildingName)
+        ? String(initialValues?.buildingName).trim()
         : '';
+    const candidateIsOnlyLocation =
+      !candidate ||
+      cleanLocationName(candidate) === building ||
+      cleanLocationName(candidate) === area ||
+      candidate === autoVillage ||
+      cleanLocationName(candidate) === autoVillage;
+    const village = candidateIsOnlyLocation ? autoVillage : candidate;
+    lastAutoVillageRef.current = autoVillage;
+    setUnitCode(code);
+    setVillageBuilding(village);
     setForm(
       defaultUnitForm({
         ...initialValues,
-        area: area || initialValues?.area,
-        buildingName: building || initialValues?.buildingName,
-        legalAddress: building || initialValues?.legalAddress,
+        area,
+        buildingName: building,
+        legalAddress: village || building || initialValues?.legalAddress,
+        // Unit Name stays separate — do not bake brgy/city into unitNumber.
+        unitNumber: code || extractUnitCode(initialValues?.unitNumber ?? '') || '',
       }),
     );
     setPhotoPreview(String(initialPhoto ?? '').trim());
     setPhotoPreviewOpen(false);
     setShowMoreDetails(false);
     if (photoInputRef.current) photoInputRef.current.value = '';
-    // Reset when modal opens or panel context changes while open.
+    // Reset only when the modal opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [isOpen, contextArea, contextBuilding]);
+  }, [isOpen]);
 
-  // Keep City / Brgy synced from panels while the modal is open (hidden fields).
+  // Soft-sync City / Brgy from panels; refresh Village/Building only if still auto value.
   useEffect(() => {
     if (!isOpen) return;
+    const ctxArea = cleanLocationName(!blank(contextArea) ? String(contextArea) : '');
+    const ctxBuilding = cleanLocationName(
+      !blank(contextBuilding) ? String(contextBuilding) : '',
+    );
+
     setForm((f) => {
-      const nextArea = !blank(contextArea) ? String(contextArea).trim() : f.area;
-      const nextBuilding = !blank(contextBuilding) ? String(contextBuilding).trim() : f.buildingName;
+      const nextArea = ctxArea || f.area;
+      const nextBuilding = ctxBuilding || f.buildingName;
       if (nextArea === f.area && nextBuilding === f.buildingName) return f;
       return {
         ...f,
         area: nextArea,
         buildingName: nextBuilding,
-        legalAddress: nextBuilding || f.legalAddress,
       };
     });
-  }, [isOpen, contextArea, contextBuilding]);
 
+    const autoVillage = autoVillageLabel(ctxBuilding, ctxArea);
+    setVillageBuilding((current) => {
+      const trimmed = current.trim();
+      const stillAuto =
+        blank(trimmed) ||
+        trimmed === lastAutoVillageRef.current ||
+        trimmed === ctxBuilding ||
+        trimmed === ctxArea;
+      lastAutoVillageRef.current = autoVillage;
+      return stillAuto ? autoVillage : current;
+    });
+  }, [isOpen, contextArea, contextBuilding, autoVillageLabel]);
+
+  const typeOptions = useMemo(() => UNIT_FORM_TYPES.map((ut) => ({ value: ut, label: ut })), []);
   const statusOptions = useMemo(
     () =>
       UNIT_FORM_STATUSES.map((s) => ({
@@ -124,6 +196,15 @@ export function UnitFormModal({
       })),
     [t],
   );
+  const floorOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const floor = `${ordinalFloor(i + 1)} Floor`;
+        return { value: floor, label: floor };
+      }),
+    [],
+  );
+
   const handlePhotoChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -141,29 +222,34 @@ export function UnitFormModal({
 
   const handleSave = useCallback(async () => {
     const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
-    if (!form.unitNumber.trim()) {
+    const code = unitCode.trim() || extractUnitCode(form.unitNumber);
+    if (!code && !form.unitNumber.trim()) {
       toast.error(t('views.units.addModal.validationUnitNumber'));
       return;
     }
-    // City / Brgy come from location panels (hidden fields) — sync before save.
+    // City / Brgy from category panels; Village/Building Name is manually editable.
+    const area = cleanLocationName(
+      !blank(contextArea) ? String(contextArea) : form.area,
+    );
+    const brgy = cleanLocationName(
+      !blank(contextBuilding) ? String(contextBuilding) : form.buildingName,
+    );
+    const village = villageBuilding.trim() || autoVillageLabel(brgy, area);
     const synced: UnitFormState = {
       ...form,
-      area: !blank(contextArea) ? String(contextArea).trim() : form.area,
-      buildingName: !blank(contextBuilding) ? String(contextBuilding).trim() : form.buildingName,
-      legalAddress: !blank(contextBuilding)
-        ? String(contextBuilding).trim()
-        : form.legalAddress,
+      area,
+      buildingName: brgy,
+      legalAddress: village,
+      unitNumber: code || form.unitNumber.trim(),
     };
-    // If brgy is still blank, recover from free-text in unit number
-    // e.g. "301 3rd Floor The Sharp Clark Hills" → building "The Sharp Clark Hills"
     if (blank(synced.buildingName)) {
       const detected = detectFloorAndTowerFromText(synced.unitNumber);
       const leftover = (detected.cleaned || synced.unitNumber)
         .replace(/^\d+[a-zA-Z]?\s*/i, '')
         .trim();
       if (leftover) {
-        synced.buildingName = leftover;
-        synced.legalAddress = leftover;
+        synced.buildingName = cleanLocationName(leftover);
+        if (!synced.legalAddress) synced.legalAddress = synced.buildingName;
       }
       if (blank(synced.floor) && detected.floor) synced.floor = detected.floor;
       if (blank(synced.tower) && detected.tower) synced.tower = detected.tower;
@@ -173,7 +259,17 @@ export function UnitFormModal({
       return;
     }
     await onSubmit(unitFormToWriteBody(synced, photoPreview || null));
-  }, [contextArea, contextBuilding, form, onSubmit, photoPreview, t]);
+  }, [
+    autoVillageLabel,
+    contextArea,
+    contextBuilding,
+    form,
+    onSubmit,
+    photoPreview,
+    t,
+    unitCode,
+    villageBuilding,
+  ]);
 
   return (
     <>
@@ -265,18 +361,28 @@ export function UnitFormModal({
             </div>
           </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="loc-add-unit-number">{t('views.units.addModal.unitNumber')}</Label>
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-village-building">{t('views.units.addModal.unitNumber')}</Label>
+            <Input
+              id="loc-add-village-building"
+              value={villageBuilding}
+              onChange={(e) => setVillageBuilding(e.target.value)}
+              placeholder="e.g. Amsic · Angeles City"
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-unit-number">{t('views.units.addModal.unitName')}</Label>
             <Input
               id="loc-add-unit-number"
-              value={form.unitNumber}
+              value={unitCode}
               onChange={(e) => {
-                const unitNumber = e.target.value;
-                const detected = detectFloorAndTowerFromText(unitNumber);
+                const code = e.target.value;
+                const detected = detectFloorAndTowerFromText(code);
+                setUnitCode(code);
                 setForm((f) => ({
                   ...f,
-                  unitNumber,
-                  // Auto-fill empty floor/tower from unit text (e.g. "301 3rd Floor Tower wings")
+                  unitNumber: code.trim(),
                   floor: f.floor.trim() ? f.floor : detected.floor,
                   tower: f.tower.trim() ? f.tower : detected.tower,
                 }));
@@ -304,15 +410,47 @@ export function UnitFormModal({
               />
             </button>
             {showMoreDetails ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-950/40">
-                <Textarea
-                  id="loc-add-more-details"
-                  value={form.moreDetails}
-                  onChange={(e) => setForm((f) => ({ ...f, moreDetails: e.target.value }))}
-                  placeholder={t('views.units.addModal.moreDetailsPlaceholder')}
-                  rows={3}
-                  className="min-h-[88px] resize-y rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                />
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2 dark:border-slate-600 dark:bg-slate-950/40">
+                <div className="space-y-2">
+                  <Label>{t('views.units.addModal.floor')}</Label>
+                  <Select2
+                    options={floorOptions}
+                    value={form.floor || null}
+                    onChange={(v) => setForm((f) => ({ ...f, floor: String(v ?? '') }))}
+                    placeholder="Select floor"
+                    borderless={false}
+                    className="[&_.unit-form-select-control]:!min-h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="loc-add-tower">{t('views.units.addModal.tower')}</Label>
+                  <Input
+                    id="loc-add-tower"
+                    value={form.tower}
+                    onChange={(e) => setForm((f) => ({ ...f, tower: e.target.value }))}
+                    className={FIELD}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t('views.units.addModal.categoryType')}</Label>
+                  <Select2
+                    options={typeOptions}
+                    value={form.type}
+                    onChange={(v) => {
+                      const nextType = (v ?? 'Condominium') as UnitType;
+                      const m = unitDisplayMetrics(nextType);
+                      setForm((f) => ({
+                        ...f,
+                        type: nextType,
+                        areaSqm: String(m.sqm),
+                        bedrooms: String(m.beds),
+                        bathrooms: String(m.baths),
+                      }));
+                    }}
+                    borderless={false}
+                    className="[&_.unit-form-select-control]:!min-h-12"
+                  />
+                </div>
               </div>
             ) : null}
           </div>

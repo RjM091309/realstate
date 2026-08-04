@@ -349,7 +349,11 @@
         "unitDesc": "Unit number Z–A",
         "buildingAsc": "Building A–Z",
         "rateAsc": "Monthly rate (low to high)",
-        "rateDesc": "Monthly rate (high to low)"
+        "rateDesc": "Monthly rate (high to low)",
+        "sqmAsc": "Area sqm (low to high)",
+        "sqmDesc": "Area sqm (high to low)",
+        "bedsAsc": "Bedrooms (low to high)",
+        "bedsDesc": "Bedrooms (high to low)"
       },
       "card": {
         "view": "View",
@@ -381,6 +385,8 @@
         "type": "Type",
         "status": "Status",
         "monthlyRate": "Monthly Rate",
+        "areaSqm": "Area (sqm)",
+        "bedrooms": "Bedrooms",
         "totalAmount": "Total amount",
         "actions": "Actions",
         "floor": "Floor",
@@ -434,7 +440,8 @@
       "addModal": {
         "title": "Add new unit",
         "description": "Enter the unit details. Inventory can be managed after the unit is created.",
-        "unitNumber": "Unit number",
+        "unitNumber": "Village/ Building Name",
+        "unitName": "Unit Name",
         "floor": "Floor",
         "tower": "Tower / wing (optional)",
         "buildingName": "Building name",
