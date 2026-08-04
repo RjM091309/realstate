@@ -39,22 +39,19 @@ import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
-<<<<<<< Updated upstream
 import { fetchBrgys, fetchCities, type LocationBrgy, type LocationCity } from '@/lib/locationsApi';
-import { normalizeLocationAliasLabel } from '@/lib/locationNames';
-import { toWebpDataUrl } from '@/lib/imageWebp';
-import { UNIT_FORM_TYPES, resolveUnitFloorTower } from '@/lib/unitFormUtils';
-=======
-import { resolveUnitFloorTower, resolveUnitPhotos, unitDisplayMetrics, unitToFormState, type UnitFormState } from '@/lib/unitFormUtils';
-import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
->>>>>>> Stashed changes
+import { normalizeLocationAliasLabel, stripLocationOrdinalPrefix } from '@/lib/locationNames';
+import {
+  resolveUnitFloorTower,
+  resolveUnitPhotos,
+  unitDisplayMetrics,
+  unitToFormState,
+  type UnitFormState,
+} from '@/lib/unitFormUtils';
 import { cn } from '@/lib/utils';
 import type { Contract, InventoryItem, Tenant, Unit } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
-
-<<<<<<< Updated upstream
-const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 
 /** Same as Add Unit by Location: city = `area`, barangay = `buildingName`. */
 function locationKey(unit: Pick<Unit, 'area'>): string {
@@ -69,63 +66,6 @@ function sameLocation(a: string, b: string): boolean {
   return normalizeLocationAliasLabel(a).toLowerCase() === normalizeLocationAliasLabel(b).toLowerCase();
 }
 
-type AddUnitForm = {
-  unitNumber: string;
-  floor: string;
-  tower: string;
-  buildingName: string;
-  legalAddress: string;
-  type: UnitType;
-  status: UnitStatus;
-  area: string;
-  areaSqm: string;
-  bedrooms: string;
-  bathrooms: string;
-  monthlyRate: string;
-  moreDetails: string;
-  specialRemarks: string;
-};
-
-function defaultAddForm(): AddUnitForm {
-  const metrics = unitDisplayMetrics('Condominium');
-  return {
-    unitNumber: '',
-    floor: '',
-    tower: '',
-    buildingName: '',
-    legalAddress: '',
-    type: 'Condominium',
-    status: 'Available',
-    area: '',
-    areaSqm: String(metrics.sqm),
-    bedrooms: String(metrics.beds),
-    bathrooms: String(metrics.baths),
-    monthlyRate: '',
-    moreDetails: '',
-    specialRemarks: '',
-  };
-}
-
-function ordinalFloor(n: number): string {
-  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
-  if (n % 10 === 1) return `${n}st`;
-  if (n % 10 === 2) return `${n}nd`;
-  if (n % 10 === 3) return `${n}rd`;
-  return `${n}th`;
-}
-
-function normalizeFloorForForm(rawFloor: string): string {
-  const floor = String(rawFloor ?? '').trim();
-  if (!floor || floor === '—') return '';
-  if (/^\d+$/.test(floor)) {
-    const n = Number(floor);
-    if (Number.isFinite(n) && n >= 1 && n <= 12) return `${ordinalFloor(n)} floor`;
-  }
-  return floor;
-}
-
-=======
->>>>>>> Stashed changes
 function normalizeAreaForForm(rawArea: string): string {
   const area = String(rawArea ?? '').trim();
   if (!area) return '';
