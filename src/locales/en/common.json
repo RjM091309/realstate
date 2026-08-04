@@ -527,6 +527,7 @@
       "fileMaintenance": "File Maintenance",
       "loading": "Loading locations…",
       "cityBrgyCount": "{{count}} {{panel}}",
+      "cityUnitCount": "{{count}} {{panel}}",
       "brgyUnitCount": "{{count}} {{panel}}",
       "addUnit": "Add unit",
       "addLocation": "Add Location",

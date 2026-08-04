@@ -527,6 +527,7 @@
       "fileMaintenance": "파일 유지보수",
       "loading": "위치 불러오는 중…",
       "cityBrgyCount": "{{panel}} {{count}}개",
+      "cityUnitCount": "{{panel}} {{count}}개",
       "brgyUnitCount": "{{panel}} {{count}}개",
       "addUnit": "유닛 추가",
       "addLocation": "Add Location",

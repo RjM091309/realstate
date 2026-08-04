@@ -578,16 +578,10 @@ export function UnitsView() {
     [cityOptions],
   );
 
-  const brgySelectOptions = useMemo(() => {
-    const cityNameById = new Map(
-      managedCities.map((c) => [String(c.cityId), String(c.name ?? '').trim()] as const),
-    );
-    return brgyOptions.map((b) => {
-      const cityName = cityNameById.get(b.cityId);
-      const label = !filterCityId && cityName ? `${b.name} · ${cityName}` : b.name;
-      return { value: b.brgyId, label };
-    });
-  }, [brgyOptions, managedCities, filterCityId]);
+  const brgySelectOptions = useMemo(
+    () => brgyOptions.map((b) => ({ value: b.brgyId, label: b.name })),
+    [brgyOptions],
+  );
 
   const processedUnits = useMemo(() => {
     const rows = unitList.filter((u) => {

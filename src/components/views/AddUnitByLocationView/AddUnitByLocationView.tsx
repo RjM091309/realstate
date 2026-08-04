@@ -360,7 +360,7 @@ export function AddUnitByLocationView() {
   const locations = useMemo(() => {
     // CITY panel is driven by DB `city` rows only (with cityId).
     // Fold ordinal/bare aliases so "1. Clark" and "Clark" never both show.
-    const map = new Map<string, { cityId: string; name: string; brgyCount: number }>();
+    const map = new Map<string, { cityId: string; name: string; unitCount: number }>();
 
     for (const city of managedCities) {
       const name = String(city.name ?? '').trim();
@@ -369,21 +369,21 @@ export function AddUnitByLocationView() {
       if (!key) continue;
       const prev = map.get(key);
       if (!prev) {
-        map.set(key, { cityId: city.cityId, name, brgyCount: 0 });
+        map.set(key, { cityId: city.cityId, name, unitCount: 0 });
         continue;
       }
       // Prefer numbered category label ("1. Clark") over bare ("Clark").
       if (hasLocationOrdinalPrefix(name) && !hasLocationOrdinalPrefix(prev.name)) {
-        map.set(key, { cityId: city.cityId, name, brgyCount: prev.brgyCount });
+        map.set(key, { cityId: city.cityId, name, unitCount: prev.unitCount });
       }
     }
 
-    for (const brgy of managedBrgys) {
-      const brgyCityId = String(brgy.cityId ?? '').trim();
-      if (!brgyCityId) continue;
+    for (const u of units) {
+      const raw = locationKey(u);
+      if (!raw || raw === '—') continue;
       for (const loc of map.values()) {
-        if (String(loc.cityId) === brgyCityId) {
-          loc.brgyCount += 1;
+        if (sameLocation(loc.name, raw) || locationAliasKey(loc.name) === locationAliasKey(raw)) {
+          loc.unitCount += 1;
         }
       }
     }
@@ -396,7 +396,7 @@ export function AddUnitByLocationView() {
       if (bNum) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [managedCities, managedBrgys]);
+  }, [managedCities, units]);
 
   const persistExtraLocations = useCallback((next: string[]) => {
     // Dedupe only — do not force-append seeded city names.
@@ -1409,12 +1409,12 @@ export function AddUnitByLocationView() {
                       <div className={locBoard.listTrailing}>
                         <span
                           className={locBoard.listCountBadge}
-                          title={t('views.addUnitByLocation.cityBrgyCount', {
-                            count: loc.brgyCount,
-                            panel: panelBuilding,
+                          title={t('views.addUnitByLocation.cityUnitCount', {
+                            count: loc.unitCount,
+                            panel: panelUnits,
                           })}
                         >
-                          {loc.brgyCount}
+                          {loc.unitCount}
                         </span>
                         <div className={locBoard.listActions}>
                           <button
