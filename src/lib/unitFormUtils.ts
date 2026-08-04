@@ -270,6 +270,7 @@ export function unitFormToWriteBody(
   form: UnitFormState,
   photoDataUrl: string | null,
   inventory: InventoryItem[] = [],
+  photos: string[] = [],
 ): UnitWriteBody {
   const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
   const legalAddress = isPlaceholderField(form.legalAddress) ? '' : form.legalAddress.trim();
@@ -289,6 +290,11 @@ export function unitFormToWriteBody(
       ? detectedFromUnit.cleaned
       : form.unitNumber.trim();
   const area = isPlaceholderField(form.area) ? '' : form.area.trim();
+  const normalizedPhotos = (photos.length > 0 ? photos : photoDataUrl ? [photoDataUrl] : [])
+    .map((p) => String(p ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  const cover = normalizedPhotos[0] ?? null;
   return {
     unitNumber,
     floor,
@@ -303,11 +309,24 @@ export function unitFormToWriteBody(
     bedrooms: parseMetricInput(form.bedrooms),
     bathrooms: parseMetricInput(form.bathrooms),
     monthlyRate: rate,
-    photoDataUrl,
+    photoDataUrl: cover,
+    photos: normalizedPhotos,
     moreDetails: form.moreDetails.trim() || undefined,
     specialRemarks: form.specialRemarks.trim() || undefined,
     inventory,
   };
+}
+
+/** Resolve gallery photos from a unit (supports legacy single photo). */
+export function resolveUnitPhotos(unit: Pick<Unit, 'photoDataUrl' | 'photos'> | null | undefined): string[] {
+  if (!unit) return [];
+  const fromList = (unit.photos ?? [])
+    .map((p) => String(p ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  if (fromList.length > 0) return fromList;
+  const cover = String(unit.photoDataUrl ?? '').trim();
+  return cover ? [cover] : [];
 }
 
 export function unitToFormState(unit: Unit): UnitFormState {

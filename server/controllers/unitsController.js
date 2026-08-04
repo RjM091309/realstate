@@ -24,6 +24,28 @@ const UNIT_TYPES = new Set([
   'Penthouse',
 ]);
 const UNIT_STATUSES = new Set(['Available', 'Occupied', 'Maintenance', 'Reserved']);
+const MAX_UNIT_PHOTOS = 5;
+
+function parsePhotosJson(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => normalizePhotoDataUrl(item))
+      .filter(Boolean)
+      .slice(0, MAX_UNIT_PHOTOS);
+  } catch {
+    return [];
+  }
+}
+
+function resolveUnitPhotos(row) {
+  const fromJson = parsePhotosJson(row.photos_json);
+  if (fromJson.length > 0) return fromJson;
+  const cover = row.photo_data ? normalizePhotoDataUrl(row.photo_data) : null;
+  return cover ? [cover] : [];
+}
 
 function rowToUnit(row) {
   let inventory = [];
@@ -35,6 +57,7 @@ function rowToUnit(row) {
       /* ignore malformed inventory_json */
     }
   }
+  const photos = resolveUnitPhotos(row);
   return {
     id: String(row.id),
     unitNumber: String(row.unit_number),
@@ -50,7 +73,8 @@ function rowToUnit(row) {
     bedrooms: row.bedrooms == null ? undefined : Number(row.bedrooms),
     bathrooms: row.bathrooms == null ? undefined : Number(row.bathrooms),
     monthlyRate: Number(row.monthly_rate),
-    photoDataUrl: row.photo_data ? String(row.photo_data) : null,
+    photoDataUrl: photos[0] ?? null,
+    photos,
     moreDetails: row.more_details ? String(row.more_details) : undefined,
     specialRemarks: row.special_remarks ? String(row.special_remarks) : undefined,
     inventory,
@@ -74,6 +98,7 @@ function payloadToUnit(id, parsed) {
     bathrooms: parsed.bathrooms,
     monthlyRate: parsed.monthlyRate,
     photoDataUrl: parsed.photoDataUrl,
+    photos: parsed.photos ?? [],
     moreDetails: parsed.moreDetails,
     specialRemarks: parsed.specialRemarks,
     inventory: parsed.inventory ?? [],
@@ -134,11 +159,29 @@ function validatePayload(body) {
   if (!Number.isFinite(monthlyRate) || monthlyRate < 0) return null;
 
   const photoRaw = body.photoDataUrl;
-  const photoDataUrl = normalizePhotoDataUrl(photoRaw);
+  let photos = [];
+  if (Array.isArray(body.photos)) {
+    photos = body.photos
+      .map((item) => normalizePhotoDataUrl(item))
+      .filter(Boolean)
+      .slice(0, MAX_UNIT_PHOTOS);
+  }
+  if (photos.length === 0) {
+    const single = normalizePhotoDataUrl(photoRaw);
+    if (single) photos = [single];
+  }
   // If client sent a non-empty photo but we could not normalize it, reject payload.
-  if (photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '' && !photoDataUrl) {
+  if (photos.length === 0 && photoRaw !== undefined && photoRaw !== null && String(photoRaw).trim() !== '') {
     return null;
   }
+  if (
+    Array.isArray(body.photos) &&
+    body.photos.some((item) => item != null && String(item).trim() !== '') &&
+    photos.length === 0
+  ) {
+    return null;
+  }
+  const photoDataUrl = photos[0] ?? null;
 
   const inventory = body.inventory;
   if (inventory !== undefined && !Array.isArray(inventory)) return null;
@@ -182,6 +225,7 @@ function validatePayload(body) {
     bathrooms,
     monthlyRate,
     photoDataUrl,
+    photos,
     inventory,
     moreDetails,
     specialRemarks,
@@ -254,6 +298,7 @@ export async function createUnit(req, res) {
       bathrooms: parsed.bathrooms,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
+      photosJson: JSON.stringify(parsed.photos ?? []),
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
       moreDetails: parsed.moreDetails,
       specialRemarks: parsed.specialRemarks,
@@ -306,6 +351,7 @@ export async function updateUnit(req, res) {
       bathrooms: parsed.bathrooms,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
+      photosJson: JSON.stringify(parsed.photos ?? []),
       inventoryJson: JSON.stringify(parsed.inventory ?? []),
       moreDetails: parsed.moreDetails,
       specialRemarks: parsed.specialRemarks,

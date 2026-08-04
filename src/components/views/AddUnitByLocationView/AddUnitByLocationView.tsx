@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
-import { ArrowDown, ArrowUp, ArrowUpDown, Bath, BedDouble, Building2, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Ruler, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Button, modalDismissButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Modal } from '@/components/modal';
 import { LocEmpty, LocPanel, locBoard } from '@/components/location-board/LocationBoard';
 import { CategoryMaintenanceList } from '@/components/file-maintenance/CategoryMaintenanceList';
 import { UnitFormModal } from '@/components/units/UnitFormModal';
+import { UnitDetailsModal } from '@/components/units/UnitDetailsModal';
 import {
   getCoreCategoryName,
   loadFileMaintenanceCategories,
@@ -59,8 +60,8 @@ import {
   type LocationCity,
 } from '@/lib/locationsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
-import { UNIT_FORM_TYPES, formatUnitFloorTowerMeta, formatUnitNumberDisplay, unitToFormState, resolveUnitFloorTower, type UnitFormState } from '@/lib/unitFormUtils';
-import { normalizeLocationLabel, normalizeLocationAliasLabel, stripLocationOrdinalPrefix } from '@/lib/locationNames';
+import { UNIT_FORM_TYPES, formatUnitFloorTowerMeta, formatUnitNumberDisplay, resolveUnitPhotos, unitToFormState, type UnitFormState } from '@/lib/unitFormUtils';
+import { normalizeLocationLabel, normalizeLocationAliasLabel, stripLocationOrdinalPrefix, hasLocationOrdinalPrefix, withLocationOrdinalPrefix } from '@/lib/locationNames';
 import { cn } from '@/lib/utils';
 import type { Unit, UnitStatus } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -156,6 +157,7 @@ function unitToWriteBody(unit: Unit, patch: Partial<UnitWriteBody> = {}): UnitWr
     bathrooms: unit.bathrooms ?? null,
     monthlyRate: Number(unit.monthlyRate) || 0,
     photoDataUrl: unit.photoDataUrl ?? null,
+    photos: unit.photos ?? (unit.photoDataUrl ? [unit.photoDataUrl] : []),
     moreDetails: unit.moreDetails,
     specialRemarks: unit.specialRemarks,
     inventory: unit.inventory ?? [],
@@ -285,6 +287,7 @@ export function AddUnitByLocationView() {
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [addInitial, setAddInitial] = useState<Partial<UnitFormState>>({});
   const [addInitialPhoto, setAddInitialPhoto] = useState<string | null>(null);
+  const [addInitialPhotos, setAddInitialPhotos] = useState<string[]>([]);
   const [detailUnit, setDetailUnit] = useState<Unit | null>(null);
   /** Managed cities from `city` table (source of truth for CITY panel). */
   const [managedCities, setManagedCities] = useState<LocationCity[]>([]);
@@ -356,13 +359,23 @@ export function AddUnitByLocationView() {
 
   const locations = useMemo(() => {
     // CITY panel is driven by DB `city` rows only (with cityId).
-    // Do not merge localStorage/seed names — that recreated "Angeles City" after rename.
+    // Fold ordinal/bare aliases so "1. Clark" and "Clark" never both show.
     const map = new Map<string, { cityId: string; name: string; count: number }>();
 
     for (const city of managedCities) {
       const name = String(city.name ?? '').trim();
       if (!name) continue;
-      map.set(city.cityId, { cityId: city.cityId, name, count: 0 });
+      const key = locationAliasKey(name);
+      if (!key) continue;
+      const prev = map.get(key);
+      if (!prev) {
+        map.set(key, { cityId: city.cityId, name, count: 0 });
+        continue;
+      }
+      // Prefer numbered category label ("1. Clark") over bare ("Clark").
+      if (hasLocationOrdinalPrefix(name) && !hasLocationOrdinalPrefix(prev.name)) {
+        map.set(key, { cityId: city.cityId, name, count: prev.count });
+      }
     }
 
     for (const u of units) {
@@ -375,7 +388,14 @@ export function AddUnitByLocationView() {
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(map.values()).sort((a, b) => {
+      const aNum = a.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
+      const bNum = b.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
+      if (aNum && bNum) return Number(aNum[1]) - Number(bNum[1]);
+      if (aNum) return -1;
+      if (bNum) return 1;
+      return a.name.localeCompare(b.name);
+    });
   }, [units, managedCities]);
 
   const persistExtraLocations = useCallback((next: string[]) => {
@@ -528,7 +548,7 @@ export function AddUnitByLocationView() {
       const clash = managedCities.some(
         (c) =>
           String(c.cityId) !== String(cityIdToEdit) &&
-          c.name.trim().toLowerCase() === name.toLowerCase(),
+          (sameLocation(c.name, name) || c.name.trim().toLowerCase() === name.toLowerCase()),
       );
       if (clash) {
         toast.error(t('views.addUnitByLocation.locationExists'));
@@ -612,8 +632,11 @@ export function AddUnitByLocationView() {
       return;
     }
 
-    // Create: keep the typed name (do not force seed canonical names).
-    const createName = normalizeLocationLabel(name);
+    // Create: CITY category always uses "N. Name".
+    const createName = withLocationOrdinalPrefix(
+      name,
+      managedCities.map((c) => c.name),
+    );
     const exists = managedCities.some(
       (c) =>
         sameLocation(c.name, createName) ||
@@ -1144,6 +1167,7 @@ export function AddUnitByLocationView() {
       setFormMode('create');
       setEditingUnitId(null);
       setAddInitialPhoto(null);
+      setAddInitialPhotos([]);
       setAddInitial({
         area,
         buildingName: building,
@@ -1190,6 +1214,7 @@ export function AddUnitByLocationView() {
         legalAddress: savedVillage || building,
       });
       setAddInitialPhoto(unit.photoDataUrl ?? null);
+      setAddInitialPhotos(resolveUnitPhotos(unit));
       setDetailUnit(null);
       setAddOpen(true);
     },
@@ -1934,6 +1959,7 @@ export function AddUnitByLocationView() {
         mode={formMode}
         initialValues={addInitial}
         initialPhoto={addInitialPhoto}
+        initialPhotos={addInitialPhotos}
         contextArea={selectedLocation}
         contextBuilding={selectedBuilding}
         extraAreaOptions={cityAreaOptions}
@@ -1942,217 +1968,18 @@ export function AddUnitByLocationView() {
         onSubmit={handleSaveUnit}
       />
 
-      <Modal
+      <UnitDetailsModal
+        unit={detailUnit}
         isOpen={Boolean(detailUnit)}
         onClose={() => setDetailUnit(null)}
-        title={
-          detailUnit
-            ? t('views.units.unitLabel', { unitNumber: formatUnitNumberDisplay(detailUnit) })
-            : t('views.units.table.viewDetails')
-        }
-        maxWidth="lg"
-        footer={
-          <div className="flex w-full justify-end">
-            <Button
-              type="button"
-              className={modalDismissButtonClass}
-              onClick={() => setDetailUnit(null)}
-            >
-              {t('views.units.details.close')}
-            </Button>
-          </div>
-        }
-      >
-        {detailUnit ? (
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[16/9] dark:border-slate-700 dark:bg-slate-900/40">
-              {detailUnit.photoDataUrl ? (
-                <img
-                  src={detailUnit.photoDataUrl}
-                  alt={detailUnit.unitNumber}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-slate-300">
-                  <Building2 className="h-12 w-12" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                  detailUnit.status === 'Available' && 'bg-emerald-500 text-white',
-                  detailUnit.status === 'Occupied' && 'bg-brand-blue text-white',
-                  detailUnit.status === 'Maintenance' && 'bg-rose-500 text-white',
-                  detailUnit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
-                )}
-              >
-                {detailUnit.status === 'Available'
-                  ? t('views.units.statuses.available')
-                  : detailUnit.status === 'Occupied'
-                    ? t('views.units.statuses.occupied')
-                    : detailUnit.status === 'Maintenance'
-                      ? t('views.units.statuses.maintenance')
-                      : t('views.units.statuses.reserved')}
-              </Badge>
-              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {detailUnit.type}
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              {(() => {
-                const villageName =
-                  [detailUnit.legalAddress, detailUnit.commonAddress]
-                    .map((v) => String(v ?? '').trim())
-                    .find((v) => v && v !== '—' && v !== '-') || '';
-                const cityLabel = stripLocationOrdinalPrefix(
-                  selectedLocation && selectedLocation !== '—'
-                    ? selectedLocation
-                    : detailUnit.area || '',
-                );
-                const brgyLabel =
-                  selectedBuilding && selectedBuilding !== '—'
-                    ? stripLocationOrdinalPrefix(selectedBuilding)
-                    : detailUnit.buildingName &&
-                        detailUnit.buildingName !== '—' &&
-                        detailUnit.buildingName !== '-'
-                      ? stripLocationOrdinalPrefix(detailUnit.buildingName)
-                      : '';
-                const floorTower = resolveUnitFloorTower(detailUnit);
-                const detailField = (label: string, value: React.ReactNode, fullWidth?: boolean) => (
-                  <div className={fullWidth ? 'sm:col-span-2' : undefined}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {label}
-                    </p>
-                    <div className="mt-1 whitespace-normal break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {value}
-                    </div>
-                  </div>
-                );
-                return (
-                  <>
-                    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                      {detailField(
-                        t('views.units.addModal.unitNumber'),
-                        villageName || '—',
-                        true,
-                      )}
-                      {detailField(
-                        t('views.units.addModal.unitName'),
-                        formatUnitNumberDisplay(detailUnit) || '—',
-                      )}
-                      {detailField(
-                        t('views.units.addModal.categoryType'),
-                        detailUnit.type || '—',
-                      )}
-                      {detailField(
-                        panelLocation,
-                        <span className="uppercase">{cityLabel || '—'}</span>,
-                      )}
-                      {detailField(
-                        panelBuilding,
-                        <span className="uppercase">{brgyLabel || '—'}</span>,
-                      )}
-                      {detailField(
-                        t('views.units.addModal.floor'),
-                        floorTower.floor || '—',
-                      )}
-                      {detailField(
-                        t('views.units.addModal.tower'),
-                        floorTower.tower || '—',
-                      )}
-                      {detailField(
-                        t('views.units.table.monthlyRate'),
-                        <span className="font-bold tabular-nums">
-                          ₱{Number(detailUnit.monthlyRate).toLocaleString()}
-                        </span>,
-                      )}
-                      {detailField(
-                        t('views.units.addModal.status'),
-                        detailUnit.status === 'Available'
-                          ? t('views.units.statuses.available')
-                          : detailUnit.status === 'Occupied'
-                            ? t('views.units.statuses.occupied')
-                            : detailUnit.status === 'Maintenance'
-                              ? t('views.units.statuses.maintenance')
-                              : t('views.units.statuses.reserved'),
-                      )}
-                      <div className="sm:col-span-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {t('views.units.addModal.layoutMetrics')}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          <span
-                            className="inline-flex items-center gap-1.5"
-                            title={t('views.units.addModal.sqm')}
-                          >
-                            <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">
-                              {detailUnit.areaSqm != null ? detailUnit.areaSqm : '—'}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.sqm')}
-                            </span>
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5"
-                            title={t('views.units.addModal.bedrooms')}
-                          >
-                            <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">
-                              {detailUnit.bedrooms != null ? detailUnit.bedrooms : '—'}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.bedrooms')}
-                            </span>
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5"
-                            title={t('views.units.addModal.bathrooms')}
-                          >
-                            <Bath className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">
-                              {detailUnit.bathrooms != null ? detailUnit.bathrooms : '—'}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.bathrooms')}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {t('views.units.addModal.specialRemarks')}
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-                        {detailUnit.specialRemarks?.trim()
-                          ? detailUnit.specialRemarks
-                          : t('views.units.details.noRemarks')}
-                      </p>
-                    </div>
-
-                    {detailUnit.moreDetails?.trim() ? (
-                      <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {t('views.units.addModal.moreDetails')}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-                          {detailUnit.moreDetails}
-                        </p>
-                      </div>
-                    ) : null}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        canEdit={canUpdate}
+        onEdit={(unit) => {
+          setDetailUnit(null);
+          openEdit(unit);
+        }}
+        cityLabel={selectedLocation}
+        buildingLabel={selectedBuilding}
+      />
     </div>
   );
 }

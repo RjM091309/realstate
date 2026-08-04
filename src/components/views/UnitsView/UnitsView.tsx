@@ -1,13 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import {
   Search,
   Plus,
-  MoreVertical,
   Building2,
-  MapPin,
   LayoutGrid,
   List as ListIcon,
   Loader2,
@@ -22,39 +20,40 @@ import {
   CircleDollarSign,
   Home,
   Check,
-  Ruler,
-  ChevronDown,
+  Package,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button, modalActionButtonClass, modalDismissButtonClass, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
+import { Button, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { DataTable, type ColumnDef, meritCellAccentClass, meritCellPrimaryClass, meritCellMetaClass, meritStatusPillClass } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
 import { SkeletonTable } from '@/components/skeleton';
+import { UnitFormModal } from '@/components/units/UnitFormModal';
+import { UnitDetailsModal } from '@/components/units/UnitDetailsModal';
+import { locBoard } from '@/components/location-board/LocationBoard';
 import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
+<<<<<<< Updated upstream
 import { fetchBrgys, fetchCities, type LocationBrgy, type LocationCity } from '@/lib/locationsApi';
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 import { toWebpDataUrl } from '@/lib/imageWebp';
 import { UNIT_FORM_TYPES, resolveUnitFloorTower } from '@/lib/unitFormUtils';
+=======
+import { resolveUnitFloorTower, resolveUnitPhotos, unitDisplayMetrics, unitToFormState, type UnitFormState } from '@/lib/unitFormUtils';
+import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
+>>>>>>> Stashed changes
 import { cn } from '@/lib/utils';
-import type { Contract, InventoryItem, Tenant, Unit, UnitStatus, UnitType } from '@/types';
+import type { Contract, InventoryItem, Tenant, Unit } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
+<<<<<<< Updated upstream
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 
 /** Same as Add Unit by Location: city = `area`, barangay = `buildingName`. */
@@ -125,6 +124,8 @@ function normalizeFloorForForm(rawFloor: string): string {
   return floor;
 }
 
+=======
+>>>>>>> Stashed changes
 function normalizeAreaForForm(rawArea: string): string {
   const area = String(rawArea ?? '').trim();
   if (!area) return '';
@@ -135,73 +136,7 @@ function normalizeAreaForForm(rawArea: string): string {
 }
 
 function areaDisplayLabel(rawArea: string): string {
-  return normalizeAreaForForm(rawArea) || '—';
-}
-
-function isPlaceholderField(value: string | undefined | null): boolean {
-  const v = String(value ?? '').trim();
-  return !v || v === '—' || v === '-';
-}
-
-function resolveUnitAddressBase(unit: Pick<Unit, 'legalAddress' | 'commonAddress' | 'buildingName'>): string {
-  for (const candidate of [unit.legalAddress, unit.commonAddress, unit.buildingName]) {
-    const value = String(candidate ?? '').trim();
-    if (!isPlaceholderField(value)) return value;
-  }
-  return '';
-}
-
-function deriveBuildingName(addressOrBuilding: string, fallbackBuilding = ''): string {
-  const raw = String(addressOrBuilding ?? '').trim();
-  const fallback = String(fallbackBuilding ?? '').trim();
-  if (!raw) return fallback;
-
-  // Prefer the first segment as the "building name" (keeps title/subtitle concise).
-  // Handles: "Building, Street, City" | "Building · Wing" | "Building - Wing"
-  const first = raw
-    .split(/[,\u00B7-]/)
-    .map((s) => s.trim())
-    .filter(Boolean)[0];
-
-  return first || fallback || raw;
-}
-
-function formToWriteBody(
-  form: AddUnitForm,
-  inventory: Unit['inventory'],
-  photoDataUrl: string | null,
-): UnitWriteBody {
-  const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
-  const legalAddress = form.legalAddress.trim();
-  const commonAddress = legalAddress || form.buildingName.trim();
-  const buildingName = deriveBuildingName(commonAddress, form.buildingName) || '—';
-  return {
-    unitNumber: form.unitNumber.trim(),
-    floor: form.floor.trim() || '—',
-    tower: form.tower.trim() || '—',
-    buildingName: buildingName.trim() || '—',
-    commonAddress: commonAddress || buildingName || '—',
-    legalAddress: legalAddress || commonAddress || buildingName || '—',
-    type: form.type,
-    status: form.status,
-    area: form.area.trim() || '—',
-    areaSqm: parseMetricInput(form.areaSqm),
-    bedrooms: parseMetricInput(form.bedrooms),
-    bathrooms: parseMetricInput(form.bathrooms),
-    monthlyRate: rate,
-    photoDataUrl,
-    moreDetails: form.moreDetails.trim() || undefined,
-    specialRemarks: form.specialRemarks.trim() || undefined,
-    inventory,
-  };
-}
-
-function parseMetricInput(raw: string): number | null {
-  const value = String(raw ?? '').trim();
-  if (!value) return null;
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return n;
+  return stripLocationOrdinalPrefix(normalizeAreaForForm(rawArea)) || '—';
 }
 
 async function notifyUnitSaveSuccess(title: string, detail: string) {
@@ -226,26 +161,6 @@ async function notifyUnitSaveError(title: string, message: string, confirmLabel:
   });
 }
 
-function unitToForm(u: Unit): AddUnitForm {
-  const metrics = unitDisplayMetrics(u.type);
-  return {
-    unitNumber: u.unitNumber,
-    floor: normalizeFloorForForm(u.floor),
-    tower: u.tower === '—' ? '' : u.tower,
-    buildingName: u.buildingName,
-    legalAddress: resolveUnitAddressBase(u),
-    type: u.type,
-    status: u.status,
-    area: normalizeAreaForForm(u.area),
-    areaSqm: String(u.areaSqm ?? metrics.sqm),
-    bedrooms: String(u.bedrooms ?? metrics.beds),
-    bathrooms: String(u.bathrooms ?? metrics.baths),
-    monthlyRate: String(u.monthlyRate),
-    moreDetails: u.moreDetails ?? '',
-    specialRemarks: u.specialRemarks ?? '',
-  };
-}
-
 function newInventoryItemId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -258,26 +173,6 @@ function normalizeInventoryDraft(items: InventoryItem[] | undefined | null): Inv
     quantity: Number.isFinite(Number(it.quantity)) && Number(it.quantity) >= 1 ? Math.floor(Number(it.quantity)) : 1,
     condition: (['New', 'Good', 'Fair', 'Poor'].includes(it.condition) ? it.condition : 'Good') as InventoryItem['condition'],
   }));
-}
-
-/** Typical layout metrics by unit type (listing cards — not stored on `Unit`). */
-function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths: number } {
-  const map: Record<UnitType, { sqm: number; beds: number; baths: number }> = {
-    'House and Lot': { sqm: 120, beds: 3, baths: 2 },
-    Condominium: { sqm: 45, beds: 1, baths: 1 },
-    Apartment: { sqm: 45, beds: 1, baths: 1 },
-    'Commercial Building': { sqm: 200, beds: 0, baths: 2 },
-    Warehouse: { sqm: 500, beds: 0, baths: 1 },
-    Hotel: { sqm: 30, beds: 1, baths: 1 },
-    'Office Space': { sqm: 120, beds: 0, baths: 2 },
-    Studio: { sqm: 32, beds: 1, baths: 1 },
-    '1BR': { sqm: 45, beds: 1, baths: 1 },
-    '2BR': { sqm: 72, beds: 2, baths: 2 },
-    '3BR': { sqm: 105, beds: 3, baths: 2 },
-    Loft: { sqm: 58, beds: 1, baths: 1 },
-    Penthouse: { sqm: 165, beds: 3, baths: 3 },
-  };
-  return map[type];
 }
 
 /** Resolve a unit's layout metrics: prefer stored values, fall back to type defaults. */
@@ -382,43 +277,38 @@ function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
     type: u.type,
     status: u.status,
     area: u.area,
+    areaSqm: u.areaSqm ?? null,
+    bedrooms: u.bedrooms ?? null,
+    bathrooms: u.bathrooms ?? null,
     monthlyRate: u.monthlyRate,
     photoDataUrl: u.photoDataUrl ?? null,
+    photos: u.photos ?? (u.photoDataUrl ? [u.photoDataUrl] : []),
+    moreDetails: u.moreDetails,
+    specialRemarks: u.specialRemarks,
     inventory,
   };
 }
 
-function formToUnit(
-  id: string,
-  form: AddUnitForm,
-  inventory: Unit['inventory'],
-  photoDataUrl: string | null,
-): Unit {
-  const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
-  const legalAddress = form.legalAddress.trim();
-  const commonAddress = legalAddress || form.buildingName.trim();
-  const buildingName = deriveBuildingName(commonAddress, form.buildingName) || '—';
-  const areaSqm = parseMetricInput(form.areaSqm);
-  const bedrooms = parseMetricInput(form.bedrooms);
-  const bathrooms = parseMetricInput(form.bathrooms);
+function writeBodyToUnit(id: string, body: UnitWriteBody, inventory: Unit['inventory']): Unit {
   return {
     id,
-    unitNumber: form.unitNumber.trim(),
-    floor: form.floor.trim() || '—',
-    tower: form.tower.trim() || '—',
-    buildingName: buildingName.trim() || '—',
-    commonAddress: commonAddress || buildingName || '—',
-    legalAddress: legalAddress || commonAddress || buildingName || '—',
-    type: form.type,
-    status: form.status,
-    area: form.area.trim() || '—',
-    areaSqm: areaSqm ?? undefined,
-    bedrooms: bedrooms ?? undefined,
-    bathrooms: bathrooms ?? undefined,
-    monthlyRate: Number.isFinite(rate) ? rate : 0,
-    photoDataUrl,
-    moreDetails: form.moreDetails.trim() || undefined,
-    specialRemarks: form.specialRemarks.trim() || undefined,
+    unitNumber: body.unitNumber,
+    floor: body.floor || '—',
+    tower: body.tower || '—',
+    buildingName: body.buildingName || '—',
+    commonAddress: body.commonAddress || body.buildingName || '—',
+    legalAddress: body.legalAddress || body.commonAddress || body.buildingName || '—',
+    type: body.type,
+    status: body.status,
+    area: body.area || '—',
+    areaSqm: body.areaSqm ?? undefined,
+    bedrooms: body.bedrooms ?? undefined,
+    bathrooms: body.bathrooms ?? undefined,
+    monthlyRate: Number(body.monthlyRate) || 0,
+    photoDataUrl: body.photoDataUrl ?? null,
+    photos: body.photos ?? (body.photoDataUrl ? [body.photoDataUrl] : []),
+    moreDetails: body.moreDetails,
+    specialRemarks: body.specialRemarks,
     inventory,
   };
 }
@@ -426,7 +316,6 @@ function formToUnit(
 export function UnitsView() {
   const { t } = useTranslation();
   const { session } = useAuth();
-  const canCreate = session?.crud?.units?.create ?? false;
   const canUpdate = session?.crud?.units?.update ?? false;
   const canDelete = session?.crud?.units?.delete ?? false;
 
@@ -445,12 +334,10 @@ export function UnitsView() {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [addForm, setAddForm] = useState<AddUnitForm>(defaultAddForm);
-  const addUnitPhotoInputRef = useRef<HTMLInputElement | null>(null);
-  const [addUnitPhotoPreview, setAddUnitPhotoPreview] = useState('');
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
-  const [photoPreviewTitle, setPhotoPreviewTitle] = useState('');
+  const [addInitial, setAddInitial] = useState<Partial<UnitFormState> | undefined>();
+  const [addInitialPhoto, setAddInitialPhoto] = useState<string | null>(null);
+  const [addInitialPhotos, setAddInitialPhotos] = useState<string[]>([]);
+  const [unitSaving, setUnitSaving] = useState(false);
   /** When false, the list is mock/offline data — persist edits only in memory (API IDs are not in the database). */
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
   const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
@@ -512,7 +399,14 @@ export function UnitsView() {
     };
   }, []);
 
-  const unitRemarksDisplay = selectedUnit?.specialRemarks?.trim() || null;
+  const selectedActiveContract = useMemo(
+    () => (selectedUnit ? activeContractForUnit(selectedUnit.id, branchContracts) : null),
+    [selectedUnit, branchContracts],
+  );
+  const selectedCurrentTenant = useMemo(() => {
+    if (!selectedActiveContract) return null;
+    return tenantsList.find((x) => x.id === selectedActiveContract.tenantId) ?? null;
+  }, [selectedActiveContract, tenantsList]);
 
   useEffect(() => {
     if ((!isDetailsOpen && !isManageInventoryOpen) || !selectedUnit) return;
@@ -794,27 +688,14 @@ export function UnitsView() {
     [processedUnits],
   );
 
-  const openAddUnitModal = useCallback(() => {
-    setIsDetailsOpen(false);
-    setIsManageInventoryOpen(false);
-    setFormMode('create');
-    setEditingId(null);
-    setAddUnitPhotoPreview('');
-    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
-    setAddForm(defaultAddForm());
-    setShowMoreDetails(false);
-    setIsAddUnitOpen(true);
-  }, []);
-
   const openEditUnitModal = useCallback((unit: Unit) => {
     setIsDetailsOpen(false);
     setIsManageInventoryOpen(false);
     setFormMode('edit');
     setEditingId(unit.id);
-    setAddForm(unitToForm(unit));
-    setAddUnitPhotoPreview(unit.photoDataUrl ?? '');
-    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
-    setShowMoreDetails(false);
+    setAddInitial(unitToFormState(unit));
+    setAddInitialPhoto(unit.photoDataUrl ?? null);
+    setAddInitialPhotos(resolveUnitPhotos(unit));
     setIsAddUnitOpen(true);
   }, []);
 
@@ -822,67 +703,48 @@ export function UnitsView() {
     setIsAddUnitOpen(false);
     setFormMode('create');
     setEditingId(null);
-    setAddForm(defaultAddForm());
-    setAddUnitPhotoPreview('');
-    setShowMoreDetails(false);
-    if (addUnitPhotoInputRef.current) addUnitPhotoInputRef.current.value = '';
+    setAddInitial(undefined);
+    setAddInitialPhoto(null);
+    setAddInitialPhotos([]);
   }, []);
 
-  const openAddUnitPhotoPicker = useCallback(() => {
-    addUnitPhotoInputRef.current?.click();
-  }, []);
+  const handleSaveUnit = useCallback(
+    async (body: UnitWriteBody) => {
+      const existingInventory =
+        formMode === 'edit' && editingId
+          ? (unitList.find((u) => u.id === editingId)?.inventory ?? [])
+          : [];
+      const patched: UnitWriteBody = { ...body, inventory: existingInventory };
 
-  const handleAddUnitPhotoChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      setUnitSaving(true);
       try {
-        const dataUrl = await toWebpDataUrl(file);
-        setAddUnitPhotoPreview(dataUrl);
-      } catch {
-        toast.error(t('views.units.addModal.validationPhotoWebp'));
-      }
-      e.target.value = '';
-    },
-    [t],
-  );
+        if (!unitsBackedByApi) {
+          if (formMode === 'edit' && editingId) {
+            const updated = writeBodyToUnit(editingId, patched, existingInventory);
+            setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
+            setSelectedUnit(updated);
+            closeAddUnitModal();
+            await notifyUnitSaveSuccess(
+              t('views.units.updated'),
+              t('views.units.saveSuccessEditDetail'),
+            );
+            setIsDetailsOpen(true);
+            setIsManageInventoryOpen(false);
+          } else {
+            const newId = `local-${Date.now()}`;
+            const created = writeBodyToUnit(newId, patched, []);
+            setUnitList((prev) => [created, ...prev]);
+            closeAddUnitModal();
+            await notifyUnitSaveSuccess(
+              t('views.units.addModal.saved'),
+              t('views.units.saveSuccessAddDetail'),
+            );
+          }
+          return;
+        }
 
-  const openPhotoPreview = useCallback(
-    (photoUrl: string | null | undefined, title?: string) => {
-      const url = String(photoUrl ?? '').trim();
-      if (!url) return;
-      setPhotoPreviewTitle(title ?? t('views.units.addModal.photo'));
-      setPhotoPreviewUrl(url);
-    },
-    [t],
-  );
-
-  const closePhotoPreview = useCallback(() => {
-    setPhotoPreviewUrl('');
-    setPhotoPreviewTitle('');
-  }, []);
-
-  const handleSaveUnit = useCallback(async () => {
-    const rate = Number(String(addForm.monthlyRate).replace(/,/g, ''));
-    if (!addForm.unitNumber.trim()) {
-      toast.error(t('views.units.addModal.validationRequired'));
-      return;
-    }
-    if (!Number.isFinite(rate) || rate < 0) {
-      toast.error(t('views.units.addModal.validationRate'));
-      return;
-    }
-    const existingInventory =
-      formMode === 'edit' && editingId
-        ? (unitList.find((u) => u.id === editingId)?.inventory ?? [])
-        : [];
-
-    const photoDataUrl = addUnitPhotoPreview || null;
-
-    if (!unitsBackedByApi) {
-      try {
         if (formMode === 'edit' && editingId) {
-          const updated = formToUnit(editingId, addForm, existingInventory, photoDataUrl);
+          const updated = await updateUnit(editingId, patched);
           setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
           setSelectedUnit(updated);
           closeAddUnitModal();
@@ -893,8 +755,7 @@ export function UnitsView() {
           setIsDetailsOpen(true);
           setIsManageInventoryOpen(false);
         } else {
-          const newId = `local-${Date.now()}`;
-          const created = formToUnit(newId, addForm, [], photoDataUrl);
+          const created = await createUnit(patched);
           setUnitList((prev) => [created, ...prev]);
           closeAddUnitModal();
           await notifyUnitSaveSuccess(
@@ -908,49 +769,12 @@ export function UnitsView() {
           e instanceof Error ? e.message : 'Error',
           t('common.close'),
         );
+      } finally {
+        setUnitSaving(false);
       }
-      return;
-    }
-
-    const body = formToWriteBody(addForm, existingInventory, photoDataUrl);
-    try {
-      if (formMode === 'edit' && editingId) {
-        const updated = await updateUnit(editingId, body);
-        setUnitList((prev) => prev.map((u) => (u.id === editingId ? updated : u)));
-        setSelectedUnit(updated);
-        closeAddUnitModal();
-        await notifyUnitSaveSuccess(
-          t('views.units.updated'),
-          t('views.units.saveSuccessEditDetail'),
-        );
-        setIsDetailsOpen(true);
-        setIsManageInventoryOpen(false);
-      } else {
-        const created = await createUnit(body);
-        setUnitList((prev) => [created, ...prev]);
-        closeAddUnitModal();
-        await notifyUnitSaveSuccess(
-          t('views.units.addModal.saved'),
-          t('views.units.saveSuccessAddDetail'),
-        );
-      }
-    } catch (e) {
-      await notifyUnitSaveError(
-        t('views.units.saveErrorTitle'),
-        e instanceof Error ? e.message : 'Error',
-        t('common.close'),
-      );
-    }
-  }, [
-    addForm,
-    addUnitPhotoPreview,
-    closeAddUnitModal,
-    editingId,
-    formMode,
-    t,
-    unitList,
-    unitsBackedByApi,
-  ]);
+    },
+    [closeAddUnitModal, editingId, formMode, t, unitList, unitsBackedByApi],
+  );
 
   const handleDeleteUnit = useCallback(
     async (unit: Unit) => {
@@ -982,25 +806,6 @@ export function UnitsView() {
     [t, unitsBackedByApi, selectedUnit],
   );
 
-  const addTypeOptions = useMemo(
-    () => UNIT_FORM_TYPES.map((ut) => ({ value: ut, label: ut })),
-    [],
-  );
-
-  const addStatusOptions = useMemo(
-    () => UNIT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
-    [statusLabel],
-  );
-
-  const addFloorOptions = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => {
-        const floor = `${ordinalFloor(i + 1)} Floor`;
-        return { value: floor, label: floor };
-      }),
-    [],
-  );
-
   const columns: ColumnDef<Unit>[] = useMemo(
     () => [
       {
@@ -1008,31 +813,73 @@ export function UnitsView() {
         render: (unit) => <span className={meritCellAccentClass}>{unit.unitNumber}</span>,
       },
       {
-        header: t('views.units.table.building'),
-        render: (unit) => (
-          <div className="flex flex-col">
-            <span className={meritCellPrimaryClass}>{unit.buildingName}</span>
-            <span className={meritCellMetaClass}>
-              {unit.tower},{' '}
-              {/\bfloor\b/i.test(String(unit.floor ?? ''))
-                ? unit.floor
-                : `${t('views.units.table.floor')} ${unit.floor}`}
-            </span>
-          </div>
-        ),
-      },
-      {
         header: t('views.units.table.area'),
-        render: (unit) => (
-          <div className="flex items-center gap-1 text-xs font-bold uppercase tracking-tight text-slate-600">
-            <MapPin className="w-3 h-3" />
-            {areaDisplayLabel(unit.area)}
-          </div>
-        ),
+        render: (unit) => {
+          const villageName = stripLocationOrdinalPrefix(
+            [unit.legalAddress, unit.commonAddress]
+              .map((v) => String(v ?? '').trim())
+              .find((v) => v && v !== '—' && v !== '-') || '',
+          );
+          const brgyLabel = stripLocationOrdinalPrefix(
+            unit.buildingName && unit.buildingName !== '—' && unit.buildingName !== '-'
+              ? unit.buildingName
+              : '',
+          );
+          const cityLabel = areaDisplayLabel(unit.area);
+          const floorTower = resolveUnitFloorTower(unit);
+          const floorMeta = [floorTower.floor, floorTower.tower].filter(Boolean).join(' · ');
+          const primary = villageName || brgyLabel || (cityLabel !== '—' ? cityLabel : '') || '—';
+          const primaryLower = primary.toLowerCase();
+          const includesPart = (part: string) =>
+            Boolean(part) && part !== '—' && primaryLower.includes(part.toLowerCase());
+          const secondary = [
+            brgyLabel && villageName && !includesPart(brgyLabel) ? brgyLabel : null,
+            cityLabel && cityLabel !== '—' && !includesPart(cityLabel) ? cityLabel : null,
+            floorMeta || null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          return (
+            <div className="min-w-0 max-w-[16rem] space-y-0.5">
+              <p className={cn(meritCellPrimaryClass, 'whitespace-normal break-words leading-snug')}>
+                {primary}
+              </p>
+              {secondary ? (
+                <p className={cn(meritCellMetaClass, 'whitespace-normal break-words leading-snug')}>
+                  {secondary}
+                </p>
+              ) : null}
+            </div>
+          );
+        },
       },
       {
         header: t('views.units.table.type'),
-        render: (unit) => <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest">{unit.type}</Badge>,
+        render: (unit) => (
+          <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest">
+            {unit.type}
+          </Badge>
+        ),
+      },
+      {
+        header: t('views.units.table.sqm'),
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
+        render: (unit) => {
+          const metrics = resolveUnitMetrics(unit);
+          return <span className="text-sm font-semibold tabular-nums text-slate-700">{metrics.sqm}</span>;
+        },
+      },
+      {
+        header: t('views.units.table.bedrooms'),
+        className: 'text-center',
+        headerClassName: 'text-center',
+        cellClassName: 'text-center',
+        render: (unit) => {
+          const metrics = resolveUnitMetrics(unit);
+          return <span className="text-sm font-semibold tabular-nums text-slate-700">{metrics.beds}</span>;
+        },
       },
       {
         header: t('views.units.table.status'),
@@ -1058,7 +905,14 @@ export function UnitsView() {
       },
       {
         header: t('views.units.table.monthlyRate'),
-        render: (unit) => <span className="text-sm font-black tabular-nums text-slate-800">₱{unit.monthlyRate.toLocaleString()}</span>,
+        className: 'text-right',
+        headerClassName: 'text-right',
+        cellClassName: 'text-right',
+        render: (unit) => (
+          <span className="text-sm font-black tabular-nums text-slate-800">
+            ₱{unit.monthlyRate.toLocaleString()}
+          </span>
+        ),
       },
       {
         header: t('views.units.table.actions'),
@@ -1067,64 +921,47 @@ export function UnitsView() {
         cellClassName: 'text-right',
         render: (unit) => (
           <div
-            className="inline-flex justify-end"
+            className="inline-flex items-center justify-end gap-0.5"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title={t('views.units.table.moreOptions')}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                }
+            <button
+              type="button"
+              className={locBoard.editBtn}
+              title={t('views.units.table.viewDetails')}
+              onClick={() => handleViewDetails(unit)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </button>
+            {canUpdate ? (
+              <button
+                type="button"
+                className={locBoard.editBtn}
+                title={t('views.units.table.editUnit')}
+                onClick={() => openEditUnitModal(unit)}
               >
-                <MoreVertical className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleViewDetails(unit);
-                  }}
-                >
-                  {t('views.units.table.viewDetails')}
-                </DropdownMenuItem>
-                {canUpdate && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditUnitModal(unit);
-                    }}
-                  >
-                    {t('views.units.table.editUnit')}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleManageInventory(unit);
-                  }}
-                >
-                  {t('views.units.table.manageInventory')}
-                </DropdownMenuItem>
-                {canDelete && (
-                  <DropdownMenuItem
-                    className="text-rose-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteUnit(unit);
-                    }}
-                  >
-                    {t('views.units.table.delete')}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={locBoard.editBtn}
+              title={t('views.units.table.manageInventory')}
+              onClick={() => handleManageInventory(unit)}
+            >
+              <Package className="h-3.5 w-3.5" />
+            </button>
+            {canDelete ? (
+              <button
+                type="button"
+                className={locBoard.deleteBtn}
+                title={t('views.units.table.delete')}
+                onClick={() => void handleDeleteUnit(unit)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
         ),
       },
@@ -1176,16 +1013,6 @@ export function UnitsView() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            {canCreate && (
-              <Button
-                type="button"
-                className="h-10 shrink-0 rounded-xl bg-brand-blue shadow-sm hover:bg-[#3d7ab8]"
-                onClick={openAddUnitModal}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('views.units.addUnit')}
-              </Button>
-            )}
           </div>
           <div className="flex rounded-xl bg-white p-0.5 shadow-sm dark:bg-slate-900/90 dark:shadow-none">
             <Button
@@ -1221,7 +1048,7 @@ export function UnitsView() {
       {unitsLoading ? (
         viewMode === 'list' ? (
           <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
-            <SkeletonTable rows={8} columns={7} />
+            <SkeletonTable rows={8} columns={8} />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1555,189 +1382,15 @@ export function UnitsView() {
 
 
 
-      <Modal
+      <UnitDetailsModal
+        unit={selectedUnit}
         isOpen={isDetailsOpen && !isAddUnitOpen}
         onClose={() => setIsDetailsOpen(false)}
-        title={
-          selectedUnit
-            ? t('views.units.unitLabel', { unitNumber: selectedUnit.unitNumber })
-            : t('views.units.table.viewDetails')
-        }
-        maxWidth="lg"
-        footer={
-          <div className="flex flex-wrap items-center justify-end gap-2 w-full">
-            <Button
-              type="button"
-              className={modalDismissButtonClass}
-              onClick={() => setIsDetailsOpen(false)}
-            >
-              {t('views.units.details.close')}
-            </Button>
-            {canUpdate && selectedUnit ? (
-              <Button
-                type="button"
-                className={modalActionButtonClass}
-                onClick={() => openEditUnitModal(selectedUnit)}
-              >
-                {t('views.units.details.editUnitInfo')}
-              </Button>
-            ) : null}
-          </div>
-        }
-        variant="default"
-      >
-        {selectedUnit ? (
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[16/9] dark:border-slate-700 dark:bg-slate-900/40">
-              {selectedUnit.photoDataUrl ? (
-                <img
-                  src={selectedUnit.photoDataUrl}
-                  alt={selectedUnit.unitNumber}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-slate-300">
-                  <Building2 className="h-12 w-12" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                  selectedUnit.status === 'Available' && 'bg-emerald-500 text-white',
-                  selectedUnit.status === 'Occupied' && 'bg-brand-blue text-white',
-                  selectedUnit.status === 'Maintenance' && 'bg-rose-500 text-white',
-                  selectedUnit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
-                )}
-              >
-                {statusLabel(selectedUnit.status)}
-              </Badge>
-              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {selectedUnit.type}
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              {(() => {
-                const villageName =
-                  [selectedUnit.legalAddress, selectedUnit.commonAddress]
-                    .map((v) => String(v ?? '').trim())
-                    .find((v) => v && v !== '—' && v !== '-') || '';
-                const floorTower = resolveUnitFloorTower(selectedUnit);
-                const detailField = (label: string, value: React.ReactNode, fullWidth?: boolean) => (
-                  <div className={fullWidth ? 'sm:col-span-2' : undefined}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {label}
-                    </p>
-                    <div className="mt-1 whitespace-normal break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {value}
-                    </div>
-                  </div>
-                );
-                const metrics = resolveUnitMetrics(selectedUnit);
-                return (
-                  <>
-                    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                      {detailField(
-                        t('views.units.addModal.unitNumber'),
-                        villageName || '—',
-                        true,
-                      )}
-                      {detailField(
-                        t('views.units.addModal.unitName'),
-                        selectedUnit.unitNumber || '—',
-                      )}
-                      {detailField(
-                        t('views.units.addModal.categoryType'),
-                        selectedUnit.type || '—',
-                      )}
-                      {detailField(
-                        t('views.addUnitByLocation.panels.location'),
-                        <span className="uppercase">{areaDisplayLabel(selectedUnit.area)}</span>,
-                      )}
-                      {detailField(
-                        t('views.addUnitByLocation.panels.building'),
-                        <span className="uppercase">{selectedUnit.buildingName || '—'}</span>,
-                      )}
-                      {detailField(
-                        t('views.units.addModal.floor'),
-                        floorTower.floor || '—',
-                      )}
-                      {detailField(
-                        t('views.units.addModal.tower'),
-                        floorTower.tower || '—',
-                      )}
-                      {detailField(
-                        t('views.units.table.monthlyRate'),
-                        <span className="font-bold tabular-nums">
-                          ₱{Number(selectedUnit.monthlyRate).toLocaleString()}
-                        </span>,
-                      )}
-                      {detailField(t('views.units.addModal.status'), statusLabel(selectedUnit.status))}
-                      <div className="sm:col-span-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {t('views.units.addModal.layoutMetrics')}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          <span className="inline-flex items-center gap-1.5" title={t('views.units.card.sqm')}>
-                            <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">{metrics.sqm}</span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.sqm')}
-                            </span>
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5"
-                            title={t('views.units.addModal.bedrooms')}
-                          >
-                            <BedDouble className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">{metrics.beds}</span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.bedrooms')}
-                            </span>
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5"
-                            title={t('views.units.addModal.bathrooms')}
-                          >
-                            <Bath className="h-4 w-4 text-slate-500" aria-hidden />
-                            <span className="tabular-nums">{metrics.baths}</span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {t('views.units.addModal.bathrooms')}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {t('views.units.addModal.specialRemarks')}
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-                        {unitRemarksDisplay || t('views.units.details.noRemarks')}
-                      </p>
-                    </div>
-
-                    {selectedUnit.moreDetails?.trim() ? (
-                      <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {t('views.units.addModal.moreDetails')}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-                          {selectedUnit.moreDetails}
-                        </p>
-                      </div>
-                    ) : null}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        canEdit={canUpdate}
+        onEdit={openEditUnitModal}
+        activeContract={selectedActiveContract}
+        currentTenant={selectedCurrentTenant}
+      />
 
       <Modal
         isOpen={Boolean(isManageInventoryOpen && !isAddUnitOpen && selectedUnit)}
@@ -2010,262 +1663,18 @@ export function UnitsView() {
         </div>
       </Modal>
 
-      <Modal
+      <UnitFormModal
         isOpen={isAddUnitOpen}
         onClose={closeAddUnitModal}
-        title={formMode === 'edit' ? t('views.units.editModal.title') : t('views.units.addModal.title')}
-        maxWidth="3xl"
-        variant="default"
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button
-              type="button"
-              className={modalDismissButtonClass}
-              onClick={closeAddUnitModal}
-            >
-              {t('views.units.addModal.cancel')}
-            </Button>
-            <Button
-              type="button"
-              className={modalPrimaryButtonClass}
-              onClick={() => void handleSaveUnit()}
-            >
-              {formMode === 'edit' ? t('views.units.editModal.save') : t('views.units.addModal.save')}
-            </Button>
-          </div>
-        }
-      >
-        <input
-          ref={addUnitPhotoInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleAddUnitPhotoChange}
-        />
-        <div className="unit-form-fields grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>{t('views.units.addModal.photo')}</Label>
-            <div className="flex flex-col gap-3">
-              <div className="unit-form-bordered relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 aspect-[4/3] max-h-[min(20rem,50vh)] sm:max-h-[22rem] dark:bg-slate-900/40">
-                {addUnitPhotoPreview ? (
-                  <button
-                    type="button"
-                    className="flex h-full w-full cursor-zoom-in items-center justify-center"
-                    onClick={() =>
-                      openPhotoPreview(
-                        addUnitPhotoPreview,
-                        `${addForm.unitNumber ? t('views.units.unitLabel', { unitNumber: addForm.unitNumber }) : t('views.units.addModal.title')} ${t('views.units.addModal.photo')}`,
-                      )
-                    }
-                  >
-                    <img
-                      src={addUnitPhotoPreview}
-                      alt="Unit photo preview"
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-slate-300">
-                    <Building2 className="h-14 w-14 sm:h-16 sm:w-16" />
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={modalOutlineButtonClass}
-                  onClick={openAddUnitPhotoPicker}
-                >
-                  {t('views.units.addModal.photoUpload')}
-                </Button>
-                {addUnitPhotoPreview ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 min-w-[7.5rem] px-4 rounded-xl border border-rose-200 bg-white font-medium text-rose-600 shadow-none hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                    onClick={() => setAddUnitPhotoPreview('')}
-                  >
-                    {t('views.units.table.delete')}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-unit-number">{t('views.units.addModal.unitNumber')}</Label>
-            <Input
-              id="add-unit-number"
-              value={addForm.unitNumber}
-              onChange={(e) => setAddForm((f) => ({ ...f, unitNumber: e.target.value }))}
-              placeholder="e.g. 1201"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900/50 dark:hover:bg-slate-900"
-              onClick={() => setShowMoreDetails((v) => !v)}
-              aria-expanded={showMoreDetails}
-            >
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {t('views.units.addModal.moreDetails')}
-              </span>
-              <ChevronDown
-                className={cn(
-                  'h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200',
-                  showMoreDetails && 'rotate-180',
-                )}
-              />
-            </button>
-            {showMoreDetails ? (
-              <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2 dark:border-slate-600 dark:bg-slate-950/40">
-                <div className="space-y-2">
-                  <Label>{t('views.units.addModal.floor')}</Label>
-                  <Select2
-                    options={addFloorOptions}
-                    value={addForm.floor || null}
-                    onChange={(v) => setAddForm((f) => ({ ...f, floor: String(v ?? '') }))}
-                    placeholder="Select floor"
-                    borderless={false}
-                    className="[&_.unit-form-select-control]:!min-h-12"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-tower">{t('views.units.addModal.tower')}</Label>
-                  <Input
-                    id="add-tower"
-                    value={addForm.tower}
-                    onChange={(e) => setAddForm((f) => ({ ...f, tower: e.target.value }))}
-                    className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>{t('views.units.addModal.categoryType')}</Label>
-                  <Select2
-                    options={addTypeOptions}
-                    value={addForm.type}
-                    onChange={(v) => {
-                      const nextType = (v ?? 'Condominium') as UnitType;
-                      const m = unitDisplayMetrics(nextType);
-                      setAddForm((f) => ({
-                        ...f,
-                        type: nextType,
-                        areaSqm: String(m.sqm),
-                        bedrooms: String(m.beds),
-                        bathrooms: String(m.baths),
-                      }));
-                    }}
-                    borderless={false}
-                    className="[&_.unit-form-select-control]:!min-h-12"
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label>{t('views.units.addModal.status')}</Label>
-            <Select2
-              options={addStatusOptions}
-              value={addForm.status}
-              onChange={(v) =>
-                setAddForm((f) => ({ ...f, status: (v ?? 'Available') as UnitStatus }))
-              }
-              borderless={false}
-              className="[&_.unit-form-select-control]:!min-h-12"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="add-rate">{t('views.units.addModal.monthlyRate')}</Label>
-            <Input
-              id="add-rate"
-              type="text"
-              inputMode="decimal"
-              value={addForm.monthlyRate}
-              onChange={(e) => setAddForm((f) => ({ ...f, monthlyRate: e.target.value }))}
-              placeholder="35000"
-              className="h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>{t('views.units.addModal.layoutMetrics')}</Label>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="relative">
-                <Ruler className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-                <Input
-                  id="add-sqm"
-                  type="text"
-                  inputMode="decimal"
-                  value={addForm.areaSqm}
-                  onChange={(e) => setAddForm((f) => ({ ...f, areaSqm: e.target.value }))}
-                  placeholder={t('views.units.addModal.sqm')}
-                  aria-label={t('views.units.addModal.sqm')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                />
-              </div>
-              <div className="relative">
-                <BedDouble className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-                <Input
-                  id="add-bedrooms"
-                  type="text"
-                  inputMode="numeric"
-                  value={addForm.bedrooms}
-                  onChange={(e) => setAddForm((f) => ({ ...f, bedrooms: e.target.value }))}
-                  placeholder={t('views.units.addModal.bedrooms')}
-                  aria-label={t('views.units.addModal.bedrooms')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                />
-              </div>
-              <div className="relative">
-                <Bath className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-                <Input
-                  id="add-bathrooms"
-                  type="text"
-                  inputMode="numeric"
-                  value={addForm.bathrooms}
-                  onChange={(e) => setAddForm((f) => ({ ...f, bathrooms: e.target.value }))}
-                  placeholder={t('views.units.addModal.bathrooms')}
-                  aria-label={t('views.units.addModal.bathrooms')}
-                  className="h-12 rounded-xl border border-slate-200 bg-white pl-9 shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="add-special-remarks">{t('views.units.addModal.specialRemarks')}</Label>
-            <Textarea
-              id="add-special-remarks"
-              value={addForm.specialRemarks}
-              onChange={(e) => setAddForm((f) => ({ ...f, specialRemarks: e.target.value }))}
-              placeholder={t('views.units.addModal.specialRemarksPlaceholder')}
-              rows={3}
-              className="rounded-xl border border-slate-200 bg-white shadow-sm resize-y min-h-[88px] focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
-            />
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={Boolean(photoPreviewUrl)}
-        onClose={closePhotoPreview}
-        title={photoPreviewTitle || t('views.units.addModal.photo')}
-        maxWidth="3xl"
-        variant="default"
-        footer={
-          <div className="flex justify-end w-full">
-            <Button type="button" className={modalDismissButtonClass} onClick={closePhotoPreview}>
-              {t('views.units.details.close')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
-          {photoPreviewUrl ? (
-            <img src={photoPreviewUrl} alt="Photo preview" className="w-full max-h-[70vh] object-contain" />
-          ) : null}
-        </div>
-      </Modal>
+        mode={formMode}
+        initialValues={addInitial}
+        initialPhoto={addInitialPhoto}
+        initialPhotos={addInitialPhotos}
+        contextArea={addInitial?.area ?? null}
+        contextBuilding={addInitial?.buildingName ?? null}
+        saving={unitSaving}
+        onSubmit={handleSaveUnit}
+      />
     </div>
   );
 }

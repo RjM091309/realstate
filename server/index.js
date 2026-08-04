@@ -38,7 +38,7 @@ const apiPort = Number(process.env.API_PORT ?? 2550);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 // Return JSON for invalid JSON payloads (instead of default HTML)
 app.use((err, _req, res, next) => {
   if (err && err.type === 'entity.parse.failed') {

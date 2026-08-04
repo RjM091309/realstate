@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Bath, BedDouble, Building2, ChevronDown, Ruler } from 'lucide-react';
+import { Bath, BedDouble, Building2, ChevronDown, Plus, Ruler, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/modal';
 import { Select2 } from '@/components/select2';
@@ -17,6 +17,7 @@ import {
   defaultUnitForm,
   detectFloorAndTowerFromText,
   ordinalFloor,
+  resolveUnitPhotos,
   unitDisplayMetrics,
   unitFormToWriteBody,
   type UnitFormState,
@@ -26,6 +27,20 @@ import type { UnitStatus, UnitType } from '@/types';
 
 const FIELD =
   'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
+
+const MAX_PHOTOS = 5;
+
+async function fileToDataUrl(file: File): Promise<string> {
+  if (!file.type || !file.type.startsWith('image/')) {
+    throw new Error('Not an image');
+  }
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image'));
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  });
+}
 
 /** Unit code from stored unit number — supports "101 Brgy City" or "Brgy City 101". */
 function extractUnitCode(raw: string): string {
@@ -48,8 +63,10 @@ export type UnitFormModalProps = {
   mode?: 'create' | 'edit';
   /** Prefill when opening (city / barangay from drill-down, or full unit for edit). */
   initialValues?: Partial<UnitFormState>;
-  /** Existing photo when editing. */
+  /** Existing photo when editing (legacy single). */
   initialPhoto?: string | null;
+  /** Existing gallery photos when editing (up to 5). */
+  initialPhotos?: string[] | null;
   /** Live City panel selection — auto-synced into the form (hidden). */
   contextArea?: string | null;
   /** Live Brgy panel selection — auto-synced into the form (hidden). */
@@ -69,6 +86,7 @@ export function UnitFormModal({
   mode = 'create',
   initialValues,
   initialPhoto = null,
+  initialPhotos = null,
   contextArea = null,
   contextBuilding = null,
   saving = false,
@@ -80,9 +98,16 @@ export function UnitFormModal({
   const [form, setForm] = useState<UnitFormState>(() => defaultUnitForm(initialValues));
   const [unitCode, setUnitCode] = useState(() => extractUnitCode(initialValues?.unitNumber ?? ''));
   const [villageBuilding, setVillageBuilding] = useState('');
-  const [photoPreview, setPhotoPreview] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photosRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
 
   const blank = (v?: string | null) => {
     const s = String(v ?? '').trim();
@@ -140,9 +165,16 @@ export function UnitFormModal({
         unitNumber: code || extractUnitCode(initialValues?.unitNumber ?? '') || '',
       }),
     );
-    setPhotoPreview(String(initialPhoto ?? '').trim());
+    const initial = resolveUnitPhotos({
+      photos: initialPhotos ?? undefined,
+      photoDataUrl: initialPhoto,
+    });
+    photosRef.current = initial;
+    setPhotos(initial);
+    setActivePhotoIndex(0);
     setPhotoPreviewOpen(false);
     setShowMoreDetails(false);
+    setPhotoUploading(false);
     if (photoInputRef.current) photoInputRef.current.value = '';
     // Reset only when the modal opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
@@ -205,20 +237,65 @@ export function UnitFormModal({
     [],
   );
 
-  const handlePhotoChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const handlePhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0 || photoUploading) return;
+
+    const current = photosRef.current;
+    const slotsLeft = MAX_PHOTOS - current.length;
+    if (slotsLeft <= 0) {
+      toast.error(t('views.units.addModal.photoMaxReached'));
+      return;
+    }
+
+    const accepted = files.slice(0, slotsLeft);
+    if (files.length > slotsLeft) {
+      toast.error(t('views.units.addModal.photoMaxReached'));
+    }
+
+    setPhotoUploading(true);
+    const toastId = toast.loading(
+      t('views.units.addModal.photoUploading', { count: accepted.length }),
+    );
+
+    const next: string[] = [];
+    for (const file of accepted) {
       try {
-        const dataUrl = await toWebpDataUrl(file);
-        setPhotoPreview(dataUrl);
+        next.push(await toWebpDataUrl(file));
       } catch {
-        toast.error(t('views.units.addModal.validationPhotoWebp'));
+        try {
+          next.push(await fileToDataUrl(file));
+        } catch {
+          toast.error(t('views.units.addModal.validationPhotoWebp'));
+        }
       }
-      e.target.value = '';
-    },
-    [t],
-  );
+    }
+
+    toast.dismiss(toastId);
+    setPhotoUploading(false);
+
+    if (next.length === 0) return;
+
+    const merged = [...photosRef.current, ...next].slice(0, MAX_PHOTOS);
+    photosRef.current = merged;
+    setPhotos(merged);
+    setActivePhotoIndex(Math.max(0, merged.length - 1));
+    toast.success(t('views.units.addModal.photoAdded', { count: next.length }));
+  }, [photoUploading, t]);
+
+  const removePhotoAt = useCallback((index: number) => {
+    setPhotos((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setActivePhotoIndex((cur) => {
+        if (next.length === 0) return 0;
+        if (cur >= next.length) return next.length - 1;
+        if (cur > index) return cur - 1;
+        return cur;
+      });
+      return next;
+    });
+  }, []);
 
   const handleSave = useCallback(async () => {
     const rate = Number(String(form.monthlyRate).replace(/,/g, ''));
@@ -258,14 +335,14 @@ export function UnitFormModal({
       toast.error(t('views.units.addModal.validationRate'));
       return;
     }
-    await onSubmit(unitFormToWriteBody(synced, photoPreview || null));
+    await onSubmit(unitFormToWriteBody(synced, photos[0] ?? null, [], photos));
   }, [
     autoVillageLabel,
     contextArea,
     contextBuilding,
     form,
     onSubmit,
-    photoPreview,
+    photos,
     t,
     unitCode,
     villageBuilding,
@@ -312,23 +389,30 @@ export function UnitFormModal({
           ref={photoInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(e) => void handlePhotoChange(e)}
         />
         <div className="unit-form-fields grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label>{t('views.units.addModal.photo')}</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label>{t('views.units.addModal.photo')}</Label>
+              <span className="text-xs font-medium text-slate-400">
+                {t('views.units.addModal.photosCount', { count: photos.length })}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">{t('views.units.addModal.photoHint')}</p>
             <div className="flex flex-col gap-3">
               <div className="unit-form-bordered relative aspect-[4/3] max-h-[min(20rem,50vh)] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 sm:max-h-[22rem] dark:bg-slate-900/40">
-                {photoPreview ? (
+                {photos[activePhotoIndex] ? (
                   <button
                     type="button"
                     className="flex h-full w-full cursor-zoom-in items-center justify-center"
                     onClick={() => setPhotoPreviewOpen(true)}
                   >
                     <img
-                      src={photoPreview}
-                      alt="Unit photo preview"
+                      src={photos[activePhotoIndex]}
+                      alt={`Unit photo ${activePhotoIndex + 1}`}
                       className="h-full w-full object-cover"
                     />
                   </button>
@@ -338,21 +422,77 @@ export function UnitFormModal({
                   </div>
                 )}
               </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {photos.map((url, idx) => (
+                  <div
+                    key={`${idx}-${url.slice(0, 24)}`}
+                    className={cn(
+                      'group relative h-16 w-20 overflow-hidden rounded-xl border-2',
+                      idx === activePhotoIndex
+                        ? 'border-brand-blue ring-2 ring-brand-blue/20'
+                        : 'border-slate-200',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="h-full w-full"
+                      onClick={() => setActivePhotoIndex(idx)}
+                    >
+                      <img src={url} alt={`Thumbnail ${idx + 1}`} className="h-full w-full object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute top-1 right-1 rounded-full bg-slate-900/70 p-0.5 text-white opacity-90 hover:bg-rose-600"
+                      title={t('views.units.addModal.photoRemove')}
+                      onClick={() => removePhotoAt(idx)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                    {idx === 0 ? (
+                      <span className="absolute bottom-1 left-1 rounded bg-brand-blue/90 px-1 py-0.5 text-[9px] font-bold text-white">
+                        {t('views.units.addModal.photoCover')}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+
+                {photos.length < MAX_PHOTOS ? (
+                  <button
+                    type="button"
+                    disabled={photoUploading}
+                    onClick={() => photoInputRef.current?.click()}
+                    className="flex h-16 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-[10px] font-semibold">
+                      {t('views.units.addModal.photoAdd')}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   className={modalOutlineButtonClass}
+                  disabled={photos.length >= MAX_PHOTOS || photoUploading}
                   onClick={() => photoInputRef.current?.click()}
                 >
-                  {t('views.units.addModal.photoUpload')}
+                  {photoUploading
+                    ? t('views.addUnitByLocation.saving')
+                    : t('views.units.addModal.photoUpload')}
                 </Button>
-                {photoPreview ? (
+                {photos.length > 0 ? (
                   <Button
                     type="button"
                     variant="outline"
                     className="h-10 min-w-[7.5rem] rounded-xl border border-rose-200 bg-white px-4 font-medium text-rose-600 shadow-none hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                    onClick={() => setPhotoPreview('')}
+                    onClick={() => {
+                      setPhotos([]);
+                      setActivePhotoIndex(0);
+                    }}
                   >
                     {t('views.units.table.delete')}
                   </Button>
@@ -563,8 +703,12 @@ export function UnitFormModal({
         }
       >
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          {photoPreview ? (
-            <img src={photoPreview} alt="Photo preview" className="max-h-[70vh] w-full object-contain" />
+          {photos[activePhotoIndex] ? (
+            <img
+              src={photos[activePhotoIndex]}
+              alt="Photo preview"
+              className="max-h-[70vh] w-full object-contain"
+            />
           ) : null}
         </div>
       </Modal>

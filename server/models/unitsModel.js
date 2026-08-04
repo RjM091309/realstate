@@ -39,6 +39,7 @@ export async function listUnitsByBranch(branchId) {
       a.name AS area,
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
+      COALESCE(u.photos_json, '[]') AS photos_json,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
       u.more_details AS more_details,
       u.special_remarks AS special_remarks
@@ -122,11 +123,12 @@ export async function insertUnit(branchId, payload) {
       listing_type,
       monthly_rent,
       photo_data,
+      photos_json,
       status,
       inventory_json,
       more_details,
       special_remarks
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       propertyId,
@@ -140,6 +142,7 @@ export async function insertUnit(branchId, payload) {
       payload.bathrooms ?? null,
       payload.monthlyRate,
       payload.photoDataUrl ?? null,
+      payload.photosJson ?? '[]',
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
       payload.moreDetails ?? null,
@@ -182,6 +185,7 @@ export async function updateUnitById(id, branchId, payload) {
       bathrooms = ?,
       monthly_rent = ?,
       photo_data = ?,
+      photos_json = ?,
       status = ?,
       inventory_json = ?,
       more_details = ?,
@@ -200,6 +204,7 @@ export async function updateUnitById(id, branchId, payload) {
       payload.bathrooms ?? null,
       payload.monthlyRate,
       payload.photoDataUrl ?? null,
+      payload.photosJson ?? '[]',
       mapToUnitStatus(payload.status),
       payload.inventoryJson,
       payload.moreDetails ?? null,
@@ -236,6 +241,7 @@ export async function getUnitById(id, branchId) {
       a.name AS area,
       u.monthly_rent AS monthly_rate,
       u.photo_data AS photo_data,
+      COALESCE(u.photos_json, '[]') AS photos_json,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
       u.more_details AS more_details,
       u.special_remarks AS special_remarks

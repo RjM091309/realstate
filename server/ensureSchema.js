@@ -503,6 +503,21 @@ export async function ensureSchema() {
         `ALTER TABLE \`unit\` ADD COLUMN \`bathrooms\` TINYINT UNSIGNED NULL DEFAULT NULL AFTER \`bedrooms\``,
       );
     }
+
+    const [photosJsonRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'photos_json'
+      `,
+    );
+    if (photosJsonRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`photos_json\` LONGTEXT NULL AFTER \`photo_data\``,
+      );
+    }
   }
 
   async function ensureUserAvatarColumn() {
@@ -1090,6 +1105,7 @@ export async function ensureSchema() {
       \`listing_type\` ENUM('monthly_rental','selling','short_term_rental') NOT NULL DEFAULT 'monthly_rental',
       \`monthly_rent\` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
       \`photo_data\` LONGTEXT NULL,
+      \`photos_json\` LONGTEXT NULL,
       \`market_value\` DECIMAL(14,2) NULL DEFAULT NULL,
       \`inventory_json\` LONGTEXT NULL,
       \`status\` ENUM('vacant','occupied','reserved','maintenance','inactive') NOT NULL DEFAULT 'vacant',

@@ -16,6 +16,8 @@ export type UnitWriteBody = {
   bathrooms?: number | null;
   monthlyRate: number;
   photoDataUrl?: string | null;
+  /** Up to 5 gallery photos. First photo is also stored as photoDataUrl. */
+  photos?: string[];
   moreDetails?: string;
   specialRemarks?: string;
   inventory: Unit['inventory'];

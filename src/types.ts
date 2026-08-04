@@ -38,6 +38,8 @@ export interface Unit {
   bathrooms?: number;
   monthlyRate: number;
   photoDataUrl?: string | null;
+  /** Up to 5 unit gallery photos (first is also photoDataUrl / cover). */
+  photos?: string[];
   marketValue?: number;
   moreDetails?: string;
   specialRemarks?: string;

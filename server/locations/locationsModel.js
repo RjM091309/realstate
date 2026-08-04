@@ -18,6 +18,71 @@ function aliasName(value) {
     .trim();
 }
 
+/** True when display name already has a list ordinal ("1. Clark"). */
+function hasOrdinalPrefix(value) {
+  return /^#?\d+[.)\]:\-]\s+\S/u.test(String(value ?? '').trim());
+}
+
+/** Prefer numbered city rows; then lower city_id as stable tie-break. */
+function preferCityRow(a, b) {
+  const aOrd = hasOrdinalPrefix(a?.name);
+  const bOrd = hasOrdinalPrefix(b?.name);
+  if (aOrd && !bOrd) return a;
+  if (bOrd && !aOrd) return b;
+  return Number(a?.city_id) <= Number(b?.city_id) ? a : b;
+}
+
+async function nextCityOrdinal(branchId) {
+  const cities = await listCities(branchId, { includeInactive: false });
+  let max = 0;
+  for (const row of cities) {
+    const m = String(row.name ?? '')
+      .trim()
+      .match(/^#?(\d+)[.)\]:\-]\s+/u);
+    if (m) max = Math.max(max, Number(m[1]) || 0);
+  }
+  return max + 1;
+}
+
+/** Ensure CITY category names always use "N. Name" format. */
+async function withCityOrdinalPrefix(branchId, name) {
+  const cleaned = cleanName(name);
+  if (!cleaned) return cleaned;
+  if (hasOrdinalPrefix(cleaned)) return cleaned;
+  const n = await nextCityOrdinal(branchId);
+  return `${n}. ${aliasName(cleaned) || cleaned}`;
+}
+
+async function reassignCityChildren(keepCityId, dropCityId, branchId) {
+  await pool.query(
+    `
+    UPDATE brgy b
+    LEFT JOIN brgy keep_b
+      ON keep_b.city_id = ?
+     AND LOWER(TRIM(keep_b.name)) = LOWER(TRIM(b.name))
+    SET b.city_id = ?, b.updated_at = CURRENT_TIMESTAMP
+    WHERE b.city_id = ? AND keep_b.brgy_id IS NULL
+    `,
+    [keepCityId, keepCityId, dropCityId],
+  );
+  await pool.query(
+    `
+    UPDATE brgy
+    SET active = 0, updated_at = CURRENT_TIMESTAMP
+    WHERE city_id = ? AND active = 1
+    `,
+    [dropCityId],
+  );
+  await pool.query(
+    `
+    UPDATE area
+    SET city_id = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE city_id = ? AND branch_id = ?
+    `,
+    [keepCityId, dropCityId, branchId],
+  );
+}
+
 /* ───────────────────────── City ───────────────────────── */
 
 export async function listCities(branchId, { includeInactive = false } = {}) {
@@ -49,21 +114,50 @@ export async function getCityById(cityId, branchId) {
 export async function findCityByName(branchId, name) {
   const cleaned = cleanName(name);
   if (!cleaned) return null;
-  const [rows] = await pool.query(
+
+  const [exactRows] = await pool.query(
     `
     SELECT city_id, branch_id, name, active, created_at, updated_at
     FROM city
     WHERE branch_id = ? AND LOWER(TRIM(name)) = LOWER(?)
+    ORDER BY active DESC, city_id ASC
     LIMIT 1
     `,
     [branchId, cleaned],
   );
-  return rows[0] ?? null;
+  const exact = exactRows[0] ?? null;
+  if (exact && Number(exact.active) === 1) return exact;
+
+  const alias = aliasName(cleaned).toLowerCase();
+  if (!alias) return exact;
+
+  const active = await listCities(branchId, { includeInactive: false });
+  const matches = active.filter(
+    (row) => aliasName(row.name).toLowerCase() === alias,
+  );
+  if (matches.length === 0) return exact;
+  return matches.reduce(preferCityRow);
 }
 
 export async function upsertCity(branchId, name) {
   const cleaned = cleanName(name);
   if (!cleaned) return null;
+
+  const existing = await findCityByName(branchId, cleaned);
+  if (existing && Number(existing.active) === 1) {
+    // Upgrade bare seed name → numbered category name when caller provides ordinal.
+    if (hasOrdinalPrefix(cleaned) && !hasOrdinalPrefix(existing.name)) {
+      try {
+        await renameCity(existing.city_id, branchId, cleaned);
+        return (await getCityById(existing.city_id, branchId)) || existing;
+      } catch {
+        return existing;
+      }
+    }
+    return existing;
+  }
+
+  const toInsert = await withCityOrdinalPrefix(branchId, cleaned);
 
   await pool.query(
     `
@@ -71,23 +165,32 @@ export async function upsertCity(branchId, name) {
     VALUES (?, ?, 1)
     ON DUPLICATE KEY UPDATE
       active = 1,
-      name = VALUES(name),
       updated_at = CURRENT_TIMESTAMP
     `,
-    [branchId, cleaned],
+    [branchId, toInsert],
   );
-  return findCityByName(branchId, cleaned);
+  return findCityByName(branchId, toInsert);
 }
 
 export async function renameCity(cityId, branchId, nextName) {
-  const cleaned = cleanName(nextName);
+  let cleaned = cleanName(nextName);
   if (!cleaned) return 0;
 
   const existing = await getCityById(cityId, branchId);
   if (!existing || Number(existing.active) !== 1) return 0;
 
-  const clash = await findCityByName(branchId, cleaned);
-  if (clash && String(clash.city_id) !== String(cityId)) {
+  // CITY category must stay numbered ("1. Name"). Keep current N when user drops it.
+  if (!hasOrdinalPrefix(cleaned)) {
+    const m = String(existing.name ?? '')
+      .trim()
+      .match(/^#?(\d+)[.)\]:\-]\s+/u);
+    const base = aliasName(cleaned) || cleaned;
+    cleaned = m ? `${Number(m[1])}. ${base}` : await withCityOrdinalPrefix(branchId, base);
+  }
+
+  const clashExact = await findCityByName(branchId, cleaned);
+  if (clashExact && String(clashExact.city_id) !== String(cityId)) {
+    // Alias clash (e.g. renaming to bare "Clark" while "1. Clark" exists).
     const err = new Error('CITY_EXISTS');
     throw err;
   }
@@ -559,51 +662,58 @@ export async function seedCitiesAndBrgysForAllBranches() {
   }
 }
 
-/** Soft-delete exact aliases only when two rows share the same alias key
- * after stripping ordinals — but do NOT rewrite stored names (allow "1. Angeles City"). */
+/** Soft-delete alias duplicates (e.g. "1. Clark" + "Clark"); keep numbered name. */
 export async function mergeDuplicateCitiesForBranch(branchId) {
-  const cities = await listCities(branchId, { includeInactive: true });
+  const cities = await listCities(branchId, { includeInactive: false });
   const byAlias = new Map();
   for (const row of cities) {
-    if (Number(row.active) !== 1) continue;
     const key = aliasName(row.name).toLowerCase();
     if (!key) continue;
-    const cur = byAlias.get(key);
-    if (!cur) {
-      byAlias.set(key, row);
-      continue;
-    }
-    // Prefer the row that already has no ordinal prefix when merging true duplicates.
-    const keep =
-      aliasName(cur.name) === String(cur.name).trim() ? cur : aliasName(row.name) === String(row.name).trim() ? row : cur;
-    const drop = keep.city_id === cur.city_id ? row : cur;
-    // Only merge when both names are effectively the same after alias normalize
-    // AND one is a pure ordinal duplicate of the other with identical cleaned form
-    // stored differently... Actually user wants to KEEP "1. Angeles City".
-    // Skip merging different display names — only merge if names are case-only variants.
-    if (String(keep.name).trim().toLowerCase() === String(drop.name).trim().toLowerCase()) {
-      await pool.query(
-        `
-        UPDATE brgy b
-        LEFT JOIN brgy keep_b
-          ON keep_b.city_id = ?
-         AND LOWER(TRIM(keep_b.name)) = LOWER(TRIM(b.name))
-        SET b.city_id = ?, b.updated_at = CURRENT_TIMESTAMP
-        WHERE b.city_id = ? AND keep_b.brgy_id IS NULL
-        `,
-        [keep.city_id, keep.city_id, drop.city_id],
-      );
-      await pool.query(
-        `
-        UPDATE area
-        SET city_id = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE city_id = ? AND branch_id = ?
-        `,
-        [keep.city_id, drop.city_id, branchId],
-      );
+    const group = byAlias.get(key);
+    if (!group) byAlias.set(key, [row]);
+    else group.push(row);
+  }
+
+  for (const group of byAlias.values()) {
+    if (group.length < 2) continue;
+    const keep = group.reduce(preferCityRow);
+    for (const drop of group) {
+      if (String(drop.city_id) === String(keep.city_id)) continue;
+      await reassignCityChildren(keep.city_id, drop.city_id, branchId);
       await softDeleteCity(drop.city_id, branchId);
     }
-    byAlias.set(key, keep);
+  }
+
+  await ensureActiveCitiesNumbered(branchId);
+}
+
+/** Number any remaining bare city names as "N. Name". */
+export async function ensureActiveCitiesNumbered(branchId) {
+  const cities = await listCities(branchId, { includeInactive: false });
+  const used = new Set();
+  for (const row of cities) {
+    const m = String(row.name ?? '')
+      .trim()
+      .match(/^#?(\d+)[.)\]:\-]\s+/u);
+    if (m) used.add(Number(m[1]) || 0);
+  }
+  const takeNext = () => {
+    let n = 1;
+    while (used.has(n)) n += 1;
+    used.add(n);
+    return n;
+  };
+
+  for (const row of cities) {
+    if (hasOrdinalPrefix(row.name)) continue;
+    const base = aliasName(row.name) || cleanName(row.name);
+    if (!base) continue;
+    const numbered = `${takeNext()}. ${base}`;
+    try {
+      await renameCity(row.city_id, branchId, numbered);
+    } catch (err) {
+      console.warn('[ensureActiveCitiesNumbered] rename skipped:', err?.message ?? err);
+    }
   }
 }
 

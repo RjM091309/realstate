@@ -6,6 +6,7 @@ import {
   listAreas,
   listBrgys,
   listCities,
+  mergeDuplicateCitiesForBranch,
   renameBrgy,
   renameCity,
   softDeleteBrgy,
@@ -73,6 +74,8 @@ export async function listCitiesHandler(req, res) {
   const ctx = await getAuthContext(req, res);
   if (!ctx) return;
   try {
+    // Heal ordinal/bare duplicates and ensure "N. Name" format for CITY category.
+    await mergeDuplicateCitiesForBranch(ctx.session.branchId);
     const rows = await listCities(ctx.session.branchId);
     res.json({ cities: rows.map(cityDto) });
   } catch (e) {
@@ -94,8 +97,20 @@ export async function createCityHandler(req, res) {
     return;
   }
   try {
+    await mergeDuplicateCitiesForBranch(ctx.session.branchId);
     const existing = await listCities(ctx.session.branchId).then((rows) =>
-      rows.find((r) => String(r.name).toLowerCase() === name.toLowerCase()),
+      rows.find(
+        (r) =>
+          String(r.name).toLowerCase() === name.toLowerCase() ||
+          String(r.name)
+            .trim()
+            .replace(/^#?\d+[.)\]:\-]\s*/u, '')
+            .toLowerCase() ===
+            name
+              .trim()
+              .replace(/^#?\d+[.)\]:\-]\s*/u, '')
+              .toLowerCase(),
+      ),
     );
     const row = await upsertCity(ctx.session.branchId, name);
     res.status(existing ? 200 : 201).json({ city: cityDto(row) });
