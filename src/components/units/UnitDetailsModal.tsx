@@ -273,13 +273,8 @@ export function UnitDetailsModal({
           <div className="flex flex-col justify-between gap-4 border-b border-slate-100 bg-slate-50/60 px-6 py-5 sm:flex-row sm:items-start dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-<<<<<<< Updated upstream
                 <span className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-slate-50">
-                  {unitDisplay}
-=======
-                <span className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
                   {`Unit ${unitDisplay}`}
->>>>>>> Stashed changes
                 </span>
                 <span className="rounded-md border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-brand-blue dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300">
                   {unit.type}
