@@ -312,6 +312,7 @@ export function CRMView() {
   const [pendingActivateTenant, setPendingActivateTenant] = useState<Tenant | null>(null);
   const [isTenantHistoryOpen, setIsTenantHistoryOpen] = useState(false);
   const [tenantHistoryTarget, setTenantHistoryTarget] = useState<Tenant | null>(null);
+  const [tenantStatusSaving, setTenantStatusSaving] = useState(false);
 
   const reloadTenants = useCallback(async () => {
     try {
@@ -513,6 +514,44 @@ export function CRMView() {
       toast.error(e instanceof Error ? e.message : t('views.crm.table.activateTenantError'));
     }
   };
+
+  const saveTenantProfileStatus = useCallback(
+    async (
+      tenant: Tenant,
+      patch: Partial<Pick<TenantForm, 'kycVerified' | 'isBlacklisted' | 'blacklistReason'>>,
+    ) => {
+      if (!canUpdate) return;
+
+      const nextKycVerified = patch.kycVerified ?? tenant.kycVerified !== false;
+      const nextBlacklisted = patch.isBlacklisted ?? tenant.isBlacklisted;
+
+      if (!nextBlacklisted && !nextKycVerified) {
+        toast.error(t('views.crm.table.tenantActivationRequiresVerified'));
+        return;
+      }
+
+      const nextForm: TenantForm = {
+        ...tenantToForm(tenant),
+        ...patch,
+        kycVerified: nextKycVerified,
+        isBlacklisted: nextBlacklisted,
+      };
+      if (!nextBlacklisted) nextForm.blacklistReason = '';
+
+      setTenantStatusSaving(true);
+      try {
+        const updated = await updateTenant(tenant.id, formToBody(nextForm));
+        setTenantList((prev) => prev.map((x) => (x.id === tenant.id ? updated : x)));
+        setSelectedTenant((s) => (s?.id === tenant.id ? updated : s));
+        toast.success(t('views.crm.tenantModal.updated'));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Error');
+      } finally {
+        setTenantStatusSaving(false);
+      }
+    },
+    [canUpdate, t],
+  );
 
   const handleSaveTenant = async () => {
     const body = formToBody(form);
@@ -931,7 +970,9 @@ export function CRMView() {
                 email: selectedTenant.email,
                 phone: selectedTenant.phone,
                 nationality: nationalityLabel(selectedTenant.nationality),
-                verified: selectedTenant.kycVerified !== false,
+                kycVerified: selectedTenant.kycVerified !== false,
+                isBlacklisted: selectedTenant.isBlacklisted,
+                blacklistReason: selectedTenant.blacklistReason,
                 active: !selectedTenant.isBlacklisted,
                 idType: selectedTenant.idType,
                 idNumber: selectedTenant.idNumber,
@@ -987,6 +1028,33 @@ export function CRMView() {
         ]}
         closeLabel={t('views.crm.details.close')}
         editLabel={t('views.crm.details.editTenant')}
+        canUpdateStatus={canUpdate}
+        statusSaving={tenantStatusSaving}
+        onKycVerifiedChange={
+          canUpdate && selectedTenant
+            ? (checked) => {
+                void saveTenantProfileStatus(selectedTenant, { kycVerified: checked });
+              }
+            : undefined
+        }
+        onBlacklistedChange={
+          canUpdate && selectedTenant
+            ? (checked) => {
+                void saveTenantProfileStatus(selectedTenant, {
+                  isBlacklisted: checked,
+                  blacklistReason: checked ? selectedTenant.blacklistReason ?? '' : '',
+                });
+              }
+            : undefined
+        }
+        onBlacklistReasonSave={
+          canUpdate && selectedTenant
+            ? (reason) => {
+                if (!selectedTenant.isBlacklisted) return;
+                void saveTenantProfileStatus(selectedTenant, { blacklistReason: reason });
+              }
+            : undefined
+        }
         onEditTenant={
           canUpdate && selectedTenant
             ? () => {

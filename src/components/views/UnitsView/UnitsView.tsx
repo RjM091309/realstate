@@ -1018,11 +1018,11 @@ export function UnitsView() {
             <>
               <td
                 colSpan={Math.max(1, columns.length - 2)}
-                className="px-6 py-3.5 text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                className="px-6 py-3.5 text-center text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
               >
                 {t('views.units.table.totalAmount')}
               </td>
-              <td className="px-6 py-3.5 text-sm font-bold tabular-nums text-rose-600 dark:text-rose-400">
+              <td className="px-6 py-3.5 text-center text-sm font-bold tabular-nums text-rose-600 dark:text-rose-400">
                 ₱{totalMonthlyRate.toLocaleString()}
               </td>
               <td className="px-6 py-3.5" />

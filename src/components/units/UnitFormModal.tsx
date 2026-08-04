@@ -161,7 +161,7 @@ export function UnitFormModal({
         area,
         buildingName: building,
         legalAddress: village || building || initialValues?.legalAddress,
-        // Unit Name stays separate — do not bake brgy/city into unitNumber.
+        // Unit No stays separate — do not bake brgy/city into unitNumber.
         unitNumber: code || extractUnitCode(initialValues?.unitNumber ?? '') || '',
       }),
     );

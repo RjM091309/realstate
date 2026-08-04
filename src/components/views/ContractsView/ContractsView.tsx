@@ -134,8 +134,8 @@ export function ContractsView() {
   const openEditModal = (contract: Contract) => {
     setFormMode('edit');
     setEditingContractId(contract.id);
-    setUnitId(contract.unitId);
-    setTenantId(contract.tenantId);
+    setUnitId(String(contract.unitId));
+    setTenantId(String(contract.tenantId));
     setAgentId(normalizeAgentIdForWrite(contract.agentId));
     setMonthlyRent(String(contract.monthlyRent));
     setSecurityDeposit(String(contract.securityDeposit));
@@ -255,13 +255,24 @@ export function ContractsView() {
     };
   }, [session?.user?.id, session?.user?.firstName, session?.user?.lastName, session?.user?.username]);
 
-  const unitOptions = useMemo(
-    () =>
-      unitList
-        .filter((u) => u.status === 'Available')
-        .map((u) => ({ value: u.id, label: `${u.unitNumber} - ${u.buildingName}` })),
-    [unitList],
-  );
+  const unitOptions = useMemo(() => {
+    const toOption = (u: Unit) => ({
+      value: u.id,
+      label: `${u.unitNumber} - ${u.buildingName}`,
+    });
+
+    const availableOptions = unitList.filter((u) => u.status === 'Available').map(toOption);
+
+    // Occupied units are excluded from "Available" — still show the lease's unit when editing.
+    if (formMode === 'edit' && unitId) {
+      const currentUnit = unitList.find((u) => u.id === unitId);
+      if (currentUnit && !availableOptions.some((o) => o.value === unitId)) {
+        return [toOption(currentUnit), ...availableOptions];
+      }
+    }
+
+    return availableOptions;
+  }, [unitList, formMode, unitId]);
   const tenantOptions = useMemo(
     () => tenantList.map((ten) => ({ value: ten.id, label: ten.name })),
     [tenantList],

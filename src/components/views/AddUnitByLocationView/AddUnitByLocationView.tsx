@@ -360,7 +360,7 @@ export function AddUnitByLocationView() {
   const locations = useMemo(() => {
     // CITY panel is driven by DB `city` rows only (with cityId).
     // Fold ordinal/bare aliases so "1. Clark" and "Clark" never both show.
-    const map = new Map<string, { cityId: string; name: string; count: number }>();
+    const map = new Map<string, { cityId: string; name: string; brgyCount: number }>();
 
     for (const city of managedCities) {
       const name = String(city.name ?? '').trim();
@@ -369,21 +369,21 @@ export function AddUnitByLocationView() {
       if (!key) continue;
       const prev = map.get(key);
       if (!prev) {
-        map.set(key, { cityId: city.cityId, name, count: 0 });
+        map.set(key, { cityId: city.cityId, name, brgyCount: 0 });
         continue;
       }
       // Prefer numbered category label ("1. Clark") over bare ("Clark").
       if (hasLocationOrdinalPrefix(name) && !hasLocationOrdinalPrefix(prev.name)) {
-        map.set(key, { cityId: city.cityId, name, count: prev.count });
+        map.set(key, { cityId: city.cityId, name, brgyCount: prev.brgyCount });
       }
     }
 
-    for (const u of units) {
-      const raw = locationKey(u);
-      if (!raw || raw === '—') continue;
+    for (const brgy of managedBrgys) {
+      const brgyCityId = String(brgy.cityId ?? '').trim();
+      if (!brgyCityId) continue;
       for (const loc of map.values()) {
-        if (sameLocation(loc.name, raw) || locationAliasKey(loc.name) === locationAliasKey(raw)) {
-          loc.count += 1;
+        if (String(loc.cityId) === brgyCityId) {
+          loc.brgyCount += 1;
         }
       }
     }
@@ -396,7 +396,7 @@ export function AddUnitByLocationView() {
       if (bNum) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [units, managedCities]);
+  }, [managedCities, managedBrgys]);
 
   const persistExtraLocations = useCallback((next: string[]) => {
     // Dedupe only — do not force-append seeded city names.
@@ -983,19 +983,15 @@ export function AddUnitByLocationView() {
   }, [buildingsForLocation, selectedLocation]);
 
   const filteredUnits = useMemo(() => {
-    // Wait for a barangay/building click before showing any unit rows.
-    if (!selectedLocation || !selectedBuilding) return [];
+    if (!selectedLocation) return [];
 
-    const isBlankBuilding = (v?: string | null) => {
-      const s = String(v ?? '').trim();
-      return !s || s === '—' || s === '-';
-    };
-    const brgy = selectedBuilding.trim().toLowerCase();
     let list = units.filter((u) => {
       if (!sameLocation(locationKey(u), selectedLocation)) return false;
+      if (!selectedBuilding) return true;
+      const brgy = selectedBuilding.trim().toLowerCase();
       const key = buildingKey(u).trim().toLowerCase();
-      // Match barangay, or orphan units (saved as —) under this city so BRGY can sync visually.
-      return key === brgy || isBlankBuilding(key);
+      // When a barangay is selected, show only units inside that exact barangay.
+      return key === brgy;
     });
     if (statusFilter !== 'all') {
       list = list.filter((u) => u.status === statusFilter);
@@ -1366,7 +1362,7 @@ export function AddUnitByLocationView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-stretch">
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 xl:col-span-3">
             <LocPanel
               title={panelLocation}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1390,6 +1386,7 @@ export function AddUnitByLocationView() {
                       key={loc.cityId ?? loc.name}
                       className={cn(
                         locBoard.listItem,
+                        locBoard.listItemCity,
                         selectedLocation &&
                           sameLocation(selectedLocation, loc.name) &&
                           locBoard.listItemActive,
@@ -1397,7 +1394,7 @@ export function AddUnitByLocationView() {
                     >
                       <button
                         type="button"
-                        className="min-w-0 flex-1 text-left"
+                        className="min-w-0 overflow-hidden text-left"
                         onClick={() => {
                           setSelectedLocation((prev) =>
                             prev && sameLocation(prev, loc.name) ? null : loc.name,
@@ -1405,31 +1402,44 @@ export function AddUnitByLocationView() {
                           setSelectedBuilding(null);
                         }}
                       >
-                        <div className={cn(locBoard.listName, 'min-w-0')}>{loc.name}</div>
+                        <div className={locBoard.listName} title={loc.name}>
+                          {loc.name}
+                        </div>
                       </button>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          className={locBoard.editBtn}
-                          title={t('views.addUnitByLocation.editPanel', { panel: panelLocation })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditLocation(loc);
-                          }}
+                      <div className={locBoard.listTrailing}>
+                        <span
+                          className={locBoard.listCountBadge}
+                          title={t('views.addUnitByLocation.cityBrgyCount', {
+                            count: loc.brgyCount,
+                            panel: panelBuilding,
+                          })}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          className={locBoard.deleteBtn}
-                          title={t('views.addUnitByLocation.deletePanel', { panel: panelLocation })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void deleteLocation(loc);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          {loc.brgyCount}
+                        </span>
+                        <div className={locBoard.listActions}>
+                          <button
+                            type="button"
+                            className={locBoard.listEditBtn}
+                            title={t('views.addUnitByLocation.editPanel', { panel: panelLocation })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditLocation(loc);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className={locBoard.listDeleteBtn}
+                            title={t('views.addUnitByLocation.deletePanel', { panel: panelLocation })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void deleteLocation(loc);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1438,7 +1448,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2 xl:col-span-2">
             <LocPanel
               title={panelBuilding}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1472,43 +1482,57 @@ export function AddUnitByLocationView() {
                       key={b.brgyId ?? b.name}
                       className={cn(
                         locBoard.listItem,
+                        locBoard.listItemBrgy,
                         selectedBuilding === b.name && locBoard.listItemActive,
                       )}
                     >
                       <button
                         type="button"
-                        className="min-w-0 flex-1 text-left"
+                        className="min-w-0 overflow-hidden text-left"
                         onClick={() =>
                           setSelectedBuilding((prev) => (prev === b.name ? null : b.name))
                         }
                       >
-                        <div className={cn(locBoard.listName, 'min-w-0')}>{b.name}</div>
+                        <div className={locBoard.listNameBrgy} title={b.name}>
+                          {b.name}
+                        </div>
                       </button>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          className={locBoard.editBtn}
-                          title={t('views.addUnitByLocation.editPanel', { panel: panelBuilding })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditBuilding(b);
-                          }}
+                      <div className={locBoard.listTrailing}>
+                        <span
+                          className={locBoard.listCountBadge}
+                          title={t('views.addUnitByLocation.brgyUnitCount', {
+                            count: b.count,
+                            panel: panelUnits,
+                          })}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        {canDelete ? (
+                          {b.count}
+                        </span>
+                        <div className={locBoard.listActions}>
                           <button
                             type="button"
-                            className={locBoard.deleteBtn}
-                            title={t('views.addUnitByLocation.deletePanel', { panel: panelBuilding })}
+                            className={locBoard.listEditBtn}
+                            title={t('views.addUnitByLocation.editPanel', { panel: panelBuilding })}
                             onClick={(e) => {
                               e.stopPropagation();
-                              void deleteBuilding(b);
+                              openEditBuilding(b);
                             }}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
-                        ) : null}
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              className={locBoard.listDeleteBtn}
+                              title={t('views.addUnitByLocation.deletePanel', { panel: panelBuilding })}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void deleteBuilding(b);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1517,7 +1541,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="lg:col-span-6">
+          <div className="min-w-0 lg:col-span-7 xl:col-span-7">
             <LocPanel
               title={panelUnits}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1633,27 +1657,11 @@ export function AddUnitByLocationView() {
                     panel: panelLocation.toUpperCase(),
                   })}
                 </LocEmpty>
-              ) : !selectedBuilding ? (
-                <LocEmpty>
-                  {t('views.addUnitByLocation.selectPanelForUnits', {
-                    panel: panelBuilding.toUpperCase(),
-                  })}
-                </LocEmpty>
               ) : filteredUnits.length === 0 ? (
                 <LocEmpty>{t('views.addUnitByLocation.emptyUnits')}</LocEmpty>
               ) : (
-                <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                  <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
-                    <colgroup>
-                      <col className="w-[10%]" />
-                      <col className="w-[28%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[8%]" />
-                      <col className="w-[10%]" />
-                      <col className="w-[10%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[10%]" />
-                    </colgroup>
+                <div className="max-lg:overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                  <table className="w-full table-auto border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
                         {renderSortTh('unit', t('views.units.table.unit'))}
@@ -1729,7 +1737,7 @@ export function AddUnitByLocationView() {
                               </div>
                             </td>
                             <td className="px-3 py-2.5 align-middle text-slate-600 dark:text-slate-300">
-                              <span className="block truncate" title={unit.type}>
+                              <span className="block whitespace-normal break-words" title={unit.type}>
                                 {unit.type}
                               </span>
                             </td>
@@ -1762,7 +1770,7 @@ export function AddUnitByLocationView() {
                               ₱{Number(unit.monthlyRate).toLocaleString()}
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <div className="flex items-center justify-center gap-0.5">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
                                   className={locBoard.editBtn}
@@ -1801,7 +1809,7 @@ export function AddUnitByLocationView() {
                       <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
                         <td
                           colSpan={6}
-                          className="px-3 py-2.5 text-right align-middle font-semibold uppercase tracking-wide text-slate-500"
+                          className="px-3 py-2.5 text-center align-middle font-semibold uppercase tracking-wide text-slate-500"
                         >
                           {t('views.units.table.totalAmount')}
                         </td>
