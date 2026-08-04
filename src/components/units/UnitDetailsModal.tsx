@@ -266,24 +266,24 @@ export function UnitDetailsModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="relative flex max-h-[92vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-2xl"
+          className="relative flex max-h-[92vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 bg-slate-50/60 px-6 py-5 sm:flex-row sm:items-start">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 bg-slate-50/60 px-6 py-5 sm:flex-row sm:items-start dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                <span className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-slate-50">
                   {unitDisplay}
                 </span>
-                <span className="rounded-md border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-brand-blue">
+                <span className="rounded-md border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-brand-blue dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300">
                   {unit.type}
                 </span>
               </div>
-              <h1 className="text-base font-bold break-words text-slate-800 sm:text-lg">
+              <h1 className="text-base font-bold break-words text-slate-800 sm:text-lg dark:text-slate-100">
                 {fullAddress}
               </h1>
-              <p className="flex items-start gap-1.5 text-xs font-medium text-slate-500 sm:text-sm">
+              <p className="flex items-start gap-1.5 text-xs font-medium text-slate-500 sm:text-sm dark:text-slate-400">
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <span className="break-words">{locationLine}</span>
               </p>
@@ -291,11 +291,11 @@ export function UnitDetailsModal({
 
             <div className="flex shrink-0 items-center gap-3 self-end sm:self-start">
               <StatusBadge status={unit.status} label={statusLabel} />
-              <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+              <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
               <button
                 type="button"
                 onClick={handleShareLink}
-                className="cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue"
+                className="cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-300"
                 title={t('views.units.details.share')}
               >
                 <Share2 className="h-4 w-4" />
@@ -303,7 +303,7 @@ export function UnitDetailsModal({
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="hidden cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue sm:block"
+                className="hidden cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-300 sm:block"
                 title={t('views.units.details.print')}
               >
                 <Printer className="h-4 w-4" />
@@ -311,7 +311,7 @@ export function UnitDetailsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="ml-1 cursor-pointer rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="ml-1 cursor-pointer rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 aria-label={t('common.close')}
               >
                 <X className="h-5 w-5" />
@@ -402,45 +402,45 @@ export function UnitDetailsModal({
               </div>
 
               <div className="flex flex-col space-y-4 lg:col-span-4">
-                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                  <span className="mb-1 block text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/60">
+                  <span className="mb-1 block text-xs font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
                     {t('views.units.details.monthlyRentalRate')}
                   </span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-extrabold tracking-tight text-brand-blue">
                       ₱{Number(unit.monthlyRate).toLocaleString()}
                     </span>
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       {t('views.units.details.perMonth')}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2.5">
-                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center">
+                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">
                     <Maximize2 className="mx-auto h-4 w-4 text-brand-blue" />
-                    <span className="block text-[11px] font-medium text-slate-400">
+                    <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-500">
                       {t('views.units.details.floorArea')}
                     </span>
-                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm">
+                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                       {metrics.sqm}
                     </strong>
                   </div>
-                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center">
+                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">
                     <Bed className="mx-auto h-4 w-4 text-brand-blue" />
-                    <span className="block text-[11px] font-medium text-slate-400">
+                    <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-500">
                       {t('views.units.addModal.bedrooms')}
                     </span>
-                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm">
+                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                       {metrics.beds}
                     </strong>
                   </div>
-                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center">
+                  <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">
                     <Bath className="mx-auto h-4 w-4 text-brand-blue" />
-                    <span className="block text-[11px] font-medium text-slate-400">
+                    <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-500">
                       {t('views.units.addModal.bathrooms')}
                     </span>
-                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm">
+                    <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                       {metrics.baths}
                     </strong>
                   </div>
@@ -659,21 +659,21 @@ export function UnitDetailsModal({
             ) : null}
 
             {/* Remarks */}
-            <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-950/60">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-700">
                 <FileText className="h-5 w-5 text-brand-blue" />
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-50">
                   {t('views.units.details.specialRequests')}
                 </h3>
               </div>
-              <div className="min-h-[80px] rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 font-mono text-xs leading-relaxed text-slate-700 sm:text-sm">
+              <div className="min-h-[80px] rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 font-mono text-xs leading-relaxed text-slate-700 sm:text-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                 {remarks || t('views.units.details.noRemarks')}
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col items-stretch justify-end gap-3 border-t border-slate-100 bg-slate-50/40 px-6 py-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-stretch justify-end gap-3 border-t border-slate-100 bg-slate-50/40 px-6 py-4 sm:flex-row sm:items-center dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-center gap-2 self-end sm:self-auto">
               {canEdit && onEdit ? (
                 <button
@@ -688,7 +688,7 @@ export function UnitDetailsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 sm:text-sm"
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 {t('views.units.details.close')}
               </button>
