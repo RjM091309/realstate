@@ -46,6 +46,8 @@ import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
+import { fetchBrgys, fetchCities, type LocationBrgy, type LocationCity } from '@/lib/locationsApi';
+import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 import { toWebpDataUrl } from '@/lib/imageWebp';
 import { UNIT_FORM_TYPES, resolveUnitFloorTower } from '@/lib/unitFormUtils';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,19 @@ import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
+
+/** Same as Add Unit by Location: city = `area`, barangay = `buildingName`. */
+function locationKey(unit: Pick<Unit, 'area'>): string {
+  return String(unit.area ?? '').trim() || '—';
+}
+
+function buildingKey(unit: Pick<Unit, 'buildingName'>): string {
+  return String(unit.buildingName ?? '').trim() || '—';
+}
+
+function sameLocation(a: string, b: string): boolean {
+  return normalizeLocationAliasLabel(a).toLowerCase() === normalizeLocationAliasLabel(b).toLowerCase();
+}
 
 type AddUnitForm = {
   unitNumber: string;
@@ -418,6 +433,11 @@ export function UnitsView() {
   const [unitList, setUnitList] = useState<Unit[]>([]);
   const [unitsLoading, setUnitsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  /** Level 1 / Level 2 filters — same city/brgy masters as Add Unit by Location. */
+  const [managedCities, setManagedCities] = useState<LocationCity[]>([]);
+  const [managedBrgys, setManagedBrgys] = useState<LocationBrgy[]>([]);
+  const [filterCityId, setFilterCityId] = useState('');
+  const [filterBrgyId, setFilterBrgyId] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -447,11 +467,19 @@ export function UnitsView() {
   const reloadUnits = useCallback(async () => {
     setUnitsLoading(true);
     try {
-      const units = await fetchUnits();
+      const [units, cities, brgys] = await Promise.all([
+        fetchUnits(),
+        fetchCities(),
+        fetchBrgys(),
+      ]);
       setUnitList(units);
+      setManagedCities(cities);
+      setManagedBrgys(brgys);
       setUnitsBackedByApi(true);
     } catch {
       setUnitList([]);
+      setManagedCities([]);
+      setManagedBrgys([]);
       setUnitsBackedByApi(false);
       toast.warning(t('views.units.loadError'));
     } finally {
@@ -673,8 +701,77 @@ export function UnitsView() {
     [t],
   );
 
+  const selectedCity = useMemo(
+    () => managedCities.find((c) => String(c.cityId) === String(filterCityId)) ?? null,
+    [managedCities, filterCityId],
+  );
+
+  const selectedBrgy = useMemo(
+    () => managedBrgys.find((b) => String(b.brgyId) === String(filterBrgyId)) ?? null,
+    [managedBrgys, filterBrgyId],
+  );
+
+  /** Level 1 — DB `city` rows (same source as Add Unit by Location CITY panel). */
+  const cityOptions = useMemo(
+    () =>
+      [...managedCities]
+        .map((c) => ({ cityId: String(c.cityId), name: String(c.name ?? '').trim() }))
+        .filter((c) => c.name)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [managedCities],
+  );
+
+  /** Level 2 — DB `brgy` rows for the selected city (all brgys if no city). */
+  const brgyOptions = useMemo(() => {
+    const rows = filterCityId
+      ? managedBrgys.filter((b) => String(b.cityId) === String(filterCityId))
+      : managedBrgys;
+    const map = new Map<string, { brgyId: string; cityId: string; name: string }>();
+    for (const row of rows) {
+      const name = String(row.name ?? '').trim();
+      if (!name) continue;
+      map.set(String(row.brgyId), {
+        brgyId: String(row.brgyId),
+        cityId: String(row.cityId),
+        name,
+      });
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [managedBrgys, filterCityId]);
+
+  const citySelectOptions = useMemo(
+    () => cityOptions.map((c) => ({ value: c.cityId, label: c.name })),
+    [cityOptions],
+  );
+
+  const brgySelectOptions = useMemo(() => {
+    const cityNameById = new Map(
+      managedCities.map((c) => [String(c.cityId), String(c.name ?? '').trim()] as const),
+    );
+    return brgyOptions.map((b) => {
+      const cityName = cityNameById.get(b.cityId);
+      const label = !filterCityId && cityName ? `${b.name} · ${cityName}` : b.name;
+      return { value: b.brgyId, label };
+    });
+  }, [brgyOptions, managedCities, filterCityId]);
+
   const processedUnits = useMemo(() => {
     const rows = unitList.filter((u) => {
+      if (selectedCity) {
+        const unitCity = locationKey(u);
+        if (
+          !sameLocation(unitCity, selectedCity.name) &&
+          unitCity.trim().toLowerCase() !== selectedCity.name.trim().toLowerCase()
+        ) {
+          return false;
+        }
+      }
+      if (selectedBrgy) {
+        const unitBrgy = buildingKey(u);
+        if (unitBrgy.trim().toLowerCase() !== selectedBrgy.name.trim().toLowerCase()) {
+          return false;
+        }
+      }
       const haystack = unitSearchHaystack(u, branchContracts, tenantsList, statusLabel);
       return matchesUniversalSearch(haystack, searchTerm);
     });
@@ -682,7 +779,15 @@ export function UnitsView() {
     return [...rows].sort((a, b) =>
       a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true }),
     );
-  }, [unitList, searchTerm, branchContracts, tenantsList, statusLabel]);
+  }, [
+    unitList,
+    searchTerm,
+    selectedCity,
+    selectedBrgy,
+    branchContracts,
+    tenantsList,
+    statusLabel,
+  ]);
 
   const totalMonthlyRate = useMemo(
     () => processedUnits.reduce((sum, u) => sum + (Number(u.monthlyRate) || 0), 0),
@@ -1035,6 +1140,32 @@ export function UnitsView() {
           <p className="text-slate-500 mt-1 dark:text-slate-400">{t('views.units.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Select2
+            borderless={false}
+            className="w-full min-w-[12rem] sm:w-[15rem] [&_.unit-form-select-control]:!min-h-10 [&_.unit-form-select-control]:!text-sm [&_div]:!text-slate-900 dark:[&_div]:!text-slate-50"
+            placeholder={t('views.units.filters.level1')}
+            value={filterCityId || null}
+            onChange={(v) => {
+              setFilterCityId(v == null ? '' : String(v));
+              setFilterBrgyId('');
+            }}
+            options={citySelectOptions}
+          />
+          <Select2
+            borderless={false}
+            className="w-full min-w-[12rem] sm:w-[15rem] [&_.unit-form-select-control]:!min-h-10 [&_.unit-form-select-control]:!text-sm [&_div]:!text-slate-900 dark:[&_div]:!text-slate-50"
+            placeholder={t('views.units.filters.level2')}
+            value={filterBrgyId || null}
+            onChange={(v) => {
+              const next = v == null ? '' : String(v);
+              setFilterBrgyId(next);
+              if (next) {
+                const parent = managedBrgys.find((b) => String(b.brgyId) === next);
+                if (parent?.cityId) setFilterCityId(String(parent.cityId));
+              }
+            }}
+            options={brgySelectOptions}
+          />
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
               <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none dark:text-slate-500" />

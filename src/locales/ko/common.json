@@ -341,7 +341,13 @@
         "type": "유형",
         "typePh": "전체 유형",
         "status": "상태",
-        "statusPh": "전체 상태"
+        "statusPh": "전체 상태",
+        "level1": "레벨 1 · 시티",
+        "level2": "레벨 2 · 바랑가이",
+        "city": "시티",
+        "cityPh": "전체 시티",
+        "barangay": "바랑가이",
+        "barangayPh": "전체 바랑가이"
       },
       "sort": {
         "label": "정렬",

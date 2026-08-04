@@ -341,7 +341,13 @@
         "type": "Type",
         "typePh": "All types",
         "status": "Status",
-        "statusPh": "All statuses"
+        "statusPh": "All statuses",
+        "level1": "Level 1 · City",
+        "level2": "Level 2 · Barangay",
+        "city": "City",
+        "cityPh": "All cities",
+        "barangay": "Barangay",
+        "barangayPh": "All barangays"
       },
       "sort": {
         "label": "Sort",

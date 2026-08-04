@@ -61,16 +61,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
-    try {
-      const data = await apiFetch<{ session: SessionPayload }>('/api/auth/session');
-      setSession(data.session);
-    } catch {
+
+    // Retry transient failures (API still booting / Vite proxy ECONNREFUSED → 500).
+    // Only clear the token on real auth failures so a race does not log the user out.
+    const isAuthFailure = (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      return /unauthorized|invalid or expired session/i.test(msg);
+    };
+
+    const maxAttempts = 8;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const data = await apiFetch<{ session: SessionPayload }>('/api/auth/session');
+        setSession(data.session);
+        setLoading(false);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (isAuthFailure(err)) break;
+        await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+      }
+    }
+
+    if (isAuthFailure(lastErr)) {
       setToken(null);
       setDevBypassUserId(null);
-      setSession(null);
-    } finally {
-      setLoading(false);
     }
+    setSession(null);
+    setLoading(false);
   }, []);
 
   useEffect(() => {

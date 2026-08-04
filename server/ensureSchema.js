@@ -5,6 +5,170 @@
 import { pool } from './config/db.js';
 import { SIDEBAR_FEATURE_KEYS } from './accessConfig.js';
 
+async function tableExists(tableName) {
+  const [rows] = await pool.query(
+    `
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+    LIMIT 1
+    `,
+    [tableName],
+  );
+  return rows.length > 0;
+}
+
+async function tableHasPrimaryKey(tableName) {
+  const [rows] = await pool.query(
+    `
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+      AND constraint_type = 'PRIMARY KEY'
+    LIMIT 1
+    `,
+    [tableName],
+  );
+  return rows.length > 0;
+}
+
+/** Remove duplicate rows on the given columns so a PRIMARY KEY can be added. */
+async function dedupeTableRows(tableName, columnNames) {
+  const tmpCol = '_ensure_schema_rowid';
+  const [existing] = await pool.query(
+    `
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+      AND column_name = ?
+    LIMIT 1
+    `,
+    [tableName, tmpCol],
+  );
+  if (existing.length === 0) {
+    await pool.query(
+      `ALTER TABLE \`${tableName}\` ADD COLUMN \`${tmpCol}\` INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST`,
+    );
+  }
+  const onClause = columnNames.map((c) => `a.\`${c}\` = b.\`${c}\``).join(' AND ');
+  await pool.query(
+    `DELETE a FROM \`${tableName}\` a
+     INNER JOIN \`${tableName}\` b
+       ON ${onClause} AND a.\`${tmpCol}\` > b.\`${tmpCol}\``,
+  );
+  await pool.query(`ALTER TABLE \`${tableName}\` DROP COLUMN \`${tmpCol}\``);
+}
+
+/**
+ * Restore PRIMARY KEY (+ optional AUTO_INCREMENT) on existing tables that lost indexes
+ * (CREATE TABLE IF NOT EXISTS cannot repair broken tables).
+ */
+async function ensurePrimaryKey(tableName, columnNames, autoIncrementColumn = null) {
+  if (!(await tableExists(tableName))) return;
+
+  if (!(await tableHasPrimaryKey(tableName))) {
+    const colsSql = columnNames.map((c) => `\`${c}\``).join(', ');
+    try {
+      await pool.query(`ALTER TABLE \`${tableName}\` ADD PRIMARY KEY (${colsSql})`);
+    } catch (error) {
+      if (error?.code === 'ER_DUP_ENTRY' || error?.errno === 1062) {
+        await dedupeTableRows(tableName, columnNames);
+        await pool.query(`ALTER TABLE \`${tableName}\` ADD PRIMARY KEY (${colsSql})`);
+      } else if (error?.code !== 'ER_MULTIPLE_PRI_KEY') {
+        console.error(`[ensureSchema] primary key on ${tableName} skipped:`, error.message || error);
+        return;
+      }
+    }
+  }
+
+  if (!autoIncrementColumn) return;
+
+  const [colRows] = await pool.query(
+    `
+    SELECT column_type, extra, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+      AND column_name = ?
+    LIMIT 1
+    `,
+    [tableName, autoIncrementColumn],
+  );
+  const col = colRows[0];
+  if (!col) return;
+  const extra = String(col.EXTRA ?? col.extra ?? '').toLowerCase();
+  if (extra.includes('auto_increment')) return;
+
+  const columnType = String(col.COLUMN_TYPE ?? col.column_type);
+  try {
+    await pool.query(
+      `ALTER TABLE \`${tableName}\`
+       MODIFY COLUMN \`${autoIncrementColumn}\` ${columnType} NOT NULL AUTO_INCREMENT`,
+    );
+  } catch (error) {
+    console.error(
+      `[ensureSchema] AUTO_INCREMENT on ${tableName}.${autoIncrementColumn} skipped:`,
+      error.message || error,
+    );
+  }
+}
+
+/** Expected PKs for tables that may already exist without indexes. */
+async function repairMissingPrimaryKeys() {
+  const specs = [
+    ['user_role', ['IDNo'], 'IDNo'],
+    ['user_info', ['IDNO'], 'IDNO'],
+    ['branch', ['id'], 'id'],
+    ['branch_sidebar_permissions', ['branch_id', 'feature_key'], null],
+    ['user_role_crud_permissions', ['role_id', 'module_key'], null],
+    ['role_sidebar_permissions', ['role_id', 'feature_key'], null],
+    ['city', ['city_id'], 'city_id'],
+    ['brgy', ['brgy_id'], 'brgy_id'],
+    ['area', ['id'], 'id'],
+    ['property', ['id'], 'id'],
+    ['deleted_building', ['id'], 'id'],
+    ['location_building', ['id'], 'id'],
+    ['unit', ['id'], 'id'],
+    ['partner_agency', ['id'], 'id'],
+    ['landlord_profile', ['id'], 'id'],
+    ['landlord_document', ['id'], 'id'],
+    ['tenant_profile', ['id'], 'id'],
+    ['lease_contract', ['id'], 'id'],
+    ['contract_tenant', ['contract_id', 'tenant_id'], null],
+    ['blacklist_record', ['id'], 'id'],
+    ['blacklist', ['id'], 'id'],
+    ['document_template', ['id'], 'id'],
+    ['document_repository', ['id'], 'id'],
+    ['tenant_document', ['id'], 'id'],
+    ['invoice', ['id'], 'id'],
+    ['payment_schedule', ['id'], 'id'],
+    ['payment_transaction', ['id'], 'id'],
+    ['contract_collaboration', ['id'], 'id'],
+    ['special_request', ['id'], 'id'],
+    ['inventory_snapshot', ['id'], 'id'],
+    ['inventory_snapshot_item', ['id'], 'id'],
+    ['calendar_event', ['id'], 'id'],
+    ['unit_inspection', ['id'], 'id'],
+    ['inspection_checklist', ['id'], 'id'],
+    ['inspection_photo', ['id'], 'id'],
+    ['inventory_verification', ['id'], 'id'],
+    ['inspection_log', ['id'], 'id'],
+    ['audit_log', ['id'], 'id'],
+    ['lease_renewals', ['id'], 'id'],
+    ['lease_renewal_approvals', ['id'], 'id'],
+    ['lease_renewal_logs', ['id'], 'id'],
+    ['kyc_scanner_api', ['id'], 'id'],
+    ['notification_read', ['user_id', 'notification_key'], null],
+  ];
+
+  for (const [table, cols, autoInc] of specs) {
+    await ensurePrimaryKey(table, cols, autoInc);
+  }
+}
+
 /**
  * notification_feed is a VIEW; notification_read is a real table.
  * Safe to run on every startup (CREATE TABLE IF NOT EXISTS + CREATE OR REPLACE VIEW).
@@ -384,6 +548,12 @@ export async function ensureSchema() {
   }
 
   async function ensureTenantDocumentCascade() {
+    if (!(await tableExists('tenant_document')) || !(await tableExists('tenant_profile'))) {
+      return;
+    }
+    await ensurePrimaryKey('tenant_profile', ['id'], 'id');
+    await ensurePrimaryKey('tenant_document', ['id'], 'id');
+
     const [rows] = await pool.query(
       `
       SELECT delete_rule
@@ -393,12 +563,15 @@ export async function ensureSchema() {
       LIMIT 1
       `,
     );
-    const deleteRule = String(rows[0]?.delete_rule ?? '').toUpperCase();
+    const deleteRule = String(rows[0]?.DELETE_RULE ?? rows[0]?.delete_rule ?? '').toUpperCase();
     if (deleteRule === 'CASCADE') return;
 
-    await pool.query(
-      'ALTER TABLE `tenant_document` DROP FOREIGN KEY `fk_tenant_document_tenant`',
-    );
+    // Only DROP when the constraint exists; missing FK used to crash bootstrap (errno 1091).
+    if (rows.length > 0) {
+      await pool.query(
+        'ALTER TABLE `tenant_document` DROP FOREIGN KEY `fk_tenant_document_tenant`',
+      );
+    }
     await pool.query(
       `ALTER TABLE \`tenant_document\`
        ADD CONSTRAINT \`fk_tenant_document_tenant\`
@@ -536,6 +709,9 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_user_info_user_role\` FOREIGN KEY (\`PERMISSIONS\`) REFERENCES \`user_role\` (\`IDNo\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  // Existing DBs may have lost PRIMARY KEYs (INSERT IGNORE then duplicates rows; FKs fail with errno 150).
+  await repairMissingPrimaryKeys();
 
   await pool.query(`
     INSERT IGNORE INTO \`user_role\` (\`IDNo\`, \`ROLE\`, \`ENCODED_BY\`, \`ENCODED_DT\`, \`EDITED_BY\`, \`EDITED_DT\`, \`ACTIVE\`) VALUES
@@ -793,6 +969,10 @@ export async function ensureSchema() {
   }
 
   try {
+    // Referenced columns must be PK/UNIQUE (errno 150 otherwise).
+    await ensurePrimaryKey('city', ['city_id'], 'city_id');
+    await ensurePrimaryKey('brgy', ['brgy_id'], 'brgy_id');
+
     const [areaKeys] = await pool.query(
       `
       SELECT CONSTRAINT_NAME AS name
