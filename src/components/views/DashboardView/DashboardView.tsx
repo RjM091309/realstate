@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   Users,
@@ -108,11 +109,23 @@ interface StatCardProps {
   subtextVariant?: 'up' | 'down' | 'alert' | 'neutral';
   icon: React.ReactNode;
   iconColor: string;
+  onClick?: () => void;
+  clickHint?: string;
 }
 
-function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, iconColor }: StatCardProps) {
-  return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+function StatCard({
+  label,
+  value,
+  subtext,
+  subtextVariant = 'neutral',
+  icon,
+  iconColor,
+  onClick,
+  clickHint,
+}: StatCardProps) {
+  const interactive = Boolean(onClick);
+  const body = (
+    <>
       <div className="mb-4 flex items-start justify-between">
         <div className={cn('flex h-12 w-12 items-center justify-center rounded text-white shadow-lg', iconColor)}>
           {icon}
@@ -129,6 +142,7 @@ function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, ico
           subtextVariant === 'down' && 'text-rose-500',
           subtextVariant === 'alert' && 'text-rose-500',
           subtextVariant === 'neutral' && 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500',
+          interactive && 'underline-offset-2 group-hover:underline',
         )}
       >
         {subtextVariant === 'up' && <ArrowUpRight className="h-3 w-3" />}
@@ -136,14 +150,31 @@ function StatCard({ label, value, subtext, subtextVariant = 'neutral', icon, ico
         {subtextVariant === 'alert' && <AlertCircle className="h-3 w-3" />}
         {subtext}
       </div>
-    </div>
+    </>
   );
+
+  const cardClass = cn(
+    'group relative flex w-full flex-col overflow-hidden rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900',
+    interactive &&
+      'cursor-pointer transition hover:border-brand-blue/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40',
+  );
+
+  if (interactive) {
+    return (
+      <button type="button" onClick={onClick} title={clickHint || subtext} className={cardClass}>
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={cardClass}>{body}</div>;
 }
 
 type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
 
 export function DashboardView() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const { dateRange } = useDateRange();
   const { session } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -237,7 +268,10 @@ export function DashboardView() {
   const activeContracts = useMemo(() => contracts.filter((c) => c.status === 'Active').length, [contracts]);
 
   const baseMonthlyRentProfit = useMemo(
-    () => contracts.filter((c) => c.status === 'Active').reduce((sum, contract) => sum + (Number(contract.monthlyRent) || 0), 0),
+    () =>
+      contracts
+        .filter((c) => c.status === 'Active')
+        .reduce((sum, contract) => sum + (Number(contract.monthlyRent) || 0), 0),
     [contracts],
   );
 
@@ -513,6 +547,19 @@ export function DashboardView() {
           subtextVariant={collectedTrend.variant === 'down' ? 'down' : collectedTrend.variant === 'up' ? 'up' : 'neutral'}
           iconColor="bg-[#334155]"
           icon={<DollarSign className="h-6 w-6" />}
+          clickHint={t('views.dashboard.cards.viewPaidHint')}
+          onClick={() => {
+            if (!dateRange.start || !dateRange.end) {
+              navigate('/ledger?tab=paid');
+              return;
+            }
+            const params = new URLSearchParams({
+              tab: 'paid',
+              from: dateRange.start,
+              to: dateRange.end,
+            });
+            navigate(`/ledger?${params.toString()}`);
+          }}
         />
         <StatCard
           label={t('views.dashboard.cards.netProfit')}
@@ -521,6 +568,8 @@ export function DashboardView() {
           subtextVariant="neutral"
           iconColor="bg-brand-blue"
           icon={<TrendingUp className="h-6 w-6" />}
+          clickHint={t('views.dashboard.cards.viewMonthlyRentBaseHint')}
+          onClick={() => navigate('/contracts?status=Active')}
         />
         <StatCard
           label={t('views.dashboard.cards.activeLeases')}
@@ -533,6 +582,14 @@ export function DashboardView() {
           subtextVariant={newLeasesThisWeekCount > 0 ? 'up' : 'neutral'}
           iconColor="bg-brand-green"
           icon={<Users className="h-6 w-6" />}
+          clickHint={t('views.dashboard.cards.viewActiveLeasesHint')}
+          onClick={() =>
+            navigate(
+              newLeasesThisWeekCount > 0
+                ? '/contracts?status=Active&newThisWeek=1'
+                : '/contracts?status=Active',
+            )
+          }
         />
         <StatCard
           label={t('views.dashboard.cards.vacancyRate')}
@@ -541,6 +598,8 @@ export function DashboardView() {
           subtextVariant="down"
           iconColor="bg-brand-orange"
           icon={<Building2 className="h-6 w-6" />}
+          clickHint={t('views.dashboard.cards.viewAvailableUnitsHint')}
+          onClick={() => navigate('/units?status=Available')}
         />
         <StatCard
           label={t('views.dashboard.cards.overdueRent')}
@@ -549,6 +608,8 @@ export function DashboardView() {
           subtextVariant={overduePayments > 0 ? 'alert' : 'neutral'}
           iconColor="bg-rose-500"
           icon={<AlertCircle className="h-6 w-6" />}
+          clickHint={t('views.dashboard.cards.viewOverdueHint')}
+          onClick={() => navigate('/ledger?tab=outstanding')}
         />
       </div>
 

@@ -33,6 +33,7 @@ function rowToPayment(row) {
     dueDate: fmtDate(row.due_date) ?? '',
     paidDate: fmtDate(row.paid_date),
     status: String(row.status),
+    remarks: row.remarks ? String(row.remarks) : '',
   };
 }
 
@@ -58,7 +59,13 @@ function validatePayload(body) {
   }
   if (status === 'Paid' && !paidDate) paidDate = dueDate;
 
-  return { contractId, unitId, amount, dueDate, paidDate, status };
+  let remarks;
+  if (Object.prototype.hasOwnProperty.call(body, 'remarks')) {
+    const raw = body.remarks;
+    remarks = raw == null ? null : String(raw).trim().slice(0, 255) || null;
+  }
+
+  return { contractId, unitId, amount, dueDate, paidDate, status, remarks };
 }
 
 function canCrud(session, op) {

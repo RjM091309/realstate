@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   Search,
@@ -9,6 +9,7 @@ import {
   Eye,
   ClipboardList,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -31,7 +32,7 @@ import {
   updateContract,
 } from '@/lib/contractsApi';
 import { fetchPayments } from '@/lib/paymentsApi';
-import { format } from 'date-fns';
+import { endOfDay, format, isAfter, isBefore, parseISO, startOfDay, subDays } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,8 @@ function contractStatusLabel(status: Contract['status'], t: (key: string) => str
 export function ContractsView() {
   const { t } = useTranslation();
   const { session } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkHandledRef = useRef(false);
   const canCreate = session?.crud?.contracts?.create ?? false;
   const canUpdate = session?.crud?.contracts?.update ?? false;
   const canDelete = session?.crud?.contracts?.delete ?? false;
@@ -88,6 +91,8 @@ export function ContractsView() {
   const [contractsLoading, setContractsLoading] = useState(true);
   const [contractList, setContractList] = useState<Contract[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<Contract['status'] | null>(null);
+  const [newThisWeekOnly, setNewThisWeekOnly] = useState(false);
   const [isNewContractOpen, setIsNewContractOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingContractId, setEditingContractId] = useState<string | null>(null);
@@ -185,6 +190,27 @@ export function ContractsView() {
       cancelled = true;
     };
   }, [t]);
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    const statusParam = searchParams.get('status');
+    const newWeekParam = searchParams.get('newThisWeek');
+    if (!statusParam && !newWeekParam) return;
+
+    const allowed: Contract['status'][] = ['Pending Inspection', 'Active', 'Expired', 'Terminated'];
+    deepLinkHandledRef.current = true;
+    if (statusParam && allowed.includes(statusParam as Contract['status'])) {
+      setStatusFilter(statusParam as Contract['status']);
+    }
+    if (newWeekParam === '1' || newWeekParam === 'true') {
+      setNewThisWeekOnly(true);
+      if (!statusParam) setStatusFilter('Active');
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    next.delete('newThisWeek');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     void (async () => {
@@ -659,7 +685,18 @@ export function ContractsView() {
 
   const filteredContracts = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
+    const startWeek = startOfDay(subDays(new Date(), 7));
+    const endToday = endOfDay(new Date());
     return contractList.filter((c) => {
+      if (statusFilter && c.status !== statusFilter) return false;
+      if (newThisWeekOnly) {
+        try {
+          const sd = parseISO(c.startDate);
+          if (isBefore(sd, startWeek) || isAfter(sd, endToday)) return false;
+        } catch {
+          return false;
+        }
+      }
       if (!q) return true;
       const unit = unitList.find((u) => u.id === c.unitId);
       const tenant = tenantList.find((ten) => ten.id === c.tenantId);
@@ -670,7 +707,25 @@ export function ContractsView() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [searchTerm, contractList, tenantList, unitList]);
+  }, [searchTerm, contractList, tenantList, unitList, statusFilter, newThisWeekOnly]);
+
+  const highlightedContractIds = useMemo(() => {
+    if (!newThisWeekOnly) return null;
+    const startWeek = startOfDay(subDays(new Date(), 7));
+    const endToday = endOfDay(new Date());
+    return new Set(
+      filteredContracts
+        .filter((c) => {
+          try {
+            const sd = parseISO(c.startDate);
+            return !isBefore(sd, startWeek) && !isAfter(sd, endToday);
+          } catch {
+            return false;
+          }
+        })
+        .map((c) => c.id),
+    );
+  }, [filteredContracts, newThisWeekOnly]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -860,6 +915,31 @@ export function ContractsView() {
         onPayloadChange={setInspectionPayload}
       />
 
+      {statusFilter || newThisWeekOnly ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-green/30 bg-emerald-50 px-4 py-2.5 text-sm text-slate-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-slate-200">
+          <p>
+            {newThisWeekOnly
+              ? t('views.contracts.newThisWeekBanner', { count: filteredContracts.length })
+              : t('views.contracts.statusFilterBanner', {
+                  status: contractStatusLabel(statusFilter!, t),
+                  count: filteredContracts.length,
+                })}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-brand-green"
+            onClick={() => {
+              setStatusFilter(null);
+              setNewThisWeekOnly(false);
+            }}
+          >
+            {t('views.contracts.clearStatusFilter')}
+          </Button>
+        </div>
+      ) : null}
+
       {contractsLoading ? (
         <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
           <SkeletonTable rows={8} columns={7} />
@@ -870,6 +950,13 @@ export function ContractsView() {
           columns={columns}
           keyExtractor={(c) => c.id}
           onRowClick={(c) => openContractSummary(c)}
+          rowClassName={(c) =>
+            highlightedContractIds?.has(c.id)
+              ? '[&>td]:!bg-emerald-50 [&>td]:dark:!bg-emerald-950/50 ring-2 ring-inset ring-emerald-400/70'
+              : statusFilter === 'Active' && c.status === 'Active'
+                ? '[&>td]:!bg-emerald-50/60 [&>td]:dark:!bg-emerald-950/30'
+                : undefined
+          }
         />
       )}
     </div>

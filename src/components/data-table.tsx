@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   columns: ColumnDef<T>[];
   keyExtractor: (item: T) => string | number;
   onRowClick?: (item: T) => void;
+  /** Optional per-row class names (e.g. highlight paid rows). */
+  rowClassName?: (item: T) => string | undefined;
   /** Rows per page. Default 10. */
   defaultPageSize?: number;
   /** Page-size dropdown values. Default [10, 25, 50, 100]. */
@@ -121,6 +123,7 @@ export function DataTable<T>({
   columns,
   keyExtractor,
   onRowClick,
+  rowClassName,
   highlightFirstColumn = true,
   embedded = false,
   stickyHeader = false,
@@ -246,6 +249,7 @@ export function DataTable<T>({
                 className={cn(
                   'data-table-row group text-sm transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/40',
                   onRowClick ? 'cursor-pointer' : '',
+                  rowClassName?.(item),
                 )}
               >
                 {columns.map((col, i) => {

@@ -46,6 +46,17 @@ export function isPaymentPaidInMonth(payment: Payment, monthKey: string): boolea
   return paid.startsWith(monthKey);
 }
 
+export function isPaymentPaidBetween(
+  payment: Payment,
+  fromYmd: string,
+  toYmd: string,
+): boolean {
+  if (payment.status !== 'Paid') return false;
+  const paid = toLedgerYmd(payment.paidDate || payment.dueDate);
+  if (!paid || paid.length < 10) return false;
+  return paid >= fromYmd.slice(0, 10) && paid <= toYmd.slice(0, 10);
+}
+
 export function isLedgerPaymentPastDue(payment: Payment): boolean {
   if (payment.status === 'Paid') return false;
   if (payment.status === 'Overdue') return true;

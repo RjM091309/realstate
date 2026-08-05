@@ -8,6 +8,7 @@ export type PaymentWriteBody = {
   dueDate: string;
   paidDate?: string;
   status: Payment['status'];
+  remarks?: string;
 };
 
 export async function fetchPayments(): Promise<Payment[]> {

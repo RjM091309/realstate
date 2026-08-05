@@ -269,7 +269,8 @@ export async function listPaymentsByBranch(branchId) {
         WHEN 'paid' THEN 'Paid'
         WHEN 'overdue' THEN 'Overdue'
         ELSE 'Pending'
-      END AS status
+      END AS status,
+      ps.notes AS remarks
     FROM payment_schedule ps
     JOIN lease_contract lc
       ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
@@ -277,7 +278,7 @@ export async function listPaymentsByBranch(branchId) {
       ON pt.payment_schedule_id = ps.id AND pt.active = 1
     WHERE ps.branch_id = ?
       AND ps.active = 1
-    GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status
+    GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status, ps.notes
     ORDER BY ps.due_date DESC, ps.created_at DESC
     `,
     [branchId],
@@ -342,16 +343,22 @@ export async function updatePaymentById(id, branchId, payload) {
 
   const scheduleStatus = mapToScheduleStatus(payload.status);
 
+  const setClauses = ['amount_due = ?', 'due_date = ?', 'status = ?'];
+  const setValues = [payload.amount, payload.dueDate, scheduleStatus];
+  if (payload.remarks !== undefined) {
+    setClauses.push('notes = ?');
+    setValues.push(payload.remarks);
+  }
+  setValues.push(id, branchId);
+
   const [result] = await pool.query(
     `
     UPDATE payment_schedule
     SET
-      amount_due = ?,
-      due_date = ?,
-      status = ?
+      ${setClauses.join(',\n      ')}
     WHERE id = ? AND branch_id = ? AND active = 1
     `,
-    [payload.amount, payload.dueDate, scheduleStatus, id, branchId],
+    setValues,
   );
 
   // Keep payment_transaction consistent with payment_schedule.status
@@ -394,14 +401,15 @@ export async function getPaymentById(id, branchId) {
         WHEN 'paid' THEN 'Paid'
         WHEN 'overdue' THEN 'Overdue'
         ELSE 'Pending'
-      END AS status
+      END AS status,
+      ps.notes AS remarks
     FROM payment_schedule ps
     JOIN lease_contract lc
       ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
     LEFT JOIN payment_transaction pt
       ON pt.payment_schedule_id = ps.id AND pt.active = 1
     WHERE ps.id = ? AND ps.branch_id = ? AND ps.active = 1
-    GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status
+    GROUP BY ps.id, ps.branch_id, ps.contract_id, lc.unit_id, ps.amount_due, ps.due_date, ps.status, ps.notes
     LIMIT 1
     `,
     [id, branchId],

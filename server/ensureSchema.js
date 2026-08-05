@@ -676,6 +676,11 @@ export async function ensureSchema() {
         `ALTER TABLE \`payment_schedule\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`status\``,
       );
     }
+    if (!(await hasColumn('payment_schedule', 'notes'))) {
+      await pool.query(
+        `ALTER TABLE \`payment_schedule\` ADD COLUMN \`notes\` VARCHAR(255) NULL DEFAULT NULL AFTER \`active\``,
+      );
+    }
     if (!(await hasColumn('payment_transaction', 'active'))) {
       await pool.query(
         `ALTER TABLE \`payment_transaction\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER \`payment_method\``,

@@ -26,6 +26,7 @@ import {
   computeContractLedgerMetrics,
   computeLedgerSummary,
   isLedgerPaymentPastDue,
+  isPaymentPaidBetween,
   ledgerCurrentMonthKey,
   ledgerTodayYmd,
   paymentMatchesLedgerTab,
@@ -126,6 +127,9 @@ export function LeaseLedgerView() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduleContractId, setScheduleContractId] = useState<string | null>(null);
   const [highlightPaymentId, setHighlightPaymentId] = useState<string | null>(null);
+  const [paidHighlightRange, setPaidHighlightRange] = useState<{ from: string; to: string } | null>(
+    null,
+  );
   const [refLoading, setRefLoading] = useState(false);
   const [scheduleBusyId, setScheduleBusyId] = useState<string | null>(null);
 
@@ -231,14 +235,35 @@ export function LeaseLedgerView() {
 
   const filteredPayments = useMemo(
     () =>
-      payments.filter(
-        (p) =>
-          paymentMatchesQuery(p, searchTerm, units, contracts, tenants) &&
-          paymentMatchesLedgerTab(p, ledgerTab, ledgerMonth) &&
-          (!ledgerFilterUnitId || p.unitId === ledgerFilterUnitId),
-      ),
-    [payments, searchTerm, units, contracts, tenants, ledgerTab, ledgerMonth, ledgerFilterUnitId],
+      payments.filter((p) => {
+        if (!paymentMatchesQuery(p, searchTerm, units, contracts, tenants)) return false;
+        if (ledgerFilterUnitId && p.unitId !== ledgerFilterUnitId) return false;
+        if (paidHighlightRange && ledgerTab === 'paid') {
+          return isPaymentPaidBetween(p, paidHighlightRange.from, paidHighlightRange.to);
+        }
+        return paymentMatchesLedgerTab(p, ledgerTab, ledgerMonth);
+      }),
+    [
+      payments,
+      searchTerm,
+      units,
+      contracts,
+      tenants,
+      ledgerTab,
+      ledgerMonth,
+      ledgerFilterUnitId,
+      paidHighlightRange,
+    ],
   );
+
+  const highlightedPaidIds = useMemo(() => {
+    if (!paidHighlightRange) return null;
+    return new Set(
+      payments
+        .filter((p) => isPaymentPaidBetween(p, paidHighlightRange.from, paidHighlightRange.to))
+        .map((p) => p.id),
+    );
+  }, [payments, paidHighlightRange]);
 
   const tabCounts = useMemo(
     () =>
@@ -414,16 +439,50 @@ export function LeaseLedgerView() {
     if (loading || deepLinkHandledRef.current) return;
     const contractId = searchParams.get('contractId');
     const paymentId = searchParams.get('paymentId');
-    if (!contractId && !paymentId) return;
+    const tabParam = searchParams.get('tab');
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+
+    const validTabs: LedgerTab[] = ['this_month', 'outstanding', 'paid'];
+    const hasTabDeepLink = Boolean(tabParam && validTabs.includes(tabParam as LedgerTab));
+    const hasPaidRangeDeepLink =
+      (Boolean(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(fromParam || '')) ||
+      (Boolean(toParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam || ''));
+    const hasScheduleDeepLink = Boolean(contractId || paymentId);
+
+    if (!hasTabDeepLink && !hasPaidRangeDeepLink && !hasScheduleDeepLink) return;
     deepLinkHandledRef.current = true;
-    let resolvedContractId = contractId;
-    if (!resolvedContractId && paymentId) {
-      resolvedContractId = payments.find((p) => String(p.id) === String(paymentId))?.contractId ?? null;
+    initialTabSetRef.current = true;
+
+    if (hasTabDeepLink) {
+      setLedgerTab(tabParam as LedgerTab);
     }
-    if (resolvedContractId) openScheduleModal(resolvedContractId, paymentId);
+
+    if (hasPaidRangeDeepLink || tabParam === 'paid') {
+      if (!hasTabDeepLink) setLedgerTab('paid');
+      const from = fromParam && /^\d{4}-\d{2}-\d{2}$/.test(fromParam) ? fromParam : null;
+      const to = toParam && /^\d{4}-\d{2}-\d{2}$/.test(toParam) ? toParam : from;
+      if (from && to) {
+        setPaidHighlightRange({ from, to });
+        setLedgerMonth(from.slice(0, 7));
+      }
+    }
+
+    if (hasScheduleDeepLink) {
+      let resolvedContractId = contractId;
+      if (!resolvedContractId && paymentId) {
+        resolvedContractId =
+          payments.find((p) => String(p.id) === String(paymentId))?.contractId ?? null;
+      }
+      if (resolvedContractId) openScheduleModal(resolvedContractId, paymentId);
+    }
+
     const next = new URLSearchParams(searchParams);
     next.delete('contractId');
     next.delete('paymentId');
+    next.delete('tab');
+    next.delete('from');
+    next.delete('to');
     setSearchParams(next, { replace: true });
   }, [loading, openScheduleModal, payments, searchParams, setSearchParams]);
 
@@ -470,6 +529,7 @@ export function LeaseLedgerView() {
           dueDate: toLedgerYmd(payment.dueDate),
           paidDate: ledgerTodayYmd(),
           status: 'Paid',
+          remarks: payment.remarks ?? '',
         });
         patchPaymentInList(updated);
         toast.success(t('views.ledger.markedPaid'));
@@ -492,11 +552,39 @@ export function LeaseLedgerView() {
           amount: payment.amount,
           dueDate: toLedgerYmd(payment.dueDate),
           status: 'Pending',
+          remarks: payment.remarks ?? '',
         });
         patchPaymentInList(updated);
         toast.success(t('views.ledger.markedPending'));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t('views.ledger.updateStatusError'));
+      } finally {
+        setScheduleBusyId(null);
+      }
+    },
+    [patchPaymentInList, t],
+  );
+
+  const handleScheduleRemarksSave = useCallback(
+    async (payment: Payment, rawValue: string) => {
+      const next = rawValue.trim();
+      const prev = (payment.remarks ?? '').trim();
+      if (next === prev) return;
+
+      setScheduleBusyId(payment.id);
+      try {
+        const updated = await updatePayment(payment.id, {
+          contractId: payment.contractId,
+          unitId: payment.unitId,
+          amount: payment.amount,
+          dueDate: toLedgerYmd(payment.dueDate),
+          paidDate: payment.paidDate ? toLedgerYmd(payment.paidDate) : undefined,
+          status: payment.status,
+          remarks: next,
+        });
+        patchPaymentInList(updated);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('views.ledger.remarksSaveError'));
       } finally {
         setScheduleBusyId(null);
       }
@@ -756,7 +844,10 @@ export function LeaseLedgerView() {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => setLedgerMonth((m) => shiftLedgerMonth(m, -1))}
+            onClick={() => {
+              setPaidHighlightRange(null);
+              setLedgerMonth((m) => shiftLedgerMonth(m, -1));
+            }}
             aria-label={t('views.ledger.prevMonth')}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -769,7 +860,10 @@ export function LeaseLedgerView() {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => setLedgerMonth((m) => shiftLedgerMonth(m, 1))}
+            onClick={() => {
+              setPaidHighlightRange(null);
+              setLedgerMonth((m) => shiftLedgerMonth(m, 1));
+            }}
             aria-label={t('views.ledger.nextMonth')}
           >
             <ChevronRight className="h-4 w-4" />
@@ -780,7 +874,10 @@ export function LeaseLedgerView() {
               variant="ghost"
               size="sm"
               className="h-8 text-xs text-brand-blue"
-              onClick={() => setLedgerMonth(ledgerCurrentMonthKey())}
+              onClick={() => {
+                setPaidHighlightRange(null);
+                setLedgerMonth(ledgerCurrentMonthKey());
+              }}
             >
               {t('views.ledger.todayMonth')}
             </Button>
@@ -810,7 +907,10 @@ export function LeaseLedgerView() {
           <button
             key={tab}
             type="button"
-            onClick={() => setLedgerTab(tab)}
+            onClick={() => {
+              setPaidHighlightRange(null);
+              setLedgerTab(tab);
+            }}
             className={cn(
               'rounded-full px-3 py-1.5 text-sm font-medium transition',
               ledgerTab === tab
@@ -822,6 +922,27 @@ export function LeaseLedgerView() {
           </button>
         ))}
       </div>
+
+      {paidHighlightRange ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-blue/30 bg-brand-blue/10 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200">
+          <p>
+            {t('views.ledger.paidPeriodHighlight', {
+              from: formatPaymentDate(paidHighlightRange.from),
+              to: formatPaymentDate(paidHighlightRange.to),
+              count: highlightedPaidIds?.size ?? 0,
+            })}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-brand-blue"
+            onClick={() => setPaidHighlightRange(null)}
+          >
+            {t('views.ledger.clearPaidHighlight')}
+          </Button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
@@ -837,6 +958,11 @@ export function LeaseLedgerView() {
               embedded
               stickyHeader
               compact
+              rowClassName={(p) =>
+                highlightedPaidIds?.has(p.id)
+                  ? '[&>td]:!bg-emerald-50 [&>td]:dark:!bg-emerald-950/50 ring-2 ring-inset ring-emerald-400/70'
+                  : undefined
+              }
               onRowClick={canUpdate ? (p) => openEditModal(p) : undefined}
             />
           </CardContent>
@@ -847,7 +973,7 @@ export function LeaseLedgerView() {
         isOpen={isScheduleModalOpen}
         onClose={closeModal}
         title={t('views.ledger.monthlyScheduleTitle')}
-        maxWidth="3xl"
+        maxWidth="4xl"
         variant="glass"
         compact
         footer={
@@ -911,6 +1037,7 @@ export function LeaseLedgerView() {
                         <th className="px-3 py-2.5">{t('views.ledger.table.dueDate')}</th>
                         <th className="px-3 py-2.5 text-right">{t('views.ledger.table.amount')}</th>
                         <th className="px-3 py-2.5">{t('views.ledger.table.status')}</th>
+                        <th className="min-w-[9rem] px-3 py-2.5">{t('views.ledger.table.remarks')}</th>
                         <th className="px-3 py-2.5 text-right">{t('views.ledger.table.actions')}</th>
                       </tr>
                     </thead>
@@ -945,6 +1072,25 @@ export function LeaseLedgerView() {
                                     ? t('views.ledger.table.overdue')
                                     : t('views.ledger.table.pending')}
                               </StatusBadge>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {canUpdate ? (
+                                <Input
+                                  key={`${payment.id}-${payment.remarks ?? ''}`}
+                                  className="h-8 min-w-[8rem] max-w-[14rem] text-xs normal-case"
+                                  defaultValue={payment.remarks ?? ''}
+                                  disabled={busy}
+                                  maxLength={255}
+                                  placeholder={t('views.ledger.table.remarksPlaceholder')}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                  onBlur={(e) => void handleScheduleRemarksSave(payment, e.target.value)}
+                                />
+                              ) : (
+                                <span className="block max-w-[14rem] truncate text-xs normal-case text-slate-600 dark:text-slate-300">
+                                  {payment.remarks?.trim() || '—'}
+                                </span>
+                              )}
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               {canUpdate && payment.status === 'Paid' ? (

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -22,6 +22,7 @@ import {
   Check,
   Package,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, modalDismissButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,6 +131,44 @@ function floorLabelForCard(floor: string, floorWord: string): string {
   if (!f || f === '—') return '—';
   if (/\bfloor\b/i.test(f)) return f;
   return `${floorWord} ${f}`;
+}
+
+/** Full address line for unit cards: village, barangay, city, floor · tower. */
+function unitCardAddressLine(unit: Unit, floorWord: string): string {
+  const pushUnique = (parts: string[], value: string | null | undefined) => {
+    const v = stripLocationOrdinalPrefix(String(value ?? '').trim());
+    if (!v || v === '—' || v === '-') return;
+    const lower = v.toLowerCase();
+    if (parts.some((p) => p.toLowerCase() === lower || p.toLowerCase().includes(lower))) return;
+    parts.push(v);
+  };
+
+  const village =
+    [unit.legalAddress, unit.commonAddress]
+      .map((v) => String(v ?? '').trim())
+      .find((v) => v && v !== '—' && v !== '-') || '';
+  const barangay =
+    unit.buildingName && unit.buildingName !== '—' && unit.buildingName !== '-'
+      ? unit.buildingName
+      : '';
+  const city = areaDisplayLabel(unit.area);
+  const floorTower = resolveUnitFloorTower(unit);
+  const floorPart = floorLabelForCard(floorTower.floor || unit.floor, floorWord);
+  const towerPart =
+    floorTower.tower && floorTower.tower !== '—' && floorTower.tower !== '-'
+      ? floorTower.tower
+      : unit.tower && unit.tower !== '—' && unit.tower !== '-'
+        ? unit.tower
+        : '';
+
+  const parts: string[] = [];
+  pushUnique(parts, village);
+  pushUnique(parts, barangay);
+  pushUnique(parts, city !== '—' ? city : '');
+  const floorMeta = [floorPart !== '—' ? floorPart : '', towerPart].filter(Boolean).join(' · ');
+  pushUnique(parts, floorMeta || null);
+
+  return parts.join(', ') || '—';
 }
 
 function activeContractForUnit(unitId: string, contracts: Contract[]): Contract | null {
@@ -260,6 +299,8 @@ function writeBodyToUnit(id: string, body: UnitWriteBody, inventory: Unit['inven
 export function UnitsView() {
   const { t } = useTranslation();
   const { session } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkHandledRef = useRef(false);
   const canUpdate = session?.crud?.units?.update ?? false;
   const canDelete = session?.crud?.units?.delete ?? false;
 
@@ -271,6 +312,7 @@ export function UnitsView() {
   const [managedBrgys, setManagedBrgys] = useState<LocationBrgy[]>([]);
   const [filterCityId, setFilterCityId] = useState('');
   const [filterBrgyId, setFilterBrgyId] = useState('');
+  const [statusFilter, setStatusFilter] = useState<Unit['status'] | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -321,6 +363,19 @@ export function UnitsView() {
   useEffect(() => {
     void reloadUnits();
   }, [reloadUnits]);
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    const statusParam = searchParams.get('status');
+    if (!statusParam) return;
+    const allowed: Unit['status'][] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
+    if (!allowed.includes(statusParam as Unit['status'])) return;
+    deepLinkHandledRef.current = true;
+    setStatusFilter(statusParam as Unit['status']);
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -589,6 +644,7 @@ export function UnitsView() {
 
   const processedUnits = useMemo(() => {
     const rows = unitList.filter((u) => {
+      if (statusFilter && u.status !== statusFilter) return false;
       if (selectedCity) {
         const unitCity = locationKey(u);
         if (
@@ -619,6 +675,7 @@ export function UnitsView() {
     branchContracts,
     tenantsList,
     statusLabel,
+    statusFilter,
   ]);
 
   const totalMonthlyRate = useMemo(
@@ -983,6 +1040,26 @@ export function UnitsView() {
         </div>
       </div>
 
+      {statusFilter ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-orange/30 bg-orange-50 px-4 py-2.5 text-sm text-slate-700 dark:border-orange-800/50 dark:bg-orange-950/30 dark:text-slate-200">
+          <p>
+            {t('views.units.statusFilterBanner', {
+              status: statusLabel(statusFilter),
+              count: processedUnits.length,
+            })}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-brand-orange"
+            onClick={() => setStatusFilter(null)}
+          >
+            {t('views.units.clearStatusFilter')}
+          </Button>
+        </div>
+      ) : null}
+
       {unitsLoading ? (
         viewMode === 'list' ? (
           <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
@@ -1036,10 +1113,7 @@ export function UnitsView() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {processedUnits.map((unit) => {
             const metrics = resolveUnitMetrics(unit);
-            const towerLine =
-              unit.tower && unit.tower !== '—' ? `${unit.buildingName} · ${unit.tower}` : unit.buildingName;
-            const floorPart = floorLabelForCard(unit.floor, t('views.units.table.floor'));
-            const locationSubtitle = floorPart === '—' ? towerLine : `${towerLine} · ${floorPart}`;
+            const locationSubtitle = unitCardAddressLine(unit, t('views.units.table.floor'));
             const active = activeContractForUnit(unit.id, branchContracts);
             const tenantName = active
               ? tenantsList.find((x) => x.id === active.tenantId)?.name.trim() || '—'
@@ -1186,7 +1260,7 @@ export function UnitsView() {
                         {unit.type}
                       </p>
                       <p
-                        className="mt-0.5 line-clamp-2 text-sm leading-snug text-slate-600 dark:text-slate-300"
+                        className="mt-0.5 line-clamp-3 text-sm leading-snug text-slate-600 dark:text-slate-300"
                         title={locationSubtitle}
                       >
                         {locationSubtitle}

@@ -270,6 +270,7 @@ export interface Payment {
   dueDate: string;
   paidDate?: string;
   status: PaymentStatus;
+  remarks?: string;
 }
 
 export interface InvoiceRow {
