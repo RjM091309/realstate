@@ -19,6 +19,12 @@ export const UNIT_FORM_TYPES: UnitType[] = [
 
 export const UNIT_FORM_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 
+export const UNIT_FORM_FURNISHING = [
+  'Unfurnished',
+  'Semi-furnished',
+  'Fully furnished',
+] as const;
+
 /** Luzon city options used by the Units “Add New Unit” modal (Area field). */
 export const UNIT_FORM_AREA_CITIES: string[] = [
   'Manila',
@@ -129,6 +135,8 @@ export type UnitFormState = {
   monthlyRate: string;
   moreDetails: string;
   specialRemarks: string;
+  parkingSlot: string;
+  furnishing: string;
 };
 
 export function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths: number } {
@@ -167,6 +175,8 @@ export function defaultUnitForm(partial?: Partial<UnitFormState>): UnitFormState
     monthlyRate: '',
     moreDetails: '',
     specialRemarks: '',
+    parkingSlot: '',
+    furnishing: '',
     ...partial,
   };
 }
@@ -313,6 +323,8 @@ export function unitFormToWriteBody(
     photos: normalizedPhotos,
     moreDetails: form.moreDetails.trim() || undefined,
     specialRemarks: form.specialRemarks.trim() || undefined,
+    parkingSlot: form.parkingSlot.trim() || undefined,
+    furnishing: (form.furnishing.trim() || undefined) as UnitWriteBody['furnishing'],
     inventory,
   };
 }
@@ -346,5 +358,7 @@ export function unitToFormState(unit: Unit): UnitFormState {
     monthlyRate: String(unit.monthlyRate ?? ''),
     moreDetails: unit.moreDetails ?? '',
     specialRemarks: unit.specialRemarks ?? '',
+    parkingSlot: unit.parkingSlot ?? '',
+    furnishing: unit.furnishing ?? '',
   };
 }

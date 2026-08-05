@@ -19,6 +19,7 @@ export type UnitType =
   | '3BR'
   | 'Loft'
   | 'Penthouse';
+export type UnitFurnishing = 'Unfurnished' | 'Semi-furnished' | 'Fully furnished';
 export type TransactionType = 'Monthly Rental' | 'Sales' | 'Short-term Rental';
 export type PaymentStatus = 'Paid' | 'Overdue' | 'Pending';
 
@@ -43,6 +44,8 @@ export interface Unit {
   marketValue?: number;
   moreDetails?: string;
   specialRemarks?: string;
+  parkingSlot?: string;
+  furnishing?: UnitFurnishing;
   inventory: InventoryItem[];
 }
 
@@ -431,6 +434,10 @@ export interface LeaseRenewalBalanceBreakdown {
   penalties: number;
   parkingFees: number;
   otherCharges: number;
+  /** Future unpaid schedule total (not yet due) — informational, does not block renewal. */
+  remainingScheduled?: number;
+  overdueMonths?: number;
+  remainingMonths?: number;
 }
 
 export interface LeaseRenewalTerms {

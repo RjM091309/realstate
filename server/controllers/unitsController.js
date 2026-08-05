@@ -63,6 +63,8 @@ function rowToUnit(row) {
     unitNumber: String(row.unit_number),
     floor: String(row.floor ?? ''),
     tower: String(row.tower ?? ''),
+    parkingSlot: row.parking_slot ? String(row.parking_slot) : undefined,
+    furnishing: row.furnishing ? String(row.furnishing) : undefined,
     buildingName: String(row.building_name),
     commonAddress: String(row.common_address ?? ''),
     legalAddress: String(row.legal_address ?? ''),
@@ -87,6 +89,8 @@ function payloadToUnit(id, parsed) {
     unitNumber: parsed.unitNumber,
     floor: parsed.floor,
     tower: parsed.tower,
+    parkingSlot: parsed.parkingSlot,
+    furnishing: parsed.furnishing,
     buildingName: parsed.buildingName,
     commonAddress: parsed.commonAddress,
     legalAddress: parsed.legalAddress,
@@ -198,6 +202,16 @@ function validatePayload(body) {
       ? null
       : String(moreDetailsRaw).trim() || null;
 
+  const parkingSlotRaw = body.parkingSlot;
+  const parkingSlot =
+    parkingSlotRaw === null || parkingSlotRaw === undefined
+      ? null
+      : String(parkingSlotRaw).trim() || null;
+
+  const FURNISHING = new Set(['Unfurnished', 'Semi-furnished', 'Fully furnished']);
+  const furnishingRaw = String(body.furnishing ?? '').trim();
+  const furnishing = furnishingRaw && FURNISHING.has(furnishingRaw) ? furnishingRaw : null;
+
   const parseMetric = (raw, { max, allowDecimal }) => {
     if (raw === null || raw === undefined || String(raw).trim() === '') return null;
     const n = Number(raw);
@@ -229,6 +243,8 @@ function validatePayload(body) {
     inventory,
     moreDetails,
     specialRemarks,
+    parkingSlot,
+    furnishing,
   };
 }
 
@@ -287,6 +303,8 @@ export async function createUnit(req, res) {
       unitNumber: parsed.unitNumber,
       floor: parsed.floor,
       tower: parsed.tower,
+      parkingSlot: parsed.parkingSlot,
+      furnishing: parsed.furnishing,
       buildingName: parsed.buildingName,
       commonAddress: parsed.commonAddress,
       legalAddress: parsed.legalAddress,
@@ -340,6 +358,8 @@ export async function updateUnit(req, res) {
       unitNumber: parsed.unitNumber,
       floor: parsed.floor,
       tower: parsed.tower,
+      parkingSlot: parsed.parkingSlot,
+      furnishing: parsed.furnishing,
       buildingName: parsed.buildingName,
       commonAddress: parsed.commonAddress,
       legalAddress: parsed.legalAddress,

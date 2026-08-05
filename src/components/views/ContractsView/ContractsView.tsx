@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
-  FileText,
   Pencil,
   RefreshCw,
   CheckCircle2,
   Trash2,
+  Eye,
+  ClipboardList,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
@@ -38,17 +39,18 @@ import { apiFetch } from '@/lib/api';
 import type { Contract, Tenant, Unit, Payment, UnitInspectionPayload } from '@/types';
 import { DatePicker as AppDatePicker } from '@/components/DatePicker';
 import { UnitInspectionWorkflowModal } from '@/components/contracts/UnitInspectionWorkflowModal';
+import {
+  ContractSummaryModal,
+  leaseTermLabel,
+} from '@/components/contracts/ContractSummaryModal';
 import { fetchContractInspection } from '@/lib/unitInspectionApi';
 import { RenewLeaseModal } from '@/components/contracts/RenewLeaseModal';
+import { formatPhp } from '@/lib/leaseRenewalUtils';
 
 type StaffUserOption = { value: string; label: string };
 
-function parseContractDateTime(value?: string): Date | null {
-  if (!value?.trim()) return null;
-  const normalized = value.trim().includes('T') ? value.trim() : value.trim().replace(' ', 'T');
-  const d = new Date(normalized);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+const ACTION_ICON_BTN =
+  'h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5';
 
 function isInspectionApprovedForActivation(payload: UnitInspectionPayload | null) {
   const status = payload?.inspection?.status;
@@ -102,8 +104,10 @@ export function ContractsView() {
   });
   const [tenantList, setTenantList] = useState<Tenant[]>([]);
   const [unitList, setUnitList] = useState<Unit[]>([]);
+  const [summaryContract, setSummaryContract] = useState<Contract | null>(null);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isInspectionOpen, setIsInspectionOpen] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [renewTarget, setRenewTarget] = useState<Contract | null>(null);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
@@ -332,9 +336,19 @@ export function ContractsView() {
     }
   };
 
-  const openContractDetails = (contract: Contract, prefetch?: UnitInspectionPayload | null) => {
+  const openContractSummary = (contract: Contract) => {
+    setSummaryContract(contract);
+    setIsSummaryOpen(true);
+  };
+
+  const closeContractSummary = () => {
+    setIsSummaryOpen(false);
+    setSummaryContract(null);
+  };
+
+  const openInspection = (contract: Contract, prefetch?: UnitInspectionPayload | null) => {
     setSelectedContract(contract);
-    setIsDetailsOpen(true);
+    setIsInspectionOpen(true);
     if (prefetch) {
       setInspectionPayload(prefetch);
       setInspectionLoading(false);
@@ -364,18 +378,27 @@ export function ContractsView() {
         toast.success(t('views.contracts.leaseActivated'));
         return;
       }
-      openContractDetails(contract, inspectionData);
+      openInspection(contract, inspectionData);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.contracts.activateError'));
-      openContractDetails(contract);
+      openInspection(contract);
     }
   };
 
-  const closeContractDetails = () => {
-    setIsDetailsOpen(false);
+  const closeInspection = () => {
+    setIsInspectionOpen(false);
     setSelectedContract(null);
     setInspectionPayload(null);
   };
+
+  const resolveAgentName = useCallback(
+    (contract: Contract) =>
+      (contract.agentName && contract.agentName.trim()) ||
+      staffOptions.find((s) => s.value === contract.agentId)?.label ||
+      contract.agentId ||
+      '—',
+    [staffOptions],
+  );
 
   const unpaidBalanceForContract = useCallback(
     (contractId: string) =>
@@ -405,33 +428,21 @@ export function ContractsView() {
   const columns: ColumnDef<Contract>[] = useMemo(
     () => [
       {
-        id: 'createdAt',
-        header: t('views.contracts.table.dateTime'),
-        sortable: true,
-        sortValue: (contract) => contract.createdAt ?? '',
-        render: (contract) => {
-          const dt = parseContractDateTime(contract.createdAt);
-          return dt ? (
-            <div className="flex min-w-[8rem] flex-col gap-0.5">
-              <span className={cn(meritCellMetaClass, 'whitespace-nowrap text-slate-500')}>
-                {format(dt, 'MMM dd, yyyy')}
-              </span>
-              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {format(dt, 'h:mm a')}
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm text-slate-400">—</span>
-          );
-        },
-      },
-      {
         id: 'contractId',
         header: t('views.contracts.table.contractId'),
         sortable: true,
         sortValue: (contract) => contract.contractNo ?? contract.id,
         render: (contract) => (
-          <span className={meritCellAccentClass}>{contract.contractNo ?? contract.id}</span>
+          <button
+            type="button"
+            className={cn(meritCellAccentClass, 'cursor-pointer text-left hover:underline')}
+            onClick={(e) => {
+              e.stopPropagation();
+              openContractSummary(contract);
+            }}
+          >
+            {contract.contractNo ?? contract.id}
+          </button>
         ),
       },
       {
@@ -455,10 +466,18 @@ export function ContractsView() {
         sortValue: (contract) => unitList.find((u) => u.id === contract.unitId)?.unitNumber ?? contract.unitId,
         render: (contract) => {
           const unit = unitList.find((u) => u.id === contract.unitId);
+          const building = unit?.buildingName?.trim() || unit?.area?.trim() || '';
           return (
-            <span className={cn(meritCellPrimaryClass, 'block min-w-[5rem]')}>
-              {unit?.unitNumber ?? contract.unitId}
-            </span>
+            <div className="min-w-[5rem]">
+              <span className={cn(meritCellPrimaryClass, 'block')}>
+                {unit?.unitNumber ?? contract.unitId}
+              </span>
+              {building ? (
+                <span className={cn(meritCellMetaClass, 'mt-0.5 block truncate text-slate-400')}>
+                  {building}
+                </span>
+              ) : null}
+            </div>
           );
         },
       },
@@ -468,22 +487,28 @@ export function ContractsView() {
         sortable: true,
         sortValue: (contract) => contract.startDate,
         render: (contract) => (
-          <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            {format(new Date(contract.startDate), 'MMM dd, yyyy')}
-            <span className="mx-1.5 text-slate-300 dark:text-slate-600">—</span>
-            {format(new Date(contract.endDate), 'MMM dd, yyyy')}
-          </span>
+          <div className="min-w-[9rem]">
+            <span className="block whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              {format(new Date(contract.startDate), 'MMM dd, yyyy')}
+              <span className="mx-1.5 text-slate-300 dark:text-slate-600">—</span>
+              {format(new Date(contract.endDate), 'MMM dd, yyyy')}
+            </span>
+            <span className="mt-0.5 block text-[10px] font-semibold text-slate-400">
+              {leaseTermLabel(contract.startDate, contract.endDate, t)}
+            </span>
+          </div>
         ),
       },
       {
-        id: 'agent',
-        header: t('views.contracts.table.agent'),
+        id: 'rent',
+        header: t('views.contracts.table.rent'),
         sortable: true,
-        sortValue: (contract) => contract.agentName?.trim() ?? '',
-        render: (contract) => {
-          const label = (contract.agentName && contract.agentName.trim()) || '—';
-          return <span className="text-[12px] font-black uppercase tracking-tight text-slate-700">{label}</span>;
-        },
+        sortValue: (contract) => Number(contract.monthlyRent) || 0,
+        render: (contract) => (
+          <span className="whitespace-nowrap text-sm font-bold text-slate-800 dark:text-slate-100">
+            {formatPhp(contract.monthlyRent)}
+          </span>
+        ),
       },
       {
         id: 'status',
@@ -494,41 +519,6 @@ export function ContractsView() {
           <StatusBadge tone={contract.status === 'Active' ? 'success' : contractStatusVariant(contract.status)}>
             {contractStatusLabel(contract.status, t)}
           </StatusBadge>
-        ),
-      },
-      {
-        id: 'documents',
-        header: t('views.contracts.table.documents'),
-        className: 'text-center',
-        headerClassName: 'text-center',
-        cellClassName: 'text-center',
-        render: (contract) => (
-          <div className="flex w-full items-center justify-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-lg border-transparent bg-white px-2 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview(contract, 'contract');
-              }}
-            >
-              <FileText className="mr-1 h-3.5 w-3.5 shrink-0" />
-              {t('views.contracts.table.contract')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-lg border-transparent bg-white px-2 text-xs font-medium text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview(contract, 'invoice');
-              }}
-            >
-              <FileText className="mr-1 h-3.5 w-3.5 shrink-0" />
-              {t('views.contracts.table.invoice')}
-            </Button>
-          </div>
         ),
       },
       {
@@ -544,13 +534,33 @@ export function ContractsView() {
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title={t('views.contracts.table.view')}
+              className={ACTION_ICON_BTN}
+              onClick={() => openContractSummary(contract)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title={t('views.contracts.table.inspect')}
+              className={ACTION_ICON_BTN}
+              onClick={() => openInspection(contract)}
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+            </Button>
             {canUpdate ? (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 title={t('views.contracts.table.edit')}
-                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                className={ACTION_ICON_BTN}
                 onClick={() => openEditModal(contract)}
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -562,7 +572,7 @@ export function ContractsView() {
                 variant="outline"
                 size="icon"
                 title={t('views.contracts.table.renew')}
-                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                className={ACTION_ICON_BTN}
                 onClick={() => openRenewLease(contract)}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -574,7 +584,7 @@ export function ContractsView() {
                 variant="outline"
                 size="icon"
                 title={t('views.contracts.table.inspectOrActivate')}
-                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                className={ACTION_ICON_BTN}
                 onClick={() => void handleInspectOrActivate(contract)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -586,7 +596,7 @@ export function ContractsView() {
                 variant="outline"
                 size="icon"
                 title={t('views.contracts.table.delete')}
-                className="h-8 w-8 rounded-lg border-transparent bg-white text-slate-700 shadow-sm hover:border-transparent hover:bg-slate-50 dark:border-transparent dark:bg-slate-900 dark:text-slate-300 dark:hover:border-transparent dark:hover:bg-slate-800 [&_svg]:translate-y-0.5"
+                className={ACTION_ICON_BTN}
                 onClick={() => void handleDeleteContract(contract)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -596,7 +606,7 @@ export function ContractsView() {
         ),
       },
     ],
-    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease]
+    [t, tenantList, unitList, canUpdate, canDelete, canRenewLease],
   );
 
   const handleGenerate = () => {
@@ -813,9 +823,26 @@ export function ContractsView() {
         }}
       />
 
+      <ContractSummaryModal
+        isOpen={isSummaryOpen}
+        onClose={closeContractSummary}
+        contract={summaryContract}
+        unit={summaryContract ? unitList.find((u) => u.id === summaryContract.unitId) ?? null : null}
+        tenantName={
+          summaryContract
+            ? tenantList.find((ten) => ten.id === summaryContract.tenantId)?.name ?? summaryContract.tenantId
+            : '—'
+        }
+        agentName={summaryContract ? resolveAgentName(summaryContract) : '—'}
+        canEdit={canUpdate}
+        onEdit={openEditModal}
+        onOpenInspection={openInspection}
+        onPreviewDocument={handlePreview}
+      />
+
       <UnitInspectionWorkflowModal
-        isOpen={isDetailsOpen}
-        onClose={closeContractDetails}
+        isOpen={isInspectionOpen}
+        onClose={closeInspection}
         contract={selectedContract}
         unit={selectedContract ? unitList.find((u) => u.id === selectedContract.unitId) ?? null : null}
         tenantName={
@@ -823,13 +850,7 @@ export function ContractsView() {
             ? tenantList.find((ten) => ten.id === selectedContract.tenantId)?.name ?? selectedContract.tenantId
             : '—'
         }
-        agentName={
-          selectedContract
-            ? (selectedContract.agentName && selectedContract.agentName.trim()) ||
-              staffOptions.find((s) => s.value === selectedContract.agentId)?.label ||
-              selectedContract.agentId
-            : '—'
-        }
+        agentName={selectedContract ? resolveAgentName(selectedContract) : '—'}
         payload={inspectionPayload}
         loading={inspectionLoading}
         canWrite={canUpdate}
@@ -841,15 +862,15 @@ export function ContractsView() {
 
       {contractsLoading ? (
         <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
-          <SkeletonTable rows={8} columns={9} />
+          <SkeletonTable rows={8} columns={7} />
         </div>
       ) : (
         <DataTable
           data={filteredContracts}
           columns={columns}
           keyExtractor={(c) => c.id}
-          onRowClick={(c) => openContractDetails(c)}
-                  />
+          onRowClick={(c) => openContractSummary(c)}
+        />
       )}
     </div>
   );

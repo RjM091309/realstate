@@ -11,6 +11,7 @@ import { LocEmpty, LocPanel, locBoard } from '@/components/location-board/Locati
 import { CategoryMaintenanceList } from '@/components/file-maintenance/CategoryMaintenanceList';
 import { UnitFormModal } from '@/components/units/UnitFormModal';
 import { UnitDetailsModal } from '@/components/units/UnitDetailsModal';
+import { meritCellAccentClass, meritCellPrimaryClass, meritCellMetaClass } from '@/components/data-table';
 import {
   getCoreCategoryName,
   loadFileMaintenanceCategories,
@@ -160,6 +161,8 @@ function unitToWriteBody(unit: Unit, patch: Partial<UnitWriteBody> = {}): UnitWr
     photos: unit.photos ?? (unit.photoDataUrl ? [unit.photoDataUrl] : []),
     moreDetails: unit.moreDetails,
     specialRemarks: unit.specialRemarks,
+    parkingSlot: unit.parkingSlot,
+    furnishing: unit.furnishing,
     inventory: unit.inventory ?? [],
     ...patch,
   };
@@ -1361,8 +1364,8 @@ export function AddUnitByLocationView() {
           {t('views.addUnitByLocation.loading')}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-stretch">
-          <div className="lg:col-span-3 xl:col-span-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,16.5rem)_minmax(0,16.5rem)_minmax(0,1fr)] lg:items-stretch">
+          <div className="min-w-0">
             <LocPanel
               title={panelLocation}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1448,7 +1451,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="lg:col-span-2 xl:col-span-2">
+          <div className="min-w-0">
             <LocPanel
               title={panelBuilding}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1541,7 +1544,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="min-w-0 lg:col-span-7 xl:col-span-7">
+          <div className="min-w-0">
             <LocPanel
               title={panelUnits}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1660,8 +1663,18 @@ export function AddUnitByLocationView() {
               ) : filteredUnits.length === 0 ? (
                 <LocEmpty>{t('views.addUnitByLocation.emptyUnits')}</LocEmpty>
               ) : (
-                <div className="max-lg:overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                  <table className="w-full table-auto border-collapse text-left text-xs">
+                <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                  <table className="w-full min-w-[52rem] table-fixed border-collapse text-left text-xs">
+                    <colgroup>
+                      <col className="w-[10%]" />
+                      <col className="w-[28%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[8%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
                         {renderSortTh('unit', t('views.units.table.unit'))}
@@ -1719,18 +1732,31 @@ export function AddUnitByLocationView() {
                             key={unit.id}
                             className="border-b border-slate-100 last:border-b-0 even:bg-slate-50/60 hover:bg-slate-50 dark:border-slate-800 dark:even:bg-slate-900/40"
                           >
-                            <td className="px-3 py-2.5 align-middle font-bold text-slate-800 dark:text-slate-100">
-                              <span className="block break-words" title={formatUnitNumberDisplay(unit)}>
+                            <td className="px-3 py-2.5 align-middle">
+                              <span
+                                className={cn(meritCellAccentClass, 'block break-words')}
+                                title={formatUnitNumberDisplay(unit)}
+                              >
                                 {formatUnitNumberDisplay(unit)}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 align-middle text-slate-600 dark:text-slate-300">
+                            <td className="px-3 py-2.5 align-middle">
                               <div className="min-w-0 space-y-0.5" title={areaTitle}>
-                                <div className="whitespace-normal break-words font-semibold leading-snug">
+                                <div
+                                  className={cn(
+                                    meritCellPrimaryClass,
+                                    'whitespace-normal break-words leading-snug normal-case',
+                                  )}
+                                >
                                   {primaryLabel}
                                 </div>
                                 {secondaryLabel ? (
-                                  <div className="whitespace-normal break-words text-[11px] leading-snug text-slate-400">
+                                  <div
+                                    className={cn(
+                                      meritCellMetaClass,
+                                      'whitespace-normal break-words leading-snug normal-case',
+                                    )}
+                                  >
                                     {secondaryLabel}
                                   </div>
                                 ) : null}
@@ -1752,7 +1778,7 @@ export function AddUnitByLocationView() {
                                 className={cn(
                                   'rounded-full px-2 py-0.5 text-[10px] font-semibold',
                                   unit.status === 'Available' && 'bg-emerald-500 text-white',
-                                  unit.status === 'Occupied' && 'bg-brand-blue text-white',
+                                  unit.status === 'Occupied' && 'bg-rose-600 text-white',
                                   unit.status === 'Maintenance' && 'bg-rose-500 text-white',
                                   unit.status === 'Reserved' && 'bg-amber-500 text-amber-950',
                                 )}

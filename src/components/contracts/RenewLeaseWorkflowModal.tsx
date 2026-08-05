@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Info,
   TrendingUp,
 } from 'lucide-react';
 import { addMonths, addYears, differenceInCalendarDays, differenceInCalendarMonths, format, parseISO } from 'date-fns';
@@ -169,7 +170,12 @@ export function RenewLeaseWorkflowModal({
     penalties: 0,
     parkingFees: 0,
     otherCharges: 0,
+    remainingScheduled: 0,
+    overdueMonths: 0,
+    remainingMonths: 0,
   };
+  const remainingScheduled = Number(breakdown.remainingScheduled ?? 0);
+  const remainingMonths = Number(breakdown.remainingMonths ?? 0);
   const previousRent = summary?.currentMonthlyRent ?? Number(contract?.monthlyRent ?? 0);
   const currentRent = parseRentInput(rentInput);
   const increaseAmount = Number.isFinite(currentRent) ? currentRent - previousRent : 0;
@@ -489,6 +495,24 @@ export function RenewLeaseWorkflowModal({
           </span>
           <span className="text-base font-bold text-brand-blue dark:text-blue-50">{formatPhp(outstanding)}</span>
         </div>
+        {remainingScheduled > 0 ? (
+          <div className="mt-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-slate-600/70 dark:bg-slate-800/50">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t('views.contracts.renewLease.workflow.remainingScheduled')}
+              </span>
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {formatPhp(remainingScheduled)}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              {t('views.contracts.renewLease.workflow.remainingScheduledHint', {
+                months: remainingMonths,
+                monthly: formatPhp(previousRent),
+              })}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             type="button"
@@ -948,6 +972,25 @@ export function RenewLeaseWorkflowModal({
           >
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden />
             <p>{t('views.contracts.renewLease.workflow.outstandingWarning', { amount: formatPhp(outstanding) })}</p>
+          </div>
+        ) : remainingScheduled > 0 ? (
+          <div
+            className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-500/40 dark:bg-sky-950 dark:text-sky-100"
+            role="status"
+          >
+            <Info className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-300" aria-hidden />
+            <div className="space-y-0.5">
+              <p className="font-medium">
+                {t('views.contracts.renewLease.workflow.remainingScheduledWarning', {
+                  amount: formatPhp(remainingScheduled),
+                  months: remainingMonths,
+                  monthly: formatPhp(previousRent),
+                })}
+              </p>
+              <p className="text-xs opacity-90">
+                {t('views.contracts.renewLease.workflow.remainingScheduledWarningHint')}
+              </p>
+            </div>
           </div>
         ) : null}
 

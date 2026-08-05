@@ -23,6 +23,8 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
+  Car,
+  Armchair,
 } from 'lucide-react';
 import { format, parseISO, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -445,6 +447,54 @@ export function UnitDetailsModal({
                     </strong>
                   </div>
                 </div>
+
+                {(() => {
+                  const parking =
+                    String(unit.parkingSlot ?? '').trim() &&
+                    String(unit.parkingSlot).trim() !== '—'
+                      ? String(unit.parkingSlot).trim()
+                      : '';
+                  const furnishingLabel =
+                    unit.furnishing === 'Unfurnished'
+                      ? t('views.units.addModal.furnishingOptions.unfurnished')
+                      : unit.furnishing === 'Semi-furnished'
+                        ? t('views.units.addModal.furnishingOptions.semi')
+                        : unit.furnishing === 'Fully furnished'
+                          ? t('views.units.addModal.furnishingOptions.fully')
+                          : '';
+                  if (!parking && !furnishingLabel) return null;
+                  return (
+                    <div
+                      className={cn(
+                        'grid gap-2.5',
+                        parking && furnishingLabel ? 'grid-cols-2' : 'grid-cols-1',
+                      )}
+                    >
+                      {parking ? (
+                        <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">
+                          <Car className="mx-auto h-4 w-4 text-brand-blue" />
+                          <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                            {t('views.units.addModal.parkingSlot')}
+                          </span>
+                          <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
+                            {parking}
+                          </strong>
+                        </div>
+                      ) : null}
+                      {furnishingLabel ? (
+                        <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">
+                          <Armchair className="mx-auto h-4 w-4 text-brand-blue" />
+                          <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                            {t('views.units.addModal.furnishing')}
+                          </span>
+                          <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
+                            {furnishingLabel}
+                          </strong>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

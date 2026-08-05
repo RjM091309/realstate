@@ -20,6 +20,8 @@ export type UnitWriteBody = {
   photos?: string[];
   moreDetails?: string;
   specialRemarks?: string;
+  parkingSlot?: string;
+  furnishing?: Unit['furnishing'];
   inventory: Unit['inventory'];
 };
 

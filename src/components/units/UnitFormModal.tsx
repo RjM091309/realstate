@@ -12,6 +12,7 @@ import { toWebpDataUrl } from '@/lib/imageWebp';
 import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
 import { cn } from '@/lib/utils';
 import {
+  UNIT_FORM_FURNISHING,
   UNIT_FORM_STATUSES,
   UNIT_FORM_TYPES,
   defaultUnitForm,
@@ -235,6 +236,19 @@ export function UnitFormModal({
         return { value: floor, label: floor };
       }),
     [],
+  );
+  const furnishingOptions = useMemo(
+    () =>
+      UNIT_FORM_FURNISHING.map((value) => ({
+        value,
+        label:
+          value === 'Unfurnished'
+            ? t('views.units.addModal.furnishingOptions.unfurnished')
+            : value === 'Semi-furnished'
+              ? t('views.units.addModal.furnishingOptions.semi')
+              : t('views.units.addModal.furnishingOptions.fully'),
+      })),
+    [t],
   );
 
   const handlePhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -563,15 +577,6 @@ export function UnitFormModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="loc-add-tower">{t('views.units.addModal.tower')}</Label>
-                  <Input
-                    id="loc-add-tower"
-                    value={form.tower}
-                    onChange={(e) => setForm((f) => ({ ...f, tower: e.target.value }))}
-                    className={FIELD}
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
                   <Label>{t('views.units.addModal.categoryType')}</Label>
                   <Select2
                     options={typeOptions}
@@ -587,6 +592,27 @@ export function UnitFormModal({
                         bathrooms: String(m.baths),
                       }));
                     }}
+                    borderless={false}
+                    className="[&_.unit-form-select-control]:!min-h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="loc-add-parking">{t('views.units.addModal.parkingSlot')}</Label>
+                  <Input
+                    id="loc-add-parking"
+                    value={form.parkingSlot}
+                    onChange={(e) => setForm((f) => ({ ...f, parkingSlot: e.target.value }))}
+                    placeholder={t('views.units.addModal.parkingSlotPlaceholder')}
+                    className={cn(FIELD, '!h-12 !min-h-12')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('views.units.addModal.furnishing')}</Label>
+                  <Select2
+                    options={furnishingOptions}
+                    value={form.furnishing || null}
+                    onChange={(v) => setForm((f) => ({ ...f, furnishing: String(v ?? '') }))}
+                    placeholder={t('views.units.addModal.furnishingPlaceholder')}
                     borderless={false}
                     className="[&_.unit-form-select-control]:!min-h-12"
                   />

@@ -518,6 +518,36 @@ export async function ensureSchema() {
         `ALTER TABLE \`unit\` ADD COLUMN \`photos_json\` LONGTEXT NULL AFTER \`photo_data\``,
       );
     }
+
+    const [parkingRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'parking_slot'
+      `,
+    );
+    if (parkingRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`parking_slot\` VARCHAR(120) NULL DEFAULT NULL AFTER \`tower\``,
+      );
+    }
+
+    const [furnishingRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'furnishing'
+      `,
+    );
+    if (furnishingRows.length === 0) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`furnishing\` VARCHAR(40) NULL DEFAULT NULL AFTER \`parking_slot\``,
+      );
+    }
   }
 
   async function ensureUserAvatarColumn() {

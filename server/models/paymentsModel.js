@@ -199,7 +199,7 @@ export async function pruneOffScheduleDues(
 
 const monthlyBackfillDone = new Set();
 
-/** Sum of unpaid payment_schedule rows for a contract (pending + overdue). */
+/** Sum of past-due / overdue unpaid payment_schedule rows (excludes future months). */
 export async function sumUnpaidBalanceForContract(branchId, contractId, conn = pool) {
   const [rows] = await conn.query(
     `
@@ -209,6 +209,11 @@ export async function sumUnpaidBalanceForContract(branchId, contractId, conn = p
       AND contract_id = ?
       AND active = 1
       AND status <> 'paid'
+      AND (
+        status = 'overdue'
+        OR due_date IS NULL
+        OR due_date <= CURDATE()
+      )
     `,
     [branchId, contractId],
   );

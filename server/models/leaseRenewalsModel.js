@@ -1,6 +1,5 @@
 import { pool } from '../config/db.js';
 import { getContractById, renewLeaseContract } from './contractsModel.js';
-import { sumUnpaidBalanceForContract } from './paymentsModel.js';
 
 const WORKFLOW_STEPS = ['summary', 'balance', 'terms', 'agreement', 'approval', 'activation'];
 const RENEWAL_STATUSES = [
@@ -31,10 +30,24 @@ function categorizeNote(note) {
   return 'outstandingRent';
 }
 
+function isSchedulePastDue(row) {
+  if (String(row.status ?? '').toLowerCase() === 'overdue') return true;
+  const due = row.due_date;
+  if (!due) return false;
+  const ymd = typeof due === 'string' ? due.slice(0, 10) : new Date(due).toISOString().slice(0, 10);
+  const today = new Date();
+  const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return ymd <= todayYmd;
+}
+
+/**
+ * Outstanding = unpaid schedules that are past due / overdue (blocks renewal).
+ * Remaining scheduled = future unpaid months on the current lease (info only — not arrears).
+ */
 export async function computeBalanceBreakdown(branchId, contractId, conn = pool) {
   const [rows] = await conn.query(
     `
-    SELECT amount_due, notes
+    SELECT amount_due, due_date, status, notes
     FROM payment_schedule
     WHERE branch_id = ?
       AND contract_id = ?
@@ -50,15 +63,31 @@ export async function computeBalanceBreakdown(branchId, contractId, conn = pool)
     penalties: 0,
     parkingFees: 0,
     otherCharges: 0,
+    remainingScheduled: 0,
+    overdueMonths: 0,
+    remainingMonths: 0,
   };
 
   for (const row of rows) {
     const amount = Number(row.amount_due ?? 0);
-    const bucket = categorizeNote(row.notes);
-    breakdown[bucket] += amount;
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    if (isSchedulePastDue(row)) {
+      const bucket = categorizeNote(row.notes);
+      breakdown[bucket] += amount;
+      breakdown.overdueMonths += 1;
+    } else {
+      breakdown.remainingScheduled += amount;
+      breakdown.remainingMonths += 1;
+    }
   }
 
-  const total = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
+  const total =
+    breakdown.outstandingRent +
+    breakdown.utilities +
+    breakdown.penalties +
+    breakdown.parkingFees +
+    breakdown.otherCharges;
   return { breakdown, total };
 }
 
@@ -320,6 +349,9 @@ export async function createOrGetRenewalDraft(branchId, contractId, actorUserId)
 
   const existing = await getActiveDraftRenewalForContract(branchId, contractId);
   if (existing) {
+    // Recompute so drafts created before past-due-only logic stay accurate.
+    const refreshed = await refreshRenewalBalance(branchId, existing.id);
+    if (refreshed.ok) return { ok: true, ...refreshed, created: false };
     const payload = await buildRenewalPayload(branchId, existing);
     return { ok: true, ...payload, created: false };
   }

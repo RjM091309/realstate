@@ -7,3 +7,7 @@ coverage/
 .env*
 !.env.example
 *.zip
+
+# Local DB dumps often contain API keys / PII — keep out of git
+/realstate*.sql
+/*.sql.bak

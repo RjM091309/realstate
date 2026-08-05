@@ -225,6 +225,8 @@ function unitToWriteBody(u: Unit, inventory: InventoryItem[]): UnitWriteBody {
     photos: u.photos ?? (u.photoDataUrl ? [u.photoDataUrl] : []),
     moreDetails: u.moreDetails,
     specialRemarks: u.specialRemarks,
+    parkingSlot: u.parkingSlot,
+    furnishing: u.furnishing,
     inventory,
   };
 }
@@ -249,6 +251,8 @@ function writeBodyToUnit(id: string, body: UnitWriteBody, inventory: Unit['inven
     photos: body.photos ?? (body.photoDataUrl ? [body.photoDataUrl] : []),
     moreDetails: body.moreDetails,
     specialRemarks: body.specialRemarks,
+    parkingSlot: body.parkingSlot,
+    furnishing: body.furnishing,
     inventory,
   };
 }
@@ -826,7 +830,7 @@ export function UnitsView() {
               unit.status === 'Available' &&
                 'border-brand-green/20 bg-brand-green/10 text-brand-green hover:bg-brand-green/10',
               unit.status === 'Occupied' &&
-                'border-brand-blue/20 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/10',
+                'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-50',
               unit.status === 'Maintenance' &&
                 'border-brand-orange/20 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/10',
               unit.status === 'Reserved' &&
