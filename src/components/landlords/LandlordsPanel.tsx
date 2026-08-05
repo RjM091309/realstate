@@ -1,18 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
 import {
   Archive,
   Building2,
   Eye,
-  FileUp,
   Pencil,
   Plus,
   Search,
   Users,
-  CheckCircle2,
   Clock3,
-  Home,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -29,7 +25,6 @@ import {
   computeLandlordSummary,
   DEFAULT_LANDLORD_FILTERS,
   filterLandlords,
-  formatLandlordDateTime,
   type LandlordFilters,
 } from '@/lib/landlordUtils';
 import type { Landlord } from '@/types';
@@ -38,67 +33,6 @@ const TABLE_ACTION_BTN =
   'inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
 
 const LANDLORD_BADGE = '!px-2 !py-0.5 !text-[10px]';
-
-const LANDLORD_COL = {
-  date: 'w-[10%]',
-  name: 'w-[13%]',
-  contact: 'w-[9%]',
-  email: 'w-[15%]',
-  properties: 'w-[7%]',
-  units: 'w-[7%]',
-  kyc: 'w-[8%]',
-  status: 'w-[7%]',
-  activity: 'w-[10%]',
-  actions: 'w-[14%]',
-} as const;
-
-const LANDLORD_CELL = 'max-w-0 align-middle';
-
-function TruncatedText({
-  value,
-  className,
-  title,
-}: {
-  value: string;
-  className?: string;
-  title?: string;
-}) {
-  return (
-    <span className={cn('block truncate text-sm', className)} title={title ?? value}>
-      {value}
-    </span>
-  );
-}
-
-function renderDateAdded(value?: string) {
-  const dt = parseDateTime(value);
-  return dt ? (
-    <span className="block truncate text-xs text-slate-600 dark:text-slate-300" title={format(dt, 'MMM dd, yyyy · h:mm a')}>
-      {format(dt, 'MMM d, yy · h:mm a')}
-    </span>
-  ) : (
-    <span className="text-sm text-slate-400">—</span>
-  );
-}
-
-function parseDateTime(value?: string) {
-  if (!value?.trim()) return null;
-  const normalized = value.trim().includes('T') ? value.trim() : value.trim().replace(' ', 'T');
-  const d = new Date(normalized);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function kycTone(status?: string): 'success' | 'warning' | 'danger' {
-  if (status === 'verified') return 'success';
-  if (status === 'rejected') return 'danger';
-  return 'warning';
-}
-
-function accountTone(status?: string): 'success' | 'neutral' | 'danger' {
-  if (status === 'active') return 'success';
-  if (status === 'suspended') return 'danger';
-  return 'neutral';
-}
 
 type SummaryCardProps = {
   label: string;
@@ -123,6 +57,18 @@ function SummaryCard({ label, value, icon: Icon, accent }: SummaryCardProps) {
   );
 }
 
+function kycTone(status?: string): 'success' | 'warning' | 'danger' {
+  if (status === 'verified') return 'success';
+  if (status === 'rejected') return 'danger';
+  return 'warning';
+}
+
+function accountTone(status?: string): 'success' | 'neutral' | 'danger' {
+  if (status === 'active') return 'success';
+  if (status === 'suspended') return 'danger';
+  return 'neutral';
+}
+
 export type LandlordsPanelProps = {
   canCreate: boolean;
   canUpdate: boolean;
@@ -140,8 +86,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
   const [editingLandlord, setEditingLandlord] = useState<Landlord | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLandlord, setProfileLandlord] = useState<Landlord | null>(null);
-  const [profileTab, setProfileTab] = useState<'overview' | 'properties' | 'documents'>('overview');
-  const [docUploadLandlord, setDocUploadLandlord] = useState<Landlord | null>(null);
+  const [profileTab, setProfileTab] = useState<'overview' | 'activity'>('overview');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -199,145 +144,100 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
   const columns: ColumnDef<Landlord>[] = useMemo(
     () => [
       {
-        id: 'createdAt',
-        header: t('views.crm.landlords.columns.dateAdded'),
-        sortable: true,
-        sortValue: (l) => l.createdAt ?? '',
-        className: LANDLORD_COL.date,
-        cellClassName: LANDLORD_CELL,
-        render: (l) => renderDateAdded(l.createdAt),
-      },
-      {
         id: 'name',
         header: t('views.crm.landlords.columns.name'),
         sortable: true,
         sortValue: (l) => l.fullName,
-        className: LANDLORD_COL.name,
-        cellClassName: LANDLORD_CELL,
         render: (l) => (
-          <TruncatedText value={l.fullName} className="text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100" />
+          <span className="text-[13px] font-black uppercase tracking-tight text-slate-800 dark:text-slate-100">
+            {l.fullName}
+          </span>
         ),
       },
       {
-        id: 'mobile',
+        id: 'contact',
         header: t('views.crm.landlords.columns.contact'),
         sortable: true,
-        sortValue: (l) => l.mobileNo,
-        className: LANDLORD_COL.contact,
-        cellClassName: LANDLORD_CELL,
-        render: (l) => (
-          <TruncatedText value={l.mobileNo || '—'} className="text-[12px] font-bold uppercase tracking-tight text-slate-600 dark:text-slate-300" />
-        ),
-      },
-      {
-        id: 'email',
-        header: t('views.crm.landlords.columns.email'),
-        sortable: true,
         sortValue: (l) => l.email,
-        className: LANDLORD_COL.email,
-        cellClassName: LANDLORD_CELL,
         render: (l) => (
-          <TruncatedText value={l.email || '—'} className="text-[12px] font-bold tracking-tight text-slate-600 dark:text-slate-300" />
+          <div className="flex min-w-[10rem] flex-col gap-0.5">
+            <span className="text-sm text-slate-700 dark:text-slate-300">{l.email || '—'}</span>
+            <span className="text-xs text-slate-500">{l.mobileNo || '—'}</span>
+          </div>
         ),
       },
       {
-        id: 'properties',
-        header: t('views.crm.landlords.columns.propertyCount'),
+        id: 'portfolio',
+        header: t('views.crm.landlords.columns.portfolio'),
         sortable: true,
-        sortValue: (l) => l.propertyCount ?? 0,
-        className: cn(LANDLORD_COL.properties, 'text-center'),
+        sortValue: (l) => (l.propertyCount ?? 0) * 1000 + (l.totalUnits ?? 0),
+        className: 'text-center',
         headerClassName: 'text-center',
-        cellClassName: cn(LANDLORD_CELL, 'text-center'),
-        render: (l) => <span className="tabular-nums text-sm">{l.propertyCount ?? 0}</span>,
-      },
-      {
-        id: 'units',
-        header: t('views.crm.landlords.columns.totalUnits'),
-        sortable: true,
-        sortValue: (l) => l.totalUnits ?? 0,
-        className: cn(LANDLORD_COL.units, 'text-center'),
-        headerClassName: 'text-center',
-        cellClassName: cn(LANDLORD_CELL, 'text-center'),
-        render: (l) => <span className="tabular-nums text-sm">{l.totalUnits ?? 0}</span>,
-      },
-      {
-        id: 'kyc',
-        header: t('views.crm.landlords.columns.kycStatus'),
-        sortable: true,
-        sortValue: (l) => l.kycStatus ?? 'pending',
-        className: LANDLORD_COL.kyc,
-        cellClassName: LANDLORD_CELL,
+        cellClassName: 'text-center',
         render: (l) => (
-          <StatusBadge tone={kycTone(l.kycStatus)} className={LANDLORD_BADGE}>
-            {t(`views.crm.landlords.kyc.${l.kycStatus ?? 'pending'}`)}
-          </StatusBadge>
+          <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300">
+            {t('views.crm.landlords.portfolioSummary', {
+              properties: l.propertyCount ?? 0,
+              units: l.totalUnits ?? 0,
+            })}
+          </span>
         ),
       },
       {
         id: 'status',
         header: t('views.crm.landlords.columns.status'),
         sortable: true,
-        sortValue: (l) => l.accountStatus ?? 'active',
-        className: LANDLORD_COL.status,
-        cellClassName: LANDLORD_CELL,
-        render: (l) => (
-          <StatusBadge tone={accountTone(l.accountStatus)} className={LANDLORD_BADGE}>
-            {t(`views.crm.landlords.status.${l.accountStatus ?? 'active'}`)}
-          </StatusBadge>
-        ),
-      },
-      {
-        id: 'activity',
-        header: t('views.crm.landlords.columns.lastActivity'),
-        sortable: true,
-        sortValue: (l) => l.lastActivity ?? l.createdAt ?? '',
-        className: LANDLORD_COL.activity,
-        cellClassName: LANDLORD_CELL,
+        sortValue: (l) => `${l.kycStatus ?? 'pending'}-${l.accountStatus ?? 'active'}`,
         render: (l) => {
-          const label = formatLandlordDateTime(l.lastActivity || l.createdAt);
-          const dt = parseDateTime(l.lastActivity || l.createdAt);
-          const short = dt ? format(dt, 'MMM d, yy · h:mm a') : label;
-          return (
-            <span className="block truncate text-xs text-slate-500" title={label}>
-              {short}
-            </span>
+          const kycPending = (l.kycStatus ?? 'pending') !== 'verified';
+          return kycPending ? (
+            <StatusBadge tone={kycTone(l.kycStatus)} className={LANDLORD_BADGE}>
+              {t(`views.crm.landlords.kyc.${l.kycStatus ?? 'pending'}`)}
+            </StatusBadge>
+          ) : (
+            <StatusBadge tone={accountTone(l.accountStatus)} className={LANDLORD_BADGE}>
+              {t(`views.crm.landlords.status.${l.accountStatus ?? 'active'}`)}
+            </StatusBadge>
           );
         },
       },
       {
         id: 'actions',
         header: t('views.crm.table.actions'),
-        className: cn(LANDLORD_COL.actions, 'text-center'),
+        className: 'text-center',
         headerClassName: 'text-center',
-        cellClassName: cn(LANDLORD_CELL, 'text-center'),
+        cellClassName: 'text-center',
         render: (l) => (
-          <div className="flex items-center justify-center gap-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-            <button type="button" className={TABLE_ACTION_BTN} title={t('views.crm.landlords.actions.view')} onClick={() => openProfile(l)}>
+          <div
+            className="flex items-center justify-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className={TABLE_ACTION_BTN}
+              title={t('views.crm.landlords.actions.view')}
+              onClick={() => openProfile(l)}
+            >
               <Eye className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            {canUpdate ? (
-              <button type="button" className={TABLE_ACTION_BTN} title={t('views.crm.landlords.actions.edit')} onClick={() => openEdit(l)}>
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            ) : null}
-            <button type="button" className={TABLE_ACTION_BTN} title={t('views.crm.landlords.actions.viewProperties')} onClick={() => openProfile(l, 'properties')}>
-              <Building2 className="h-3.5 w-3.5" aria-hidden />
             </button>
             {canUpdate ? (
               <button
                 type="button"
                 className={TABLE_ACTION_BTN}
-                title={t('views.crm.landlords.actions.uploadDocuments')}
-                onClick={() => {
-                  setDocUploadLandlord(l);
-                  openProfile(l, 'documents');
-                }}
+                title={t('views.crm.landlords.actions.edit')}
+                onClick={() => openEdit(l)}
               >
-                <FileUp className="h-3.5 w-3.5" aria-hidden />
+                <Pencil className="h-3.5 w-3.5" aria-hidden />
               </button>
             ) : null}
             {canDelete ? (
-              <button type="button" className={TABLE_ACTION_BTN} title={t('views.crm.landlords.actions.archive')} onClick={() => void handleArchive(l)}>
+              <button
+                type="button"
+                className={TABLE_ACTION_BTN}
+                title={t('views.crm.landlords.actions.archive')}
+                onClick={() => void handleArchive(l)}
+              >
                 <Archive className="h-3.5 w-3.5" aria-hidden />
               </button>
             ) : null}
@@ -350,12 +250,25 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label={t('views.crm.landlords.summary.total')} value={summary.totalLandlords} icon={Users} accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue" />
-        <SummaryCard label={t('views.crm.landlords.summary.verified')} value={summary.verifiedLandlords} icon={CheckCircle2} accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300" />
-        <SummaryCard label={t('views.crm.landlords.summary.pendingKyc')} value={summary.pendingKyc} icon={Clock3} accent="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300" />
-        <SummaryCard label={t('views.crm.landlords.summary.properties')} value={summary.totalProperties} icon={Home} accent="bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300" />
-        <SummaryCard label={t('views.crm.landlords.summary.units')} value={summary.totalUnits} icon={Building2} accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue" />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <SummaryCard
+          label={t('views.crm.landlords.summary.total')}
+          value={summary.totalLandlords}
+          icon={Users}
+          accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue"
+        />
+        <SummaryCard
+          label={t('views.crm.landlords.summary.pendingKyc')}
+          value={summary.pendingKyc}
+          icon={Clock3}
+          accent="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+        />
+        <SummaryCard
+          label={t('views.crm.landlords.summary.units')}
+          value={summary.totalUnits}
+          icon={Building2}
+          accent="bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/10 dark:text-brand-blue"
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -397,7 +310,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
 
       {loading ? (
         <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 md:p-8">
-          <SkeletonTable rows={6} columns={10} />
+          <SkeletonTable rows={6} columns={5} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl bg-white p-12 text-center shadow-sm dark:bg-slate-900">
@@ -414,7 +327,7 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
           columns={columns}
           keyExtractor={(l) => l.id}
           onRowClick={(l) => openProfile(l)}
-                    stickyHeader
+          stickyHeader
           compact
           fitWidth
         />
@@ -439,18 +352,16 @@ export function LandlordsPanel({ canCreate, canUpdate, canDelete }: LandlordsPan
 
       <LandlordProfileModal
         isOpen={profileOpen}
-        landlord={profileLandlord ?? docUploadLandlord}
+        landlord={profileLandlord}
         initialTab={profileTab}
         onClose={() => {
           setProfileOpen(false);
           setProfileLandlord(null);
-          setDocUploadLandlord(null);
         }}
         onEdit={(l) => {
           setProfileOpen(false);
           openEdit(l);
         }}
-        onViewProperties={(l) => openProfile(l, 'properties')}
       />
     </div>
   );

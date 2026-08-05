@@ -216,21 +216,19 @@ function defaultTermsFromContract(contract) {
   const start = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), prevEnd.getDate() + 1);
   const end = new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
   const prevRent = Number(contract.monthly_rent ?? 0);
-  const newRent = Math.round(prevRent * 1.05 * 100) / 100;
-  const increasePct = prevRent > 0 ? Math.round(((newRent - prevRent) / prevRent) * 10000) / 100 : 0;
 
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
     leaseTerm: '12',
-    monthlyRent: newRent,
+    monthlyRent: prevRent,
     previousRent: prevRent,
     securityDeposit: Number(contract.security_deposit ?? 0),
     advanceRent: Number(contract.advance_rent ?? 0),
     parkingFee: 0,
     associationDues: 0,
     renewalFee: 0,
-    rentIncreasePercentage: increasePct,
+    rentIncreasePercentage: 0,
   };
 }
 

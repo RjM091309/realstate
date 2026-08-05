@@ -44,19 +44,18 @@ export function defaultTermsFromContract(contract: Contract): LeaseRenewalTerms 
   const start = addDays(prevEnd, 1);
   const end = addYears(start, 1);
   const prevRent = Number(contract.monthlyRent ?? 0);
-  const newRent = rentWithPercentIncrease(prevRent, 5);
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
     leaseTerm: '12',
-    monthlyRent: newRent,
+    monthlyRent: prevRent,
     previousRent: prevRent,
     securityDeposit: Number(contract.securityDeposit ?? 0),
     advanceRent: Number(contract.advanceRent ?? 0),
     parkingFee: 0,
     associationDues: 0,
     renewalFee: 0,
-    rentIncreasePercentage: computeIncreasePct(prevRent, newRent),
+    rentIncreasePercentage: 0,
   };
 }
 

@@ -3,7 +3,7 @@ import type { AuditLog } from '@/lib/auditLogsApi';
 import type { SpecialRequestRow } from '@/lib/specialRequestsApi';
 import type { Contract, InvoiceRow, Payment, Tenant, UnitInspectionPayload } from '@/types';
 
-export type HistoryTab = 'lease' | 'financial' | 'notes';
+export type HistoryTab = 'overview' | 'activity';
 
 export type TimelineEvent = {
   id: string;
@@ -210,18 +210,33 @@ export function buildLedgerRows(invoices: InvoiceRow[], payments: Payment[]): Le
     .sort((a, b) => b.billingPeriod.localeCompare(a.billingPeriod));
 }
 
+function isPaymentPastDue(payment: Payment): boolean {
+  if (payment.status === 'Overdue') return true;
+  if (payment.status === 'Paid') return false;
+  const due = String(payment.dueDate ?? '').slice(0, 10);
+  if (!due) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return due <= today;
+}
+
+function isPaymentMatured(payment: Payment): boolean {
+  const due = String(payment.dueDate ?? '').slice(0, 10);
+  if (!due) return payment.status === 'Paid';
+  const today = new Date().toISOString().slice(0, 10);
+  return due <= today || payment.status === 'Paid';
+}
+
 export function computeFinancialSummary(
   payments: Payment[],
   invoices: InvoiceRow[],
   t: (key: string, opts?: Record<string, string | number>) => string,
 ): FinancialSummary {
-  const settled = payments.filter((p) => p.status === 'Paid');
-  const due = payments.filter((p) => p.status !== 'Paid');
-  const totalTracked = settled.length + due.length;
+  const matured = payments.filter(isPaymentMatured);
+  const paidMatured = matured.filter((p) => p.status === 'Paid');
 
   let onTimePercent: number | null = null;
-  if (totalTracked > 0) {
-    onTimePercent = Math.round((settled.length / totalTracked) * 100);
+  if (matured.length > 0) {
+    onTimePercent = Math.round((paidMatured.length / matured.length) * 100);
   } else if (invoices.length > 0) {
     const paidInvoices = invoices.filter((i) => i.status === 'paid').length;
     onTimePercent = Math.round((paidInvoices / invoices.length) * 100);
@@ -231,7 +246,7 @@ export function computeFinancialSummary(
     .filter((i) => i.status === 'overdue' || i.status === 'partially_paid')
     .reduce((sum, i) => sum + i.totalAmount, 0);
   const overduePayments = payments
-    .filter((p) => p.status === 'Overdue' || p.status === 'Pending')
+    .filter(isPaymentPastDue)
     .reduce((sum, p) => sum + p.amount, 0);
   const outstandingBalance = overdueInvoices + overduePayments;
 
