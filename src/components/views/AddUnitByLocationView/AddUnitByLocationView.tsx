@@ -70,6 +70,17 @@ import { useTranslation } from 'react-i18next';
 
 type UnitSortField = 'unit' | 'type' | 'sqm' | 'beds' | 'status' | 'rate';
 type UnitSortDir = 'asc' | 'desc';
+/** CITY / BARANGAY panel list — sort by unit count via header arrows. */
+type PanelCountSortDir = UnitSortDir;
+
+function compareByCountSort(
+  a: { name: string; count: number },
+  b: { name: string; count: number },
+  dir: PanelCountSortDir,
+): number {
+  if (a.count !== b.count) return dir === 'desc' ? b.count - a.count : a.count - b.count;
+  return a.name.localeCompare(b.name);
+}
 
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
 
@@ -187,6 +198,9 @@ export function AddUnitByLocationView() {
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
   const [sortField, setSortField] = useState<UnitSortField>('unit');
   const [sortDir, setSortDir] = useState<UnitSortDir>('asc');
+  /** Default: highest counts on top. Header arrows toggle asc/desc. */
+  const [cityCountSort, setCityCountSort] = useState<PanelCountSortDir>('desc');
+  const [brgyCountSort, setBrgyCountSort] = useState<PanelCountSortDir>('desc');
 
   useEffect(() => {
     setStatusFilter('all');
@@ -391,15 +405,14 @@ export function AddUnitByLocationView() {
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => {
-      const aNum = a.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
-      const bNum = b.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
-      if (aNum && bNum) return Number(aNum[1]) - Number(bNum[1]);
-      if (aNum) return -1;
-      if (bNum) return 1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [managedCities, units]);
+    return Array.from(map.values()).sort((a, b) =>
+      compareByCountSort(
+        { name: a.name, count: a.unitCount },
+        { name: b.name, count: b.unitCount },
+        cityCountSort,
+      ),
+    );
+  }, [cityCountSort, managedCities, units]);
 
   const persistExtraLocations = useCallback((next: string[]) => {
     // Dedupe only — do not force-append seeded city names.
@@ -480,9 +493,15 @@ export function AddUnitByLocationView() {
         }
       }
 
-      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+      return Array.from(map.values()).sort((a, b) =>
+        compareByCountSort(
+          { name: a.name, count: a.count },
+          { name: b.name, count: b.count },
+          brgyCountSort,
+        ),
+      );
     },
-    [managedBrgys, managedCities, units],
+    [brgyCountSort, managedBrgys, managedCities, units],
   );
 
   const openAddLocation = useCallback(() => {
@@ -1090,6 +1109,38 @@ export function AddUnitByLocationView() {
     });
   }, []);
 
+  const panelSortTitle = (label: string, dir: PanelCountSortDir) => (
+    <>
+      <span className={cn(locBoard.panelTitle, 'group-hover/sort:text-brand-blue')}>{label}</span>
+      <span className="flex shrink-0 flex-col items-center leading-none" aria-hidden>
+        <ArrowUp
+          className={cn(
+            'h-3.5 w-3.5 -mb-0.5 transition',
+            dir === 'asc'
+              ? 'text-brand-blue'
+              : 'text-slate-300 group-hover/sort:text-slate-400 dark:text-slate-600',
+          )}
+        />
+        <ArrowDown
+          className={cn(
+            'h-3.5 w-3.5 -mt-0.5 transition',
+            dir === 'desc'
+              ? 'text-brand-blue'
+              : 'text-slate-300 group-hover/sort:text-slate-400 dark:text-slate-600',
+          )}
+        />
+      </span>
+    </>
+  );
+
+  const toggleCityCountSort = useCallback(() => {
+    setCityCountSort((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  }, []);
+
+  const toggleBrgyCountSort = useCallback(() => {
+    setBrgyCountSort((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  }, []);
+
   const renderSortTh = (
     field: UnitSortField,
     label: string,
@@ -1367,7 +1418,13 @@ export function AddUnitByLocationView() {
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,16.5rem)_minmax(0,16.5rem)_minmax(0,1fr)] lg:items-stretch">
           <div className="min-w-0">
             <LocPanel
-              title={panelLocation}
+              title={panelSortTitle(panelLocation, cityCountSort)}
+              onHeaderClick={toggleCityCountSort}
+              headerTitle={`${t('views.addUnitByLocation.sortByCount')} — ${
+                cityCountSort === 'desc'
+                  ? t('views.addUnitByLocation.sortDesc')
+                  : t('views.addUnitByLocation.sortAsc')
+              }`}
               bodyClassName="max-h-[min(720px,65vh)]"
               actions={
                 <button
@@ -1453,7 +1510,13 @@ export function AddUnitByLocationView() {
 
           <div className="min-w-0">
             <LocPanel
-              title={panelBuilding}
+              title={panelSortTitle(panelBuilding, brgyCountSort)}
+              onHeaderClick={toggleBrgyCountSort}
+              headerTitle={`${t('views.addUnitByLocation.sortByCount')} — ${
+                brgyCountSort === 'desc'
+                  ? t('views.addUnitByLocation.sortDesc')
+                  : t('views.addUnitByLocation.sortAsc')
+              }`}
               bodyClassName="max-h-[min(720px,65vh)]"
               actions={
                 selectedLocation ? (

@@ -50,18 +50,43 @@ export function LocPanel({
   children,
   className,
   bodyClassName,
+  onHeaderClick,
+  headerTitle,
 }: {
-  title: string;
+  title: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   bodyClassName?: string;
+  /** Makes the whole header bar (except actions) clickable. */
+  onHeaderClick?: () => void;
+  headerTitle?: string;
 }) {
   return (
     <div className={cn(locBoard.panel, className)}>
       <div className={locBoard.panelHeader}>
-        <span className={locBoard.panelTitle}>{title}</span>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {onHeaderClick ? (
+          <button
+            type="button"
+            onClick={onHeaderClick}
+            title={headerTitle}
+            className={cn(
+              'group/sort -mx-1.5 -my-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition',
+              'hover:bg-slate-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 dark:hover:bg-slate-800/80',
+            )}
+          >
+            {typeof title === 'string' ? (
+              <span className={cn(locBoard.panelTitle, 'group-hover/sort:text-brand-blue')}>{title}</span>
+            ) : (
+              title
+            )}
+          </button>
+        ) : typeof title === 'string' ? (
+          <span className={locBoard.panelTitle}>{title}</span>
+        ) : (
+          title
+        )}
+        {actions ? <div className="relative z-10 flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
       <div className={cn(locBoard.panelBody, bodyClassName)}>{children}</div>
     </div>

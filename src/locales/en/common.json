@@ -586,6 +586,10 @@
       "emptyBuildings": "No buildings in this location yet.",
       "emptyUnits": "No units match this filter. Use + to add one.",
       "unitCount": "{{count}} units",
+      "sortByCount": "Unit count",
+      "sortByName": "Name",
+      "sortAsc": "ascending",
+      "sortDesc": "descending",
       "addUnderBuilding": "Add unit under this building",
       "panels": {
         "location": "City",
