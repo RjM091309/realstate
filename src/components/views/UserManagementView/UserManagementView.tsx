@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ImagePlus, Plus, Search, Pencil, Trash2, UserRoundCheck, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  ImagePlus,
+  Plus,
+  Search,
+  Pencil,
+  Shield,
+  Trash2,
+  UserRoundCheck,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,6 +46,167 @@ const inputClass =
 /** Must match server `MIN_PASSWORD_LENGTH` in authController.js */
 const PASSWORD_MIN_LENGTH = 4;
 const ADMIN_ROLE_ID = 1;
+
+type UserStatTone = 'neutral' | 'success' | 'danger' | 'info';
+
+function UserStatCard({
+  label,
+  value,
+  subtitle,
+  tone,
+  icon,
+  index = 0,
+}: {
+  label: string;
+  value: string | number;
+  subtitle: string;
+  tone: UserStatTone;
+  icon: React.ReactNode;
+  index?: number;
+}) {
+  const fromLeft = index % 2 === 0;
+  const iconColor =
+    tone === 'success'
+      ? 'bg-brand-green'
+      : tone === 'danger'
+        ? 'bg-rose-500'
+        : tone === 'info'
+          ? 'bg-brand-blue'
+          : 'bg-[#334155]';
+  const valueColor =
+    tone === 'success'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : tone === 'danger'
+        ? 'text-rose-600 dark:text-rose-400'
+        : 'text-slate-800 dark:text-slate-100';
+  const footerClass =
+    tone === 'success'
+      ? 'text-brand-green'
+      : tone === 'danger'
+        ? 'text-rose-500'
+        : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500';
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      whileHover="hover"
+      variants={{
+        hidden: {
+          opacity: 0,
+          x: fromLeft ? -36 : 36,
+          y: 18,
+          scale: 0.88,
+        },
+        show: {
+          opacity: 1,
+          x: 0,
+          y: 0,
+          scale: 1,
+          transition: {
+            type: 'spring',
+            stiffness: 260,
+            damping: 16,
+            mass: 0.9,
+            delay: 0.06 + index * 0.09,
+          },
+        },
+        hover: {
+          scale: 1.035,
+          y: -4,
+          borderColor: 'rgba(75,137,205,0.45)',
+          boxShadow: '0 18px 36px -16px rgba(75,137,205,0.4), 0 8px 16px -10px rgba(15,23,42,0.2)',
+          transition: { type: 'spring', stiffness: 420, damping: 18 },
+        },
+      }}
+      className={cn(
+        'group relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-100/90 bg-white/95 p-4 text-left',
+        'shadow-[0_8px_24px_-14px_rgba(15,23,42,0.22)]',
+        'dark:border-slate-800 dark:bg-slate-900/90',
+        'dark:shadow-[0_10px_28px_-14px_rgba(0,0,0,0.55)]',
+      )}
+    >
+      <div className="relative mb-4 flex items-start justify-between">
+        <motion.div
+          initial={{ scale: 0, rotate: -28 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{
+            type: 'spring',
+            stiffness: 460,
+            damping: 14,
+            delay: 0.18 + index * 0.08,
+          }}
+          variants={{
+            show: { scale: 1, y: 0 },
+            hover: { scale: 1.12, y: -3, transition: { type: 'spring', stiffness: 400, damping: 16 } },
+          }}
+          className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg',
+            'ring-1 ring-white/25',
+            iconColor,
+          )}
+        >
+          <motion.span
+            animate={{ y: [0, -3, 0] }}
+            transition={{ duration: 2.4 + index * 0.15, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            {icon}
+          </motion.span>
+        </motion.div>
+        <div className="text-right">
+          <motion.p
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + index * 0.08, duration: 0.35 }}
+            className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400"
+          >
+            {label}
+          </motion.p>
+          <div className="overflow-hidden">
+            <motion.h3
+              key={String(value)}
+              initial={{ y: '110%', opacity: 0 }}
+              animate={{ y: '0%', opacity: 1 }}
+              transition={{
+                type: 'spring',
+                stiffness: 280,
+                damping: 18,
+                delay: 0.22 + index * 0.08,
+              }}
+              className={cn('text-3xl font-bold tabular-nums', valueColor)}
+            >
+              {value}
+            </motion.h3>
+          </div>
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, scaleX: 0.6 }}
+        animate={{ opacity: 1, scaleX: 1 }}
+        transition={{ delay: 0.32 + index * 0.08, duration: 0.4 }}
+        style={{ transformOrigin: 'left center' }}
+        className={cn(
+          'relative mt-auto flex items-center gap-1 border-t border-slate-50 pt-3 text-xs font-medium transition-colors dark:border-slate-800',
+          footerClass,
+        )}
+      >
+        {tone === 'success' && (
+          <motion.span
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            <UserRoundCheck className="h-3 w-3" />
+          </motion.span>
+        )}
+        {tone === 'danger' && <XCircle className="h-3 w-3" />}
+        {subtitle}
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function staffInitials(firstName: string, lastName: string, username: string): string {
   const a = firstName.trim().charAt(0);
@@ -467,19 +640,38 @@ export function UserManagementView() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: t('views.userInfo.stats.totalUsers'), value: stats.total, valueClass: 'text-slate-900 dark:text-slate-50' },
-          { label: t('views.userInfo.stats.activeUsers'), value: stats.active, valueClass: 'text-emerald-600 dark:text-emerald-400' },
-          { label: t('views.userInfo.stats.inactiveUsers'), value: stats.inactive, valueClass: 'text-rose-600 dark:text-rose-400' },
-          { label: t('views.userInfo.stats.userRoles'), value: stats.roleCount, valueClass: 'text-slate-900 dark:text-slate-50' },
-        ].map((s) => (
-          <Card key={s.label} className="border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <CardContent className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
-              <p className={cn('mt-2 text-3xl font-bold tabular-nums', s.valueClass)}>{loading ? '—' : s.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <UserStatCard
+          index={0}
+          label={t('views.userInfo.stats.totalUsers')}
+          value={loading ? '—' : stats.total}
+          subtitle="All staff accounts"
+          tone="neutral"
+          icon={<Users className="h-6 w-6" />}
+        />
+        <UserStatCard
+          index={1}
+          label={t('views.userInfo.stats.activeUsers')}
+          value={loading ? '—' : stats.active}
+          subtitle="Currently active"
+          tone="success"
+          icon={<UserRoundCheck className="h-6 w-6" />}
+        />
+        <UserStatCard
+          index={2}
+          label={t('views.userInfo.stats.inactiveUsers')}
+          value={loading ? '—' : stats.inactive}
+          subtitle="Disabled accounts"
+          tone="danger"
+          icon={<XCircle className="h-6 w-6" />}
+        />
+        <UserStatCard
+          index={3}
+          label={t('views.userInfo.stats.userRoles')}
+          value={loading ? '—' : stats.roleCount}
+          subtitle="Assigned roles"
+          tone="info"
+          icon={<Shield className="h-6 w-6" />}
+        />
       </div>
 
       <Card className="border-slate-200/90 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

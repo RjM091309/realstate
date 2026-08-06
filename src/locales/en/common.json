@@ -375,7 +375,7 @@
         "inventory": "Inventory",
         "delete": "Delete",
         "more": "More",
-        "perMonth": "/mo",
+        "perMonth": "Monthly Rent",
         "sqm": "sqm",
         "noResults": "No units match your search.",
         "selectUnit": "Select unit",
@@ -390,7 +390,15 @@
         "badgeVacant": "Vacant",
         "badgeOverdue": "Overdue ({{count}}d)",
         "badgeEndingSoon": "Lease ending soon",
-        "badgePaid": "Paid"
+        "badgePaid": "Paid",
+        "showDetails": "Show details",
+        "hideDetails": "Hide details",
+        "specBedroom_one": "{{count}} bedroom",
+        "specBedroom_other": "{{count}} bedrooms",
+        "specBathroom_one": "{{count}} bathroom",
+        "specBathroom_other": "{{count}} bathrooms",
+        "specParking": "{{slot}} parking",
+        "specParkingFallback": "Parking"
       },
       "table": {
         "unit": "Unit No.",

@@ -21,6 +21,12 @@ import {
   Home,
   Check,
   Package,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Car,
+  Armchair,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,6 +49,7 @@ import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } fr
 import { fetchBrgys, fetchCities, type LocationBrgy, type LocationCity } from '@/lib/locationsApi';
 import { normalizeLocationAliasLabel, stripLocationOrdinalPrefix } from '@/lib/locationNames';
 import {
+  formatUnitNumberDisplay,
   resolveUnitFloorTower,
   resolveUnitPhotos,
   unitDisplayMetrics,
@@ -130,45 +137,84 @@ function floorLabelForCard(floor: string, floorWord: string): string {
   const f = String(floor ?? '').trim();
   if (!f || f === '—') return '—';
   if (/\bfloor\b/i.test(f)) return f;
+  // "3" / "3rd" → "3rd Floor"
+  if (/^\d+(st|nd|rd|th)?$/i.test(f)) {
+    const n = f.replace(/(st|nd|rd|th)$/i, '');
+    const ord =
+      n.endsWith('1') && !n.endsWith('11')
+        ? 'st'
+        : n.endsWith('2') && !n.endsWith('12')
+          ? 'nd'
+          : n.endsWith('3') && !n.endsWith('13')
+            ? 'rd'
+            : 'th';
+    const withOrd = /^\d+$/.test(f) ? `${f}${ord}` : f;
+    return `${withOrd} ${floorWord}`;
+  }
   return `${floorWord} ${f}`;
 }
 
-/** Full address line for unit cards: village, barangay, city, floor · tower. */
-function unitCardAddressLine(unit: Unit, floorWord: string): string {
-  const pushUnique = (parts: string[], value: string | null | undefined) => {
-    const v = stripLocationOrdinalPrefix(String(value ?? '').trim());
-    if (!v || v === '—' || v === '-') return;
-    const lower = v.toLowerCase();
-    if (parts.some((p) => p.toLowerCase() === lower || p.toLowerCase().includes(lower))) return;
-    parts.push(v);
-  };
+function cleanField(value: string | null | undefined): string {
+  const v = stripLocationOrdinalPrefix(String(value ?? '').trim());
+  if (!v || v === '—' || v === '-') return '';
+  return v;
+}
 
-  const village =
-    [unit.legalAddress, unit.commonAddress]
-      .map((v) => String(v ?? '').trim())
-      .find((v) => v && v !== '—' && v !== '-') || '';
-  const barangay =
-    unit.buildingName && unit.buildingName !== '—' && unit.buildingName !== '-'
-      ? unit.buildingName
-      : '';
-  const city = areaDisplayLabel(unit.area);
+/** Normalize address text so "A · B" and "A, B" compare equal. */
+function addressKey(value: string): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[·•|,/_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function sameAddressText(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const ka = addressKey(a);
+  const kb = addressKey(b);
+  return ka === kb || ka.includes(kb) || kb.includes(ka);
+}
+
+/** Card detail lines: building, city/area, floor • tower. */
+function unitCardDetailLines(
+  unit: Unit,
+  floorWord: string,
+): { building: string; location: string; floorTower: string } {
+  const village = cleanField(unit.legalAddress) || cleanField(unit.commonAddress);
+  const barangay = cleanField(unit.buildingName);
+  const city = cleanField(areaDisplayLabel(unit.area));
+
+  // Prefer condo/village name; fall back to barangay/building label
+  const building = village || barangay;
+
+  // Location parts that aren't already covered by building
+  const locationParts: string[] = [];
+  for (const part of [barangay, city]) {
+    if (!part) continue;
+    if (sameAddressText(part, building)) continue;
+    if (locationParts.some((p) => sameAddressText(p, part))) continue;
+    locationParts.push(part);
+  }
+  let location = locationParts.join(', ');
+  // Drop whole location line if it duplicates building (e.g. "The Village · Clark" vs "The Village, Clark")
+  if (sameAddressText(location, building)) location = '';
+
   const floorTower = resolveUnitFloorTower(unit);
   const floorPart = floorLabelForCard(floorTower.floor || unit.floor, floorWord);
-  const towerPart =
-    floorTower.tower && floorTower.tower !== '—' && floorTower.tower !== '-'
-      ? floorTower.tower
-      : unit.tower && unit.tower !== '—' && unit.tower !== '-'
-        ? unit.tower
-        : '';
+  const towerRaw = cleanField(floorTower.tower) || cleanField(unit.tower);
+  const towerPart = towerRaw
+    ? /\btower\b/i.test(towerRaw)
+      ? towerRaw
+      : `Tower ${towerRaw}`
+    : '';
+  const floorTowerLine = [floorPart !== '—' ? floorPart : '', towerPart].filter(Boolean).join(' • ');
 
-  const parts: string[] = [];
-  pushUnique(parts, village);
-  pushUnique(parts, barangay);
-  pushUnique(parts, city !== '—' ? city : '');
-  const floorMeta = [floorPart !== '—' ? floorPart : '', towerPart].filter(Boolean).join(' · ');
-  pushUnique(parts, floorMeta || null);
-
-  return parts.join(', ') || '—';
+  return {
+    building: building || '',
+    location,
+    floorTower: floorTowerLine,
+  };
 }
 
 function activeContractForUnit(unitId: string, contracts: Contract[]): Contract | null {
@@ -336,6 +382,8 @@ export function UnitsView() {
   const [inventoryAddName, setInventoryAddName] = useState('');
   const [inventoryAddQty, setInventoryAddQty] = useState(1);
   const [inventoryAddCondition, setInventoryAddCondition] = useState<InventoryItem['condition']>('Good');
+  const [expandedCardDetails, setExpandedCardDetails] = useState<Record<string, boolean>>({});
+  const [cardPhotoIndex, setCardPhotoIndex] = useState<Record<string, number>>({});
 
   const reloadUnits = useCallback(async () => {
     setUnitsLoading(true);
@@ -1110,10 +1158,84 @@ export function UnitsView() {
           <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('views.units.card.noResults')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {processedUnits.map((unit) => {
             const metrics = resolveUnitMetrics(unit);
-            const locationSubtitle = unitCardAddressLine(unit, t('views.units.table.floor'));
+            const floorWord = t('views.units.table.floor');
+            const detailLines = unitCardDetailLines(unit, floorWord);
+            const parkingLabel = (() => {
+              const raw = String(unit.parkingSlot ?? '').trim();
+              if (!raw || raw === '—' || raw === '-') return '';
+              return raw;
+            })();
+            const furnishingLabel = (() => {
+              if (unit.furnishing === 'Unfurnished') {
+                return t('views.units.addModal.furnishingOptions.unfurnished');
+              }
+              if (unit.furnishing === 'Semi-furnished') {
+                return t('views.units.addModal.furnishingOptions.semi');
+              }
+              if (unit.furnishing === 'Fully furnished') {
+                return t('views.units.addModal.furnishingOptions.fully');
+              }
+              return '';
+            })();
+            const specChips: {
+              key: string;
+              icon: React.ReactNode;
+              value: string;
+              title: string;
+              iconClass: string;
+              chipClass: string;
+            }[] = [
+              {
+                key: 'beds',
+                icon: <BedDouble className="h-3.5 w-3.5" aria-hidden />,
+                value: t('views.units.card.specBedroom', { count: metrics.beds }),
+                title: t('views.units.addModal.bedrooms'),
+                iconClass: 'bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-300',
+                chipClass: 'border-sky-100/80 bg-sky-50/70 dark:border-sky-500/20 dark:bg-sky-500/10',
+              },
+              {
+                key: 'sqm',
+                icon: <Maximize2 className="h-3.5 w-3.5" aria-hidden />,
+                value: `${metrics.sqm} ${t('views.units.card.sqm')}`,
+                title: t('views.units.card.sqm'),
+                iconClass: 'bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300',
+                chipClass: 'border-violet-100/80 bg-violet-50/70 dark:border-violet-500/20 dark:bg-violet-500/10',
+              },
+              {
+                key: 'baths',
+                icon: <Bath className="h-3.5 w-3.5" aria-hidden />,
+                value: t('views.units.card.specBathroom', { count: metrics.baths }),
+                title: t('views.units.addModal.bathrooms'),
+                iconClass: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300',
+                chipClass: 'border-cyan-100/80 bg-cyan-50/70 dark:border-cyan-500/20 dark:bg-cyan-500/10',
+              },
+            ];
+            if (parkingLabel) {
+              const parkingDisplay = /parking/i.test(parkingLabel)
+                ? parkingLabel
+                : t('views.units.card.specParking', { slot: parkingLabel });
+              specChips.push({
+                key: 'parking',
+                icon: <Car className="h-3.5 w-3.5" aria-hidden />,
+                value: parkingDisplay,
+                title: t('views.units.addModal.parkingSlot'),
+                iconClass: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
+                chipClass: 'border-amber-100/80 bg-amber-50/70 dark:border-amber-500/20 dark:bg-amber-500/10',
+              });
+            }
+            if (furnishingLabel) {
+              specChips.push({
+                key: 'furnishing',
+                icon: <Armchair className="h-3.5 w-3.5" aria-hidden />,
+                value: furnishingLabel,
+                title: t('views.units.addModal.furnishing'),
+                iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300',
+                chipClass: 'border-emerald-100/80 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-500/10',
+              });
+            }
             const active = activeContractForUnit(unit.id, branchContracts);
             const tenantName = active
               ? tenantsList.find((x) => x.id === active.tenantId)?.name.trim() || '—'
@@ -1121,12 +1243,7 @@ export function UnitsView() {
             const { daysToEnd, endLabel } = active ? leaseEndInsight(active.endDate) : { daysToEnd: null, endLabel: null };
 
             const secondaryPill = (() => {
-              if (unit.status === 'Available' && !active) {
-                return {
-                  cls: 'bg-blue-600 text-white shadow-md ring-1 ring-black/15 dark:bg-blue-600 dark:text-white',
-                  label: t('views.units.card.badgeVacant'),
-                } as const;
-              }
+              // Status badge already covers Available/Occupied — only show urgent lease alerts
               if (!active) return null;
               if (daysToEnd === null) return null;
               if (daysToEnd < 0) {
@@ -1143,11 +1260,7 @@ export function UnitsView() {
                   label: t('views.units.card.badgeEndingSoon'),
                 } as const;
               }
-              return {
-                cls:
-                  'bg-emerald-600 text-white shadow-md ring-1 ring-black/15 dark:bg-emerald-600 dark:text-white',
-                label: t('views.units.card.badgePaid'),
-              } as const;
+              return null;
             })();
 
             const leaseEndsNode = (() => {
@@ -1204,19 +1317,26 @@ export function UnitsView() {
               );
             })();
 
+            const unitPhotos = resolveUnitPhotos(unit);
+            const photoIdx = Math.min(
+              cardPhotoIndex[unit.id] ?? 0,
+              Math.max(unitPhotos.length - 1, 0),
+            );
+            const photoUrl = unitPhotos[photoIdx] ?? null;
+
             return (
               <Card
                 key={unit.id}
                 className={cn(
-                  'group relative flex flex-col overflow-hidden rounded-xl bg-white shadow-lg transition-all duration-300',
+                  'group relative flex flex-col gap-0 overflow-hidden rounded-xl bg-white py-0 shadow-lg transition-all duration-300',
                   'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50',
                   'dark:bg-slate-900 dark:shadow-black/40 dark:hover:shadow-xl dark:hover:shadow-black/60',
                 )}
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
-                  {unit.photoDataUrl ? (
+                  {photoUrl ? (
                     <img
-                      src={unit.photoDataUrl}
+                      src={photoUrl}
                       alt=""
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
@@ -1225,115 +1345,277 @@ export function UnitsView() {
                       <Building2 className="h-14 w-14 text-slate-200 dark:text-slate-600" />
                     </div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-end gap-2">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+
+                  {unitPhotos.length > 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCardPhotoIndex((prev) => ({
+                            ...prev,
+                            [unit.id]: (photoIdx - 1 + unitPhotos.length) % unitPhotos.length,
+                          }));
+                        }}
+                        className="absolute top-1/2 left-2 z-[2] -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft className="h-4 w-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCardPhotoIndex((prev) => ({
+                            ...prev,
+                            [unit.id]: (photoIdx + 1) % unitPhotos.length,
+                          }));
+                        }}
+                        className="absolute top-1/2 right-2 z-[2] -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight className="h-4 w-4" aria-hidden />
+                      </button>
+                      <div className="absolute inset-x-0 bottom-2 z-[2] flex items-center justify-center gap-1.5">
+                        {unitPhotos.map((_, idx) => (
+                          <button
+                            key={`${unit.id}-dot-${idx}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCardPhotoIndex((prev) => ({ ...prev, [unit.id]: idx }));
+                            }}
+                            className={cn(
+                              'h-1.5 rounded-full shadow-sm transition-all',
+                              idx === photoIdx
+                                ? 'w-4 bg-white'
+                                : 'w-1.5 bg-white/55 hover:bg-white/80',
+                            )}
+                            aria-label={`Photo ${idx + 1} of ${unitPhotos.length}`}
+                            aria-current={idx === photoIdx}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  <div className="absolute top-3 left-3 right-3 flex flex-wrap items-start gap-2">
                     <span
                       className={cn(
-                        'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold shadow-md backdrop-blur-md',
-                        unit.status === 'Available' && 'bg-emerald-600 text-white',
-                        unit.status === 'Occupied' && 'bg-red-600 text-white',
-                        unit.status === 'Maintenance' && 'bg-amber-500 text-amber-950',
-                        unit.status === 'Reserved' && 'bg-slate-100 text-slate-900 dark:bg-white/90 dark:text-slate-900',
+                        'group/badge relative inline-flex max-w-full items-center gap-1 overflow-hidden truncate rounded-full px-2 py-0.5 text-[11px] font-bold tracking-wide',
+                        'ring-1 ring-white/35 backdrop-blur-md transition-transform duration-300',
+                        'shadow-[0_1px_0_rgba(255,255,255,0.45)_inset,0_6px_14px_-5px_rgba(0,0,0,0.55),0_1px_3px_rgba(0,0,0,0.25)]',
+                        'before:pointer-events-none before:absolute before:inset-x-1 before:top-0 before:h-1/2 before:rounded-full',
+                        'before:bg-gradient-to-b before:from-white/45 before:to-transparent',
+                        unit.status === 'Available' &&
+                          'bg-gradient-to-b from-emerald-400 to-emerald-700 text-white',
+                        unit.status === 'Occupied' &&
+                          'bg-gradient-to-b from-rose-400 to-rose-700 text-white',
+                        unit.status === 'Maintenance' &&
+                          'bg-gradient-to-b from-amber-300 to-amber-600 text-amber-950',
+                        unit.status === 'Reserved' &&
+                          'bg-gradient-to-b from-slate-100 to-slate-300 text-slate-900 dark:from-white dark:to-slate-200',
                       )}
                     >
-                      {statusLabel(unit.status)}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'relative z-[1] h-1.5 w-1.5 shrink-0 rounded-full bg-white/95 shadow-[0_0_5px_rgba(255,255,255,0.75)]',
+                          unit.status === 'Available' && 'animate-pulse',
+                          unit.status === 'Occupied' && 'bg-white',
+                          unit.status === 'Maintenance' && 'bg-amber-950/80',
+                          unit.status === 'Reserved' && 'bg-slate-700',
+                        )}
+                      />
+                      <span className="relative z-[1] truncate">{statusLabel(unit.status)}</span>
                     </span>
                     {secondaryPill ? (
                       <span
                         className={cn(
-                          'inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-semibold shadow-md',
+                          'relative inline-flex max-w-full items-center truncate overflow-hidden rounded-full px-2 py-0.5 text-[11px] font-bold tracking-wide',
+                          'ring-1 ring-white/30 backdrop-blur-md',
+                          'shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_6px_14px_-5px_rgba(0,0,0,0.5)]',
+                          'before:pointer-events-none before:absolute before:inset-x-1 before:top-0 before:h-1/2 before:rounded-full',
+                          'before:bg-gradient-to-b before:from-white/40 before:to-transparent',
                           secondaryPill.cls,
                         )}
                       >
-                        {secondaryPill.label}
+                        <span className="relative z-[1] truncate">{secondaryPill.label}</span>
                       </span>
                     ) : null}
                   </div>
+
+                  {/* Unit + building overlay — bottom-left on photo */}
+                  <div
+                    className={cn(
+                      'absolute inset-x-0 bottom-0 z-[1] p-3 pt-8',
+                      unitPhotos.length > 1 && 'pb-7',
+                    )}
+                  >
+                    <h3 className="truncate text-base font-bold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+                      {t('views.units.unitLabel', { unitNumber: formatUnitNumberDisplay(unit) })}
+                    </h3>
+                    <p
+                      className="mt-0.5 max-w-[75%] truncate text-[11px] font-medium leading-snug text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]"
+                      title={detailLines.building || unit.type}
+                    >
+                      {detailLines.building || unit.type}
+                    </p>
+                  </div>
                 </div>
-                <CardContent className="flex flex-1 flex-col p-4 pt-4 dark:bg-slate-900">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                        {t('views.units.unitLabel', { unitNumber: unit.unitNumber })}
-                      </h3>
-                      <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        {unit.type}
-                      </p>
-                      <p
-                        className="mt-0.5 line-clamp-3 text-sm leading-snug text-slate-600 dark:text-slate-300"
-                        title={locationSubtitle}
-                      >
-                        {locationSubtitle}
-                      </p>
+                <CardContent className="flex flex-col gap-2 px-4 pb-4 pt-2 dark:bg-slate-900">
+                  <div className="flex min-h-[2.5rem] min-w-0 items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                      <MapPin
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-blue"
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        {(() => {
+                          const addressParts = [
+                            detailLines.building,
+                            detailLines.location,
+                            detailLines.floorTower,
+                          ].filter(Boolean);
+                          const addressText = addressParts.join(' · ') || unit.type;
+                          return (
+                            <p
+                              className="line-clamp-2 text-[13px] leading-snug text-slate-600 dark:text-slate-300"
+                              title={addressText}
+                            >
+                              {addressText}
+                            </p>
+                          );
+                        })()}
+                      </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-white">
+                    <div className="shrink-0 space-y-0.5 text-right">
+                      <p className="text-base font-bold tabular-nums leading-tight text-brand-blue">
                         ₱{unit.monthlyRate.toLocaleString()}
                       </p>
-                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      <p className="text-[11px] font-medium text-brand-blue/70 dark:text-sky-300/80">
                         {t('views.units.card.perMonth')}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="inline-flex items-center gap-1.5 tabular-nums">
-                      <BedDouble className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                      {metrics.beds}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 tabular-nums">
-                      <Maximize2 className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                      {metrics.sqm} {t('views.units.card.sqm')}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 tabular-nums">
-                      <Bath className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                      {metrics.baths}
-                    </span>
+                  <div className="flex min-h-[4.75rem] flex-wrap content-start gap-1.5">
+                    {specChips.map((chip) => (
+                      <div
+                        key={chip.key}
+                        title={chip.title}
+                        className={cn(
+                          'inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1.5',
+                          chip.chipClass,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                            chip.iconClass,
+                          )}
+                        >
+                          {chip.icon}
+                        </span>
+                        <span className="whitespace-nowrap text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                          {chip.value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="my-4 h-px bg-slate-100/70 dark:bg-slate-800/60" />
-
-                  <div className="space-y-3.5 text-sm leading-snug">
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                        <User className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                        {t('views.units.card.tenant')}
-                      </span>
-                      <span className="min-w-0 flex-1 text-right font-semibold text-slate-900 dark:text-slate-100">
-                        {tenantName === '—' ? (
-                          <span className="font-medium text-slate-500 dark:text-slate-400">—</span>
-                        ) : (
-                          <span className="break-words">{tenantName}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCardDetails((prev) => {
+                            const willOpen = !prev[unit.id];
+                            return willOpen ? { [unit.id]: true } : {};
+                          });
+                        }}
+                        className={cn(
+                          'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5',
+                          'text-[11px] font-medium tracking-wide text-slate-500',
+                          'transition-colors hover:bg-slate-50 hover:text-brand-blue',
+                          'dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-sky-300',
+                          expandedCardDetails[unit.id] && 'text-brand-blue dark:text-sky-300',
                         )}
-                      </span>
+                        aria-expanded={Boolean(expandedCardDetails[unit.id])}
+                      >
+                        {expandedCardDetails[unit.id]
+                          ? t('views.units.card.hideDetails')
+                          : t('views.units.card.showDetails')}
+                        <ChevronDown
+                          className={cn(
+                            'h-3 w-3 transition-transform duration-200',
+                            expandedCardDetails[unit.id] && 'rotate-180',
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+                      <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
                     </div>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                        <Calendar className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                        {t('views.units.card.leaseEnds')}
-                      </span>
-                      <div className="min-w-0 flex-1 text-right text-sm leading-snug">{leaseEndsNode}</div>
-                    </div>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                        <CircleDollarSign className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                        {t('views.units.card.rentStatus')}
-                      </span>
-                      <div className="min-w-0 flex-1 text-right text-sm">{rentStatusNode}</div>
-                    </div>
-                    {unit.status === 'Available' ? (
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                          <Home className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                          {t('views.units.card.vacantSince')}
-                        </span>
-                        <span className="min-w-0 flex-1 text-right font-medium text-slate-500 dark:text-slate-400">—</span>
+
+                    <div
+                      className={cn(
+                        'grid transition-[grid-template-rows] duration-300 ease-out',
+                        expandedCardDetails[unit.id] ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                      )}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        <div
+                          className={cn(
+                            'space-y-3 pt-2 text-sm leading-snug transition-opacity duration-300',
+                            expandedCardDetails[unit.id] ? 'opacity-100' : 'opacity-0',
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                              <User className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                              {t('views.units.card.tenant')}
+                            </span>
+                            <span className="min-w-0 flex-1 text-right font-semibold text-slate-900 dark:text-slate-100">
+                              {tenantName === '—' ? (
+                                <span className="font-medium text-slate-500 dark:text-slate-400">—</span>
+                              ) : (
+                                <span className="break-words">{tenantName}</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                              <Calendar className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                              {t('views.units.card.leaseEnds')}
+                            </span>
+                            <div className="min-w-0 flex-1 text-right text-sm leading-snug">{leaseEndsNode}</div>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                              <CircleDollarSign className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                              {t('views.units.card.rentStatus')}
+                            </span>
+                            <div className="min-w-0 flex-1 text-right text-sm">{rentStatusNode}</div>
+                          </div>
+                          {unit.status === 'Available' ? (
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                <Home className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                                {t('views.units.card.vacantSince')}
+                              </span>
+                              <span className="min-w-0 flex-1 text-right font-medium text-slate-500 dark:text-slate-400">—</span>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    ) : null}
+                    </div>
                   </div>
 
                   <div
-                    className="mt-auto flex items-stretch gap-1.5 pt-4"
+                    className="flex items-stretch gap-1.5"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                     role="presentation"

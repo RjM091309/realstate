@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
+  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Download,
   Search,
   Trash2,
+  Wallet,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, modalOutlineButtonClass } from '@/components/ui/button';
@@ -41,6 +45,159 @@ import type { Contract, Payment, Tenant, Unit } from '@/types';
 
 const LEDGER_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
 const LEDGER_TABS: LedgerTab[] = ['this_month', 'outstanding', 'paid'];
+
+type LedgerStatTone = 'danger' | 'success' | 'neutral';
+
+function LedgerStatCard({
+  label,
+  value,
+  subtitle,
+  tone,
+  icon,
+  index = 0,
+}: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  tone: LedgerStatTone;
+  icon: React.ReactNode;
+  index?: number;
+}) {
+  const fromLeft = index % 2 === 0;
+  const iconColor =
+    tone === 'danger' ? 'bg-rose-500' : tone === 'success' ? 'bg-brand-green' : 'bg-brand-blue';
+  const valueColor =
+    tone === 'danger'
+      ? 'text-rose-600 dark:text-rose-400'
+      : tone === 'success'
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-slate-800 dark:text-slate-100';
+  const footerVariant =
+    tone === 'danger' ? 'alert' : tone === 'success' ? 'up' : 'neutral';
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      whileHover="hover"
+      variants={{
+        hidden: {
+          opacity: 0,
+          x: fromLeft ? -36 : 36,
+          y: 18,
+          scale: 0.88,
+        },
+        show: {
+          opacity: 1,
+          x: 0,
+          y: 0,
+          scale: 1,
+          transition: {
+            type: 'spring',
+            stiffness: 260,
+            damping: 16,
+            mass: 0.9,
+            delay: 0.06 + index * 0.09,
+          },
+        },
+        hover: {
+          scale: 1.035,
+          y: -4,
+          borderColor: 'rgba(75,137,205,0.45)',
+          boxShadow: '0 18px 36px -16px rgba(75,137,205,0.4), 0 8px 16px -10px rgba(15,23,42,0.2)',
+          transition: { type: 'spring', stiffness: 420, damping: 18 },
+        },
+      }}
+      className={cn(
+        'group relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-100/90 bg-white/95 p-4 text-left',
+        'shadow-[0_8px_24px_-14px_rgba(15,23,42,0.22)]',
+        'dark:border-slate-800 dark:bg-slate-900/90',
+        'dark:shadow-[0_10px_28px_-14px_rgba(0,0,0,0.55)]',
+      )}
+    >
+      <div className="relative mb-4 flex items-start justify-between">
+        <motion.div
+          initial={{ scale: 0, rotate: -28 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{
+            type: 'spring',
+            stiffness: 460,
+            damping: 14,
+            delay: 0.18 + index * 0.08,
+          }}
+          variants={{
+            show: { scale: 1, y: 0 },
+            hover: { scale: 1.12, y: -3, transition: { type: 'spring', stiffness: 400, damping: 16 } },
+          }}
+          className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg',
+            'ring-1 ring-white/25',
+            iconColor,
+          )}
+        >
+          <motion.span
+            animate={{ y: [0, -3, 0] }}
+            transition={{ duration: 2.4 + index * 0.15, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            {icon}
+          </motion.span>
+        </motion.div>
+        <div className="text-right">
+          <motion.p
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + index * 0.08, duration: 0.35 }}
+            className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400"
+          >
+            {label}
+          </motion.p>
+          <div className="overflow-hidden">
+            <motion.h3
+              key={value}
+              initial={{ y: '110%', opacity: 0 }}
+              animate={{ y: '0%', opacity: 1 }}
+              transition={{
+                type: 'spring',
+                stiffness: 280,
+                damping: 18,
+                delay: 0.22 + index * 0.08,
+              }}
+              className={cn('text-3xl font-bold tabular-nums', valueColor)}
+            >
+              {value}
+            </motion.h3>
+          </div>
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, scaleX: 0.6 }}
+        animate={{ opacity: 1, scaleX: 1 }}
+        transition={{ delay: 0.32 + index * 0.08, duration: 0.4 }}
+        style={{ transformOrigin: 'left center' }}
+        className={cn(
+          'relative mt-auto flex items-center gap-1 border-t border-slate-50 pt-3 text-xs font-medium transition-colors dark:border-slate-800',
+          footerVariant === 'up' && 'text-brand-green',
+          footerVariant === 'alert' && 'text-rose-500',
+          footerVariant === 'neutral' && 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500',
+        )}
+      >
+        {footerVariant === 'up' && (
+          <motion.span
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            <BadgeCheck className="h-3 w-3" />
+          </motion.span>
+        )}
+        {footerVariant === 'alert' && <AlertCircle className="h-3 w-3" />}
+        {subtitle ?? (tone === 'danger' ? 'Requires attention' : tone === 'success' ? 'All recorded payments' : '—')}
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function shiftLedgerMonth(monthKey: string, delta: number): string {
   try {
@@ -804,37 +961,30 @@ export function LeaseLedgerView() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              {t('views.ledger.overdueBalance')}
-            </p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-rose-600">
-              ₱{summary.overdueBalance.toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              {t('views.ledger.totalPaid')}
-            </p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-600">
-              ₱{summary.totalPaidAll.toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              {t('views.ledger.actualCollected')}
-            </p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
-              ₱{summary.actualCollected.toLocaleString()}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{formatLedgerMonthLabel(summary.monthKey)}</p>
-          </CardContent>
-        </Card>
+        <LedgerStatCard
+          index={0}
+          label={t('views.ledger.overdueBalance')}
+          value={`₱${summary.overdueBalance.toLocaleString()}`}
+          subtitle="Requires attention"
+          tone="danger"
+          icon={<AlertCircle className="h-6 w-6" />}
+        />
+        <LedgerStatCard
+          index={1}
+          label={t('views.ledger.totalPaid')}
+          value={`₱${summary.totalPaidAll.toLocaleString()}`}
+          subtitle="All recorded payments"
+          tone="success"
+          icon={<BadgeCheck className="h-6 w-6" />}
+        />
+        <LedgerStatCard
+          index={2}
+          label={t('views.ledger.actualCollected')}
+          value={`₱${summary.actualCollected.toLocaleString()}`}
+          subtitle={formatLedgerMonthLabel(summary.monthKey)}
+          tone="neutral"
+          icon={<Wallet className="h-6 w-6" />}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

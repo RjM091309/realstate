@@ -52,6 +52,7 @@ import {
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
 import type { Contract, Payment } from '@/types';
 import { useDateRange, toYYYYMMDD } from '@/context/DateRangeContext';
 import { useAuth } from '@/context/AuthContext';
@@ -95,11 +96,27 @@ const occupancyData = (t: (key: string) => string, units: Array<{ status: string
   },
 ];
 
-function getGreeting(): { text: string; icon: React.ReactNode } {
+function getGreeting(): { text: string; icon: React.ReactNode; tone: 'morning' | 'afternoon' | 'evening' } {
   const hour = new Date().getHours();
-  if (hour < 12) return { text: 'Good morning', icon: <Sun className="w-5 h-5 text-amber-400" /> };
-  if (hour < 18) return { text: 'Good afternoon', icon: <Sunset className="w-5 h-5 text-orange-400" /> };
-  return { text: 'Good evening', icon: <Moon className="w-5 h-5 text-brand-blue" /> };
+  if (hour < 12) {
+    return {
+      text: 'Good morning',
+      tone: 'morning',
+      icon: <Sun className="w-5 h-5 text-amber-400" />,
+    };
+  }
+  if (hour < 18) {
+    return {
+      text: 'Good afternoon',
+      tone: 'afternoon',
+      icon: <Sunset className="w-5 h-5 text-orange-400" />,
+    };
+  }
+  return {
+    text: 'Good evening',
+    tone: 'evening',
+    icon: <Moon className="w-5 h-5 text-brand-blue" />,
+  };
 }
 
 interface StatCardProps {
@@ -111,6 +128,7 @@ interface StatCardProps {
   iconColor: string;
   onClick?: () => void;
   clickHint?: string;
+  index?: number;
 }
 
 function StatCard({
@@ -122,22 +140,76 @@ function StatCard({
   iconColor,
   onClick,
   clickHint,
+  index = 0,
 }: StatCardProps) {
   const interactive = Boolean(onClick);
+  const fromLeft = index % 2 === 0;
+
   const body = (
     <>
-      <div className="mb-4 flex items-start justify-between">
-        <div className={cn('flex h-12 w-12 items-center justify-center rounded text-white shadow-lg', iconColor)}>
-          {icon}
-        </div>
+      <div className="relative mb-4 flex items-start justify-between">
+        <motion.div
+          initial={{ scale: 0, rotate: -28 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{
+            type: 'spring',
+            stiffness: 460,
+            damping: 14,
+            delay: 0.18 + index * 0.08,
+          }}
+          variants={{
+            show: { scale: 1, y: 0 },
+            hover: { scale: 1.12, y: -3, transition: { type: 'spring', stiffness: 400, damping: 16 } },
+            tap: { scale: 0.96 },
+          }}
+          className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg',
+            'ring-1 ring-white/25',
+            iconColor,
+          )}
+        >
+          <motion.span
+            animate={{ y: [0, -3, 0] }}
+            transition={{ duration: 2.4 + index * 0.15, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            {icon}
+          </motion.span>
+        </motion.div>
         <div className="text-right">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-          <h3 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{value}</h3>
+          <motion.p
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + index * 0.08, duration: 0.35 }}
+            className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400"
+          >
+            {label}
+          </motion.p>
+          <div className="overflow-hidden">
+            <motion.h3
+              key={String(value)}
+              initial={{ y: '110%', opacity: 0 }}
+              animate={{ y: '0%', opacity: 1 }}
+              transition={{
+                type: 'spring',
+                stiffness: 280,
+                damping: 18,
+                delay: 0.22 + index * 0.08,
+              }}
+              className="text-3xl font-bold text-slate-800 dark:text-slate-100"
+            >
+              {value}
+            </motion.h3>
+          </div>
         </div>
       </div>
-      <div
+      <motion.div
+        initial={{ opacity: 0, scaleX: 0.6 }}
+        animate={{ opacity: 1, scaleX: 1 }}
+        transition={{ delay: 0.32 + index * 0.08, duration: 0.4 }}
+        style={{ transformOrigin: 'left center' }}
         className={cn(
-          'mt-auto flex items-center gap-1 border-t border-slate-50 pt-3 text-xs font-medium transition-colors dark:border-slate-800',
+          'relative mt-auto flex items-center gap-1 border-t border-slate-50 pt-3 text-xs font-medium transition-colors dark:border-slate-800',
           subtextVariant === 'up' && 'text-brand-green',
           subtextVariant === 'down' && 'text-rose-500',
           subtextVariant === 'alert' && 'text-rose-500',
@@ -145,29 +217,113 @@ function StatCard({
           interactive && 'underline-offset-2 group-hover:underline',
         )}
       >
-        {subtextVariant === 'up' && <ArrowUpRight className="h-3 w-3" />}
-        {subtextVariant === 'down' && <ArrowDownRight className="h-3 w-3" />}
+        {subtextVariant === 'up' && (
+          <motion.span
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            <ArrowUpRight className="h-3 w-3" />
+          </motion.span>
+        )}
+        {subtextVariant === 'down' && (
+          <motion.span
+            animate={{ y: [0, 2, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            <ArrowDownRight className="h-3 w-3" />
+          </motion.span>
+        )}
         {subtextVariant === 'alert' && <AlertCircle className="h-3 w-3" />}
         {subtext}
-      </div>
+      </motion.div>
     </>
   );
 
   const cardClass = cn(
-    'group relative flex w-full flex-col overflow-hidden rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900',
+    'group relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-100/90 bg-white/95 p-4 text-left',
+    'shadow-[0_8px_24px_-14px_rgba(15,23,42,0.22)]',
+    'dark:border-slate-800 dark:bg-slate-900/90',
+    'dark:shadow-[0_10px_28px_-14px_rgba(0,0,0,0.55)]',
     interactive &&
-      'cursor-pointer transition hover:border-brand-blue/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40',
+      'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40',
   );
+
+  const motionProps = {
+    initial: 'hidden' as const,
+    animate: 'show' as const,
+    whileHover: 'hover' as const,
+    whileTap: interactive ? ('tap' as const) : undefined,
+    variants: {
+      hidden: {
+        opacity: 0,
+        x: fromLeft ? -36 : 36,
+        y: 18,
+        scale: 0.88,
+      },
+      show: {
+        opacity: 1,
+        x: 0,
+        y: 0,
+        scale: 1,
+        transition: {
+          type: 'spring' as const,
+          stiffness: 260,
+          damping: 16,
+          mass: 0.9,
+          delay: 0.06 + index * 0.09,
+        },
+      },
+      hover: interactive
+        ? {
+            scale: 1.035,
+            y: -4,
+            borderColor: 'rgba(75,137,205,0.45)',
+            boxShadow: '0 18px 36px -16px rgba(75,137,205,0.4), 0 8px 16px -10px rgba(15,23,42,0.2)',
+            transition: { type: 'spring' as const, stiffness: 420, damping: 18 },
+          }
+        : {
+            scale: 1.015,
+            y: -2,
+          },
+      tap: {
+        scale: 0.97,
+        transition: { type: 'spring' as const, stiffness: 500, damping: 28 },
+      },
+      rest: {},
+    },
+  };
 
   if (interactive) {
     return (
-      <button type="button" onClick={onClick} title={clickHint || subtext} className={cardClass}>
+      <motion.button
+        type="button"
+        onClick={onClick}
+        title={clickHint || subtext}
+        className={cardClass}
+        initial="hidden"
+        animate="show"
+        whileHover="hover"
+        whileTap="tap"
+        variants={motionProps.variants}
+      >
         {body}
-      </button>
+      </motion.button>
     );
   }
 
-  return <div className={cardClass}>{body}</div>;
+  return (
+    <motion.div
+      className={cardClass}
+      initial="hidden"
+      animate="show"
+      whileHover="hover"
+      variants={motionProps.variants}
+    >
+      {body}
+    </motion.div>
+  );
 }
 
 type AgentRow = { id: string; name: string; deals: number; profit: number; status: string };
@@ -527,20 +683,71 @@ export function DashboardView() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Greeting Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            {greeting.icon}
-            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{greeting.text},</span>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
+      >
+        <div className="relative">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -left-6 -top-8 h-24 w-24 rounded-full bg-amber-300/20 blur-2xl dark:bg-brand-blue/15"
+          />
+          <div className="mb-1 flex items-center gap-2">
+            <motion.span
+              animate={
+                greeting.tone === 'morning'
+                  ? { rotate: [0, 12, -8, 0], scale: [1, 1.08, 1] }
+                  : greeting.tone === 'afternoon'
+                    ? { y: [0, -2, 0], rotate: [0, -6, 4, 0] }
+                    : { rotate: [-6, 6, -6], opacity: [0.85, 1, 0.85] }
+              }
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+              className="inline-flex"
+            >
+              {greeting.icon}
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.12, type: 'spring', stiffness: 360, damping: 24 }}
+              className="text-sm font-medium text-slate-500 dark:text-slate-400"
+            >
+              {greeting.text},
+            </motion.span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{firstName} 👋</h1>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">{today}</p>
+          <motion.h1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, type: 'spring', stiffness: 300, damping: 22 }}
+            className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100"
+          >
+            {firstName}{' '}
+            <motion.span
+              aria-hidden
+              className="inline-block origin-[70%_70%]"
+              animate={{ rotate: [0, 18, -8, 14, 0] }}
+              transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 2.4, ease: 'easeInOut' }}
+            >
+              👋
+            </motion.span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.32 }}
+            className="mt-1 text-sm text-slate-400 dark:text-slate-500"
+          >
+            {today}
+          </motion.p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
+          index={0}
           label={t('views.dashboard.cards.totalProfit')}
           value={`₱${periodTotals.current.toLocaleString()}`}
           subtext={collectedTrend.text}
@@ -562,6 +769,7 @@ export function DashboardView() {
           }}
         />
         <StatCard
+          index={1}
           label={t('views.dashboard.cards.netProfit')}
           value={`₱${baseMonthlyRentProfit.toLocaleString()}`}
           subtext={t('views.dashboard.cards.netProfitHint')}
@@ -572,6 +780,7 @@ export function DashboardView() {
           onClick={() => navigate('/contracts?status=Active')}
         />
         <StatCard
+          index={2}
           label={t('views.dashboard.cards.activeLeases')}
           value={activeContracts}
           subtext={
@@ -592,6 +801,7 @@ export function DashboardView() {
           }
         />
         <StatCard
+          index={3}
           label={t('views.dashboard.cards.vacancyRate')}
           value={`${vacancyRate}%`}
           subtext={`${availableUnits} ${availableUnits === 1 ? 'unit' : 'units'} available`}
@@ -602,6 +812,7 @@ export function DashboardView() {
           onClick={() => navigate('/units?status=Available')}
         />
         <StatCard
+          index={4}
           label={t('views.dashboard.cards.overdueRent')}
           value={overduePayments}
           subtext={t('views.dashboard.cards.overdueHint')}

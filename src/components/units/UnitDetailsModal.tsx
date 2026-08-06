@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Car,
   Armchair,
+  DollarSign,
 } from 'lucide-react';
 import { format, parseISO, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,109 @@ function displayOrDash(value: string | null | undefined): string {
   const v = String(value ?? '').trim();
   if (!v || v === '—' || v === '-') return '—';
   return v;
+}
+
+/** Animates a number from 0 → target (count-up). */
+function useCountUp(target: number, active: boolean, durationMs = 1100) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setValue(0);
+      return;
+    }
+    const end = Number.isFinite(target) ? Math.max(0, target) : 0;
+    if (end === 0) {
+      setValue(0);
+      return;
+    }
+
+    let frame = 0;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      // easeOutExpo-ish
+      const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+      setValue(Math.round(end * eased));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, active, durationMs]);
+
+  return value;
+}
+
+function MonthlyRateCard({
+  rate,
+  label,
+  perMonthLabel,
+  active,
+}: {
+  rate: number;
+  label: string;
+  perMonthLabel: string;
+  active: boolean;
+}) {
+  const counted = useCountUp(rate, active, 1200);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 22, delay: 0.12 }}
+      whileHover={{
+        y: -4,
+        scale: 1.015,
+        boxShadow: '0 18px 36px -16px rgba(75,137,205,0.4), 0 8px 16px -10px rgba(15,23,42,0.2)',
+        transition: { type: 'spring', stiffness: 420, damping: 20 },
+      }}
+      className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_24px_-14px_rgba(15,23,42,0.22)] dark:border-slate-700 dark:bg-slate-950/60 dark:shadow-[0_10px_28px_-14px_rgba(0,0,0,0.55)]"
+    >
+      {/* Left accent rail */}
+      <motion.div
+        aria-hidden
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.2 }}
+        className="absolute inset-y-3 left-0 w-1 origin-top rounded-full bg-gradient-to-b from-brand-blue via-sky-400 to-brand-blue"
+      />
+
+      <div className="relative flex items-start justify-between gap-3 pl-2">
+        <div className="min-w-0 flex-1">
+          <span className="mb-1 block text-xs font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+            {label}
+          </span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-extrabold tracking-tight text-brand-blue tabular-nums">
+              ₱{counted.toLocaleString()}
+            </span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {perMonthLabel}
+            </span>
+          </div>
+        </div>
+
+        <motion.div
+          initial={{ scale: 0, rotate: -24 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 14, delay: 0.22 }}
+          whileHover={{ scale: 1.1, y: -2 }}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-blue text-white shadow-lg ring-1 ring-white/25"
+        >
+          <motion.span
+            animate={{ y: [0, -3, 0] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="inline-flex"
+          >
+            <DollarSign className="h-6 w-6" />
+          </motion.span>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
 }
 
 function formatLeaseDate(raw: string | undefined | null): string {
@@ -404,19 +508,12 @@ export function UnitDetailsModal({
               </div>
 
               <div className="flex flex-col space-y-4 lg:col-span-4">
-                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/60">
-                  <span className="mb-1 block text-xs font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
-                    {t('views.units.details.monthlyRentalRate')}
-                  </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-brand-blue">
-                      ₱{Number(unit.monthlyRate).toLocaleString()}
-                    </span>
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {t('views.units.details.perMonth')}
-                    </span>
-                  </div>
-                </div>
+                <MonthlyRateCard
+                  rate={Number(unit.monthlyRate) || 0}
+                  label={t('views.units.details.monthlyRentalRate')}
+                  perMonthLabel={t('views.units.details.perMonth')}
+                  active={isOpen}
+                />
 
                 <div className="grid grid-cols-3 gap-2.5">
                   <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-800/70">

@@ -375,7 +375,7 @@
         "inventory": "비품",
         "delete": "삭제",
         "more": "더보기",
-        "perMonth": "/월",
+        "perMonth": "월 임대료",
         "sqm": "㎡",
         "noResults": "검색에 맞는 유닛이 없습니다.",
         "selectUnit": "유닛 선택",
@@ -390,7 +390,15 @@
         "badgeVacant": "공실",
         "badgeOverdue": "연체 ({{count}}일)",
         "badgeEndingSoon": "임대 종료 임박",
-        "badgePaid": "납부 완료"
+        "badgePaid": "납부 완료",
+        "showDetails": "상세 보기",
+        "hideDetails": "상세 숨기기",
+        "specBedroom_one": "침실 {{count}}",
+        "specBedroom_other": "침실 {{count}}",
+        "specBathroom_one": "욕실 {{count}}",
+        "specBathroom_other": "욕실 {{count}}",
+        "specParking": "주차 {{slot}}",
+        "specParkingFallback": "주차"
       },
       "table": {
         "unit": "유닛 번호",

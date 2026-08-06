@@ -48,6 +48,7 @@ import {
   subscribeNotificationPreferences,
 } from '@/lib/notificationPreferences';
 import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Modal } from '@/components/modal';
 import {
   NotificationPanel,
@@ -568,7 +569,12 @@ export function TopNav({
     <header className="h-16 bg-white dark:bg-slate-900 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         {showDateRangePicker && (
-          <div className="shrink-0 min-w-[240px] max-w-[320px] w-full sm:w-auto">
+          <motion.div
+            initial={{ opacity: 0, x: -16, scale: 0.94 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 22 }}
+            className="shrink-0 min-w-[240px] max-w-[320px] w-full sm:w-auto"
+          >
             <AppDatePicker
               mode="range"
               value={pickerRange}
@@ -577,67 +583,120 @@ export function TopNav({
               showPresets
               fullWidth
             />
-          </div>
+          </motion.div>
         )}
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-        <div className="hidden sm:flex items-center gap-1 rounded-md p-1">
-          <span className="sr-only">{t('header.languageLabel')}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-8 px-2',
-              currentLanguage === 'en' &&
-                'bg-brand-blue text-white hover:bg-[#3d7ab8] hover:text-white dark:bg-brand-blue dark:hover:bg-[#3d7ab8]',
-            )}
-            onClick={() => i18n.changeLanguage('en')}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Language + theme cluster */}
+        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-slate-50/80 p-1 shadow-sm backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-800/50">
+          <div
+            className="relative flex items-center rounded-full p-0.5"
+            role="group"
+            aria-label={t('header.languageLabel')}
           >
-            EN
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+            <span className="sr-only">{t('header.languageLabel')}</span>
+            {(['en', 'ko'] as const).map((lang) => {
+              const active = currentLanguage.toLowerCase().startsWith(lang);
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => void i18n.changeLanguage(lang)}
+                  className={cn(
+                    'relative z-10 h-7 min-w-[2.25rem] cursor-pointer rounded-full px-2.5 text-xs font-bold tracking-wide transition-colors',
+                    active
+                      ? 'text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100',
+                  )}
+                  aria-pressed={active}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="header-lang-pill"
+                      className="absolute inset-0 -z-10 rounded-full bg-brand-blue shadow-[0_6px_14px_-6px_rgba(75,137,205,0.85)]"
+                      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                    />
+                  )}
+                  <motion.span
+                    key={`${lang}-${active ? 'on' : 'off'}`}
+                    initial={{ y: 4, opacity: 0.5 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                    className="relative inline-block"
+                  >
+                    {lang.toUpperCase()}
+                  </motion.span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-slate-600/80" aria-hidden />
+
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.04, y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 480, damping: 24 }}
             className={cn(
-              'h-8 px-2',
-              currentLanguage === 'ko' &&
-                'bg-brand-blue text-white hover:bg-[#3d7ab8] hover:text-white dark:bg-brand-blue dark:hover:bg-[#3d7ab8]',
+              'relative flex h-7 min-w-[5.75rem] cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-full px-2.5',
+              'text-xs font-semibold text-slate-600 dark:text-slate-200',
+              'hover:bg-white/80 dark:hover:bg-slate-700/60',
+              'disabled:cursor-wait disabled:opacity-70',
             )}
-            onClick={() => i18n.changeLanguage('ko')}
-          >
-            KO
-          </Button>
-        </div>
-        <div className="hidden sm:flex items-center gap-1 rounded-md p-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2.5 min-w-[92px] justify-center"
             onClick={(e) => void handleAppThemeChange(nextTheme, e.currentTarget as HTMLElement)}
             disabled={themeLoading !== null}
             title={`Switch system to ${nextThemeLabel.toLowerCase()} mode`}
           >
-            {nextTheme === 'dark' ? (
-              <Moon className="w-3.5 h-3.5 mr-1.5 transition-transform duration-300" />
-            ) : (
-              <Sun className="w-3.5 h-3.5 mr-1.5 transition-transform duration-300" />
-            )}
-            {themeLoading ? 'Switching...' : nextThemeLabel}
-          </Button>
+            <span className="relative flex h-3.5 w-3.5 items-center justify-center">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={nextTheme}
+                  initial={{ rotate: -90, scale: 0.4, opacity: 0 }}
+                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                  exit={{ rotate: 90, scale: 0.4, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  {nextTheme === 'dark' ? (
+                    <Moon className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-300" />
+                  ) : (
+                    <Sun className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={themeLoading ? 'loading' : nextThemeLabel}
+                initial={{ y: 8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -8, opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="inline-block"
+              >
+                {themeLoading ? 'Switching...' : nextThemeLabel}
+              </motion.span>
+            </AnimatePresence>
+          </motion.button>
         </div>
 
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 [perspective:800px]">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="relative h-10 w-10"
+            className={cn(
+              'relative h-10 w-10 transition-transform duration-200',
+              notificationOpen && 'scale-95',
+              unreadCount > 0 && !notificationOpen && 'notify-bell-wobble',
+            )}
             aria-expanded={notificationOpen}
             aria-label={t('notifications.title')}
             onClick={() => setNotificationOpen((open) => !open)}
           >
-            <Bell className="size-7 text-slate-600" />
+            <Bell className="size-7 text-slate-600 dark:text-slate-300" />
             {unreadCount > 0 ? (
               <span
                 className={cn(
@@ -645,7 +704,8 @@ export function TopNav({
                   'rounded-full bg-rose-600 text-white',
                   'text-[11px] font-bold leading-[20px] text-center',
                   'border-2 border-white dark:border-slate-900',
-                  'shadow-sm',
+                  'shadow-[0_4px_10px_-2px_rgba(225,29,72,0.55)]',
+                  'notify-badge-pulse',
                 )}
                 aria-label={t('notifications.unread_messages', { count: unreadCount })}
               >
@@ -668,18 +728,35 @@ export function TopNav({
             onNotificationClick={(n) => void openNotificationDetails(n)}
           />
         </div>
-        <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+
+        <div className="hidden h-8 w-px bg-gradient-to-b from-transparent via-slate-300 to-transparent dark:via-slate-600 sm:block" />
+
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ y: -2, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 24 }}
                 className={cn(
-                  'group flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md px-2 py-1.5 shadow-sm hover:shadow-md transition-all',
+                  'group relative flex items-center gap-2 overflow-hidden rounded-full border border-slate-200/80 dark:border-slate-700/80',
+                  'bg-white/70 dark:bg-slate-900/55 backdrop-blur-md px-2 py-1.5',
+                  'shadow-[0_8px_20px_-12px_rgba(15,23,42,0.35)] hover:shadow-[0_14px_28px_-14px_rgba(75,137,205,0.45)]',
+                  'transition-[box-shadow,border-color] duration-300',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950',
+                  'data-[popup-open]:border-brand-blue/40 data-[popup-open]:shadow-[0_16px_32px_-14px_rgba(75,137,205,0.5)]',
                 )}
               >
-                <Avatar className="h-8 w-8">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-data-[popup-open]:opacity-100"
+                  style={{
+                    background:
+                      'linear-gradient(120deg, transparent 20%, rgba(75,137,205,0.12) 45%, transparent 70%)',
+                  }}
+                />
+                <Avatar className="relative h-8 w-8 ring-2 ring-transparent transition-[box-shadow,transform] duration-300 group-hover:ring-brand-blue/30 group-hover:scale-105 group-data-[popup-open]:ring-brand-blue/45">
                   <AvatarImage src={session?.user.avatarUrl ?? undefined} className="object-cover" />
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
@@ -691,13 +768,19 @@ export function TopNav({
                     {role || '—'}
                   </p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400 transition-transform data-[popup-open]:rotate-180" />
-              </button>
+                <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400 transition-transform duration-300 ease-out group-data-[popup-open]:rotate-180" />
+              </motion.button>
             }
           />
           <DropdownMenuContent
             align="end"
-            className="w-56 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md shadow-xl"
+            sideOffset={8}
+            className={cn(
+              'w-56 rounded-2xl border border-slate-200/80 dark:border-slate-700/80',
+              'bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl',
+              'shadow-[0_24px_48px_-20px_rgba(15,23,42,0.45)]',
+              'data-open:zoom-in-95 data-open:slide-in-from-top-3',
+            )}
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="px-2 py-2">
@@ -708,6 +791,7 @@ export function TopNav({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                className="transition-transform focus:translate-x-0.5"
                 onClick={() => {
                   setNotificationOpen(false);
                   onOpenSettings?.();
@@ -718,6 +802,7 @@ export function TopNav({
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
+                className="transition-transform focus:translate-x-0.5"
                 onClick={() => {
                   setNotificationOpen(false);
                   onLogout?.();

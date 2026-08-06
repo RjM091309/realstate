@@ -738,3 +738,54 @@
 .recharts-surface:focus-visible {
   outline: none !important;
 }
+
+/* Notification bell: gentle 3D wobble when unread */
+@keyframes notify-bell-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  12% {
+    transform: rotate(14deg);
+  }
+  24% {
+    transform: rotate(-12deg);
+  }
+  36% {
+    transform: rotate(8deg);
+  }
+  48% {
+    transform: rotate(-6deg);
+  }
+  60% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes notify-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 10px -2px rgba(225, 29, 72, 0.55);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 6px 14px -2px rgba(225, 29, 72, 0.7);
+  }
+}
+
+.notify-bell-wobble {
+  animation: notify-bell-wobble 2.4s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.notify-badge-pulse {
+  animation: notify-badge-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notify-bell-wobble,
+  .notify-badge-pulse {
+    animation: none;
+  }
+}
