@@ -34,7 +34,15 @@ function rowToPayment(row) {
     paidDate: fmtDate(row.paid_date),
     status: String(row.status),
     remarks: row.remarks ? String(row.remarks) : '',
+    paymentMethod: row.payment_method ? String(row.payment_method) : undefined,
   };
+}
+
+const VALID_PAYMENT_METHODS = new Set(['cash', 'bank_transfer', 'online', 'check', 'other']);
+
+function normalizePaymentMethod(value) {
+  const method = String(value ?? 'cash').trim().toLowerCase();
+  return VALID_PAYMENT_METHODS.has(method) ? method : 'cash';
 }
 
 function validatePayload(body) {
@@ -59,13 +67,18 @@ function validatePayload(body) {
   }
   if (status === 'Paid' && !paidDate) paidDate = dueDate;
 
+  let paymentMethod;
+  if (status === 'Paid') {
+    paymentMethod = normalizePaymentMethod(body.paymentMethod);
+  }
+
   let remarks;
   if (Object.prototype.hasOwnProperty.call(body, 'remarks')) {
     const raw = body.remarks;
     remarks = raw == null ? null : String(raw).trim().slice(0, 255) || null;
   }
 
-  return { contractId, unitId, amount, dueDate, paidDate, status, remarks };
+  return { contractId, unitId, amount, dueDate, paidDate, status, remarks, paymentMethod };
 }
 
 function canCrud(session, op) {

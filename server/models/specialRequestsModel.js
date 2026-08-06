@@ -24,6 +24,84 @@ export async function listSpecialRequestsByContract(contractId, branchId) {
   return rows;
 }
 
+export async function listSpecialRequestsByBranch(branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      sr.id,
+      sr.branch_id,
+      sr.contract_id,
+      sr.request_source,
+      sr.title,
+      sr.details,
+      sr.status,
+      sr.created_by,
+      sr.created_at,
+      sr.updated_at,
+      lc.contract_no,
+      u.unit_no AS unit_number,
+      u.tower AS unit_tower,
+      pr.name AS building_name,
+      t.full_name AS tenant_name
+    FROM special_request sr
+    INNER JOIN lease_contract lc ON lc.id = sr.contract_id AND lc.branch_id = sr.branch_id
+    INNER JOIN unit u ON u.id = lc.unit_id
+    INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = sr.branch_id
+    LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.is_primary = 1 AND ct.active = 1
+    LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    WHERE sr.branch_id = ?
+    ORDER BY sr.created_at DESC, sr.id DESC
+    `,
+    [branchId],
+  );
+  return rows;
+}
+
+export async function updateSpecialRequestStatus(id, branchId, status) {
+  const [result] = await pool.query(
+    `
+    UPDATE special_request
+    SET status = ?, updated_at = NOW()
+    WHERE id = ? AND branch_id = ?
+    `,
+    [status, id, branchId],
+  );
+  return result.affectedRows;
+}
+
+export async function getSpecialRequestById(id, branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      sr.id,
+      sr.branch_id,
+      sr.contract_id,
+      sr.request_source,
+      sr.title,
+      sr.details,
+      sr.status,
+      sr.created_by,
+      sr.created_at,
+      sr.updated_at,
+      lc.contract_no,
+      u.unit_no AS unit_number,
+      u.tower AS unit_tower,
+      pr.name AS building_name,
+      t.full_name AS tenant_name
+    FROM special_request sr
+    INNER JOIN lease_contract lc ON lc.id = sr.contract_id AND lc.branch_id = sr.branch_id
+    INNER JOIN unit u ON u.id = lc.unit_id
+    INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = sr.branch_id
+    LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.is_primary = 1 AND ct.active = 1
+    LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    WHERE sr.id = ? AND sr.branch_id = ?
+    LIMIT 1
+    `,
+    [id, branchId],
+  );
+  return rows[0] ?? null;
+}
+
 export async function insertSpecialRequest(branchId, contractId, payload) {
   const [result] = await pool.query(
     `

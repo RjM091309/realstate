@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   X,
   MapPin,
@@ -16,10 +16,7 @@ import {
   Mail,
   FileText,
   Edit,
-  Printer,
-  Share2,
   Expand,
-  CheckCircle2,
   Package,
   ChevronLeft,
   ChevronRight,
@@ -247,7 +244,6 @@ export function UnitDetailsModal({
 }: UnitDetailsModalProps) {
   const { t } = useTranslation();
   const [isZoomedImage, setIsZoomedImage] = useState(false);
-  const [shareToast, setShareToast] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const photos = useMemo(() => resolveUnitPhotos(unit), [unit]);
@@ -255,7 +251,6 @@ export function UnitDetailsModal({
   useEffect(() => {
     if (!isOpen) {
       setIsZoomedImage(false);
-      setShareToast(false);
       setCurrentImageIndex(0);
       return;
     }
@@ -304,6 +299,18 @@ export function UnitDetailsModal({
     if (!v || v === '—' || v === '-') return;
     const lower = v.toLowerCase();
     if (parts.some((p) => p.toLowerCase() === lower)) return;
+    // Skip if already present inside an earlier segment (e.g. "Airport Area" / "Clark"
+    // when village is "Airport Area · Clark NAIA T3").
+    if (
+      parts.some((p) => {
+        const existing = p.toLowerCase();
+        if (existing.includes(lower)) return true;
+        const segments = existing.split(/[·•,|/]+/).map((s) => s.trim()).filter(Boolean);
+        return segments.some((seg) => seg === lower || (lower.length > 2 && seg.includes(lower)));
+      })
+    ) {
+      return;
+    }
     parts.push(v);
   };
 
@@ -329,12 +336,6 @@ export function UnitDetailsModal({
   const remainingDays = remainingLeaseDays(activeContract?.endDate);
   const towerDisplay = displayOrDash(floorTower.tower);
 
-  const handleShareLink = () => {
-    void navigator.clipboard?.writeText?.(window.location.href);
-    setShareToast(true);
-    window.setTimeout(() => setShareToast(false), 2000);
-  };
-
   const handleNextImage = () => {
     if (photos.length <= 1) return;
     setCurrentImageIndex((prev) => (prev + 1) % photos.length);
@@ -347,20 +348,6 @@ export function UnitDetailsModal({
 
   return (
     <>
-      <AnimatePresence>
-        {shareToast ? (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="fixed top-5 right-5 z-[100] flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-semibold text-white shadow-xl"
-          >
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            {t('views.units.details.linkCopied')}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <div
         className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-3 backdrop-blur-md sm:p-4 md:p-6"
         onClick={onClose}
@@ -400,24 +387,8 @@ export function UnitDetailsModal({
               <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
               <button
                 type="button"
-                onClick={handleShareLink}
-                className="cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-300"
-                title={t('views.units.details.share')}
-              >
-                <Share2 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="hidden cursor-pointer rounded-xl p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-300 sm:block"
-                title={t('views.units.details.print')}
-              >
-                <Printer className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
                 onClick={onClose}
-                className="ml-1 cursor-pointer rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="cursor-pointer rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 aria-label={t('common.close')}
               >
                 <X className="h-5 w-5" />

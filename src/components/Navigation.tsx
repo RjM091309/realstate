@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Building2,
   MapPinned,
+  Wrench,
   Users,
   FilePen,
   BookOpen,
@@ -95,6 +96,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
       { id: 'crm', label: t('nav.menu.crm'), icon: Users },
       { id: 'ledger', label: t('nav.menu.ledger'), icon: BookOpen },
       { id: 'calendar', label: t('nav.menu.calendar'), icon: Calendar },
+      { id: 'maintenance', label: t('nav.menu.maintenance'), icon: Wrench },
       { id: 'userManagement', label: t('nav.menu.userManagement'), icon: UsersRound },
       { id: 'agentPortal', label: t('nav.menu.agentPortal'), icon: Briefcase },
       { id: 'portal', label: t('nav.menu.portal'), icon: UserCircle },
@@ -500,7 +502,7 @@ export function TopNav({
     } else if (n.type === 'payment') {
       navigate('/ledger');
     } else if (n.type === 'maintenance') {
-      navigate('/units');
+      navigate('/maintenance');
     } else {
       setSelectedNotification(n);
       setNotificationDetailOpen(true);

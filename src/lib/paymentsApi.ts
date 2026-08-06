@@ -9,6 +9,7 @@ export type PaymentWriteBody = {
   paidDate?: string;
   status: Payment['status'];
   remarks?: string;
+  paymentMethod?: string;
 };
 
 export async function fetchPayments(): Promise<Payment[]> {

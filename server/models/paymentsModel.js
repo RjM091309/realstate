@@ -245,6 +245,23 @@ function mapToScheduleStatus(appStatus) {
   return STATUS_MAP_TO_SCHEDULE[appStatus] ?? 'pending';
 }
 
+function normalizePaymentMethod(value) {
+  const allowed = new Set(['cash', 'bank_transfer', 'online', 'check', 'other']);
+  const method = String(value ?? 'cash').trim().toLowerCase();
+  return allowed.has(method) ? method : 'cash';
+}
+
+const PAYMENT_METHOD_SUBQUERY = `
+  (
+    SELECT pt_inner.payment_method
+    FROM payment_transaction pt_inner
+    WHERE pt_inner.payment_schedule_id = ps.id
+      AND pt_inner.active = 1
+    ORDER BY pt_inner.payment_date DESC, pt_inner.id DESC
+    LIMIT 1
+  ) AS payment_method
+`;
+
 export async function listPaymentsByBranch(branchId) {
   if (!monthlyBackfillDone.has(branchId)) {
     try {
@@ -270,7 +287,8 @@ export async function listPaymentsByBranch(branchId) {
         WHEN 'overdue' THEN 'Overdue'
         ELSE 'Pending'
       END AS status,
-      ps.notes AS remarks
+      ps.notes AS remarks,
+      ${PAYMENT_METHOD_SUBQUERY}
     FROM payment_schedule ps
     JOIN lease_contract lc
       ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1
@@ -310,6 +328,7 @@ export async function insertPayment(branchId, payload) {
   const scheduleId = res.insertId;
 
   if (payload.status === 'Paid') {
+    const paymentMethod = normalizePaymentMethod(payload.paymentMethod);
     await pool.query(
       `
       INSERT INTO payment_transaction (
@@ -319,9 +338,9 @@ export async function insertPayment(branchId, payload) {
         payment_date,
         payment_method,
         active
-      ) VALUES (?, ?, ?, ?, 'cash', 1)
+      ) VALUES (?, ?, ?, ?, ?, 1)
       `,
-      [branchId, scheduleId, payload.amount, payload.paidDate ?? payload.dueDate],
+      [branchId, scheduleId, payload.amount, payload.paidDate ?? payload.dueDate, paymentMethod],
     );
   }
 
@@ -367,6 +386,7 @@ export async function updatePaymentById(id, branchId, payload) {
   ]);
 
   if (payload.status === 'Paid') {
+    const paymentMethod = normalizePaymentMethod(payload.paymentMethod);
     await pool.query(
       `
       INSERT INTO payment_transaction (
@@ -376,9 +396,9 @@ export async function updatePaymentById(id, branchId, payload) {
         payment_date,
         payment_method,
         active
-      ) VALUES (?, ?, ?, ?, 'cash', 1)
+      ) VALUES (?, ?, ?, ?, ?, 1)
       `,
-      [branchId, id, payload.amount, payload.paidDate ?? payload.dueDate],
+      [branchId, id, payload.amount, payload.paidDate ?? payload.dueDate, paymentMethod],
     );
   }
 
@@ -402,7 +422,8 @@ export async function getPaymentById(id, branchId) {
         WHEN 'overdue' THEN 'Overdue'
         ELSE 'Pending'
       END AS status,
-      ps.notes AS remarks
+      ps.notes AS remarks,
+      ${PAYMENT_METHOD_SUBQUERY}
     FROM payment_schedule ps
     JOIN lease_contract lc
       ON lc.id = ps.contract_id AND lc.branch_id = ps.branch_id AND lc.active = 1

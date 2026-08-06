@@ -27,6 +27,15 @@ export function statusBadgeClass(variant: StatusBadgeVariant, extra?: string): s
   return cn(statusBadgeBase, statusBadgeVariants[variant], extra);
 }
 
+export function maintenanceStatusVariant(status: string): StatusBadgeVariant {
+  const s = status.trim().toLowerCase();
+  if (s === 'open') return 'warning';
+  if (s === 'in_progress') return 'info';
+  if (s === 'resolved') return 'success';
+  if (s === 'cancelled') return 'neutral';
+  return 'neutral';
+}
+
 export function paymentStatusVariant(status: string): StatusBadgeVariant {
   const s = status.trim().toLowerCase();
   if (s === 'paid') return 'success';

@@ -873,6 +873,7 @@ export async function ensureSchema() {
       (1, 'contracts',       1, 1, 1),
       (1, 'crm',             1, 1, 1),
       (1, 'ledger',          1, 1, 0),
+      (1, 'maintenance',     1, 1, 0),
       (1, 'calendar',        1, 1, 1),
       (1, 'tenant_portal',   0, 0, 0),
       (1, 'agent_portal',    0, 0, 0),
@@ -881,6 +882,7 @@ export async function ensureSchema() {
       (2, 'contracts',       1, 1, 1),
       (2, 'crm',             1, 1, 1),
       (2, 'ledger',          1, 1, 0),
+      (2, 'maintenance',     1, 1, 0),
       (2, 'calendar',        1, 1, 1),
       (2, 'tenant_portal',   0, 0, 0),
       (2, 'agent_portal',    0, 0, 0),
@@ -889,6 +891,7 @@ export async function ensureSchema() {
       (3, 'contracts',       1, 1, 0),
       (3, 'crm',             1, 1, 0),
       (3, 'ledger',          1, 1, 0),
+      (3, 'maintenance',     0, 1, 0),
       (3, 'calendar',        1, 1, 1),
       (3, 'tenant_portal',   0, 0, 0),
       (3, 'agent_portal',    0, 0, 0),
@@ -897,6 +900,7 @@ export async function ensureSchema() {
       (4, 'contracts',       0, 1, 0),
       (4, 'crm',             0, 1, 0),
       (4, 'ledger',          1, 1, 0),
+      (4, 'maintenance',     0, 1, 0),
       (4, 'calendar',        0, 1, 0),
       (4, 'tenant_portal',   0, 0, 0),
       (4, 'agent_portal',    0, 0, 0),
@@ -905,6 +909,7 @@ export async function ensureSchema() {
       (5, 'contracts',       0, 0, 0),
       (5, 'crm',             0, 0, 0),
       (5, 'ledger',          0, 0, 0),
+      (5, 'maintenance',     0, 0, 0),
       (5, 'calendar',        0, 0, 0),
       (5, 'tenant_portal',   0, 0, 0),
       (5, 'agent_portal',    0, 0, 0)
@@ -937,6 +942,16 @@ export async function ensureSchema() {
 
   await pool.query(`DELETE FROM \`role_sidebar_permissions\` WHERE \`feature_key\` = 'user_management'`);
   await pool.query(`DELETE FROM \`branch_sidebar_permissions\` WHERE \`feature_key\` = 'user_management'`);
+
+  await pool.query(`
+    INSERT IGNORE INTO \`user_role_crud_permissions\`
+      (\`role_id\`, \`module_key\`, \`can_create\`, \`can_update\`, \`can_delete\`) VALUES
+      (1, 'maintenance', 1, 1, 0),
+      (2, 'maintenance', 1, 1, 0),
+      (3, 'maintenance', 0, 1, 0),
+      (4, 'maintenance', 0, 1, 0),
+      (5, 'maintenance', 0, 0, 0)
+  `);
   await pool.query(`DELETE FROM \`user_role_crud_permissions\` WHERE \`module_key\` = 'user_management'`);
 
   await pool.query(`

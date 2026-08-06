@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { CalendarDays, ChevronDown } from 'lucide-react';
-import { Box, Button, Popover, Typography, Slide } from '@mui/material';
+import { Box, Button, Popover, Typography } from '@mui/material';
 import { alpha, styled } from '@mui/material/styles';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay } from '@mui/x-date-pickers/PickersDay';
-import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 const CALENDAR_COLORS = {
@@ -187,112 +186,27 @@ export function DatePicker({
   return (
     <>
       {compact ? (
-        <motion.button
+        <button
           type="button"
           onClick={(e) => setAnchorEl(e.currentTarget)}
           aria-label="Open date range picker"
-          whileHover={{ scale: 1.08, y: -1 }}
-          whileTap={{ scale: 0.9 }}
-          animate={open ? { scale: 1.05 } : { scale: 1 }}
-          transition={{ type: 'spring', stiffness: 480, damping: 20 }}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text)] transition-colors shrink-0"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text)] shrink-0"
           style={{
             backgroundColor: 'color-mix(in oklab, var(--control-bg) 88%, transparent)',
           }}
         >
-          <motion.span
-            animate={open ? { rotateY: 180 } : { rotateY: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-            style={{ display: 'inline-flex', transformStyle: 'preserve-3d' }}
-          >
-            <CalendarDays size={16} />
-          </motion.span>
-        </motion.button>
+          <CalendarDays size={16} />
+        </button>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: -8, scale: 0.96 }}
-          animate={
-            open
-              ? { opacity: 1, y: 0, scale: [1, 0.96, 1.03, 1] }
-              : { opacity: 1, y: 0, scale: 1 }
-          }
-          transition={
-            open
-              ? { duration: 0.42, times: [0, 0.25, 0.6, 1], ease: 'easeOut' }
-              : { type: 'spring', stiffness: 380, damping: 22 }
-          }
-          whileHover={!open ? { y: -2, scale: 1.015 } : undefined}
+        <div
           className={cn(
             'relative group w-full',
             fullWidth ? '' : 'sm:w-36 md:w-44 lg:w-64 xl:w-72 max-w-[170px] lg:max-w-none',
           )}
         >
-          {/* Expanding ripple rings on click/open */}
-          <AnimatePresence>
-            {open && (
-              <>
-                {[0, 1].map((i) => (
-                  <motion.span
-                    key={`ripple-${i}`}
-                    aria-hidden
-                    initial={{ opacity: 0.55, scale: 0.85 }}
-                    animate={{ opacity: 0, scale: 1.45 + i * 0.2 }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      duration: 0.7,
-                      delay: i * 0.12,
-                      ease: 'easeOut',
-                    }}
-                    className="pointer-events-none absolute inset-0 rounded-full border-2 border-brand-blue/50 dark:border-sky-400/40"
-                  />
-                ))}
-              </>
-            )}
-          </AnimatePresence>
-
-          <motion.div
-            variants={{
-              rest: {},
-              hover: {},
-              open: {},
-            }}
-            initial="rest"
-            animate={open ? 'open' : 'rest'}
-            whileHover="hover"
-            className="relative"
-          >
-            {/* Shimmer sweep — hover only */}
-            <motion.span
-              aria-hidden
-              variants={{
-                rest: { opacity: 0, x: '-30%' },
-                hover: {
-                  opacity: [0, 1, 0],
-                  x: ['-30%', '120%'],
-                  transition: { duration: 0.7, ease: 'easeInOut' },
-                },
-                open: { opacity: 0 },
-              }}
-              className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/20"
-            />
-
+          <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 z-[2] -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-brand-blue">
-              <motion.span
-                aria-hidden
-                variants={{
-                  rest: { rotateY: 0, scale: 1 },
-                  hover: { scale: 1.1, transition: { duration: 0.25 } },
-                  open: {
-                    rotateY: [0, 180],
-                    scale: [1, 1.15, 1],
-                    transition: { duration: 0.5, ease: 'easeInOut' },
-                  },
-                }}
-                className="inline-flex"
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <CalendarDays size={14} />
-              </motion.span>
+              <CalendarDays size={14} />
             </span>
 
             <input
@@ -304,11 +218,10 @@ export function DatePicker({
               aria-expanded={open}
               onClick={(e) => setAnchorEl(e.currentTarget)}
               className={cn(
-                'relative z-0 h-9 w-full cursor-pointer rounded-full border pl-9 pr-8 text-xs transition-[border-color,box-shadow,background-color] duration-300',
+                'relative z-0 h-9 w-full cursor-pointer rounded-full border pl-9 pr-8 text-xs',
                 'border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-muted)]',
                 'hover:border-brand-blue/40 focus:border-brand-blue/50 focus:outline-none focus:ring-2 focus:ring-brand-blue/25',
-                open &&
-                  'border-brand-blue bg-brand-blue/[0.06] shadow-[inset_0_2px_8px_rgba(75,137,205,0.18)] ring-0 dark:bg-brand-blue/10',
+                open && 'border-brand-blue bg-brand-blue/[0.06] dark:bg-brand-blue/10',
                 inputClassName,
               )}
               style={{
@@ -324,20 +237,18 @@ export function DatePicker({
             />
 
             <span className="pointer-events-none absolute right-2.5 top-1/2 z-[2] -translate-y-1/2">
-              <motion.span
+              <span
                 aria-hidden
-                animate={open ? { rotate: 180 } : { rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 22 }}
                 className={cn(
-                  'inline-flex text-slate-400 transition-colors',
-                  open && 'text-brand-blue',
+                  'inline-flex text-slate-400',
+                  open && 'rotate-180 text-brand-blue',
                 )}
               >
                 <ChevronDown size={14} />
-              </motion.span>
+              </span>
             </span>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
 
       <Popover
@@ -346,9 +257,7 @@ export function DatePicker({
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        TransitionComponent={Slide}
-        TransitionProps={{ direction: 'down' } as React.ComponentProps<typeof Slide>}
-        transitionDuration={{ enter: 280, exit: 180 }}
+        transitionDuration={0}
         slotProps={{
           paper: {
             sx: {
@@ -356,7 +265,7 @@ export function DatePicker({
               borderRadius: 2.5,
               border: `1px solid ${CALENDAR_COLORS.panelBorder}`,
               backgroundColor: CALENDAR_COLORS.panelBg,
-              boxShadow: '0 22px 48px -12px rgba(15, 23, 42, 0.28), 0 8px 20px -10px rgba(75, 137, 205, 0.25)',
+              boxShadow: 'none',
               width: { xs: 'calc(100vw - 12px)', sm: 'max-content' },
               maxWidth: 'calc(100vw - 16px)',
               maxHeight: { xs: 'min(88vh, 640px)', sm: 'none' },

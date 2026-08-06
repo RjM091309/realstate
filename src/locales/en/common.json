@@ -1,6 +1,7 @@
 {
   "common": {
     "close": "Close",
+    "cancel": "Cancel",
     "loading": "Loading...",
     "select_placeholder": "Select an option..."
   },
@@ -75,6 +76,7 @@
       "contracts": "Contracts & Operations",
       "crm": "CRM & Tenants",
       "ledger": "Lease Ledger",
+      "maintenance": "Maintenance",
       "calendar": "Calendar",
       "userManagement": "User Management",
       "agentPortal": "Agent Portal (Demo)",
@@ -119,6 +121,66 @@
         "summary": "Summary"
       }
     },
+    "maintenance": {
+      "title": "Maintenance Monitoring",
+      "subtitle": "Track tenant maintenance tickets, unit issues, and resolution progress across your portfolio.",
+      "badge": "Operations & repairs",
+      "refresh": "Refresh",
+      "loadError": "Could not load maintenance tickets.",
+      "searchPlaceholder": "Search ticket, unit, tenant, contract, or details...",
+      "ticketsTitle": "Maintenance tickets",
+      "ticketsDesc": "Requests submitted from the tenant portal and tracked by contract.",
+      "emptyTitle": "No maintenance tickets yet",
+      "emptyDesc": "When tenants submit maintenance requests through the portal, they will appear here for monitoring and follow-up.",
+      "viewDetails": "View",
+      "detailTitle": "Maintenance ticket",
+      "statusUpdated": "Ticket status updated.",
+      "statusUpdateError": "Could not update ticket status.",
+      "readOnlyHint": "You can view tickets but do not have permission to change status.",
+      "stats": {
+        "open": "Open",
+        "inProgress": "In progress",
+        "resolved": "Resolved",
+        "total": "Total tickets",
+        "openHint": "Awaiting action",
+        "inProgressHint": "Currently being handled",
+        "resolvedHint": "Completed tickets",
+        "totalHint": "All maintenance requests",
+        "filterHint": "Filter tickets"
+      },
+      "tabs": {
+        "all": "All",
+        "open": "Open",
+        "in_progress": "In progress",
+        "resolved": "Resolved",
+        "cancelled": "Cancelled"
+      },
+      "statuses": {
+        "open": "Open",
+        "in_progress": "In progress",
+        "resolved": "Resolved",
+        "cancelled": "Cancelled"
+      },
+      "columns": {
+        "ticket": "Ticket",
+        "unit": "Unit",
+        "tenant": "Tenant",
+        "contract": "Contract",
+        "status": "Status",
+        "source": "Source",
+        "reported": "Reported"
+      },
+      "detail": {
+        "unit": "Unit",
+        "building": "Building",
+        "tenant": "Tenant",
+        "contract": "Contract",
+        "reported": "Reported",
+        "updated": "Last updated",
+        "description": "Issue details",
+        "updateStatus": "Update status"
+      }
+    },
     "userAccess": {
       "title": "User Access",
       "subtitle": "Configure sidebar menus and CRUD rights per role. Administrators only.",
@@ -147,6 +209,7 @@
         "contracts": "Leases and documents",
         "crm": "Contacts and tenants",
         "ledger": "Rent and payments",
+        "maintenance": "Maintenance tickets and repairs",
         "calendar": "Viewings and milestones",
         "tenant_portal": "Tenant-facing portal (demo)",
         "agent_portal": "Agent-facing portal (demo)"
@@ -1644,6 +1707,7 @@
       "clearPaidHighlight": "Clear highlight",
       "viewMonthly": "View monthly schedule",
       "moreActions": "More actions",
+      "rowDetails": "Details",
       "notDueYet": "Not due yet",
       "validationRequired": "Please select a contract and due date.",
       "validationAmount": "Please enter a valid amount.",
@@ -1654,6 +1718,16 @@
       "deleted": "Payment deleted.",
       "deleteError": "Failed to delete payment.",
       "markPaid": "Mark as paid",
+      "markPaidTitle": "Record payment",
+      "markPaidConfirm": "Confirm payment",
+      "paymentMethod": "Payment method",
+      "paymentMethods": {
+        "cash": "Cash",
+        "bank_transfer": "Bank Transfer",
+        "online": "GCash",
+        "check": "Check",
+        "other": "Other"
+      },
       "markPending": "Mark as pending",
       "markOverdue": "Mark as overdue",
       "markedPaid": "Marked as paid.",
@@ -1705,6 +1779,7 @@
         "dueDate": "Due Date",
         "amount": "Amount",
         "status": "Payment status",
+        "paymentMethod": "Payment type",
         "remarks": "Remarks",
         "remarksPlaceholder": "Add note…",
         "paidDate": "Paid Date",
@@ -1714,8 +1789,41 @@
         "paid": "Paid",
         "overdue": "Overdue",
         "pending": "Pending",
-        "viewInvoice": "View Invoice"
-      }
+        "viewInvoice": "View Invoice",
+        "issueInvoice": "Issue Invoice"
+      },
+      "issueInvoice": "Issue Invoice",
+      "issuedInvoice": "Invoice issued.",
+      "issuedOverdueInvoices": "{{count}} overdue invoice(s) issued.",
+      "issueOverdueInvoices": "Issue overdue invoices",
+      "issueOverdueNone": "No overdue months to invoice.",
+      "issueInvoiceError": "Failed to issue invoice.",
+      "applyPenalty": "Apply Penalty",
+      "penaltyTitle": "Apply late penalty",
+      "penaltyAmount": "Penalty amount",
+      "penaltyDueDate": "Due date",
+      "penaltyNote": "Note",
+      "penaltyNoteDefault": "Late payment penalty",
+      "penaltyApplied": "Penalty added to the ledger.",
+      "penaltyError": "Failed to apply penalty.",
+      "penaltyNoOverdue": "No overdue balance to penalize.",
+      "sendReminder": "Send Reminder",
+      "reminderSent": "Reminder draft opened in your email client.",
+      "reminderNoEmail": "This tenant has no email on file.",
+      "reminderSubject": "Rent payment reminder — {{unit}}",
+      "reminderBody": "Hello {{tenant}},\n\nThis is a reminder that rent of ₱{{amount}} was due on {{dueDate}} for unit {{unit}}.\n\nPlease arrange payment at your earliest convenience.\n\nThank you.",
+      "finalSettlement": "Final Settlement",
+      "settlementTitle": "Final lease settlement",
+      "settlementDeposit": "Security deposit",
+      "settlementUnpaid": "Unpaid balance",
+      "settlementDeductions": "Other deductions",
+      "settlementNet": "Net to tenant",
+      "settlementNetOwed": "Net owed by tenant",
+      "settlementConfirm": "Settle & terminate",
+      "settlementDone": "Lease settled and terminated.",
+      "settlementError": "Failed to complete settlement.",
+      "settlementRemarks": "Final settlement: deposit ₱{{deposit}} − unpaid ₱{{unpaid}} − deductions ₱{{deductions}} = ₱{{net}}",
+      "settlementNotAllowed": "Settlement is only available for Active or Expired leases."
     },
     "calendar": {
       "title": "Operational Timeline",

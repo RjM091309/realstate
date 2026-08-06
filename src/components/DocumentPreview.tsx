@@ -91,11 +91,15 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
             const inv = await fetchContractInvoices(contractIdForDetails);
             if (!active) return;
             const pick =
+              (resolvedInvoice
+                ? inv.find((x) => x.id === resolvedInvoice.id) ?? resolvedInvoice
+                : null) ??
+              inv.find((x) => x.id === contractId) ??
               inv.find((x) => x.status === 'issued') ??
               inv.find((x) => x.status === 'draft') ??
               inv[0] ??
-              resolvedInvoice;
-            setInvoice(pick ?? null);
+              null;
+            setInvoice(pick);
           } catch {
             if (!active) return;
             setInvoice(resolvedInvoice);
@@ -158,17 +162,16 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
 
   const invoiceNoLabel = invoice?.invoiceNo ? invoice.invoiceNo : `INV-${new Date().getFullYear()}-001`;
   const issuedLabel = invoice?.issuedAt ? invoice.issuedAt : format(new Date(), 'MMMM dd, yyyy');
-  const monthlyRent = Number(contract.monthlyRent || 0);
   const base = invoice?.baseAmount ?? contract.securityDeposit + contract.advanceRent;
   const other = invoice?.otherCharges ?? 0;
   const discount = invoice?.discountAmount ?? 0;
   const total = invoice?.totalAmount ?? base + other - discount;
   const usingMoveInFallback = !invoice?.baseAmount;
-  const baseDescription = invoice?.billingPeriodStart && invoice?.billingPeriodEnd
-    ? `Billing period: ${invoice.billingPeriodStart} to ${invoice.billingPeriodEnd}`
-    : usingMoveInFallback
-      ? `Security deposit ₱${Number(contract.securityDeposit || 0).toLocaleString()} + advance rent ₱${Number(contract.advanceRent || 0).toLocaleString()}`
-      : 'Billing summary';
+  const billingPeriodLabel =
+    invoice?.billingPeriodStart && invoice?.billingPeriodEnd
+      ? `${invoice.billingPeriodStart} – ${invoice.billingPeriodEnd}`
+      : null;
+  const showSubtotal = other > 0 || discount > 0;
 
   const resolveUploadUrl = (p: string) => {
     const s = String(p ?? '').trim();
@@ -343,23 +346,6 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
               </div>
 
               <div className="space-y-6">
-                {monthlyRent > 0 ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-blue/20 bg-brand-blue/10 px-4 py-3 dark:border-brand-blue/30 dark:bg-brand-blue/10">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-brand-blue dark:text-brand-blue">
-                        Monthly payment
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
-                        Recurring rent due each billing cycle
-                      </p>
-                    </div>
-                    <p className="text-xl font-black tabular-nums text-brand-blue dark:text-blue-200">
-                      ₱{monthlyRent.toLocaleString()}
-                      <span className="ml-1 text-sm font-semibold text-brand-blue">/ mo</span>
-                    </p>
-                  </div>
-                ) : null}
-
                 <Table>
                   <TableHeader>
                     <TableRow className="border-b-2 border-slate-900 hover:bg-transparent">
@@ -368,29 +354,32 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {monthlyRent > 0 ? (
+                    {usingMoveInFallback ? (
                       <TableRow className="hover:bg-transparent border-slate-100">
                         <TableCell className="py-6">
-                          <p className="font-bold text-slate-900">Monthly rent</p>
+                          <p className="font-bold text-slate-900">Move-in charges</p>
                           <p className="text-xs text-slate-500">
-                            Amount paid every month for Unit {unit?.unitNumber ?? '—'}
+                            Security deposit ₱{Number(contract.securityDeposit || 0).toLocaleString()} + advance rent ₱
+                            {Number(contract.advanceRent || 0).toLocaleString()}
                           </p>
                         </TableCell>
                         <TableCell className="text-right font-bold text-slate-900">
-                          ₱{monthlyRent.toLocaleString()}
-                          <span className="mt-0.5 block text-xs font-medium text-slate-500">per month</span>
+                          ₱{Number(base).toLocaleString()}
                         </TableCell>
                       </TableRow>
-                    ) : null}
-                    <TableRow className="hover:bg-transparent border-slate-100">
-                      <TableCell className="py-6">
-                        <p className="font-bold text-slate-900">
-                          {usingMoveInFallback ? 'Move-in charges' : 'Base amount'}
-                        </p>
-                        <p className="text-xs text-slate-500">{baseDescription}</p>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-slate-900">₱{Number(base).toLocaleString()}</TableCell>
-                    </TableRow>
+                    ) : (
+                      <TableRow className="hover:bg-transparent border-slate-100">
+                        <TableCell className="py-6">
+                          <p className="font-bold text-slate-900">Monthly rent</p>
+                          {billingPeriodLabel ? (
+                            <p className="text-xs text-slate-500">Billing period: {billingPeriodLabel}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">
+                          ₱{Number(base).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {other ? (
                       <TableRow className="hover:bg-transparent border-slate-100">
                         <TableCell className="py-6">
@@ -412,25 +401,24 @@ export function DocumentPreview({ type, contractId, onBack, isStandalone = false
 
                 <div className="flex justify-end pt-6">
                   <div className="w-full max-w-xs space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Subtotal</span>
-                      <span className="font-bold text-slate-900">₱{Number(base + other).toLocaleString()}</span>
-                    </div>
-                    {discount ? (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Discount</span>
-                        <span className="font-bold text-slate-900">-₱{Number(discount).toLocaleString()}</span>
-                      </div>
+                    {showSubtotal ? (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500">Subtotal</span>
+                          <span className="font-bold text-slate-900">₱{Number(base + other).toLocaleString()}</span>
+                        </div>
+                        {discount ? (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Discount</span>
+                            <span className="font-bold text-slate-900">-₱{Number(discount).toLocaleString()}</span>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                     <div className="flex justify-between items-center pt-3 border-t-2 border-slate-900">
                       <span className="text-lg font-black uppercase text-slate-900">Total Due</span>
                       <span className="text-2xl font-black text-brand-blue">₱{Number(total).toLocaleString()}</span>
                     </div>
-                    {monthlyRent > 0 ? (
-                      <p className="pt-1 text-right text-[11px] text-slate-500">
-                        Recurring monthly payment: <span className="font-semibold text-slate-700">₱{monthlyRent.toLocaleString()}/mo</span>
-                      </p>
-                    ) : null}
                     {invoice?.dueDate ? (
                       <div className="flex justify-between text-xs text-slate-500 pt-1">
                         <span>Due date</span>

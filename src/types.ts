@@ -23,6 +23,10 @@ export type UnitFurnishing = 'Unfurnished' | 'Semi-furnished' | 'Fully furnished
 export type TransactionType = 'Monthly Rental' | 'Sales' | 'Short-term Rental';
 export type PaymentStatus = 'Paid' | 'Overdue' | 'Pending';
 
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'online' | 'check' | 'other';
+
+export const LEDGER_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'bank_transfer', 'online'];
+
 export interface Unit {
   id: string;
   unitNumber: string;
@@ -271,6 +275,7 @@ export interface Payment {
   paidDate?: string;
   status: PaymentStatus;
   remarks?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface InvoiceRow {

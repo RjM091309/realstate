@@ -14,6 +14,7 @@ import { AddUnitByLocationView } from './components/views/AddUnitByLocationView/
 import { FileMaintenanceView } from './components/views/FileMaintenanceView/index';
 import { ContractsView } from './components/views/ContractsView/index';
 import { CRMView } from './components/views/CRMView/CRMView';
+import { MaintenanceView } from './components/views/MaintenanceView/index';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
 import { UserManagementView, UserRoleManagementView } from './components/views/UserManagementView/index';
@@ -81,6 +82,7 @@ function MainApp() {
     contracts: '/contracts',
     crm: '/crm',
     ledger: '/ledger',
+    maintenance: '/maintenance',
     calendar: '/calendar',
     userManagement: '/user-management/user-info',
     settings: '/settings',
@@ -179,6 +181,8 @@ function MainApp() {
         return <CRMView />;
       case 'ledger':
         return <LeaseLedgerView />;
+      case 'maintenance':
+        return <MaintenanceView />;
       case 'calendar':
         return <CalendarView />;
       case 'settings':
