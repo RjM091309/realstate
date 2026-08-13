@@ -93,8 +93,8 @@ export async function createUserAccount(params) {
   const [insertResult] = await pool.execute(
     `INSERT INTO user_info (
       FIRSTNAME, LASTNAME, USERNAME, PASSWORD, SALT, PERMISSIONS,
-      LAST_LOGIN, ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT, ACTIVE, BRANCH_ID
-    ) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 1, ?)`,
+      LAST_LOGIN, ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT, ACTIVE, PENDING_APPROVAL, BRANCH_ID
+    ) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 1, 0, ?)`,
     [
       params.firstName,
       params.lastName,
@@ -105,6 +105,42 @@ export async function createUserAccount(params) {
     ],
   );
   return Number(insertResult.insertId);
+}
+
+/** Public self-signup: inactive + pending until an administrator approves it. */
+export async function createPendingUserAccount(params) {
+  const [insertResult] = await pool.execute(
+    `INSERT INTO user_info (
+      FIRSTNAME, LASTNAME, USERNAME, PASSWORD, SALT, PERMISSIONS,
+      LAST_LOGIN, ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT, ACTIVE, PENDING_APPROVAL, BRANCH_ID
+    ) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, NOW(), NULL, NULL, 0, 1, ?)`,
+    [
+      params.firstName,
+      params.lastName,
+      params.username,
+      params.passwordHash,
+      params.roleId,
+      params.branchId ?? null,
+    ],
+  );
+  return Number(insertResult.insertId);
+}
+
+/** Approve a pending sign-up: activates the account and clears the pending flag. */
+export async function approvePendingUserAccount(userId) {
+  await pool.execute(
+    `UPDATE user_info SET ACTIVE = 1, PENDING_APPROVAL = 0, EDITED_DT = NOW() WHERE IDNO = ? AND PENDING_APPROVAL = 1`,
+    [userId],
+  );
+}
+
+/** Reject a pending sign-up: the account never went live, so it's removed outright. */
+export async function deletePendingUserAccount(userId) {
+  const [result] = await pool.execute(
+    `DELETE FROM user_info WHERE IDNO = ? AND PENDING_APPROVAL = 1`,
+    [userId],
+  );
+  return result.affectedRows > 0;
 }
 
 export async function listBranchesActive() {
@@ -124,19 +160,19 @@ export async function getBranchByIdActive(branchId) {
 
 export async function listStaffUsersJoined() {
   const [rows] = await pool.query(
-    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.AVATAR_URL,
+    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.PENDING_APPROVAL, u.AVATAR_URL,
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
      LEFT JOIN branch b ON b.id = u.BRANCH_ID
-     ORDER BY u.IDNO ASC`,
+     ORDER BY u.PENDING_APPROVAL DESC, u.IDNO ASC`,
   );
   return rows;
 }
 
 export async function getStaffUserJoined(userId) {
   const [rows] = await pool.query(
-    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.AVATAR_URL,
+    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.PENDING_APPROVAL, u.AVATAR_URL,
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -150,7 +186,7 @@ export async function getStaffUserJoined(userId) {
 
 export async function findUserRowById(userId) {
   const [rows] = await pool.query(
-    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE, AVATAR_URL
+    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE, PENDING_APPROVAL, AVATAR_URL
      FROM user_info WHERE IDNO = ? LIMIT 1`,
     [userId],
   );

@@ -2,6 +2,7 @@
   "common": {
     "close": "닫기",
     "cancel": "취소",
+    "save": "저장",
     "loading": "로딩 중...",
     "select_placeholder": "옵션을 선택하세요..."
   },
@@ -77,6 +78,7 @@
       "crm": "CRM 및 임차인",
       "ledger": "임대 원장",
       "maintenance": "유지보수",
+      "reports": "리포트",
       "calendar": "캘린더",
       "userManagement": "사용자 관리",
       "agentPortal": "에이전트 포털 (데모)",
@@ -137,6 +139,8 @@
       "statusUpdated": "티켓 상태가 업데이트되었습니다.",
       "statusUpdateError": "티켓 상태를 업데이트할 수 없습니다.",
       "readOnlyHint": "티켓을 볼 수 있지만 상태를 변경할 권한이 없습니다.",
+      "tabTickets": "티켓",
+      "tabVendors": "업체",
       "stats": {
         "open": "열림",
         "inProgress": "진행 중",
@@ -168,7 +172,8 @@
         "contract": "계약",
         "status": "상태",
         "source": "출처",
-        "reported": "접수일"
+        "reported": "접수일",
+        "cost": "비용"
       },
       "detail": {
         "unit": "유닛",
@@ -178,7 +183,92 @@
         "reported": "접수일",
         "updated": "최종 업데이트",
         "description": "이슈 상세",
-        "updateStatus": "상태 업데이트"
+        "updateStatus": "상태 업데이트",
+        "vendorAndCost": "업체 및 수리 비용",
+        "assignedVendor": "배정된 업체",
+        "selectVendor": "업체 선택…",
+        "estimatedCost": "예상 비용",
+        "actualCost": "실제 비용",
+        "saveCost": "업체 및 비용 저장",
+        "costSaved": "업체 및 비용 정보가 저장되었습니다.",
+        "costSaveError": "업체 및 비용 정보를 저장할 수 없습니다.",
+        "costInvalid": "비용은 0 이상의 유효한 숫자여야 합니다."
+      },
+      "vendors": {
+        "title": "업체 및 협력업체",
+        "subtitle": "수리 협력업체 및 서비스 제공업체 목록입니다.",
+        "add": "업체 추가",
+        "edit": "업체 수정",
+        "delete": "업체 삭제",
+        "editTitle": "업체 수정",
+        "addTitle": "업체 추가",
+        "loadError": "업체 목록을 불러올 수 없습니다.",
+        "nameRequired": "업체 이름은 필수입니다.",
+        "created": "업체가 추가되었습니다.",
+        "updated": "업체 정보가 업데이트되었습니다.",
+        "deleted": "업체가 삭제되었습니다.",
+        "saveError": "업체를 저장할 수 없습니다.",
+        "deleteError": "업체를 삭제할 수 없습니다.",
+        "deleteConfirm": "업체 \"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+        "emptyTitle": "등록된 업체가 없습니다",
+        "emptyDesc": "함께 일하는 협력업체와 서비스 제공업체를 추가하여 유지보수 티켓에 배정하고 수리 비용을 추적하세요.",
+        "columns": {
+          "name": "업체",
+          "contact": "담당자",
+          "email": "이메일",
+          "address": "주소"
+        },
+        "form": {
+          "name": "업체/회사명",
+          "category": "분야",
+          "contactPerson": "담당자",
+          "phone": "전화번호",
+          "email": "이메일",
+          "address": "주소",
+          "notes": "메모"
+        }
+      }
+    },
+    "reports": {
+      "title": "리포트",
+      "subtitle": "선택한 기간 동안 포트폴리오 전체의 수입, 지출 및 실적입니다.",
+      "stats": {
+        "collected": "수납 임대료",
+        "collectedHint": "선택한 기간 내 결제 완료",
+        "expense": "유지보수 지출",
+        "expenseHint": "선택한 기간 내 수리 비용",
+        "netIncome": "순이익",
+        "netIncomeHint": "수납액에서 유지보수 지출을 뺀 금액",
+        "occupancy": "입주율",
+        "occupancyHint": "{{total}}개 유닛 중 {{occupied}}개 입주"
+      },
+      "charts": {
+        "trendTitle": "수입 대 지출 (최근 6개월)",
+        "collectedLabel": "수납액",
+        "expenseLabel": "지출",
+        "expenseByCategoryTitle": "분야별 지출",
+        "noExpenseData": "아직 기록된 수리 비용이 없습니다."
+      },
+      "vendorSpend": {
+        "title": "업체별 지출",
+        "subtitle": "업체별 총 수리 비용입니다.",
+        "empty": "아직 기록된 업체 비용이 없습니다.",
+        "columns": {
+          "vendor": "업체",
+          "tickets": "티켓 수",
+          "total": "총 지출"
+        }
+      },
+      "agentPerformance": {
+        "title": "에이전트 실적",
+        "subtitle": "선택한 기간의 거래 건수, 월 임대료 기준액 및 수납액입니다.",
+        "empty": "아직 에이전트 활동이 없습니다.",
+        "columns": {
+          "agent": "에이전트",
+          "deals": "거래 건수",
+          "mrrBase": "월 임대료 기준액",
+          "collectedPeriod": "수납액 (기간)"
+        }
       }
     },
     "userAccess": {
@@ -210,6 +300,7 @@
         "crm": "연락처·임차인",
         "ledger": "임대료·결제",
         "maintenance": "유지보수 티켓 및 수리",
+        "reports": "수입, 지출 및 실적 리포트",
         "calendar": "일정·일정표",
         "tenant_portal": "임차인 포털 (데모)",
         "agent_portal": "에이전트 포털 (데모)"
@@ -224,6 +315,7 @@
       "stats": {
         "totalUsers": "전체 사용자",
         "activeUsers": "활성 사용자",
+        "pendingUsers": "승인 대기",
         "inactiveUsers": "비활성 사용자",
         "userRoles": "사용자 역할 수"
       },
@@ -236,6 +328,7 @@
       },
       "statusActive": "활성",
       "statusInactive": "비활성",
+      "statusPending": "승인 대기",
       "modalAddTitle": "새 사용자 추가",
       "modalEditTitle": "사용자 수정",
       "labels": {
@@ -263,6 +356,12 @@
       "activated": "사용자가 활성화되었습니다.",
       "confirmDeactivate": "이 사용자를 비활성화할까요? 로그인할 수 없게 됩니다.",
       "confirmActivate": "이 사용자를 활성화할까요? 다시 로그인할 수 있습니다.",
+      "approve": "승인",
+      "reject": "거부",
+      "confirmApprove": "{{name}}님의 가입 요청을 승인할까요? 승인하면 로그인할 수 있습니다.",
+      "confirmReject": "{{name}}님의 가입 요청을 거부할까요? 요청이 삭제되며 되돌릴 수 없습니다.",
+      "approved": "가입 요청이 승인되었습니다.",
+      "rejected": "가입 요청이 거부되었습니다.",
       "passwordMismatch": "비밀번호가 일치하지 않습니다.",
       "passwordMin": "비밀번호는 4자 이상이어야 합니다.",
       "missingFields": "필수 항목을 모두 입력하세요.",
@@ -288,6 +387,8 @@
       "accessLevelProfile": "액세스 수준 프로필",
       "statusActive": "활성",
       "statusInactive": "비활성",
+      "usersColumn": "사용자",
+      "noUsersAssigned": "배정된 사용자 없음",
       "moreUsers": "+{{count}}",
       "loadError": "역할을 불러올 수 없습니다.",
       "savedAdd": "역할이 생성되었습니다.",

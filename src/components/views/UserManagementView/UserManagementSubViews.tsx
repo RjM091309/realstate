@@ -11,6 +11,7 @@ import { DataTable, type ColumnDef } from '@/components/data-table';
 import { SkeletonTable } from '@/components/skeleton';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { ProfileAvatarHoverPreview } from '@/components/ProfileAvatarHoverPreview';
 import { cn } from '@/lib/utils';
 
 const ADMIN_ROLE_ID = 1;
@@ -40,6 +41,48 @@ function initials(u: AssignedUser): string {
   if (a && b) return (a + b).toUpperCase();
   const un = (u.username || '').trim();
   return un.slice(0, 2).toUpperCase() || '?';
+}
+
+function AssignedUsersPreview({
+  assignedUsers,
+  userCount,
+  t,
+}: {
+  assignedUsers: AssignedUser[];
+  userCount: number;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  if (userCount <= 0) {
+    return (
+      <span className="text-xs text-slate-400 dark:text-slate-500">
+        {t('views.userRole.noUsersAssigned')}
+      </span>
+    );
+  }
+  const overflow = Math.max(0, userCount - assignedUsers.length);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex -space-x-2">
+        {assignedUsers.map((u) => (
+          <ProfileAvatarHoverPreview
+            key={u.id}
+            detachPreview
+            avatarUrl={u.avatarUrl}
+            initials={initials(u)}
+            avatarClassName="h-7 w-7 border-2 border-white dark:border-slate-900"
+            fallbackClassName="bg-slate-100 text-[9px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+            previewClassName="h-28 w-28 min-h-28 min-w-28"
+          />
+        ))}
+        {overflow > 0 ? (
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-[10px] font-semibold text-slate-700 dark:border-slate-900 dark:bg-slate-700 dark:text-slate-200">
+            {t('views.userRole.moreUsers', { count: overflow })}
+          </span>
+        ) : null}
+      </div>
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{userCount}</span>
+    </div>
+  );
 }
 
 export function UserRoleManagementView() {
@@ -138,6 +181,10 @@ export function UserRoleManagementView() {
           </span>
         ),
         className: 'w-[10rem]',
+      },
+      {
+        header: t('views.userRole.usersColumn'),
+        render: (r) => <AssignedUsersPreview assignedUsers={r.assignedUsers} userCount={r.userCount} t={t} />,
       },
       {
         header: 'Action',
@@ -400,10 +447,11 @@ export function UserRoleManagementView() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <AssignedUsersPreview assignedUsers={r.assignedUsers} userCount={r.userCount} t={t} />
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide',
                           r.active
                             ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',

@@ -24,7 +24,7 @@ import { partnerAgenciesRouter } from './routes/partnerAgenciesRoutes.js';
 import { blacklistRouter } from './routes/blacklistRoutes.js';
 import { calendarEventsRouter } from './routes/calendarEventsRoutes.js';
 import { documentsRouter } from './routes/documentsRoutes.js';
-import { inventorySnapshotsRouter } from './routes/inventorySnapshotsRoutes.js';
+import { vendorsRouter } from './routes/vendorsRoutes.js';
 import { unitInspectionsRouter } from './routes/unitInspectionsRoutes.js';
 import { leaseRenewalsRouter } from './routes/leaseRenewalsRoutes.js';
 import { specialRequestsRouter } from './routes/specialRequestsRoutes.js';
@@ -37,7 +37,23 @@ const app = express();
 const apiPort = Number(process.env.API_PORT ?? 2550);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-app.use(cors({ origin: true, credentials: true }));
+// Allowed browser origins for cookies/credentialed requests — comma-separated in `.env`.
+// Defaults to the local Vite dev/preview origin only; add production origin(s) via CORS_ORIGIN.
+const allowedOrigins = String(process.env.CORS_ORIGIN ?? 'http://localhost:2551')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function corsOriginCheck(origin, callback) {
+  // No Origin header = same-origin/non-browser request (curl, server-to-server) — allow.
+  if (!origin || allowedOrigins.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(new Error(`Origin not allowed by CORS: ${origin}`));
+}
+
+app.use(cors({ origin: corsOriginCheck, credentials: true }));
 app.use(express.json({ limit: '30mb' }));
 // Return JSON for invalid JSON payloads (instead of default HTML)
 app.use((err, _req, res, next) => {
@@ -121,7 +137,7 @@ app.use('/api/calendar-events', calendarEventsRouter);
 app.use('/api/partner-agencies', partnerAgenciesRouter);
 app.use('/api/blacklist', blacklistRouter);
 app.use('/api/documents', documentsRouter);
-app.use('/api/inventory', inventorySnapshotsRouter);
+app.use('/api/vendors', vendorsRouter);
 app.use('/api/unit-inspections', unitInspectionsRouter);
 app.use('/api/lease-renewals', leaseRenewalsRouter);
 app.use('/api/special-requests', specialRequestsRouter);
@@ -153,7 +169,7 @@ void (async () => {
 
   const server = http.createServer(app);
   const io = new SocketIOServer(server, {
-    cors: { origin: true, credentials: true },
+    cors: { origin: corsOriginCheck, credentials: true },
   });
   setIO(io);
 
@@ -165,7 +181,7 @@ void (async () => {
 
       const allowBypass =
         process.env.NODE_ENV !== 'production' &&
-        String(process.env.ALLOW_BYPASS_AUTH ?? 'true').toLowerCase() === 'true';
+        String(process.env.ALLOW_BYPASS_AUTH ?? 'false').toLowerCase() === 'true';
 
       let userId = null;
       if (allowBypass && devUserIdRaw != null && String(devUserIdRaw).trim() !== '') {
@@ -207,7 +223,7 @@ void (async () => {
   server.listen(apiPort, () => {
     console.log(`[realstate-api] http://127.0.0.1:${apiPort}`);
     console.log(
-      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/auth/change-password  PATCH /api/auth/profile  POST /api/auth/profile-photo  DELETE /api/auth/profile-photo  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/inventory  /api/unit-inspections  /api/special-requests',
+      '[realstate-api] GET /api/health  POST /api/auth/login  GET /api/auth/session  POST /api/auth/change-password  PATCH /api/auth/profile  POST /api/auth/profile-photo  DELETE /api/auth/profile-photo  POST /api/system/theme  /api/admin/*  /api/units  /api/tenants  /api/contracts  /api/payments  /api/partner-agencies  /api/blacklist  /api/documents  /api/vendors  /api/unit-inspections  /api/special-requests',
     );
   });
 

@@ -2,6 +2,7 @@
   "common": {
     "close": "Close",
     "cancel": "Cancel",
+    "save": "Save",
     "loading": "Loading...",
     "select_placeholder": "Select an option..."
   },
@@ -77,6 +78,7 @@
       "crm": "CRM & Tenants",
       "ledger": "Lease Ledger",
       "maintenance": "Maintenance",
+      "reports": "Reports",
       "calendar": "Calendar",
       "userManagement": "User Management",
       "agentPortal": "Agent Portal (Demo)",
@@ -137,6 +139,8 @@
       "statusUpdated": "Ticket status updated.",
       "statusUpdateError": "Could not update ticket status.",
       "readOnlyHint": "You can view tickets but do not have permission to change status.",
+      "tabTickets": "Tickets",
+      "tabVendors": "Vendors",
       "stats": {
         "open": "Open",
         "inProgress": "In progress",
@@ -168,7 +172,8 @@
         "contract": "Contract",
         "status": "Status",
         "source": "Source",
-        "reported": "Reported"
+        "reported": "Reported",
+        "cost": "Cost"
       },
       "detail": {
         "unit": "Unit",
@@ -178,7 +183,92 @@
         "reported": "Reported",
         "updated": "Last updated",
         "description": "Issue details",
-        "updateStatus": "Update status"
+        "updateStatus": "Update status",
+        "vendorAndCost": "Vendor & repair cost",
+        "assignedVendor": "Assigned vendor",
+        "selectVendor": "Select a vendor…",
+        "estimatedCost": "Estimated cost",
+        "actualCost": "Actual cost",
+        "saveCost": "Save vendor & cost",
+        "costSaved": "Vendor and cost details saved.",
+        "costSaveError": "Could not save vendor and cost details.",
+        "costInvalid": "Cost must be a valid non-negative number."
+      },
+      "vendors": {
+        "title": "Vendors & contractors",
+        "subtitle": "Your directory of repair contractors and service providers.",
+        "add": "Add vendor",
+        "edit": "Edit vendor",
+        "delete": "Remove vendor",
+        "editTitle": "Edit vendor",
+        "addTitle": "Add vendor",
+        "loadError": "Could not load vendors.",
+        "nameRequired": "Vendor name is required.",
+        "created": "Vendor added.",
+        "updated": "Vendor updated.",
+        "deleted": "Vendor removed.",
+        "saveError": "Could not save vendor.",
+        "deleteError": "Could not remove vendor.",
+        "deleteConfirm": "Remove vendor \"{{name}}\"? This cannot be undone.",
+        "emptyTitle": "No vendors yet",
+        "emptyDesc": "Add the contractors and service providers you work with to assign them to maintenance tickets and track repair costs.",
+        "columns": {
+          "name": "Vendor",
+          "contact": "Contact",
+          "email": "Email",
+          "address": "Address"
+        },
+        "form": {
+          "name": "Vendor / company name",
+          "category": "Category",
+          "contactPerson": "Contact person",
+          "phone": "Phone",
+          "email": "Email",
+          "address": "Address",
+          "notes": "Notes"
+        }
+      }
+    },
+    "reports": {
+      "title": "Reports",
+      "subtitle": "Income, expenses, and performance across your portfolio for the selected date range.",
+      "stats": {
+        "collected": "Collected rent",
+        "collectedHint": "Paid within the selected range",
+        "expense": "Maintenance expense",
+        "expenseHint": "Repair costs within the selected range",
+        "netIncome": "Net income",
+        "netIncomeHint": "Collected minus maintenance expense",
+        "occupancy": "Occupancy rate",
+        "occupancyHint": "{{occupied}} of {{total}} units occupied"
+      },
+      "charts": {
+        "trendTitle": "Income vs. expense (last 6 months)",
+        "collectedLabel": "Collected",
+        "expenseLabel": "Expense",
+        "expenseByCategoryTitle": "Expense by category",
+        "noExpenseData": "No recorded repair costs yet."
+      },
+      "vendorSpend": {
+        "title": "Vendor spend",
+        "subtitle": "Total repair costs by vendor.",
+        "empty": "No vendor costs recorded yet.",
+        "columns": {
+          "vendor": "Vendor",
+          "tickets": "Tickets",
+          "total": "Total spent"
+        }
+      },
+      "agentPerformance": {
+        "title": "Agent performance",
+        "subtitle": "Deals, monthly rent base, and rent collected in the selected range.",
+        "empty": "No agent activity yet.",
+        "columns": {
+          "agent": "Agent",
+          "deals": "Deals",
+          "mrrBase": "Monthly rent base",
+          "collectedPeriod": "Collected (range)"
+        }
       }
     },
     "userAccess": {
@@ -210,6 +300,7 @@
         "crm": "Contacts and tenants",
         "ledger": "Rent and payments",
         "maintenance": "Maintenance tickets and repairs",
+        "reports": "Income, expense, and performance reports",
         "calendar": "Viewings and milestones",
         "tenant_portal": "Tenant-facing portal (demo)",
         "agent_portal": "Agent-facing portal (demo)"
@@ -224,6 +315,7 @@
       "stats": {
         "totalUsers": "Total Users",
         "activeUsers": "Active Users",
+        "pendingUsers": "Pending Approval",
         "inactiveUsers": "Inactive Users",
         "userRoles": "User Roles"
       },
@@ -236,6 +328,7 @@
       },
       "statusActive": "Active",
       "statusInactive": "Inactive",
+      "statusPending": "Pending Approval",
       "modalAddTitle": "Add New User",
       "modalEditTitle": "Edit User",
       "labels": {
@@ -263,6 +356,12 @@
       "activated": "User activated.",
       "confirmDeactivate": "Deactivate this user? They will no longer be able to sign in.",
       "confirmActivate": "Activate this user? They will be able to sign in again.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "confirmApprove": "Approve {{name}}'s sign-up? They will be able to sign in once approved.",
+      "confirmReject": "Reject {{name}}'s sign-up? This deletes the request and cannot be undone.",
+      "approved": "Sign-up approved.",
+      "rejected": "Sign-up rejected.",
       "passwordMismatch": "Passwords do not match.",
       "passwordMin": "Password must be at least 4 characters.",
       "missingFields": "Please fill in all required fields.",
@@ -288,6 +387,8 @@
       "accessLevelProfile": "Access level profile",
       "statusActive": "Active",
       "statusInactive": "Inactive",
+      "usersColumn": "Users",
+      "noUsersAssigned": "No users assigned",
       "moreUsers": "+{{count}}",
       "loadError": "Could not load roles.",
       "savedAdd": "Role created.",

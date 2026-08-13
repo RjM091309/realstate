@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Check,
   CheckCircle2,
+  Clock,
   ImagePlus,
   Plus,
   Search,
@@ -9,6 +11,7 @@ import {
   Trash2,
   UserRoundCheck,
   Users,
+  X,
   XCircle,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -35,6 +38,7 @@ type StaffUser = {
   branchId: number | null;
   branchName: string | null;
   active: boolean;
+  pendingApproval: boolean;
   avatarUrl?: string | null;
 };
 
@@ -47,7 +51,7 @@ const inputClass =
 const PASSWORD_MIN_LENGTH = 4;
 const ADMIN_ROLE_ID = 1;
 
-type UserStatTone = 'neutral' | 'success' | 'danger' | 'info';
+type UserStatTone = 'neutral' | 'success' | 'danger' | 'info' | 'warning';
 
 function UserStatCard({
   label,
@@ -72,19 +76,25 @@ function UserStatCard({
         ? 'bg-rose-500'
         : tone === 'info'
           ? 'bg-brand-blue'
-          : 'bg-[#334155]';
+          : tone === 'warning'
+            ? 'bg-amber-500'
+            : 'bg-[#334155]';
   const valueColor =
     tone === 'success'
       ? 'text-emerald-600 dark:text-emerald-400'
       : tone === 'danger'
         ? 'text-rose-600 dark:text-rose-400'
-        : 'text-slate-800 dark:text-slate-100';
+        : tone === 'warning'
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-slate-800 dark:text-slate-100';
   const footerClass =
     tone === 'success'
       ? 'text-brand-green'
       : tone === 'danger'
         ? 'text-rose-500'
-        : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500';
+        : tone === 'warning'
+          ? 'text-amber-500'
+          : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500';
 
   return (
     <motion.div
@@ -362,10 +372,11 @@ export function UserManagementView() {
 
   const stats = useMemo(() => {
     const total = users.length;
-    const active = users.filter((u) => u.active).length;
-    const inactive = total - active;
+    const pending = users.filter((u) => u.pendingApproval).length;
+    const active = users.filter((u) => u.active && !u.pendingApproval).length;
+    const inactive = total - active - pending;
     const roleCount = new Set(users.map((u) => u.roleId)).size;
-    return { total, active, inactive, roleCount };
+    return { total, active, inactive, pending, roleCount };
   }, [users]);
 
   const closeModal = () => {
@@ -496,6 +507,38 @@ export function UserManagementView() {
     }
   };
 
+  const handleApprove = async (u: StaffUser) => {
+    if (!window.confirm(t('views.userInfo.confirmApprove', { name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username }))) {
+      return;
+    }
+    setStatusBusyId(u.id);
+    try {
+      await apiFetch(`/api/auth/staff/users/${u.id}/approve`, { method: 'POST' });
+      toast.success(t('views.userInfo.approved'));
+      await loadLists();
+    } catch (e) {
+      toastSaveErr(e);
+    } finally {
+      setStatusBusyId(null);
+    }
+  };
+
+  const handleReject = async (u: StaffUser) => {
+    if (!window.confirm(t('views.userInfo.confirmReject', { name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username }))) {
+      return;
+    }
+    setStatusBusyId(u.id);
+    try {
+      await apiFetch(`/api/auth/staff/users/${u.id}/reject`, { method: 'POST' });
+      toast.success(t('views.userInfo.rejected'));
+      await loadLists();
+    } catch (e) {
+      toastSaveErr(e);
+    } finally {
+      setStatusBusyId(null);
+    }
+  };
+
   const pageTitle = (
     <div>
       <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{t('views.userInfo.title')}</h1>
@@ -526,29 +569,71 @@ export function UserManagementView() {
     { header: t('views.userInfo.columns.role'), accessorKey: 'roleName' },
     {
       header: t('views.userInfo.columns.status'),
-      render: (u) => (
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold',
-            u.active
-              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200'
-              : 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200',
-          )}
-        >
-          {u.active ? (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
-          ) : (
-            <XCircle className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
-          )}
-          {u.active ? t('views.userInfo.statusActive') : t('views.userInfo.statusInactive')}
-        </span>
-      ),
+      render: (u) =>
+        u.pendingApproval ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+            <Clock className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+            {t('views.userInfo.statusPending')}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold',
+              u.active
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200'
+                : 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200',
+            )}
+          >
+            {u.active ? (
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+            )}
+            {u.active ? t('views.userInfo.statusActive') : t('views.userInfo.statusInactive')}
+          </span>
+        ),
     },
     {
       header: t('views.userInfo.columns.action'),
       render: (u) => {
         const busy = statusBusyId === u.id;
         const isSelf = u.id === sessionUserId;
+
+        if (u.pendingApproval) {
+          return (
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                disabled={busy}
+                title={t('views.userInfo.approve')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleApprove(u);
+                }}
+              >
+                <Check className="h-4 w-4" strokeWidth={2} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                disabled={busy}
+                title={t('views.userInfo.reject')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleReject(u);
+                }}
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </Button>
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center gap-1">
             <Button
@@ -617,8 +702,18 @@ export function UserManagementView() {
 
   return (
     <div className="space-y-6">
+      {pageTitle}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {pageTitle}
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('views.userInfo.searchPlaceholder')}
+            className={cn('h-10 rounded-full border-slate-200 pl-10 dark:border-slate-700', inputClass)}
+          />
+        </div>
         <Button
           type="button"
           onClick={openAdd}
@@ -629,17 +724,7 @@ export function UserManagementView() {
         </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('views.userInfo.searchPlaceholder')}
-          className={cn('h-10 rounded-full border-slate-200 pl-10 dark:border-slate-700', inputClass)}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <UserStatCard
           index={0}
           label={t('views.userInfo.stats.totalUsers')}
@@ -658,6 +743,14 @@ export function UserManagementView() {
         />
         <UserStatCard
           index={2}
+          label={t('views.userInfo.stats.pendingUsers')}
+          value={loading ? '—' : stats.pending}
+          subtitle="Awaiting approval"
+          tone="warning"
+          icon={<Clock className="h-6 w-6" />}
+        />
+        <UserStatCard
+          index={3}
           label={t('views.userInfo.stats.inactiveUsers')}
           value={loading ? '—' : stats.inactive}
           subtitle="Disabled accounts"
@@ -665,7 +758,7 @@ export function UserManagementView() {
           icon={<XCircle className="h-6 w-6" />}
         />
         <UserStatCard
-          index={3}
+          index={4}
           label={t('views.userInfo.stats.userRoles')}
           value={loading ? '—' : stats.roleCount}
           subtitle="Assigned roles"

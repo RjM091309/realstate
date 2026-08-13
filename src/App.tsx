@@ -15,6 +15,7 @@ import { FileMaintenanceView } from './components/views/FileMaintenanceView/inde
 import { ContractsView } from './components/views/ContractsView/index';
 import { CRMView } from './components/views/CRMView/CRMView';
 import { MaintenanceView } from './components/views/MaintenanceView/index';
+import { ReportsView } from './components/views/ReportsView/index';
 import { LeaseLedgerView } from './components/views/LeaseLedgerView/index';
 import { CalendarView } from './components/views/CalendarView/index';
 import { UserManagementView, UserRoleManagementView } from './components/views/UserManagementView/index';
@@ -83,6 +84,7 @@ function MainApp() {
     crm: '/crm',
     ledger: '/ledger',
     maintenance: '/maintenance',
+    reports: '/reports',
     calendar: '/calendar',
     userManagement: '/user-management/user-info',
     settings: '/settings',
@@ -183,6 +185,8 @@ function MainApp() {
         return <LeaseLedgerView />;
       case 'maintenance':
         return <MaintenanceView />;
+      case 'reports':
+        return <ReportsView />;
       case 'calendar':
         return <CalendarView />;
       case 'settings':

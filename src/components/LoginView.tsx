@@ -1,7 +1,452 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Building, Mail, Lock, ArrowRight, Eye, EyeOff, Shield, Globe, MapPin } from 'lucide-react';
+import {
+  Building,
+  Mail,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Shield,
+  Globe,
+  MapPin,
+  KeyRound,
+  CheckCircle2,
+  UserPlus,
+  Clock,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
+
+/** Must match server `MIN_PASSWORD_LENGTH` in authController.js */
+const PASSWORD_MIN_LENGTH = 4;
+
+function ForgotPasswordModal({
+  onClose,
+  initialUsername,
+}: {
+  onClose: (nextUsername?: string) => void;
+  initialUsername: string;
+}) {
+  const [username, setUsername] = useState(initialUsername);
+  const [masterKey, setMasterKey] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!username.trim() || !masterKey || !newPassword) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    if (newPassword.length < PASSWORD_MIN_LENGTH) {
+      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiFetch('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.trim(), masterKey, newPassword }),
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={loading ? undefined : () => onClose()}
+        aria-hidden
+      />
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-slate-950/90 p-7 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      >
+        <div className="mb-1 flex items-start justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-blue/15 text-brand-blue">
+              <KeyRound size={18} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-100">Reset Password</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={loading}
+            className="text-slate-500 transition-colors hover:text-slate-300 disabled:opacity-50"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="mt-5 space-y-5">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-400" size={20} />
+              <p className="text-sm text-emerald-200">
+                Password updated. You can now sign in with your new password.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onClose(username.trim())}
+              className="w-full rounded-xl bg-brand-blue py-3 font-bold text-white transition-colors hover:bg-[#3d7ab8]"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <p className="text-sm leading-relaxed text-slate-400">
+              Enter your username and the recovery key configured on this server to set a new password.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                Username
+              </label>
+              <input
+                required
+                autoComplete="username"
+                className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                Recovery Key
+              </label>
+              <input
+                required
+                type="password"
+                autoComplete="off"
+                placeholder="Server RESET_MASTER_KEY"
+                className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all placeholder:text-slate-500 focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                value={masterKey}
+                onChange={(e) => setMasterKey(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  New Password
+                </label>
+                <input
+                  required
+                  type="password"
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Confirm
+                </label>
+                <input
+                  required
+                  type="password"
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {error ? <p className="text-sm font-medium text-rose-400">{error}</p> : null}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-blue py-3 font-bold text-white transition-colors hover:bg-[#3d7ab8] disabled:opacity-70"
+            >
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <span>Resetting…</span>
+                </>
+              ) : (
+                <span>Reset Password</span>
+              )}
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+type SignUpRoleOption = { id: number; name: string };
+
+/** Public sign-up never offers the Administrator role — matches server-side `PUBLIC_SIGNUP_BLOCKED_ROLE_ID`. */
+const SIGNUP_BLOCKED_ROLE_ID = 1;
+
+function SignUpModal({
+  onClose,
+  initialUsername,
+}: {
+  onClose: (nextUsername?: string) => void;
+  initialUsername: string;
+}) {
+  const { register } = useAuth();
+  const [roles, setRoles] = useState<SignUpRoleOption[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState(initialUsername);
+  const [roleId, setRoleId] = useState<number | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch<{ roles: SignUpRoleOption[] }>('/api/auth/roles');
+        if (cancelled) return;
+        const available = (res.roles ?? []).filter((r) => r.id !== SIGNUP_BLOCKED_ROLE_ID);
+        setRoles(available);
+        setRoleId(available[0]?.id ?? null);
+      } catch {
+        if (!cancelled) setRoles([]);
+      } finally {
+        if (!cancelled) setRolesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !roleId) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        username: username.trim(),
+        password,
+        roleId,
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={loading ? undefined : () => onClose()}
+        aria-hidden
+      />
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/90 p-7 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      >
+        <div className="mb-1 flex items-start justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+              <UserPlus size={18} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-100">Create Account</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={loading}
+            className="text-slate-500 transition-colors hover:text-slate-300 disabled:opacity-50"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="mt-5 space-y-5">
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <Clock className="mt-0.5 shrink-0 text-amber-400" size={20} />
+              <p className="text-sm text-amber-200">
+                Account created. An administrator needs to approve it from User Management before
+                you can sign in.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onClose(username.trim())}
+              className="w-full rounded-xl bg-brand-blue py-3 font-bold text-white transition-colors hover:bg-[#3d7ab8]"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <p className="text-sm leading-relaxed text-slate-400">
+              Request access to the dashboard. Your account stays inactive until an administrator
+              approves it.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  First name
+                </label>
+                <input
+                  required
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Last name
+                </label>
+                <input
+                  required
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                Username
+              </label>
+              <input
+                required
+                autoComplete="username"
+                className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                Requested role
+              </label>
+              <select
+                required
+                disabled={rolesLoading || roles.length === 0}
+                className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15 disabled:opacity-60"
+                value={roleId ?? ''}
+                onChange={(e) => setRoleId(Number(e.target.value))}
+              >
+                {rolesLoading ? <option value="">Loading roles…</option> : null}
+                {!rolesLoading && roles.length === 0 ? (
+                  <option value="">No roles available</option>
+                ) : null}
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Password
+                </label>
+                <input
+                  required
+                  type="password"
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="ml-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Confirm
+                </label>
+                <input
+                  required
+                  type="password"
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/40 px-4 py-3 text-sm text-slate-100 transition-all focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/15"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {error ? <p className="text-sm font-medium text-rose-400">{error}</p> : null}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-blue py-3 font-bold text-white transition-colors hover:bg-[#3d7ab8] disabled:opacity-70"
+            >
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <span>Creating…</span>
+                </>
+              ) : (
+                <span>Create Account</span>
+              )}
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+}
 
 export function LoginView() {
   const { login } = useAuth();
@@ -10,6 +455,8 @@ export function LoginView() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [signUpOpen, setSignUpOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,9 +547,10 @@ export function LoginView() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-slate-100 mb-2">System Admin Login</h2>
             <p className="text-slate-300/80 text-sm">
-              Please sign in to access your administrative dashboard. New staff accounts are created from{' '}
-              <span className="font-semibold text-slate-200">User Management → User Info</span> after
-              you sign in.
+              Please sign in to access your administrative dashboard. New staff accounts are created
+              from <span className="font-semibold text-slate-200">User Management → User Info</span>{' '}
+              after you sign in, or request access below — an administrator reviews and approves
+              every sign-up.
             </p>
           </div>
 
@@ -133,6 +581,13 @@ export function LoginView() {
                 <label htmlFor="password" className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Password
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setForgotOpen(true)}
+                  className="text-xs font-semibold text-brand-blue hover:text-blue-300 transition-colors"
+                >
+                  Forgot password?
+                </button>
               </div>
               <div className="relative group">
                 <Lock
@@ -183,7 +638,18 @@ export function LoginView() {
             </button>
           </form>
 
-          <div className="mt-12 flex flex-col items-center gap-6">
+          <p className="mt-5 text-center text-sm text-slate-400">
+            Don&apos;t have an account?{' '}
+            <button
+              type="button"
+              onClick={() => setSignUpOpen(true)}
+              className="font-semibold text-brand-blue transition-colors hover:text-blue-300"
+            >
+              Sign Up
+            </button>
+          </p>
+
+          <div className="mt-8 flex flex-col items-center gap-6">
             <div className="flex items-center gap-3 w-full">
               <span className="h-px grow bg-slate-800/80" />
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Regional Support</span>
@@ -200,6 +666,30 @@ export function LoginView() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {forgotOpen ? (
+          <ForgotPasswordModal
+            initialUsername={username}
+            onClose={(nextUsername?: string) => {
+              if (nextUsername != null) setUsername(nextUsername);
+              setForgotOpen(false);
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {signUpOpen ? (
+          <SignUpModal
+            initialUsername={username}
+            onClose={(nextUsername?: string) => {
+              if (nextUsername != null) setUsername(nextUsername);
+              setSignUpOpen(false);
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,10 +1,15 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { getJwtSecret } from '../jwt.js';
 import { loadSessionPayload } from '../services/sessionService.js';
 import { finalizeProfileAvatarUpload, deletePublicAvatarFile } from '../services/avatarUploadService.js';
+import { logAudit } from '../services/auditLogService.js';
 import {
+  approvePendingUserAccount,
+  createPendingUserAccount,
   createUserAccount,
+  deletePendingUserAccount,
   findUserById,
   findUserByUsername,
   findUserRowById,
@@ -28,6 +33,38 @@ import {
 
 /** Minimum length for new passwords (register, staff user, change password). */
 const MIN_PASSWORD_LENGTH = 4;
+
+/** Throttle for POST /api/auth/reset-password — mitigates brute-forcing RESET_MASTER_KEY. */
+const RESET_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const RESET_ATTEMPT_LIMIT = 8;
+const resetAttemptsByIp = new Map();
+
+function isResetRateLimited(ip) {
+  const entry = resetAttemptsByIp.get(ip);
+  if (!entry || Date.now() - entry.windowStart > RESET_ATTEMPT_WINDOW_MS) return false;
+  return entry.count >= RESET_ATTEMPT_LIMIT;
+}
+
+function registerResetAttempt(ip) {
+  const now = Date.now();
+  const entry = resetAttemptsByIp.get(ip);
+  if (!entry || now - entry.windowStart > RESET_ATTEMPT_WINDOW_MS) {
+    resetAttemptsByIp.set(ip, { count: 1, windowStart: now });
+    return;
+  }
+  entry.count += 1;
+}
+
+function clearResetAttempts(ip) {
+  resetAttemptsByIp.delete(ip);
+}
+
+/** Constant-time compare so mismatched-length keys don't leak timing info. */
+function safeKeyEquals(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 async function sendTokenAndSession(res, userId, opts) {
   const status = opts?.status ?? 200;
@@ -59,6 +96,14 @@ export async function getRoles(_req, res) {
   }
 }
 
+/** Public sign-up never grants the Administrator role without a human approver reviewing it. */
+const PUBLIC_SIGNUP_BLOCKED_ROLE_ID = 1;
+
+/**
+ * Public sign-up from the Login page. Creates the account inactive and
+ * PENDING_APPROVAL — no token is issued. An administrator reviews it from
+ * User Management and approves or rejects before the account can sign in.
+ */
 export async function register(req, res) {
   try {
     const firstName = String(req.body?.firstName ?? '').trim();
@@ -72,6 +117,10 @@ export async function register(req, res) {
       return;
     }
     if (!Number.isFinite(roleId) || roleId < 1) {
+      res.status(400).json({ error: 'Choose a valid role' });
+      return;
+    }
+    if (roleId === PUBLIC_SIGNUP_BLOCKED_ROLE_ID) {
       res.status(400).json({ error: 'Choose a valid role' });
       return;
     }
@@ -104,7 +153,7 @@ export async function register(req, res) {
 
     const branchId = await getFirstActiveBranchId();
     const hash = await bcrypt.hash(password, 10);
-    const userId = await createUserAccount({
+    const userId = await createPendingUserAccount({
       firstName,
       lastName,
       username,
@@ -117,9 +166,22 @@ export async function register(req, res) {
       return;
     }
 
-    await sendTokenAndSession(res, userId, {
-      status: 201,
-      sessionError: 'Account created but session could not be loaded',
+    await logAudit({
+      branchId,
+      // No authenticated actor for a public self-signup. Also avoids a self-referencing
+      // audit_log.actor_user_id FK that would block deleting the account on reject.
+      actorUserId: null,
+      moduleName: 'auth',
+      recordTable: 'user_info',
+      recordId: userId,
+      action: 'create',
+      changeSummary: `New sign-up awaiting approval: ${username}`,
+    });
+
+    res.status(201).json({
+      ok: true,
+      pending: true,
+      message: 'Account created. An administrator must approve it before you can sign in.',
     });
   } catch (e) {
     console.error(e);
@@ -417,6 +479,73 @@ export async function changePassword(req, res) {
   }
 }
 
+/**
+ * Self-service password recovery — no session required. Verifies a shared
+ * `RESET_MASTER_KEY` (server `.env`) instead of an emailed token, since staff
+ * accounts have no email on file. Lets a locked-out admin regain access
+ * without direct DB access, as long as they hold the server's recovery key.
+ */
+export async function resetPasswordWithMasterKey(req, res) {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  try {
+    if (isResetRateLimited(ip)) {
+      res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+      return;
+    }
+
+    const configuredKey = String(process.env.RESET_MASTER_KEY ?? '').trim();
+    if (!configuredKey) {
+      res.status(503).json({ error: 'Password recovery is not configured on this server.' });
+      return;
+    }
+
+    const username = String(req.body?.username ?? '').trim();
+    const masterKey = String(req.body?.masterKey ?? '');
+    const newPassword = String(req.body?.newPassword ?? '');
+
+    if (!username || !masterKey || !newPassword) {
+      registerResetAttempt(ip);
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      res.status(400).json({
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      });
+      return;
+    }
+
+    const keyMatches = safeKeyEquals(masterKey, configuredKey);
+    const row = await findUserByUsername(username);
+
+    if (!keyMatches || !row) {
+      registerResetAttempt(ip);
+      res.status(401).json({ error: 'Invalid username or recovery key' });
+      return;
+    }
+
+    clearResetAttempts(ip);
+    const userId = Number(row.IDNO);
+    const hash = await bcrypt.hash(newPassword, 10);
+    await updateUserPasswordHash(userId, hash);
+
+    await logAudit({
+      branchId: row.BRANCH_ID == null ? null : Number(row.BRANCH_ID),
+      actorUserId: userId,
+      moduleName: 'auth',
+      recordTable: 'user_info',
+      recordId: userId,
+      action: 'override',
+      changeSummary: 'Password reset via recovery key (forgot password).',
+    });
+
+    res.json({ ok: true, active: Boolean(Number(row.ACTIVE)) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not reset password' });
+  }
+}
+
 function mapStaffUserRow(r) {
   const rawAvatar = r.AVATAR_URL;
   return {
@@ -429,6 +558,7 @@ function mapStaffUserRow(r) {
     branchId: r.BRANCH_ID == null ? null : Number(r.BRANCH_ID),
     branchName: r.branchName != null ? String(r.branchName) : null,
     active: Boolean(Number(r.ACTIVE)),
+    pendingApproval: Boolean(Number(r.PENDING_APPROVAL ?? 0)),
     avatarUrl:
       rawAvatar != null && String(rawAvatar).trim() !== '' ? String(rawAvatar) : null,
   };
@@ -678,5 +808,82 @@ export async function deactivateStaffUser(req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Could not deactivate user' });
+  }
+}
+
+/** Admin approves a self-signed-up account from User Management — activates it. */
+export async function approveStaffUser(req, res) {
+  try {
+    const targetId = Number(req.params.userId);
+    if (!Number.isFinite(targetId) || targetId < 1) {
+      res.status(400).json({ error: 'Invalid user' });
+      return;
+    }
+    const existing = await findUserRowById(targetId);
+    if (!existing || !Number(existing.PENDING_APPROVAL)) {
+      res.status(404).json({ error: 'Pending sign-up not found' });
+      return;
+    }
+
+    await approvePendingUserAccount(targetId);
+
+    await logAudit({
+      branchId: existing.BRANCH_ID == null ? null : Number(existing.BRANCH_ID),
+      actorUserId: Number(req.userId),
+      moduleName: 'auth',
+      recordTable: 'user_info',
+      recordId: targetId,
+      action: 'update',
+      changeSummary: `Approved sign-up: ${existing.USERNAME}`,
+    });
+
+    const row = await getStaffUserJoined(targetId);
+    res.json({ user: row ? mapStaffUserRow(row) : null });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not approve user' });
+  }
+}
+
+/** Admin rejects a self-signed-up account from User Management — the account never went live, so it's removed. */
+export async function rejectStaffUser(req, res) {
+  try {
+    const targetId = Number(req.params.userId);
+    if (!Number.isFinite(targetId) || targetId < 1) {
+      res.status(400).json({ error: 'Invalid user' });
+      return;
+    }
+    const existing = await findUserRowById(targetId);
+    if (!existing || !Number(existing.PENDING_APPROVAL)) {
+      res.status(404).json({ error: 'Pending sign-up not found' });
+      return;
+    }
+
+    const removed = await deletePendingUserAccount(targetId);
+    if (!removed) {
+      res.status(404).json({ error: 'Pending sign-up not found' });
+      return;
+    }
+
+    await logAudit({
+      branchId: existing.BRANCH_ID == null ? null : Number(existing.BRANCH_ID),
+      actorUserId: Number(req.userId),
+      moduleName: 'auth',
+      recordTable: 'user_info',
+      recordId: targetId,
+      action: 'delete',
+      changeSummary: `Rejected sign-up: ${existing.USERNAME}`,
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    if (e?.code === 'ER_ROW_IS_REFERENCED_2' || e?.code === 'ER_ROW_IS_REFERENCED') {
+      res
+        .status(409)
+        .json({ error: 'This account has related records and cannot be deleted. Deactivate it instead.' });
+      return;
+    }
+    res.status(500).json({ error: 'Could not reject user' });
   }
 }

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import {
+  approveStaffUser,
   changePassword,
   createStaffUser,
   deactivateStaffUser,
@@ -15,6 +16,8 @@ import {
   login,
   logout,
   register,
+  rejectStaffUser,
+  resetPasswordWithMasterKey,
   updateProfile,
   updateStaffUser,
   uploadProfilePhoto,
@@ -56,7 +59,10 @@ router.post(
 router.delete('/staff/users/:userId/photo', requireAdministrator, deleteStaffUserPhoto);
 router.patch('/staff/users/:userId', requireAdministrator, updateStaffUser);
 router.delete('/staff/users/:userId', requireAdministrator, deactivateStaffUser);
+router.post('/staff/users/:userId/approve', requireAdministrator, approveStaffUser);
+router.post('/staff/users/:userId/reject', requireAdministrator, rejectStaffUser);
 router.post('/login', login);
+router.post('/reset-password', resetPasswordWithMasterKey);
 router.get('/session', getSession);
 router.post('/logout', logout);
 router.post('/change-password', requireAuth, changePassword);

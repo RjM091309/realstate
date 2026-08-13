@@ -35,6 +35,10 @@ export async function listSpecialRequestsByBranch(branchId) {
       sr.title,
       sr.details,
       sr.status,
+      sr.vendor_id,
+      sr.estimated_cost,
+      sr.actual_cost,
+      sr.resolved_at,
       sr.created_by,
       sr.created_at,
       sr.updated_at,
@@ -42,13 +46,15 @@ export async function listSpecialRequestsByBranch(branchId) {
       u.unit_no AS unit_number,
       u.tower AS unit_tower,
       pr.name AS building_name,
-      t.full_name AS tenant_name
+      t.full_name AS tenant_name,
+      v.name AS vendor_name
     FROM special_request sr
     INNER JOIN lease_contract lc ON lc.id = sr.contract_id AND lc.branch_id = sr.branch_id
     INNER JOIN unit u ON u.id = lc.unit_id
     INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = sr.branch_id
     LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.is_primary = 1 AND ct.active = 1
     LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    LEFT JOIN vendor v ON v.id = sr.vendor_id
     WHERE sr.branch_id = ?
     ORDER BY sr.created_at DESC, sr.id DESC
     `,
@@ -58,13 +64,27 @@ export async function listSpecialRequestsByBranch(branchId) {
 }
 
 export async function updateSpecialRequestStatus(id, branchId, status) {
+  const resolvedAtSql = status === 'resolved' ? 'resolved_at = NOW()' : 'resolved_at = resolved_at';
   const [result] = await pool.query(
     `
     UPDATE special_request
-    SET status = ?, updated_at = NOW()
+    SET status = ?, ${resolvedAtSql}, updated_at = NOW()
     WHERE id = ? AND branch_id = ?
     `,
     [status, id, branchId],
+  );
+  return result.affectedRows;
+}
+
+/** Assign/clear a vendor and record estimated/actual repair cost for a ticket. */
+export async function updateSpecialRequestCosts(id, branchId, payload) {
+  const [result] = await pool.query(
+    `
+    UPDATE special_request
+    SET vendor_id = ?, estimated_cost = ?, actual_cost = ?, updated_at = NOW()
+    WHERE id = ? AND branch_id = ?
+    `,
+    [payload.vendorId ?? null, payload.estimatedCost ?? null, payload.actualCost ?? null, id, branchId],
   );
   return result.affectedRows;
 }
@@ -80,6 +100,10 @@ export async function getSpecialRequestById(id, branchId) {
       sr.title,
       sr.details,
       sr.status,
+      sr.vendor_id,
+      sr.estimated_cost,
+      sr.actual_cost,
+      sr.resolved_at,
       sr.created_by,
       sr.created_at,
       sr.updated_at,
@@ -87,13 +111,15 @@ export async function getSpecialRequestById(id, branchId) {
       u.unit_no AS unit_number,
       u.tower AS unit_tower,
       pr.name AS building_name,
-      t.full_name AS tenant_name
+      t.full_name AS tenant_name,
+      v.name AS vendor_name
     FROM special_request sr
     INNER JOIN lease_contract lc ON lc.id = sr.contract_id AND lc.branch_id = sr.branch_id
     INNER JOIN unit u ON u.id = lc.unit_id
     INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = sr.branch_id
     LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.is_primary = 1 AND ct.active = 1
     LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    LEFT JOIN vendor v ON v.id = sr.vendor_id
     WHERE sr.id = ? AND sr.branch_id = ?
     LIMIT 1
     `,

@@ -4,12 +4,11 @@ import { getJwtSecret } from '../jwt.js';
 
 /** Verifies Bearer JWT and sets `req.userId`. */
 export async function requireAuth(req, res, next) {
-  // Dev-only bypass for local development when the UI is running with BYPASS_LOGIN enabled.
-  // In non-production, this is enabled by default (or can be explicitly enabled via `.env`).
-  // Never enable in production.
+  // Dev-only bypass for local development — opt-in via `ALLOW_BYPASS_AUTH=true` in `.env`.
+  // Off by default even outside production. Never enable in production.
   const allowBypass =
     process.env.NODE_ENV !== 'production' &&
-    String(process.env.ALLOW_BYPASS_AUTH ?? 'true').toLowerCase() === 'true';
+    String(process.env.ALLOW_BYPASS_AUTH ?? 'false').toLowerCase() === 'true';
   const devUserId = req.headers['x-dev-user-id'];
   if (allowBypass && devUserId != null && String(devUserId).trim() !== '') {
     req.userId = Number(String(devUserId).trim());
@@ -36,7 +35,7 @@ export async function requireAuth(req, res, next) {
 export async function requireAdministrator(req, res, next) {
   const allowBypass =
     process.env.NODE_ENV !== 'production' &&
-    String(process.env.ALLOW_BYPASS_AUTH ?? 'true').toLowerCase() === 'true';
+    String(process.env.ALLOW_BYPASS_AUTH ?? 'false').toLowerCase() === 'true';
   const devUserId = req.headers['x-dev-user-id'];
   if (allowBypass && devUserId != null && String(devUserId).trim() !== '') {
     const userId = Number(String(devUserId).trim());

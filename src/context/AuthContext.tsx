@@ -112,20 +112,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(data.session);
   }, []);
 
+  // Sign-up creates an inactive, PENDING_APPROVAL account — no token/session is
+  // issued until an administrator approves it from User Management.
   const register = useCallback(async (input: RegisterInput) => {
-    if (BYPASS_LOGIN) {
-      setToken(null);
-      setDevBypassUserId(1);
-      setSession(createBypassSession());
-      return;
-    }
-    const data = await apiFetch<{ token: string; session: SessionPayload }>('/api/auth/register', {
+    if (BYPASS_LOGIN) return;
+    await apiFetch<{ ok: boolean; pending: boolean; message: string }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
     });
-    setToken(data.token);
-    setDevBypassUserId(null);
-    setSession(data.session);
   }, []);
 
   const applySession = useCallback((next: SessionPayload) => {

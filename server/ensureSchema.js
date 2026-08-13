@@ -571,6 +571,28 @@ export async function ensureSchema() {
     }
   }
 
+  /** Marks self-service sign-ups awaiting an administrator's approve/reject decision. */
+  async function ensureUserPendingApprovalColumn() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_info'
+        AND column_name = 'PENDING_APPROVAL'
+      `,
+    );
+    if (rows.length === 0) {
+      try {
+        await pool.query(
+          `ALTER TABLE \`user_info\` ADD COLUMN \`PENDING_APPROVAL\` TINYINT(1) NOT NULL DEFAULT 0 AFTER \`ACTIVE\``,
+        );
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
+  }
+
   async function ensureTenantDocumentDriversLicenseEnum() {
     const [rows] = await pool.query(
       `
@@ -750,6 +772,7 @@ export async function ensureSchema() {
       \`EDITED_BY\` INT UNSIGNED NULL,
       \`EDITED_DT\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
       \`ACTIVE\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`PENDING_APPROVAL\` TINYINT(1) NOT NULL DEFAULT 0,
       \`BRANCH_ID\` INT UNSIGNED NULL DEFAULT NULL,
       PRIMARY KEY (\`IDNO\`),
       UNIQUE KEY \`uk_user_info_username\` (\`USERNAME\`),
@@ -812,6 +835,7 @@ export async function ensureSchema() {
   `);
 
   await ensureUserAvatarColumn();
+  await ensureUserPendingApprovalColumn();
 
   await pool.query(`UPDATE \`user_role\` SET \`ENCODED_BY\` = 1 WHERE \`IDNo\` IN (1, 2, 3, 4, 5)`);
 
@@ -1625,6 +1649,78 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_special_request_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`vendor\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`name\` VARCHAR(180) NOT NULL,
+      \`category\` ENUM('plumbing','electrical','hvac','carpentry','painting','pest_control','cleaning','appliance','general','other') NOT NULL DEFAULT 'general',
+      \`contact_person\` VARCHAR(180) NULL DEFAULT NULL,
+      \`phone\` VARCHAR(40) NULL DEFAULT NULL,
+      \`email\` VARCHAR(180) NULL DEFAULT NULL,
+      \`address\` VARCHAR(255) NULL DEFAULT NULL,
+      \`notes\` TEXT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_vendor_branch_active\` (\`branch_id\`, \`active\`),
+      CONSTRAINT \`fk_vendor_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  {
+    async function addColumnIfMissing(sql) {
+      try {
+        await pool.query(sql);
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
+
+    const [srCostCols] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'special_request'
+        AND column_name IN ('vendor_id', 'estimated_cost', 'actual_cost', 'resolved_at')
+      `,
+    );
+    const existingSrCostCols = new Set(srCostCols.map((r) => String(r.column_name)));
+
+    if (!existingSrCostCols.has('vendor_id')) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`special_request\` ADD COLUMN \`vendor_id\` BIGINT UNSIGNED NULL DEFAULT NULL AFTER \`status\``,
+      );
+      try {
+        await pool.query(
+          `ALTER TABLE \`special_request\`
+           ADD CONSTRAINT \`fk_special_request_vendor\` FOREIGN KEY (\`vendor_id\`) REFERENCES \`vendor\` (\`id\`)`,
+        );
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_KEYNAME' && error?.code !== 'ER_CANT_CREATE_TABLE') {
+          // FK may already exist on legacy DBs.
+        }
+      }
+    }
+    if (!existingSrCostCols.has('estimated_cost')) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`special_request\` ADD COLUMN \`estimated_cost\` DECIMAL(12,2) NULL DEFAULT NULL AFTER \`vendor_id\``,
+      );
+    }
+    if (!existingSrCostCols.has('actual_cost')) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`special_request\` ADD COLUMN \`actual_cost\` DECIMAL(12,2) NULL DEFAULT NULL AFTER \`estimated_cost\``,
+      );
+    }
+    if (!existingSrCostCols.has('resolved_at')) {
+      await addColumnIfMissing(
+        `ALTER TABLE \`special_request\` ADD COLUMN \`resolved_at\` DATETIME NULL DEFAULT NULL AFTER \`actual_cost\``,
+      );
+    }
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`inventory_snapshot\` (

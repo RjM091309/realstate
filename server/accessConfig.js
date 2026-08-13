@@ -7,6 +7,7 @@ export const SIDEBAR_FEATURE_KEYS = [
   'ledger',
   'calendar',
   'maintenance',
+  'reports',
   'tenant_portal',
   'agent_portal',
 ];

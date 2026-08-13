@@ -7,6 +7,7 @@ export const SIDEBAR_FEATURE_KEYS = [
   'ledger',
   'calendar',
   'maintenance',
+  'reports',
   'tenant_portal',
   'agent_portal',
 ] as const;
@@ -21,6 +22,7 @@ const TO_NAV: Record<SidebarFeatureKey, string> = {
   ledger: 'ledger',
   calendar: 'calendar',
   maintenance: 'maintenance',
+  reports: 'reports',
   tenant_portal: 'portal',
   agent_portal: 'agentPortal',
 };

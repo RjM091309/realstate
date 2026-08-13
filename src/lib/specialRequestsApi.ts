@@ -13,6 +13,11 @@ export type MaintenanceRequestRow = {
   title: string;
   details: string;
   status: MaintenanceStatus | string;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  resolvedAt?: string | null;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +40,27 @@ export async function updateMaintenanceRequestStatus(
     {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    },
+  );
+  return request;
+}
+
+export type MaintenanceCostPatch = {
+  vendorId?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+};
+
+/** Assign/clear a vendor and set estimated/actual repair cost — independent of status. */
+export async function updateMaintenanceRequestCosts(
+  id: string,
+  patch: MaintenanceCostPatch,
+): Promise<MaintenanceRequestRow> {
+  const { request } = await apiFetch<{ request: MaintenanceRequestRow }>(
+    `/api/special-requests/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     },
   );
   return request;

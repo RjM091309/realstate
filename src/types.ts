@@ -246,26 +246,6 @@ export interface RepositoryDocumentRow {
   createdAt: string;
 }
 
-export interface InventorySnapshotRow {
-  id: string;
-  contractId: string;
-  snapshotType: 'move_in' | 'move_out' | 'routine';
-  inspectionDate: string;
-  inspectedBy?: string;
-  remarks: string;
-  createdAt: string;
-}
-
-export interface InventorySnapshotItemRow {
-  id: string;
-  snapshotId: string;
-  itemName: string;
-  category: string;
-  quantity: number;
-  conditionState: 'excellent' | 'good' | 'fair' | 'damaged' | 'missing';
-  notes: string;
-}
-
 export interface Payment {
   id: string;
   contractId: string;
