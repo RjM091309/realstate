@@ -582,7 +582,6 @@ export function TopNav({
               value={pickerRange}
               onChange={(next) => handleDateRangeChange(next as [Date | null, Date | null])}
               placeholder="Date range"
-              showPresets
               fullWidth
             />
           </motion.div>

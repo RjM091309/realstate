@@ -15,9 +15,10 @@ import {
   BedDouble,
   Bath,
   Maximize2,
+  Car,
+  Armchair,
   User,
   Calendar,
-  CircleDollarSign,
   Home,
   Check,
   Package,
@@ -25,8 +26,9 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Car,
-  Armchair,
+  Phone,
+  Wallet,
+  Clock,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -45,6 +47,8 @@ import { locBoard } from '@/components/location-board/LocationBoard';
 import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns';
 import { fetchContracts } from '@/lib/contractsApi';
 import { fetchTenants } from '@/lib/tenantsApi';
+import { fetchPayments } from '@/lib/paymentsApi';
+import { computeContractLedgerMetrics } from '@/lib/ledgerUtils';
 import { createUnit, deleteUnit, fetchUnits, updateUnit, type UnitWriteBody } from '@/lib/unitsApi';
 import { fetchBrgys, fetchCities, type LocationBrgy, type LocationCity } from '@/lib/locationsApi';
 import { normalizeLocationAliasLabel, stripLocationOrdinalPrefix } from '@/lib/locationNames';
@@ -57,7 +61,7 @@ import {
   type UnitFormState,
 } from '@/lib/unitFormUtils';
 import { cn } from '@/lib/utils';
-import type { Contract, InventoryItem, Tenant, Unit } from '@/types';
+import type { Contract, InventoryItem, Payment, Tenant, Unit } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -374,6 +378,7 @@ export function UnitsView() {
   const [unitsBackedByApi, setUnitsBackedByApi] = useState(true);
   const [branchContracts, setBranchContracts] = useState<Contract[]>([]);
   const [tenantsList, setTenantsList] = useState<Tenant[]>([]);
+  const [paymentsList, setPaymentsList] = useState<Payment[]>([]);
   const [detailInventoryDraft, setDetailInventoryDraft] = useState<InventoryItem[]>([]);
   const [inventorySaving, setInventorySaving] = useState(false);
   const [inventoryAddOpen, setInventoryAddOpen] = useState(false);
@@ -429,15 +434,21 @@ export function UnitsView() {
     let cancelled = false;
     void (async () => {
       try {
-        const [contracts, tenants] = await Promise.all([fetchContracts(), fetchTenants()]);
+        const [contracts, tenants, payments] = await Promise.all([
+          fetchContracts(),
+          fetchTenants(),
+          fetchPayments(),
+        ]);
         if (!cancelled) {
           setBranchContracts(contracts);
           setTenantsList(tenants);
+          setPaymentsList(payments);
         }
       } catch {
         if (!cancelled) {
           setBranchContracts([]);
           setTenantsList([]);
+          setPaymentsList([]);
         }
       }
     })();
@@ -690,6 +701,15 @@ export function UnitsView() {
     [brgyOptions],
   );
 
+  const statusSelectOptions = useMemo(
+    () =>
+      (['Available', 'Occupied', 'Maintenance', 'Reserved'] as const).map((s) => ({
+        value: s,
+        label: statusLabel(s),
+      })),
+    [statusLabel],
+  );
+
   const processedUnits = useMemo(() => {
     const rows = unitList.filter((u) => {
       if (statusFilter && u.status !== statusFilter) return false;
@@ -939,7 +959,7 @@ export function UnitsView() {
               unit.status === 'Maintenance' &&
                 'border-brand-orange/20 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/10',
               unit.status === 'Reserved' &&
-                'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100',
+                'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50',
             )}
           >
             {statusLabel(unit.status)}
@@ -1045,6 +1065,14 @@ export function UnitsView() {
               }
             }}
             options={brgySelectOptions}
+          />
+          <Select2
+            borderless={false}
+            className="w-full min-w-[8rem] sm:w-[9rem] [&_.unit-form-select-control]:!min-h-10 [&_.unit-form-select-control]:!text-sm [&_div]:!text-slate-900 dark:[&_div]:!text-slate-50"
+            placeholder={t('views.units.filters.status')}
+            value={statusFilter}
+            onChange={(v) => setStatusFilter((v as Unit['status'] | null) ?? null)}
+            options={statusSelectOptions}
           />
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
@@ -1180,66 +1208,71 @@ export function UnitsView() {
               }
               return '';
             })();
-            const specChips: {
+            const specItems: {
               key: string;
-              icon: React.ReactNode;
-              value: string;
+              Icon: typeof BedDouble;
+              label: string;
               title: string;
               iconClass: string;
-              chipClass: string;
             }[] = [
               {
                 key: 'beds',
-                icon: <BedDouble className="h-3.5 w-3.5" aria-hidden />,
-                value: t('views.units.card.specBedroom', { count: metrics.beds }),
+                Icon: BedDouble,
+                label: t('views.units.card.specBedroom', { count: metrics.beds }),
                 title: t('views.units.addModal.bedrooms'),
-                iconClass: 'bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-300',
-                chipClass: 'border-sky-100/80 bg-sky-50/70 dark:border-sky-500/20 dark:bg-sky-500/10',
+                iconClass: 'text-sky-600 dark:text-sky-400',
               },
               {
                 key: 'sqm',
-                icon: <Maximize2 className="h-3.5 w-3.5" aria-hidden />,
-                value: `${metrics.sqm} ${t('views.units.card.sqm')}`,
+                Icon: Maximize2,
+                label: `${metrics.sqm} ${t('views.units.card.sqm')}`,
                 title: t('views.units.card.sqm'),
-                iconClass: 'bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300',
-                chipClass: 'border-violet-100/80 bg-violet-50/70 dark:border-violet-500/20 dark:bg-violet-500/10',
+                iconClass: 'text-violet-600 dark:text-violet-400',
               },
               {
                 key: 'baths',
-                icon: <Bath className="h-3.5 w-3.5" aria-hidden />,
-                value: t('views.units.card.specBathroom', { count: metrics.baths }),
+                Icon: Bath,
+                label: t('views.units.card.specBathroom', { count: metrics.baths }),
                 title: t('views.units.addModal.bathrooms'),
-                iconClass: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300',
-                chipClass: 'border-cyan-100/80 bg-cyan-50/70 dark:border-cyan-500/20 dark:bg-cyan-500/10',
+                iconClass: 'text-cyan-600 dark:text-cyan-400',
               },
             ];
             if (parkingLabel) {
               const parkingDisplay = /parking/i.test(parkingLabel)
                 ? parkingLabel
                 : t('views.units.card.specParking', { slot: parkingLabel });
-              specChips.push({
+              specItems.push({
                 key: 'parking',
-                icon: <Car className="h-3.5 w-3.5" aria-hidden />,
-                value: parkingDisplay,
+                Icon: Car,
+                label: parkingDisplay,
                 title: t('views.units.addModal.parkingSlot'),
-                iconClass: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
-                chipClass: 'border-amber-100/80 bg-amber-50/70 dark:border-amber-500/20 dark:bg-amber-500/10',
+                iconClass: 'text-amber-600 dark:text-amber-400',
               });
             }
             if (furnishingLabel) {
-              specChips.push({
+              specItems.push({
                 key: 'furnishing',
-                icon: <Armchair className="h-3.5 w-3.5" aria-hidden />,
-                value: furnishingLabel,
+                Icon: Armchair,
+                label: furnishingLabel,
                 title: t('views.units.addModal.furnishing'),
-                iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300',
-                chipClass: 'border-emerald-100/80 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-500/10',
+                iconClass: 'text-emerald-600 dark:text-emerald-400',
               });
             }
             const active = activeContractForUnit(unit.id, branchContracts);
-            const tenantName = active
-              ? tenantsList.find((x) => x.id === active.tenantId)?.name.trim() || '—'
-              : '—';
+            const activeTenant = active ? tenantsList.find((x) => x.id === active.tenantId) ?? null : null;
+            const tenantName = activeTenant?.name.trim() || '—';
+            const tenantContact = activeTenant?.phone?.trim() || '—';
+            const leaseStartLabel = (() => {
+              if (!active?.startDate) return '—';
+              try {
+                return format(startOfDay(parseISO(active.startDate)), 'MMM d, yyyy');
+              } catch {
+                return '—';
+              }
+            })();
+            const ledgerMetrics = active
+              ? computeContractLedgerMetrics(active.id, paymentsList, active)
+              : null;
             const { daysToEnd, endLabel } = active ? leaseEndInsight(active.endDate) : { daysToEnd: null, endLabel: null };
 
             const secondaryPill = (() => {
@@ -1298,21 +1331,44 @@ export function UnitsView() {
               );
             })();
 
-            const rentStatusNode = (() => {
+            const outstandingBalanceNode = (() => {
               if (!active) {
                 return <span className="font-medium text-slate-500 dark:text-slate-400">—</span>;
               }
-              if (daysToEnd !== null && daysToEnd < 0) {
+              if (!ledgerMetrics || ledgerMetrics.outstandingBalance <= 0) {
                 return (
-                  <span className="font-semibold text-rose-500 dark:text-rose-400">
-                    {t('views.units.card.rentOverdue')}
+                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+                    <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+                    {t('views.units.card.noBalanceDue')}
                   </span>
                 );
               }
               return (
-                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
-                  <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
-                  {t('views.units.card.rentCurrent')}
+                <span className="font-semibold text-rose-500 dark:text-rose-400 tabular-nums">
+                  ₱{ledgerMetrics.outstandingBalance.toLocaleString()}
+                </span>
+              );
+            })();
+
+            const nextDueDateNode = (() => {
+              if (!active || !ledgerMetrics?.nextDueDate) {
+                return <span className="font-medium text-slate-500 dark:text-slate-400">—</span>;
+              }
+              let dueLabel = '—';
+              try {
+                dueLabel = format(startOfDay(parseISO(ledgerMetrics.nextDueDate)), 'MMM d, yyyy');
+              } catch {
+                dueLabel = '—';
+              }
+              const isOverdue = (ledgerMetrics.overdueDays ?? 0) > 0;
+              return (
+                <span
+                  className={cn(
+                    'font-semibold',
+                    isOverdue ? 'text-rose-500 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100',
+                  )}
+                >
+                  {dueLabel}
                 </span>
               );
             })();
@@ -1415,7 +1471,7 @@ export function UnitsView() {
                         unit.status === 'Maintenance' &&
                           'bg-gradient-to-b from-amber-300 to-amber-600 text-amber-950',
                         unit.status === 'Reserved' &&
-                          'bg-gradient-to-b from-slate-100 to-slate-300 text-slate-900 dark:from-white dark:to-slate-200',
+                          'bg-gradient-to-b from-blue-400 to-blue-700 text-white',
                       )}
                     >
                       <span
@@ -1425,7 +1481,6 @@ export function UnitsView() {
                           unit.status === 'Available' && 'animate-pulse',
                           unit.status === 'Occupied' && 'bg-white',
                           unit.status === 'Maintenance' && 'bg-amber-950/80',
-                          unit.status === 'Reserved' && 'bg-slate-700',
                         )}
                       />
                       <span className="relative z-[1] truncate">{statusLabel(unit.status)}</span>
@@ -1500,28 +1555,16 @@ export function UnitsView() {
                     </div>
                   </div>
 
-                  <div className="flex min-h-[4.75rem] flex-wrap content-start gap-1.5">
-                    {specChips.map((chip) => (
-                      <div
-                        key={chip.key}
-                        title={chip.title}
-                        className={cn(
-                          'inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1.5',
-                          chip.chipClass,
-                        )}
+                  <div className="flex min-h-[2.75rem] flex-wrap items-center gap-x-3 gap-y-1">
+                    {specItems.map(({ key, Icon, label, title, iconClass }) => (
+                      <span
+                        key={key}
+                        title={title}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300"
                       >
-                        <span
-                          className={cn(
-                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
-                            chip.iconClass,
-                          )}
-                        >
-                          {chip.icon}
-                        </span>
-                        <span className="whitespace-nowrap text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">
-                          {chip.value}
-                        </span>
-                      </div>
+                        <Icon className={cn('h-3.5 w-3.5 shrink-0', iconClass)} aria-hidden />
+                        {label}
+                      </span>
                     ))}
                   </div>
 
@@ -1532,10 +1575,10 @@ export function UnitsView() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setExpandedCardDetails((prev) => {
-                            const willOpen = !prev[unit.id];
-                            return willOpen ? { [unit.id]: true } : {};
-                          });
+                          setExpandedCardDetails((prev) => ({
+                            ...prev,
+                            [unit.id]: !prev[unit.id],
+                          }));
                         }}
                         className={cn(
                           'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5',
@@ -1586,6 +1629,32 @@ export function UnitsView() {
                               )}
                             </span>
                           </div>
+                          {active ? (
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                <Phone className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                                {t('views.units.card.tenantContact')}
+                              </span>
+                              <span className="min-w-0 flex-1 text-right font-semibold text-slate-900 dark:text-slate-100">
+                                {tenantContact === '—' ? (
+                                  <span className="font-medium text-slate-500 dark:text-slate-400">—</span>
+                                ) : (
+                                  <span className="break-words">{tenantContact}</span>
+                                )}
+                              </span>
+                            </div>
+                          ) : null}
+                          {active ? (
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                <Calendar className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                                {t('views.units.card.leaseStarts')}
+                              </span>
+                              <span className="min-w-0 flex-1 text-right font-semibold text-slate-900 dark:text-slate-100">
+                                {leaseStartLabel}
+                              </span>
+                            </div>
+                          ) : null}
                           <div className="flex items-start justify-between gap-3">
                             <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
                               <Calendar className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
@@ -1593,13 +1662,27 @@ export function UnitsView() {
                             </span>
                             <div className="min-w-0 flex-1 text-right text-sm leading-snug">{leaseEndsNode}</div>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                              <CircleDollarSign className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                              {t('views.units.card.rentStatus')}
-                            </span>
-                            <div className="min-w-0 flex-1 text-right text-sm">{rentStatusNode}</div>
-                          </div>
+                          {active ? (
+                            <div className="!my-2 border-t border-slate-100 dark:border-slate-800" />
+                          ) : null}
+                          {active ? (
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                <Wallet className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                                {t('views.units.card.outstandingBalance')}
+                              </span>
+                              <div className="min-w-0 flex-1 text-right text-sm">{outstandingBalanceNode}</div>
+                            </div>
+                          ) : null}
+                          {active ? (
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                <Clock className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                                {t('views.units.card.nextDueDate')}
+                              </span>
+                              <div className="min-w-0 flex-1 text-right text-sm">{nextDueDateNode}</div>
+                            </div>
+                          ) : null}
                           {unit.status === 'Available' ? (
                             <div className="flex items-start justify-between gap-3">
                               <span className="flex shrink-0 items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
@@ -1684,6 +1767,7 @@ export function UnitsView() {
         onEdit={openEditUnitModal}
         activeContract={selectedActiveContract}
         currentTenant={selectedCurrentTenant}
+        payments={paymentsList}
       />
 
       <Modal

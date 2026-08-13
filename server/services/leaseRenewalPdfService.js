@@ -67,10 +67,15 @@ function drawHeaderBand(doc, title, subtitle) {
 function drawDraftBadge(doc) {
   const left = doc.page.margins.left + PAGE_WIDTH - 72;
   const top = doc.page.margins.top + 6;
+  // save()/restore() only protect the graphics state (fill/stroke/etc) — text()
+  // still moves doc.y, so capture and restore it manually or this badge clobbers
+  // the header band's carefully-set cursor and the next section overlaps it.
+  const savedY = doc.y;
   doc.save();
   doc.roundedRect(left, top, 56, 18, 4).fill('#fbbf24');
   doc.font('Helvetica-Bold').fontSize(7).fillColor('#78350f').text('DRAFT', left, top + 5, { width: 56, align: 'center' });
   doc.restore();
+  doc.y = savedY;
 }
 
 function writeSummaryGrid(doc, rows) {

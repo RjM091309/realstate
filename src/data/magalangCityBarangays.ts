@@ -1,19 +1,36 @@
-/** Requested barangay list for Magalang (Pampanga). */
+/** Official barangay list for Magalang (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const MAGALANG_CITY_NAME = 'Magalang';
 
 export const MAGALANG_CITY_BARANGAYS: readonly string[] = [
-  'San Francisco',
-  'San Nicolas I',
-  'San Nicolas II',
-  'Santa Cruz',
-  'Dolores',
-  'San Isidro',
   'Ayala',
-  'San Jose',
-  'Turu',
+  'Bucanan',
   'Camias',
+  'Dolores',
+  'Escaler',
+  'La Paz',
+  'Navaling',
+  'San Agustin',
+  'San Antonio',
+  'San Franciso',
+  'San Ildefonso',
+  'San Isidro',
+  'San Jose',
+  'San Miguel',
+  'San Nicolas 1st',
+  'San Nicolas 2nd',
+  'San Pablo',
+  'San Pedro I',
+  'San Pedro II',
+  'San Roque',
+  'San Vicente',
+  'Santa Cruz',
+  'Santa Lucia',
+  'Santa Maria',
+  'Santo Niño',
+  'Santo Rosario',
+  'Turu',
 ] as const;
 
 export function isMagalangCity(name: string): boolean {

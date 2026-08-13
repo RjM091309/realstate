@@ -62,9 +62,10 @@ import { fetchTenants } from '@/lib/tenantsApi';
 
 /** Merit brand accents — fixed per unit status (not index-based). */
 const UNIT_STATUS_COLORS = {
-  occupied: '#4B89CD',
+  occupied: '#e11d48',
   available: '#43A751',
   maintenance: '#f08135',
+  reserved: '#4B89CD',
 } as const;
 
 function sumPaidBetween(payments: Payment[], startYmd: string, endYmd: string): number {
@@ -92,6 +93,11 @@ const occupancyData = (t: (key: string) => string, units: Array<{ status: string
     name: t('views.dashboard.charts.statuses.maintenance'),
     value: units.filter((u) => u.status === 'Maintenance').length,
     color: UNIT_STATUS_COLORS.maintenance,
+  },
+  {
+    name: t('views.dashboard.charts.statuses.reserved'),
+    value: units.filter((u) => u.status === 'Reserved').length,
+    color: UNIT_STATUS_COLORS.reserved,
   },
 ];
 

@@ -1,19 +1,44 @@
-/** Requested barangay list for City of San Fernando (Pampanga). */
+/** Official barangay list for City of San Fernando (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const SAN_FERNANDO_CITY_NAME = 'San Fernando';
 
 export const SAN_FERNANDO_CITY_BARANGAYS: readonly string[] = [
-  'Sindalan',
-  'Telabastagan',
-  'Dolores',
-  'Lourdes',
+  'Alasas',
+  'Baliti',
   'Bulaon',
   'Calulut',
-  'San Jose',
-  'Baliti',
+  'Del Carmen',
   'Del Pilar',
+  'Del Rosario',
+  'Dela Paz Norte',
+  'Dela Paz Sur',
+  'Dolores',
+  'Juliana',
+  'Lara',
+  'Lourdes',
+  'Magliman',
   'Maimpis',
+  'Malino',
+  'Malpitic',
+  'Pandaras',
+  'Panipuan',
+  'Pulung Bulu',
+  'Quebiauan',
+  'Saguin',
+  'San Agustin',
+  'San Felipe',
+  'San Isidro',
+  'San Jose',
+  'San Juan',
+  'San Nicolas',
+  'San Pedro',
+  'Santa Lucia',
+  'Santa Teresita',
+  'Santo Niño',
+  'Santo Rosario',
+  'Sindalan',
+  'Telabastagan',
 ] as const;
 
 export function isSanFernandoCity(name: string): boolean {

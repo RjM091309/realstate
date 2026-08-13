@@ -1,4 +1,4 @@
-/** Official / requested barangay list for Angeles City (Pampanga). */
+/** Official barangay list for Angeles City (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const ANGELES_CITY_NAME = 'Angeles City';
@@ -12,28 +12,29 @@ export const ANGELES_CITY_BARANGAYS: readonly string[] = [
   'Claro M. Recto',
   'Cuayan',
   'Cutcut',
+  'Cutud',
   'Lourdes North West',
-  'Lourdes Sur East',
   'Lourdes Sur',
-  'Malabanias',
+  'Lourdes Sur East',
+  'Malabañas',
   'Margot',
   'Mining',
   'Ninoy Aquino',
   'Pampang',
   'Pandan',
-  'Pulungbulu',
   'Pulung Cacutud',
   'Pulung Maragul',
+  'Pulungbulu',
   'Salapungan',
   'San Jose',
   'San Nicolas',
+  'Sapalibutad',
+  'Sapangbato',
   'Sta. Teresita',
   'Sta. Trinidad',
   'Sto. Cristo',
   'Sto. Domingo',
   'Sto. Rosario',
-  'Sapalibutad',
-  'Sapa Libutad',
   'Tabun',
   'Virgen Delos Remedios',
 ] as const;

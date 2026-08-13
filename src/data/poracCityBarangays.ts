@@ -1,19 +1,38 @@
-/** Requested barangay list for Porac (Pampanga). */
+/** Official barangay list for Porac (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const PORAC_CITY_NAME = 'Porac';
 
 export const PORAC_CITY_BARANGAYS: readonly string[] = [
-  'Pio',
+  'Babo Pangulo',
+  'Babo Sacan',
+  'Balubad',
+  'Calzadang Bayu',
+  'Camias',
+  'Cangatba',
+  'Diaz',
+  'Dolores',
+  'Inararo',
+  'Jalung',
+  'Mancatian',
+  'Manibaug Libutad',
   'Manibaug Paralaya',
   'Manibaug Pasig',
-  'Manibaug Libutad',
+  'Manuali',
+  'Mitla Proper',
+  'Palat',
+  'Pias',
+  'Pio',
+  'Planas',
+  'Poblacion',
   'Pulung Santol',
-  'Sta. Cruz',
-  'Dolores',
-  'Calzadang Bayu',
   'Salu',
-  'Babo Sacan',
+  'San Jose Mitla',
+  'Sapang Uwak',
+  'Sepung Bulaon',
+  'Sinura',
+  'Sta. Cruz',
+  'Villa Maria',
 ] as const;
 
 export function isPoracCity(name: string): boolean {

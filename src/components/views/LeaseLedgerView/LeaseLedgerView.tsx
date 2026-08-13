@@ -46,6 +46,7 @@ import { addMonths, endOfMonth, format, parseISO, startOfMonth, subMonths } from
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
+import { useDateRange } from '@/context/DateRangeContext';
 import { LEDGER_PAYMENT_METHODS, type Contract, type Payment, type PaymentMethod, type Tenant, type Unit } from '@/types';
 
 const LEDGER_SELECT_CLASS = '[&_.unit-form-select-control]:!min-h-12';
@@ -279,6 +280,7 @@ function paymentMethodLabel(method: string | undefined, t: (key: string) => stri
 export function LeaseLedgerView() {
   const { t } = useTranslation();
   const { session } = useAuth();
+  const { dateRange } = useDateRange();
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkHandledRef = useRef(false);
   const initialTabSetRef = useRef(false);
@@ -354,6 +356,20 @@ export function LeaseLedgerView() {
   }, [t]);
 
   const summary = useMemo(() => computeLedgerSummary(payments), [payments]);
+
+  // Header date-range picker drives "Actually Collected" — an as-of-today
+  // running total (overdueBalance/totalPaidAll) stays unfiltered on purpose.
+  const rangeCollected = useMemo(() => {
+    if (!dateRange.start || !dateRange.end) return summary.actualCollected;
+    return payments
+      .filter((p) => isPaymentPaidBetween(p, dateRange.start, dateRange.end))
+      .reduce((sum, p) => sum + p.amount, 0);
+  }, [payments, dateRange.start, dateRange.end, summary.actualCollected]);
+
+  const rangeCollectedLabel = useMemo(() => {
+    if (!dateRange.start || !dateRange.end) return formatLedgerMonthLabel(summary.monthKey);
+    return `${formatPaymentDate(dateRange.start)} – ${formatPaymentDate(dateRange.end)}`;
+  }, [dateRange.start, dateRange.end, summary.monthKey]);
 
   useEffect(() => {
     if (loading || initialTabSetRef.current) return;
@@ -1367,8 +1383,8 @@ export function LeaseLedgerView() {
         <LedgerStatCard
           index={2}
           label={t('views.ledger.actualCollected')}
-          value={`₱${summary.actualCollected.toLocaleString()}`}
-          subtitle={formatLedgerMonthLabel(summary.monthKey)}
+          value={`₱${rangeCollected.toLocaleString()}`}
+          subtitle={rangeCollectedLabel}
           tone="neutral"
           icon={<Wallet className="h-6 w-6" />}
         />

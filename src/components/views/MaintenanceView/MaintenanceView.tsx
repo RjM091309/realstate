@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Clock3,
   Loader2,
-  RefreshCw,
   Search,
   UserRound,
   Wrench,
@@ -66,34 +65,28 @@ export function MaintenanceView() {
 
   const [requests, setRequests] = useState<MaintenanceRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selected, setSelected] = useState<MaintenanceRequestRow | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
 
-  const loadRequests = useCallback(
-    async (mode: 'initial' | 'refresh' = 'initial') => {
-      if (mode === 'initial') setLoading(true);
-      else setRefreshing(true);
-      setError(null);
-      try {
-        const next = await fetchMaintenanceRequests();
-        setRequests(next);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : t('views.maintenance.loadError'));
-        setRequests([]);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [t],
-  );
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await fetchMaintenanceRequests();
+      setRequests(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('views.maintenance.loadError'));
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    void loadRequests('initial');
+    void loadRequests();
   }, [loadRequests]);
 
   const stats = useMemo(() => {
@@ -263,46 +256,9 @@ export function MaintenanceView() {
 
   return (
     <motion.div className="space-y-6" variants={PAGE_VARIANTS} initial="hidden" animate="show">
-      <motion.div
-        variants={SECTION_VARIANTS}
-        className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
-      >
-        <div>
-          <motion.div
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.05, duration: 0.35 }}
-            className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1 text-xs font-medium text-brand-blue"
-          >
-            <motion.span
-              animate={{ rotate: [0, -12, 12, 0] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
-              className="inline-flex"
-            >
-              <Wrench className="h-3.5 w-3.5" />
-            </motion.span>
-            {t('views.maintenance.badge')}
-          </motion.div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{t('views.maintenance.title')}</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('views.maintenance.subtitle')}</p>
-        </div>
-        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-          <Button
-            type="button"
-            className="w-full bg-brand-blue text-white hover:bg-[#3d7ab8] sm:w-auto"
-            onClick={() => void loadRequests('refresh')}
-            disabled={loading || refreshing}
-          >
-            <motion.span
-              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
-              transition={refreshing ? { duration: 0.8, repeat: Infinity, ease: 'linear' } : { duration: 0.2 }}
-              className="mr-2 inline-flex"
-            >
-              {refreshing ? <Loader2 className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
-            </motion.span>
-            {t('views.maintenance.refresh')}
-          </Button>
-        </motion.div>
+      <motion.div variants={SECTION_VARIANTS}>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{t('views.maintenance.title')}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('views.maintenance.subtitle')}</p>
       </motion.div>
 
       <motion.div variants={SECTION_VARIANTS} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

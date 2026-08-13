@@ -1,19 +1,30 @@
-/** Requested barangay list for Bacolor (Pampanga). */
+/** Official barangay list for Bacolor (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const BACOLOR_CITY_NAME = 'Bacolor';
 
 export const BACOLOR_CITY_BARANGAYS: readonly string[] = [
+  'Balas',
   'Cabalantian',
-  'San Vicente',
-  'Cabetican',
   'Cabambangan',
+  'Cabetican',
   'Calibutbut',
+  'Concepcion',
+  'Dolores',
+  'Duat',
   'Macabacle',
-  'San Antonio',
-  'Santa Barbara',
+  'Magliman',
+  'Maliwalu',
+  'Mesalipit',
   'Parulog',
   'Potrero',
+  'San Antonio',
+  'San Isidro',
+  'San Vicente',
+  'Santa Barbara',
+  'Santa Ines',
+  'Talba',
+  'Tinajero',
 ] as const;
 
 export function isBacolorCity(name: string): boolean {

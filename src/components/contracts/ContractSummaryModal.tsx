@@ -89,7 +89,17 @@ export function ContractSummaryModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('views.contracts.summary.title', { id: contractNo })}
+      title={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <span>{t('views.contracts.summary.title', { id: contractNo })}</span>
+          <StatusBadge
+            tone={contract.status === 'Active' ? 'success' : contractStatusVariant(contract.status)}
+            className="normal-case"
+          >
+            {statusLabel(contract.status, t)}
+          </StatusBadge>
+        </span>
+      }
       subtitle={t('views.contracts.summary.subtitle')}
       maxWidth="2xl"
       variant="glass"
@@ -155,15 +165,6 @@ export function ContractSummaryModal({
       }
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={contract.status === 'Active' ? 'success' : contractStatusVariant(contract.status)}>
-            {statusLabel(contract.status, t)}
-          </StatusBadge>
-          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {term}
-          </span>
-        </div>
-
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t('views.contracts.table.contractId')}>{contractNo}</Field>
           <Field label={t('views.contracts.table.tenant')}>{tenantName || '—'}</Field>
@@ -177,9 +178,16 @@ export function ContractSummaryModal({
           </Field>
           <Field label={t('views.contracts.table.agent')}>{agentName || '—'}</Field>
           <Field label={t('views.contracts.table.period')}>
-            {format(parseISO(contract.startDate), 'MMM d, yyyy')}
-            <span className="mx-1.5 text-slate-300">—</span>
-            {format(parseISO(contract.endDate), 'MMM d, yyyy')}
+            <span className="flex flex-wrap items-center gap-2">
+              <span>
+                {format(parseISO(contract.startDate), 'MMM d, yyyy')}
+                <span className="mx-1.5 text-slate-300">—</span>
+                {format(parseISO(contract.endDate), 'MMM d, yyyy')}
+              </span>
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {term}
+              </span>
+            </span>
           </Field>
           <Field label={t('views.contracts.summary.monthlyRent')}>
             <span className="text-brand-blue dark:text-blue-300">{formatPhp(contract.monthlyRent)}</span>

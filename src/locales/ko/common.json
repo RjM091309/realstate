@@ -358,7 +358,8 @@
         "statuses": {
           "occupied": "입주 중",
           "available": "공실",
-          "maintenance": "유지보수"
+          "maintenance": "유지보수",
+          "reserved": "예약됨"
         }
       },
       "vacancies": {
@@ -443,8 +444,13 @@
         "noResults": "검색에 맞는 유닛이 없습니다.",
         "selectUnit": "유닛 선택",
         "tenant": "임차인",
+        "tenantContact": "연락처",
+        "leaseStarts": "임대 시작",
         "leaseEnds": "임대 종료",
         "rentStatus": "임대료 상태",
+        "outstandingBalance": "미납 잔액",
+        "noBalanceDue": "미납 없음",
+        "nextDueDate": "다음 납부일",
         "vacantSince": "공실 시작",
         "daysLeft": "{{count}}일 남음",
         "overdueDays": "연체 ({{count}}일)",

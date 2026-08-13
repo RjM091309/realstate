@@ -358,7 +358,8 @@
         "statuses": {
           "occupied": "Occupied",
           "available": "Available",
-          "maintenance": "Maintenance"
+          "maintenance": "Maintenance",
+          "reserved": "Reserved"
         }
       },
       "vacancies": {
@@ -443,8 +444,13 @@
         "noResults": "No units match your search.",
         "selectUnit": "Select unit",
         "tenant": "Tenant",
+        "tenantContact": "Contact number",
+        "leaseStarts": "Lease starts",
         "leaseEnds": "Lease ends",
         "rentStatus": "Rent status",
+        "outstandingBalance": "Outstanding balance",
+        "noBalanceDue": "No balance due",
+        "nextDueDate": "Next due date",
         "vacantSince": "Vacant since",
         "daysLeft": "{{count}} days left",
         "overdueDays": "Overdue ({{count}} days)",

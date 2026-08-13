@@ -27,13 +27,14 @@ import {
 import { format, parseISO, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
+import { computeContractLedgerMetrics } from '@/lib/ledgerUtils';
 import {
   formatUnitNumberDisplay,
   resolveUnitFloorTower,
   resolveUnitPhotos,
   unitDisplayMetrics,
 } from '@/lib/unitFormUtils';
-import type { Contract, Tenant, Unit, UnitStatus } from '@/types';
+import type { Contract, Payment, Tenant, Unit, UnitStatus } from '@/types';
 
 /** Temporarily hidden — set to true to show Property Info / Specs / Contract sections again. */
 const SHOW_EXTENDED_DETAIL_SECTIONS = false;
@@ -50,6 +51,7 @@ export type UnitDetailsModalProps = {
   buildingLabel?: string;
   activeContract?: Contract | null;
   currentTenant?: Tenant | null;
+  payments?: Payment[];
 };
 
 function normalizeAreaLabel(rawArea: string): string {
@@ -208,14 +210,14 @@ function StatusBadge({ status, label }: { status: UnitStatus; label: string }) {
   const styles: Record<UnitStatus, string> = {
     Occupied: 'bg-rose-50 text-rose-700 border-rose-200/80',
     Available: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
-    Reserved: 'bg-amber-50 text-amber-700 border-amber-200/80',
-    Maintenance: 'bg-rose-50 text-rose-700 border-rose-200/80',
+    Reserved: 'bg-blue-50 text-blue-700 border-blue-200/80',
+    Maintenance: 'bg-amber-50 text-amber-700 border-amber-200/80',
   };
   const dots: Record<UnitStatus, string> = {
     Occupied: 'bg-rose-500 animate-pulse',
     Available: 'bg-emerald-500',
-    Reserved: 'bg-amber-500',
-    Maintenance: 'bg-rose-500',
+    Reserved: 'bg-blue-500',
+    Maintenance: 'bg-amber-500',
   };
 
   return (
@@ -241,6 +243,7 @@ export function UnitDetailsModal({
   buildingLabel,
   activeContract = null,
   currentTenant = null,
+  payments = [],
 }: UnitDetailsModalProps) {
   const { t } = useTranslation();
   const [isZoomedImage, setIsZoomedImage] = useState(false);
@@ -334,6 +337,9 @@ export function UnitDetailsModal({
   const remarks = unit.specialRemarks?.trim() || '';
   const inventoryCount = unit.inventory?.length ?? 0;
   const remainingDays = remainingLeaseDays(activeContract?.endDate);
+  const ledgerMetrics = activeContract
+    ? computeContractLedgerMetrics(activeContract.id, payments, activeContract)
+    : null;
   const towerDisplay = displayOrDash(floorTower.tower);
 
   const handleNextImage = () => {
@@ -667,21 +673,24 @@ export function UnitDetailsModal({
               </div>
             </div>
 
+              </>
+            ) : null}
+
             {/* Contract & Tenant */}
-            <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-950/60">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-700">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-brand-blue" />
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-50">
                     {t('views.units.details.contractTenantInfo')}
                   </h3>
                 </div>
                 {activeContract && currentTenant ? (
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400">
                     {t('views.units.details.activeLease')}
                   </span>
                 ) : (
-                  <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                  <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {t('views.units.details.noActiveLease')}
                   </span>
                 )}
@@ -689,9 +698,9 @@ export function UnitDetailsModal({
 
               {activeContract && currentTenant ? (
                 <div className="space-y-4">
-                  <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center">
+                  <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center dark:border-slate-700 dark:bg-slate-800/70">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white bg-brand-blue/10 text-sm font-bold text-brand-blue shadow-sm">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white bg-brand-blue/10 text-sm font-bold text-brand-blue shadow-sm dark:border-slate-900">
                         {currentTenant.name
                           .split(/\s+/)
                           .filter(Boolean)
@@ -700,11 +709,11 @@ export function UnitDetailsModal({
                           .join('') || 'T'}
                       </div>
                       <div>
-                        <span className="block text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                        <span className="block text-[11px] font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500">
                           {t('views.units.details.currentTenant')}
                         </span>
-                        <h4 className="text-base font-bold text-slate-900">{currentTenant.name}</h4>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <h4 className="text-base font-bold text-slate-900 dark:text-slate-50">{currentTenant.name}</h4>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                           {currentTenant.email ? (
                             <span className="flex items-center gap-1">
                               <Mail className="h-3.5 w-3.5 text-slate-400" />
@@ -722,59 +731,125 @@ export function UnitDetailsModal({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                      <span className="block text-xs font-medium text-slate-400">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <span className="block text-xs font-medium text-slate-400 dark:text-slate-500">
                         {t('views.units.details.leaseStart')}
                       </span>
-                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm">
+                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                         {formatLeaseDate(activeContract.startDate)}
                       </strong>
                     </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                      <span className="block text-xs font-medium text-slate-400">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <span className="block text-xs font-medium text-slate-400 dark:text-slate-500">
                         {t('views.units.details.leaseEnd')}
                       </span>
-                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm">
+                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                         {formatLeaseDate(activeContract.endDate)}
                       </strong>
                     </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                      <span className="block text-xs font-medium text-slate-400">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <span className="block text-xs font-medium text-slate-400 dark:text-slate-500">
                         {t('views.units.addModal.status')}
                       </span>
-                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm">
+                      <strong className="mt-0.5 block text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                         {activeContract.status}
                       </strong>
                     </div>
-                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
-                      <span className="block text-xs font-medium text-brand-blue">
+                    <div
+                      className={cn(
+                        'rounded-xl border p-3',
+                        remainingDays != null && remainingDays < 0
+                          ? 'border-rose-200 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-950/30'
+                          : remainingDays != null && remainingDays <= 30
+                            ? 'border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30'
+                            : 'border-blue-100 bg-blue-50/60 dark:border-blue-900/50 dark:bg-blue-950/30',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'block text-xs font-medium',
+                          remainingDays != null && remainingDays < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : remainingDays != null && remainingDays <= 30
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-brand-blue dark:text-sky-300',
+                        )}
+                      >
                         {t('views.units.details.remainingDays')}
                       </span>
-                      <strong className="mt-0.5 block text-xs font-bold text-brand-blue sm:text-sm">
+                      <strong
+                        className={cn(
+                          'mt-0.5 block text-xs font-bold sm:text-sm',
+                          remainingDays != null && remainingDays < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : remainingDays != null && remainingDays <= 30
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-brand-blue dark:text-sky-300',
+                        )}
+                      >
                         {remainingDays == null
                           ? '—'
-                          : t('views.units.details.daysCount', { count: remainingDays })}
+                          : remainingDays < 0
+                            ? t('views.units.card.overdueDays', { count: Math.abs(remainingDays) })
+                            : t('views.units.details.daysCount', { count: remainingDays })}
+                      </strong>
+                    </div>
+                    <div
+                      className={cn(
+                        'rounded-xl border p-3',
+                        ledgerMetrics && ledgerMetrics.outstandingBalance > 0
+                          ? 'border-rose-200 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-950/30'
+                          : 'border-slate-100 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/70',
+                      )}
+                    >
+                      <span className="block text-xs font-medium text-slate-400 dark:text-slate-500">
+                        {t('views.units.card.outstandingBalance')}
+                      </span>
+                      <strong
+                        className={cn(
+                          'mt-0.5 block text-xs font-bold sm:text-sm',
+                          ledgerMetrics && ledgerMetrics.outstandingBalance > 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-emerald-700 dark:text-emerald-400',
+                        )}
+                      >
+                        {ledgerMetrics && ledgerMetrics.outstandingBalance > 0
+                          ? `₱${ledgerMetrics.outstandingBalance.toLocaleString()}`
+                          : t('views.units.card.noBalanceDue')}
+                      </strong>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <span className="block text-xs font-medium text-slate-400 dark:text-slate-500">
+                        {t('views.units.card.nextDueDate')}
+                      </span>
+                      <strong
+                        className={cn(
+                          'mt-0.5 block text-xs font-bold sm:text-sm',
+                          ledgerMetrics && (ledgerMetrics.overdueDays ?? 0) > 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-slate-900 dark:text-slate-100',
+                        )}
+                      >
+                        {ledgerMetrics?.nextDueDate ? formatLeaseDate(ledgerMetrics.nextDueDate) : '—'}
                       </strong>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center">
-                  <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <div className="space-y-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-800/40">
+                  <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                     <User className="h-6 w-6" />
                   </div>
-                  <h4 className="text-base font-bold text-slate-800">
+                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">
                     {t('views.units.details.vacantProperty')}
                   </h4>
-                  <p className="mx-auto max-w-md text-xs text-slate-500">
+                  <p className="mx-auto max-w-md text-xs text-slate-500 dark:text-slate-400">
                     {t('views.units.details.vacantPropertyHint')}
                   </p>
                 </div>
               )}
             </div>
-              </>
-            ) : null}
 
             {/* Remarks */}
             <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-950/60">

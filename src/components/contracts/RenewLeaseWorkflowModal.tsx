@@ -589,17 +589,53 @@ export function RenewLeaseWorkflowModal({
           <div className={cn('p-3', RENEW_LEASE_PANEL)}>
             <div className="text-[10px] font-bold uppercase text-slate-400">{t('views.contracts.renewLease.workflow.oldContract')}</div>
             <div className="mt-1 text-sm font-semibold">{formatPhp(previousRent)} / mo</div>
+            <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {summary?.currentLeaseStart && summary?.currentLeaseEnd
+                ? `${format(parseISO(summary.currentLeaseStart), 'MMM d, yyyy')} — ${format(parseISO(summary.currentLeaseEnd), 'MMM d, yyyy')}`
+                : '—'}
+            </div>
           </div>
           <div className={cn('border-brand-blue/30 bg-brand-blue/5 p-3', RENEW_LEASE_PANEL)}>
             <div className="text-[10px] font-bold uppercase text-brand-blue">{t('views.contracts.renewLease.workflow.newContract')}</div>
-            <div className="mt-1 text-sm font-semibold text-brand-blue dark:text-blue-200">
-              {terms ? formatPhp(terms.monthlyRent) : '—'} / mo
+            <div className="mt-1 flex flex-wrap items-baseline gap-2">
+              <span className="text-sm font-semibold text-brand-blue dark:text-blue-200">
+                {terms ? formatPhp(terms.monthlyRent) : '—'} / mo
+              </span>
+              {terms && increaseAmount !== 0 ? (
+                <span
+                  className={cn(
+                    'text-xs font-semibold',
+                    increaseAmount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
+                  )}
+                >
+                  {increaseAmount > 0 ? '+' : ''}
+                  {increasePct}% ({increaseAmount > 0 ? '+' : ''}
+                  {formatPhp(increaseAmount)})
+                </span>
+              ) : null}
             </div>
             <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
               {terms ? `${format(parseISO(terms.startDate), 'MMM d, yyyy')} — ${format(parseISO(terms.endDate), 'MMM d, yyyy')}` : '—'}
             </div>
           </div>
         </div>
+
+        {terms ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className={cn('p-3', RENEW_LEASE_PANEL)}>
+              <div className="text-[10px] font-bold uppercase text-slate-400">
+                {t('views.contracts.renewLease.workflow.securityDeposit')}
+              </div>
+              <div className="mt-1 text-sm font-semibold">{formatPhp(terms.securityDeposit)}</div>
+            </div>
+            <div className={cn('p-3', RENEW_LEASE_PANEL)}>
+              <div className="text-[10px] font-bold uppercase text-slate-400">
+                {t('views.contracts.renewLease.workflow.advanceRent')}
+              </div>
+              <div className="mt-1 text-sm font-semibold">{formatPhp(terms.advanceRent)}</div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => void handlePreviewAgreement()} disabled={!renewal}>

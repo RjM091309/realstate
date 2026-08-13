@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
-import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, FolderCog, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Button, modalDismissButtonClass } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,33 +18,64 @@ import {
   saveFileMaintenanceCategories,
   type FileMaintenanceCategory,
 } from '@/lib/fileMaintenanceCategories';
-import { seedAngelesCityBarangays, ANGELES_CITY_NAME, isAngelesCity } from '@/data/angelesCityBarangays';
+import {
+  seedAngelesCityBarangays,
+  ANGELES_CITY_NAME,
+  ANGELES_CITY_BARANGAYS,
+  isAngelesCity,
+} from '@/data/angelesCityBarangays';
 import {
   seedMabalacatCityBarangays,
   MABALACAT_CITY_NAME,
+  MABALACAT_CITY_BARANGAYS,
   isMabalacatCity,
 } from '@/data/mabalacatCityBarangays';
-import { seedClarkCityAreas, CLARK_CITY_NAME, isClarkCity } from '@/data/clarkCityAreas';
+import {
+  seedClarkCityAreas,
+  CLARK_CITY_NAME,
+  CLARK_CITY_AREAS,
+  isClarkCity,
+} from '@/data/clarkCityAreas';
 import {
   seedSanFernandoCityBarangays,
   SAN_FERNANDO_CITY_NAME,
+  SAN_FERNANDO_CITY_BARANGAYS,
   isSanFernandoCity,
 } from '@/data/sanFernandoCityBarangays';
 import {
   seedMagalangCityBarangays,
   MAGALANG_CITY_NAME,
+  MAGALANG_CITY_BARANGAYS,
   isMagalangCity,
 } from '@/data/magalangCityBarangays';
 import {
   seedPoracCityBarangays,
   PORAC_CITY_NAME,
+  PORAC_CITY_BARANGAYS,
   isPoracCity,
 } from '@/data/poracCityBarangays';
 import {
   seedBacolorCityBarangays,
   BACOLOR_CITY_NAME,
+  BACOLOR_CITY_BARANGAYS,
   isBacolorCity,
 } from '@/data/bacolorCityBarangays';
+import { APALIT_CITY_BARANGAYS, isApalitCity } from '@/data/apalitCityBarangays';
+import { ARAYAT_CITY_BARANGAYS, isArayatCity } from '@/data/arayatCityBarangays';
+import { CANDABA_CITY_BARANGAYS, isCandabaCity } from '@/data/candabaCityBarangays';
+import { FLORIDABLANCA_CITY_BARANGAYS, isFloridablancaCity } from '@/data/floridablancaCityBarangays';
+import { GUAGUA_CITY_BARANGAYS, isGuaguaCity } from '@/data/guaguaCityBarangays';
+import { LUBAO_CITY_BARANGAYS, isLubaoCity } from '@/data/lubaoCityBarangays';
+import { MACABEBE_CITY_BARANGAYS, isMacabebeCity } from '@/data/macabebeCityBarangays';
+import { MASANTOL_CITY_BARANGAYS, isMasantolCity } from '@/data/masantolCityBarangays';
+import { MEXICO_CITY_BARANGAYS, isMexicoCity } from '@/data/mexicoCityBarangays';
+import { MINALIN_CITY_BARANGAYS, isMinalinCity } from '@/data/minalinCityBarangays';
+import { SAN_LUIS_CITY_BARANGAYS, isSanLuisCity } from '@/data/sanLuisCityBarangays';
+import { SAN_SIMON_CITY_BARANGAYS, isSanSimonCity } from '@/data/sanSimonCityBarangays';
+import { SANTA_ANA_CITY_BARANGAYS, isSantaAnaCity } from '@/data/santaAnaCityBarangays';
+import { SANTA_RITA_CITY_BARANGAYS, isSantaRitaCity } from '@/data/santaRitaCityBarangays';
+import { SANTO_TOMAS_CITY_BARANGAYS, isSantoTomasCity } from '@/data/santoTomasCityBarangays';
+import { SASMUAN_CITY_BARANGAYS, isSasmuanCity } from '@/data/sasmuanCityBarangays';
 import {
   softDeleteLocationBuilding,
 } from '@/lib/locationBuildingsApi';
@@ -73,13 +104,27 @@ type UnitSortDir = 'asc' | 'desc';
 /** CITY / BARANGAY panel list — sort by unit count via header arrows. */
 type PanelCountSortDir = UnitSortDir;
 
+/** Leading ordinal number from labels like "16. Masantol" — null when absent. */
+function leadingOrdinal(name: string): number | null {
+  const m = name.trim().match(/^#?(\d+)[.)\]:\-]\s+/u);
+  return m ? Number(m[1]) : null;
+}
+
+/** Compares "N. Name" labels numerically by N first, so 5 sorts before 16. */
+function compareLocationNames(a: string, b: string): number {
+  const an = leadingOrdinal(a);
+  const bn = leadingOrdinal(b);
+  if (an !== null && bn !== null && an !== bn) return an - bn;
+  return a.localeCompare(b);
+}
+
 function compareByCountSort(
   a: { name: string; count: number },
   b: { name: string; count: number },
   dir: PanelCountSortDir,
 ): number {
   if (a.count !== b.count) return dir === 'desc' ? b.count - a.count : a.count - b.count;
-  return a.name.localeCompare(b.name);
+  return compareLocationNames(a.name, b.name);
 }
 
 const UNIT_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
@@ -131,6 +176,46 @@ function canonicalLocationName(name: string): string {
 
 function sameLocation(a: string, b: string): boolean {
   return locationAliasKey(a) === locationAliasKey(b);
+}
+
+/**
+ * Sub-location seed lists for every Pampanga city/municipality we recognize:
+ * official PSA PSGC barangays for real municipalities, and a community-mapped
+ * (OpenStreetMap) sample of named developments for Clark, which has no
+ * official barangays of its own.
+ */
+const PAMPANGA_BARANGAY_SEEDS: { test: (name: string) => boolean; barangays: readonly string[] }[] = [
+  { test: isAngelesCity, barangays: ANGELES_CITY_BARANGAYS },
+  { test: isClarkCity, barangays: CLARK_CITY_AREAS },
+  { test: isMabalacatCity, barangays: MABALACAT_CITY_BARANGAYS },
+  { test: isSanFernandoCity, barangays: SAN_FERNANDO_CITY_BARANGAYS },
+  { test: isMagalangCity, barangays: MAGALANG_CITY_BARANGAYS },
+  { test: isPoracCity, barangays: PORAC_CITY_BARANGAYS },
+  { test: isBacolorCity, barangays: BACOLOR_CITY_BARANGAYS },
+  { test: isApalitCity, barangays: APALIT_CITY_BARANGAYS },
+  { test: isArayatCity, barangays: ARAYAT_CITY_BARANGAYS },
+  { test: isCandabaCity, barangays: CANDABA_CITY_BARANGAYS },
+  { test: isFloridablancaCity, barangays: FLORIDABLANCA_CITY_BARANGAYS },
+  { test: isGuaguaCity, barangays: GUAGUA_CITY_BARANGAYS },
+  { test: isLubaoCity, barangays: LUBAO_CITY_BARANGAYS },
+  { test: isMacabebeCity, barangays: MACABEBE_CITY_BARANGAYS },
+  { test: isMasantolCity, barangays: MASANTOL_CITY_BARANGAYS },
+  { test: isMexicoCity, barangays: MEXICO_CITY_BARANGAYS },
+  { test: isMinalinCity, barangays: MINALIN_CITY_BARANGAYS },
+  { test: isSanLuisCity, barangays: SAN_LUIS_CITY_BARANGAYS },
+  { test: isSanSimonCity, barangays: SAN_SIMON_CITY_BARANGAYS },
+  { test: isSantaAnaCity, barangays: SANTA_ANA_CITY_BARANGAYS },
+  { test: isSantaRitaCity, barangays: SANTA_RITA_CITY_BARANGAYS },
+  { test: isSantoTomasCity, barangays: SANTO_TOMAS_CITY_BARANGAYS },
+  { test: isSasmuanCity, barangays: SASMUAN_CITY_BARANGAYS },
+];
+
+/** Seed barangay/area list for a recognized Pampanga city/municipality, or null. */
+function getOfficialBarangaysForCity(name: string): readonly string[] | null {
+  for (const seed of PAMPANGA_BARANGAY_SEEDS) {
+    if (seed.test(name)) return seed.barangays;
+  }
+  return null;
 }
 
 function dedupeLocations(list: string[]): string[] {
@@ -218,6 +303,8 @@ export function AddUnitByLocationView() {
   const [editingCityId, setEditingCityId] = useState<string | null>(null);
   /** Stable capture so Save always renames the opened city (avoids stale closure → create). */
   const editingCityIdRef = useRef<string | null>(null);
+  /** cityIds already auto-seeded (or attempted) with official Pampanga barangays this session. */
+  const barangaySeedAttemptedRef = useRef<Set<string>>(new Set());
   const locationNameRef = useRef('');
   const [locationName, setLocationName] = useState('');
   const [locationBusy, setLocationBusy] = useState(false);
@@ -503,6 +590,55 @@ export function AddUnitByLocationView() {
     },
     [brgyCountSort, managedBrgys, managedCities, units],
   );
+
+  // When a recognized Pampanga city/municipality is opened and some of its
+  // official PSA PSGC barangays are missing from the DB, fill in the gaps.
+  // Sequential + per-item error handling: firing dozens of creates in
+  // parallel overwhelms the (session-reload-heavy) API and silently drops
+  // most of them, so this intentionally awaits one at a time.
+  useEffect(() => {
+    if (loading || !selectedLocation || !selectedCityId) return;
+    if (!canCreate && !canUpdate) return;
+    if (barangaySeedAttemptedRef.current.has(selectedCityId)) return;
+    const officialBarangays = getOfficialBarangaysForCity(selectedLocation);
+    if (!officialBarangays || officialBarangays.length === 0) return;
+
+    const existingNames = new Set(
+      managedBrgys
+        .filter((row) => String(row.cityId) === String(selectedCityId))
+        .map((row) => row.name.trim().toLowerCase()),
+    );
+    const missing = officialBarangays.filter((name) => !existingNames.has(name.toLowerCase()));
+    if (missing.length === 0) {
+      barangaySeedAttemptedRef.current.add(selectedCityId);
+      return;
+    }
+
+    barangaySeedAttemptedRef.current.add(selectedCityId);
+    let cancelled = false;
+    void (async () => {
+      let createdAny = false;
+      for (const name of missing) {
+        if (cancelled) return;
+        try {
+          await createBrgy(selectedCityId, name);
+          createdAny = true;
+        } catch (e) {
+          console.warn(`[barangay auto-seed] failed for "${name}":`, e);
+        }
+      }
+      if (cancelled || !createdAny) return;
+      try {
+        const fresh = await fetchBrgys();
+        if (!cancelled) setManagedBrgys(fresh);
+      } catch (e) {
+        console.warn('[barangay auto-seed] refresh failed:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, managedBrgys, selectedCityId, selectedLocation, canCreate, canUpdate]);
 
   const openAddLocation = useCallback(() => {
     setEditingLocation(null);

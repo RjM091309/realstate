@@ -1,4 +1,4 @@
-/** Requested barangay list for Mabalacat (Pampanga). */
+/** Official barangay list for Mabalacat (Pampanga), sourced from PSA PSGC. */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const MABALACAT_CITY_NAME = 'Mabalacat';
@@ -19,19 +19,18 @@ export const MABALACAT_CITY_BARANGAYS: readonly string[] = [
   'Macapagal Village',
   'Mamatitang',
   'Mangalit',
+  'Marcos Village',
+  'Mawaque',
+  'Paralayunan',
   'Poblacion',
   'San Francisco',
   'San Joaquin',
-  'San Isidro',
-  'San Vicente',
   'Santa Ines',
   'Santa Maria',
   'Santo Rosario',
-  'Sapang Biabas',
   'Sapang Balen',
+  'Sapang Biabas',
   'Tabun',
-  'Tacondo',
-  'Xevera',
 ] as const;
 
 const MABALACAT_RE = /^mabalacat(\s*city)?$/i;

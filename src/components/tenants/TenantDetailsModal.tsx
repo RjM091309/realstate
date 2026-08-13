@@ -146,8 +146,8 @@ function ProfileSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+    <section className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue dark:bg-sky-500/15 dark:text-sky-400">
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
@@ -264,11 +264,25 @@ export function TenantDetailsModal({
       compact
       footer={
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          <Button type="button" className={modalOutlineButtonClass} onClick={onClose}>
+          <Button
+            type="button"
+            className={modalOutlineButtonClass}
+            onClick={onClose}
+            aria-label={closeLabel ?? t('views.crm.details.close')}
+          >
             {closeLabel ?? t('views.crm.details.close')}
           </Button>
           {onEditTenant ? (
-            <Button type="button" className={modalPrimaryButtonClass} onClick={onEditTenant}>
+            <Button
+              type="button"
+              className={modalPrimaryButtonClass}
+              onClick={onEditTenant}
+              aria-label={
+                tenant
+                  ? `${editLabel ?? t('views.crm.details.editTenant')} — ${formatDisplayName(tenant.name)}`
+                  : editLabel ?? t('views.crm.details.editTenant')
+              }
+            >
               {editLabel ?? t('views.crm.details.editTenant')}
             </Button>
           ) : null}
@@ -276,10 +290,10 @@ export function TenantDetailsModal({
       }
     >
       {tenant ? (
-        <div className="tenant-details-modal max-h-[min(68vh,36rem)] space-y-4 overflow-y-auto pr-1">
+        <div className="tenant-details-modal space-y-5">
           {showSummaryBar ? (
-            <div className="rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-white p-4 dark:border-slate-700 dark:from-slate-900/80 dark:to-slate-950/80">
-              <dl className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-white p-5 dark:border-slate-700 dark:from-slate-900/80 dark:to-slate-950/80">
+              <dl className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
                 {lease?.unitLabel ? (
                   <div className="min-w-0">
                     <dt className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
@@ -315,7 +329,7 @@ export function TenantDetailsModal({
           ) : null}
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProfileTab)} className="gap-0">
-            <TabsList className="mb-4 h-auto w-full justify-start gap-6 rounded-none border-0 border-b border-slate-200 bg-transparent p-0 dark:border-slate-700">
+            <TabsList className="mb-5 h-auto w-full justify-start gap-6 rounded-none border-0 border-b border-slate-200 bg-transparent p-0 dark:border-slate-700">
               <TabsTrigger value="overview" className={TAB_TRIGGER}>
                 <ScrollText className="mr-1.5 h-3.5 w-3.5" aria-hidden />
                 {t('views.crm.landlords.profile.tabs.overview')}
@@ -326,7 +340,7 @@ export function TenantDetailsModal({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="mt-0 space-y-4">
+            <TabsContent value="overview" className="mt-0 space-y-5">
               <ProfileSection title={t('views.crm.details.tenantInfo')} icon={User}>
                 <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   <ProfileField
@@ -367,72 +381,76 @@ export function TenantDetailsModal({
                     label={t('views.crm.details.nationality')}
                     value={formatDisplayText(tenant.nationality)}
                   />
-                </dl>
 
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <p className="mb-2.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    {t('views.crm.landlords.filters.kycStatus')}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <label
-                      htmlFor="tenant-profile-kyc"
-                      className={cn(
-                        'inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition',
-                        kycVerified
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300',
-                        statusControlsDisabled && 'cursor-not-allowed opacity-60',
-                      )}
-                    >
-                      <input
-                        id="tenant-profile-kyc"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
-                        checked={kycVerified}
-                        disabled={statusControlsDisabled}
-                        onChange={(e) => onKycVerifiedChange?.(e.target.checked)}
-                      />
-                      {t('views.crm.tenantModal.kycVerified')}
-                    </label>
-                    <label
-                      htmlFor="tenant-profile-blacklist"
-                      className={cn(
-                        'inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition',
-                        isBlacklisted
-                          ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300',
-                        statusControlsDisabled && 'cursor-not-allowed opacity-60',
-                      )}
-                    >
-                      <input
-                        id="tenant-profile-blacklist"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
-                        checked={isBlacklisted}
-                        disabled={statusControlsDisabled}
-                        onChange={(e) => onBlacklistedChange?.(e.target.checked)}
-                      />
-                      {t('views.crm.tenantModal.blacklisted')}
-                    </label>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {t('views.crm.landlords.filters.kycStatus')}
+                    </dt>
+                    <dd className="mt-1.5 flex flex-wrap gap-2">
+                      <label
+                        htmlFor="tenant-profile-kyc"
+                        className={cn(
+                          'inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition',
+                          kycVerified
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300',
+                          statusControlsDisabled && 'cursor-not-allowed opacity-60',
+                        )}
+                      >
+                        <input
+                          id="tenant-profile-kyc"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
+                          checked={kycVerified}
+                          disabled={statusControlsDisabled}
+                          onChange={(e) => onKycVerifiedChange?.(e.target.checked)}
+                        />
+                        {t('views.crm.tenantModal.kycVerified')}
+                      </label>
+                      <label
+                        htmlFor="tenant-profile-blacklist"
+                        className={cn(
+                          'inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition',
+                          isBlacklisted
+                            ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300',
+                          statusControlsDisabled && 'cursor-not-allowed opacity-60',
+                        )}
+                      >
+                        <input
+                          id="tenant-profile-blacklist"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 accent-brand-blue"
+                          checked={isBlacklisted}
+                          disabled={statusControlsDisabled}
+                          onChange={(e) => onBlacklistedChange?.(e.target.checked)}
+                        />
+                        {t('views.crm.tenantModal.blacklisted')}
+                      </label>
+                    </dd>
                   </div>
+
                   {isBlacklisted ? (
-                    canUpdateStatus && onBlacklistReasonSave ? (
-                      <input
-                        type="text"
-                        className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm normal-case text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
-                        placeholder={t('views.crm.tenantModal.blacklistReason')}
-                        value={blacklistReasonDraft}
-                        disabled={statusControlsDisabled}
-                        onChange={(e) => setBlacklistReasonDraft(e.target.value)}
-                        onBlur={() => onBlacklistReasonSave(blacklistReasonDraft)}
-                      />
-                    ) : tenant.blacklistReason ? (
-                      <p className="mt-2 text-sm normal-case text-slate-600 dark:text-slate-300">
-                        {tenant.blacklistReason}
-                      </p>
-                    ) : null
+                    <div className="sm:col-span-2">
+                      {canUpdateStatus && onBlacklistReasonSave ? (
+                        <input
+                          type="text"
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm normal-case text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
+                          placeholder={t('views.crm.tenantModal.blacklistReason')}
+                          aria-label={t('views.crm.tenantModal.blacklistReason')}
+                          value={blacklistReasonDraft}
+                          disabled={statusControlsDisabled}
+                          onChange={(e) => setBlacklistReasonDraft(e.target.value)}
+                          onBlur={() => onBlacklistReasonSave(blacklistReasonDraft)}
+                        />
+                      ) : tenant.blacklistReason ? (
+                        <p className="text-sm normal-case text-slate-600 dark:text-slate-300">
+                          {tenant.blacklistReason}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
-                </div>
+                </dl>
               </ProfileSection>
 
               <ProfileSection title={t('views.crm.details.leaseInfo')} icon={Home}>
@@ -511,7 +529,8 @@ export function TenantDetailsModal({
                           {canDownload ? (
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 dark:text-brand-blue dark:hover:bg-brand-blue/10"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue dark:text-brand-blue dark:hover:bg-brand-blue/10"
+                              aria-label={`${t('views.crm.details.download')} ${doc.name}`}
                               onClick={() => {
                                 if (doc.onDownload) doc.onDownload();
                                 else if (doc.href) window.open(doc.href, '_blank', 'noopener,noreferrer');
@@ -524,8 +543,9 @@ export function TenantDetailsModal({
                           {canPreview ? (
                             <button
                               type="button"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-blue"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-brand-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-blue"
                               title={t('views.crm.details.preview')}
+                              aria-label={`${t('views.crm.details.preview')} ${doc.name}`}
                               onClick={() => {
                                 if (doc.onPreview) doc.onPreview();
                                 else if (doc.href) window.open(doc.href, '_blank', 'noopener,noreferrer');

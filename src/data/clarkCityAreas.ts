@@ -1,4 +1,10 @@
-/** Requested area list for Clark (Pampanga). */
+/**
+ * Area list for Clark (Pampanga). Clark isn't an official PSA/PSGC
+ * municipality, so unlike the other Pampanga data files this has no
+ * authoritative barangay source — the named condo/apartment/dormitory
+ * entries below are a community-mapped sample from OpenStreetMap, not an
+ * exhaustive or verified registry.
+ */
 import { normalizeLocationAliasLabel } from '@/lib/locationNames';
 
 export const CLARK_CITY_NAME = 'Clark';
@@ -10,6 +16,40 @@ export const CLARK_CITY_AREAS: readonly string[] = [
   'Clark Center',
   'Airport Area',
   'CDC Area',
+  'Avana Place II',
+  'Bourbon Street',
+  'Brooks Apartments',
+  'COSMO A',
+  "Eagle's Inn",
+  'Escalade Dormitory',
+  "Girl's Residence Hall",
+  'Golf Ridge Private Estate',
+  'Haeyoung Building',
+  'HOME',
+  'Horizon Towers',
+  'Hot Spot Apartments',
+  'Housing',
+  'J&M Residence',
+  'Kandi Palace',
+  'Kandi Tower 3',
+  'KCM Suites',
+  'Ladies Dormitory',
+  'Leticia Suites',
+  'Marlyn Apartments',
+  "Mojo's Homes",
+  'Monterrace Lake',
+  'NCC Apartments',
+  'Oguri Apartment',
+  'Omni Aviation Dormitories',
+  'Opal Tower by Kandi',
+  'Orlando Residences',
+  'Paramount Executive (Kandi Realty)',
+  'Ray Luisa Grand Terrace',
+  "Rector's House",
+  'Rishan Village',
+  'Roncal Apartments',
+  'The Manansala',
+  'White Tower by Kandi',
 ] as const;
 
 export function isClarkCity(name: string): boolean {
