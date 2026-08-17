@@ -21,6 +21,8 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -311,6 +313,29 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
             );
           })}
         </nav>
+      </div>
+
+      {/* View public website */}
+      <div className={cn('border-t border-slate-800', isCollapsed ? 'px-3 py-3' : 'px-4 py-3')}>
+        <button
+          type="button"
+          title={isCollapsed ? t('nav.viewWebsite') : undefined}
+          onClick={() =>
+            window.open(
+              `${window.location.protocol}//${window.location.hostname}:8443`,
+              '_blank',
+              'noopener,noreferrer',
+            )
+          }
+          className={cn(
+            'flex w-full items-center rounded-xl border border-brand-orange/30 bg-brand-orange/10 font-semibold text-brand-orange transition-all hover:border-brand-orange/50 hover:bg-brand-orange/20',
+            isCollapsed ? 'justify-center py-2.5' : 'gap-2 px-3 py-2.5 text-sm',
+          )}
+        >
+          <Globe className="h-4 w-4 shrink-0" />
+          {!isCollapsed && <span className="truncate">{t('nav.viewWebsite')}</span>}
+          {!isCollapsed && <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />}
+        </button>
       </div>
 
       {/* Bottom section */}

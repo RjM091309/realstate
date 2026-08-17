@@ -1,0 +1,26 @@
+{
+  "title": "Premium Real Estate",
+  "description": "",
+  "language": "en",
+  "robots": {
+    "index": true
+  },
+  "icons": {
+    "icon": ""
+  },
+  "openGraph": {
+    "image": ""
+  },
+  "analytics": {
+    "googleAnalyticsId": ""
+  },
+  "customScripts": {
+    "headStart": "",
+    "headEnd": "",
+    "bodyStart": "",
+    "bodyEnd": ""
+  },
+  "accessibility": {
+    "addBypassLinks": false
+  }
+}

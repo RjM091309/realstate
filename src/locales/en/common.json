@@ -87,6 +87,7 @@
     },
     "settings": "Settings",
     "logout": "Logout",
+    "viewWebsite": "View Website",
     "userMgmt": {
       "userInfo": "User Info",
       "userRole": "User Role",

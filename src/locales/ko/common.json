@@ -87,6 +87,7 @@
     },
     "settings": "설정",
     "logout": "로그아웃",
+    "viewWebsite": "웹사이트 보기",
     "userMgmt": {
       "userInfo": "사용자 정보",
       "userRole": "사용자 역할",
