@@ -13,6 +13,7 @@ import {
   Sunset,
   Moon,
   Loader2,
+  ArrowUpRight,
 } from 'lucide-react';
 import {
   Card,
@@ -45,7 +46,6 @@ import {
   addDays,
   parseISO,
   subDays,
-  subMonths,
   differenceInCalendarDays,
   startOfDay,
   endOfDay,
@@ -298,9 +298,10 @@ export function DashboardView() {
 
   const monthlyBars = useMemo(() => {
     const rows: { label: string; collected: number; newLeases: number }[] = [];
-    for (let i = 5; i >= 0; i -= 1) {
-      const d = subMonths(chartAnchor, i);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const year = chartAnchor.getFullYear();
+    for (let month = 0; month < 12; month += 1) {
+      const d = new Date(year, month, 1);
+      const ym = `${year}-${String(month + 1).padStart(2, '0')}`;
       const label = format(d, 'MMM');
       const collected = payments
         .filter((p) => p.status === 'Paid')
@@ -316,6 +317,8 @@ export function DashboardView() {
   }, [payments, contracts, chartAnchor]);
 
   const pieSlices = useMemo(() => occupancyData(t, units), [t, units]);
+
+  const unitStatusSummary = useMemo(() => ({ total: units.length }), [units]);
 
   const agentRows: AgentRow[] = useMemo(() => {
     const map = new Map<string, { name: string; deals: number; profit: number }>();
@@ -820,47 +823,85 @@ export function DashboardView() {
         </section>
 
         <section className="flex h-[420px] flex-col rounded-lg border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:h-[480px]">
-          <div className="shrink-0 border-b border-slate-50 p-4 dark:border-slate-800">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-50 p-4 dark:border-slate-800">
             <h3 className="text-sm font-bold uppercase text-brand-blue">
               {t('views.dashboard.charts.unitStatusTitle')}
             </h3>
+            <button
+              type="button"
+              onClick={() => navigate('/units')}
+              className="flex items-center gap-1 text-xs font-semibold text-slate-500 transition-colors hover:text-brand-blue dark:text-slate-400"
+            >
+              {t('views.dashboard.charts.unitStatusShowDetails')}
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieSlices}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  dataKey="value"
-                  nameKey="name"
-                  stroke="#fff"
-                  strokeWidth={2}
-                >
-                  {pieSlices.map((entry) => (
-                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(val, name) => [Number(val ?? 0), String(name ?? '')]}
-                />
-                <Legend
-                  verticalAlign="top"
-                  align="center"
-                  iconType="rect"
-                  wrapperStyle={{ paddingTop: '20px', fontSize: '10px', color: '#94a3b8' }}
-                  formatter={(value) => <span className="text-slate-500">{value}</span>}
-                  payload={pieSlices.map((s) => ({
-                    value: s.name,
-                    type: 'rect' as const,
-                    color: s.color,
-                    id: s.name,
-                  }))}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
+            <div className="flex min-h-0 flex-1 items-center gap-8">
+              <div className="relative h-[180px] w-[180px] shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieSlices}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={62}
+                      outerRadius={88}
+                      dataKey="value"
+                      nameKey="name"
+                      stroke="none"
+                      paddingAngle={pieSlices.filter((s) => s.value > 0).length > 1 ? 2 : 0}
+                      isAnimationActive={false}
+                    >
+                      {pieSlices.map((entry) => (
+                        <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(val, name) => [Number(val ?? 0), String(name ?? '')]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                    {unitStatusSummary.total}
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    {t('views.dashboard.charts.unitStatusTotalLabel')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-4">
+                {pieSlices.map((s) => {
+                  const pct = unitStatusSummary.total > 0 ? (s.value / unitStatusSummary.total) * 100 : 0;
+                  return (
+                    <div key={s.name} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-sm"
+                          style={{ backgroundColor: s.color }}
+                          aria-hidden
+                        />
+                        <span className="truncate text-slate-600 dark:text-slate-300">{s.name}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-4">
+                        <span className="text-base font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                          {s.value}
+                        </span>
+                        <span
+                          className="w-14 text-right text-sm font-semibold tabular-nums"
+                          style={{ color: s.color }}
+                        >
+                          {pct.toFixed(1)}%
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
       </div>

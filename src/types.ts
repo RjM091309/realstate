@@ -20,6 +20,8 @@ export type UnitType =
   | 'Loft'
   | 'Penthouse';
 export type UnitFurnishing = 'Unfurnished' | 'Semi-furnished' | 'Fully furnished';
+/** Public-website listing intent. Maps to the DB `unit.listing_type` enum. */
+export type UnitListingType = 'monthly_rental' | 'selling' | 'short_term_rental' | 'pre_selling';
 export type TransactionType = 'Monthly Rental' | 'Sales' | 'Short-term Rental';
 export type PaymentStatus = 'Paid' | 'Overdue' | 'Pending';
 
@@ -51,6 +53,17 @@ export interface Unit {
   parkingSlot?: string;
   furnishing?: UnitFurnishing;
   inventory: InventoryItem[];
+  /** Public real estate website sync — see Premium Real Estate Website project. */
+  listingType?: UnitListingType;
+  developer?: string;
+  /** Public marketing copy — distinct from moreDetails/specialRemarks, which stay internal. */
+  listingDescription?: string;
+  lotAreaSqm?: number;
+  floorsLabel?: string;
+  amenities?: string[];
+  features?: string[];
+  featured?: boolean;
+  isNewListing?: boolean;
 }
 
 export interface InventoryItem {

@@ -115,7 +115,7 @@ export function BlacklistPanel({ canCreate = false, canUpdate = false }: Blackli
             className="h-9 shrink-0 rounded-xl bg-brand-blue text-white shadow-sm hover:bg-[#3d7ab8]"
             onClick={() => setIsFormOpen(true)}
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="h-4 w-4" />
             {t('views.crm.blacklist.addRecord')}
           </Button>
         ) : null}

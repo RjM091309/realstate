@@ -719,7 +719,7 @@ export function UserManagementView() {
           onClick={openAdd}
           className="rounded-xl bg-brand-blue px-5 text-white shadow-sm hover:bg-[#3d7ab8]"
         >
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="h-4 w-4" />
           {t('views.userInfo.addUser')}
         </Button>
       </div>
@@ -842,7 +842,7 @@ export function UserManagementView() {
                   disabled={saving}
                   onClick={() => avatarFileInputRef.current?.click()}
                 >
-                  <ImagePlus className="mr-2 h-4 w-4" />
+                  <ImagePlus className="h-4 w-4" />
                   {t('views.userInfo.avatarUpload')}
                 </Button>
                 {(avatarDraftFile || (editing?.avatarUrl && !avatarRemoved)) ? (

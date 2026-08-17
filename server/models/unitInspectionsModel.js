@@ -73,6 +73,35 @@ export async function getInspectionById(id, branchId) {
   return rows[0] ?? null;
 }
 
+/** Branch-wide inspections with a scheduled date — drives the auto-generated Calendar "Inspection" event. */
+export async function listInspectionsByBranch(branchId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      ui.id,
+      ui.contract_id,
+      ui.unit_id,
+      ui.status,
+      ui.scheduled_move_in,
+      lc.contract_no,
+      u.unit_no AS unit_number,
+      u.tower AS unit_tower,
+      pr.name AS building_name,
+      t.full_name AS tenant_name
+    FROM unit_inspection ui
+    INNER JOIN lease_contract lc ON lc.id = ui.contract_id AND lc.branch_id = ui.branch_id
+    INNER JOIN unit u ON u.id = ui.unit_id
+    INNER JOIN property pr ON pr.id = u.property_id AND pr.branch_id = ui.branch_id
+    LEFT JOIN contract_tenant ct ON ct.contract_id = lc.id AND ct.is_primary = 1 AND ct.active = 1
+    LEFT JOIN tenant_profile t ON t.id = ct.tenant_id
+    WHERE ui.branch_id = ? AND ui.active = 1 AND ui.scheduled_move_in IS NOT NULL
+    ORDER BY ui.scheduled_move_in ASC, ui.id ASC
+    `,
+    [branchId],
+  );
+  return rows;
+}
+
 export async function listChecklistItems(inspectionId) {
   const [rows] = await pool.query(
     `SELECT * FROM inspection_checklist WHERE inspection_id = ? ORDER BY sort_order ASC, id ASC`,

@@ -22,6 +22,15 @@ function fmtDate(d) {
   return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
+function fmtDateOnly(d) {
+  if (d == null) return null;
+  if (typeof d === 'string') return d.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 async function getAuthContext(req, res) {
   const userId = req.userId;
   if (userId == null) {
@@ -62,6 +71,7 @@ function mapRequestRow(r) {
     status: String(r.status),
     vendorId: r.vendor_id != null ? String(r.vendor_id) : null,
     vendorName: r.vendor_name ? String(r.vendor_name) : null,
+    scheduledDate: fmtDateOnly(r.scheduled_date),
     estimatedCost: r.estimated_cost != null ? Number(r.estimated_cost) : null,
     actualCost: r.actual_cost != null ? Number(r.actual_cost) : null,
     resolvedAt: r.resolved_at ? fmtDate(r.resolved_at) : null,
@@ -178,7 +188,23 @@ export async function patchSpecialRequestStatus(req, res) {
     res.status(400).json({ error: 'Cost must be a non-negative number' });
     return;
   }
-  const hasCosts = hasVendorId || estimated.present || actual.present;
+
+  const hasScheduledDate = req.body?.scheduledDate !== undefined;
+  let scheduledDate;
+  if (hasScheduledDate) {
+    const raw = req.body.scheduledDate;
+    if (raw === null || raw === '') {
+      scheduledDate = null;
+    } else {
+      scheduledDate = String(raw).trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+        res.status(400).json({ error: 'Invalid scheduled date' });
+        return;
+      }
+    }
+  }
+
+  const hasCosts = hasVendorId || estimated.present || actual.present || hasScheduledDate;
 
   if (!hasStatus && !hasCosts) {
     res.status(400).json({ error: 'Invalid request payload' });
@@ -208,11 +234,13 @@ export async function patchSpecialRequestStatus(req, res) {
         vendorId: hasVendorId ? vendorId : existing.vendor_id,
         estimatedCost: estimated.present ? estimated.value : existing.estimated_cost,
         actualCost: actual.present ? actual.value : existing.actual_cost,
+        scheduledDate: hasScheduledDate ? scheduledDate : existing.scheduled_date,
       });
     }
 
     const summaryParts = [];
     if (hasStatus) summaryParts.push(`status to ${status.replace(/_/g, ' ')}`);
+    if (hasScheduledDate) summaryParts.push('scheduled date');
     if (hasCosts) summaryParts.push('vendor/cost details');
     void logAudit({
       branchId: ctx.session.branchId,

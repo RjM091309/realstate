@@ -550,6 +550,87 @@ export async function ensureSchema() {
     }
   }
 
+  /**
+   * Public-website listing fields: `listing_type` and `market_value` already existed
+   * on `unit` but were never written to by the app. Adds the marketing-only columns
+   * (developer, lot area, floors label, amenities/features, featured/new flags) and
+   * extends `listing_type` with 'pre_selling' so units can sync to the public site.
+   */
+  async function ensureUnitListingColumns() {
+    const [listingTypeRows] = await pool.query(
+      `
+      SELECT COLUMN_TYPE
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name = 'listing_type'
+      `,
+    );
+    const listingTypeDef = String(listingTypeRows[0]?.COLUMN_TYPE ?? '');
+    if (listingTypeDef && !listingTypeDef.includes('pre_selling')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` MODIFY COLUMN \`listing_type\` ENUM('monthly_rental','selling','short_term_rental','pre_selling') NOT NULL DEFAULT 'monthly_rental'`,
+      );
+    }
+
+    const [existingRows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'unit'
+        AND column_name IN (
+          'developer', 'lot_area_sqm', 'floors_label', 'listing_description',
+          'amenities_json', 'features_json', 'featured', 'is_new_listing'
+        )
+      `,
+    );
+    const existing = new Set(existingRows.map((r) => String(r.column_name)));
+
+    if (!existing.has('developer')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`developer\` VARCHAR(160) NULL DEFAULT NULL AFTER \`market_value\``,
+      );
+    }
+    if (!existing.has('listing_description')) {
+      // Dedicated public marketing copy — separate from more_details/special_remarks,
+      // which are internal admin notes and must never be shown on the public website.
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`listing_description\` TEXT NULL DEFAULT NULL AFTER \`developer\``,
+      );
+    }
+    if (!existing.has('lot_area_sqm')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`lot_area_sqm\` DECIMAL(8,2) NULL DEFAULT NULL AFTER \`developer\``,
+      );
+    }
+    if (!existing.has('floors_label')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`floors_label\` VARCHAR(80) NULL DEFAULT NULL AFTER \`lot_area_sqm\``,
+      );
+    }
+    if (!existing.has('amenities_json')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`amenities_json\` LONGTEXT NULL AFTER \`floors_label\``,
+      );
+    }
+    if (!existing.has('features_json')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`features_json\` LONGTEXT NULL AFTER \`amenities_json\``,
+      );
+    }
+    if (!existing.has('featured')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`featured\` TINYINT(1) NOT NULL DEFAULT 0 AFTER \`features_json\``,
+      );
+    }
+    if (!existing.has('is_new_listing')) {
+      await pool.query(
+        `ALTER TABLE \`unit\` ADD COLUMN \`is_new_listing\` TINYINT(1) NOT NULL DEFAULT 0 AFTER \`featured\``,
+      );
+    }
+  }
+
   async function ensureUserAvatarColumn() {
     const [rows] = await pool.query(
       `
@@ -1196,6 +1277,7 @@ export async function ensureSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
   await ensureUnitPhotoColumn();
+  await ensureUnitListingColumns();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`partner_agency\` (
@@ -1685,10 +1767,17 @@ export async function ensureSchema() {
       FROM information_schema.columns
       WHERE table_schema = DATABASE()
         AND table_name = 'special_request'
-        AND column_name IN ('vendor_id', 'estimated_cost', 'actual_cost', 'resolved_at')
+        AND column_name IN ('vendor_id', 'estimated_cost', 'actual_cost', 'resolved_at', 'scheduled_date')
       `,
     );
     const existingSrCostCols = new Set(srCostCols.map((r) => String(r.column_name)));
+
+    if (!existingSrCostCols.has('scheduled_date')) {
+      // When maintenance work is scheduled/targeted — drives the auto-generated Calendar "Maintenance" event.
+      await addColumnIfMissing(
+        `ALTER TABLE \`special_request\` ADD COLUMN \`scheduled_date\` DATE NULL DEFAULT NULL AFTER \`title\``,
+      );
+    }
 
     if (!existingSrCostCols.has('vendor_id')) {
       await addColumnIfMissing(
@@ -1779,6 +1868,33 @@ export async function ensureSchema() {
       CONSTRAINT \`fk_calendar_payment_schedule\` FOREIGN KEY (\`payment_schedule_id\`) REFERENCES \`payment_schedule\` (\`id\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`property_viewing\` (
+      \`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`branch_id\` INT UNSIGNED NOT NULL,
+      \`unit_id\` BIGINT UNSIGNED NOT NULL,
+      \`prospect_name\` VARCHAR(180) NOT NULL,
+      \`prospect_contact\` VARCHAR(120) NULL DEFAULT NULL,
+      \`scheduled_at\` DATETIME NOT NULL,
+      \`status\` ENUM('scheduled','completed','cancelled','no_show') NOT NULL DEFAULT 'scheduled',
+      \`agent_id\` INT UNSIGNED NULL DEFAULT NULL,
+      \`notes\` TEXT NULL,
+      \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+      \`created_by\` INT UNSIGNED NULL DEFAULT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_property_viewing_branch\` (\`branch_id\`),
+      KEY \`idx_property_viewing_unit\` (\`unit_id\`),
+      KEY \`idx_property_viewing_scheduled\` (\`scheduled_at\`),
+      CONSTRAINT \`fk_property_viewing_branch\` FOREIGN KEY (\`branch_id\`) REFERENCES \`branch\` (\`id\`),
+      CONSTRAINT \`fk_property_viewing_unit\` FOREIGN KEY (\`unit_id\`) REFERENCES \`unit\` (\`id\`),
+      CONSTRAINT \`fk_property_viewing_agent\` FOREIGN KEY (\`agent_id\`) REFERENCES \`user_info\` (\`IDNO\`),
+      CONSTRAINT \`fk_property_viewing_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`user_info\` (\`IDNO\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
   await ensureContractsOperationsActiveColumns();
   await ensureRoleAndContractMappingActiveColumns();
 

@@ -13,6 +13,7 @@ import { stripLocationOrdinalPrefix } from '@/lib/locationNames';
 import { cn } from '@/lib/utils';
 import {
   UNIT_FORM_FURNISHING,
+  UNIT_FORM_LISTING_TYPES,
   UNIT_FORM_STATUSES,
   UNIT_FORM_TYPES,
   defaultUnitForm,
@@ -24,7 +25,7 @@ import {
   type UnitFormState,
 } from '@/lib/unitFormUtils';
 import type { UnitWriteBody } from '@/lib/unitsApi';
-import type { UnitStatus, UnitType } from '@/types';
+import type { UnitListingType, UnitStatus, UnitType } from '@/types';
 
 const FIELD =
   'h-12 rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80';
@@ -247,6 +248,14 @@ export function UnitFormModal({
             : value === 'Semi-furnished'
               ? t('views.units.addModal.furnishingOptions.semi')
               : t('views.units.addModal.furnishingOptions.fully'),
+      })),
+    [t],
+  );
+  const listingTypeOptions = useMemo(
+    () =>
+      UNIT_FORM_LISTING_TYPES.map(({ value, label }) => ({
+        value,
+        label: t(`views.units.addModal.listingTypeOptions.${value}`, label),
       })),
     [t],
   );
@@ -706,6 +715,132 @@ export function UnitFormModal({
               placeholder={t('views.units.addModal.specialRemarksPlaceholder')}
               rows={3}
               className="min-h-[88px] resize-y rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
+            />
+          </div>
+
+          <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {t('views.units.addModal.websiteListing')}
+            </h3>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              {t('views.units.addModal.websiteListingHint')}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('views.units.addModal.listingType')}</Label>
+            <Select2
+              options={listingTypeOptions}
+              value={form.listingType}
+              onChange={(v) =>
+                setForm((f) => ({ ...f, listingType: (v ?? 'monthly_rental') as UnitListingType }))
+              }
+              borderless={false}
+              className="[&_.unit-form-select-control]:!min-h-12"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-market-value">{t('views.units.addModal.marketValue')}</Label>
+            <Input
+              id="loc-add-market-value"
+              type="text"
+              inputMode="decimal"
+              value={form.marketValue}
+              onChange={(e) => setForm((f) => ({ ...f, marketValue: e.target.value }))}
+              placeholder="8500000"
+              className={FIELD}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-developer">{t('views.units.addModal.developer')}</Label>
+            <Input
+              id="loc-add-developer"
+              value={form.developer}
+              onChange={(e) => setForm((f) => ({ ...f, developer: e.target.value }))}
+              placeholder={t('views.units.addModal.developerPlaceholder')}
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-floors-label">{t('views.units.addModal.floorsLabel')}</Label>
+            <Input
+              id="loc-add-floors-label"
+              value={form.floorsLabel}
+              onChange={(e) => setForm((f) => ({ ...f, floorsLabel: e.target.value }))}
+              placeholder={t('views.units.addModal.floorsLabelPlaceholder')}
+              className={FIELD}
+            />
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="loc-add-listing-description">
+              {t('views.units.addModal.listingDescription')}
+            </Label>
+            <Textarea
+              id="loc-add-listing-description"
+              value={form.listingDescription}
+              onChange={(e) => setForm((f) => ({ ...f, listingDescription: e.target.value }))}
+              placeholder={t('views.units.addModal.listingDescriptionPlaceholder')}
+              rows={3}
+              className="min-h-[88px] resize-y rounded-xl border border-slate-200 bg-white shadow-sm focus-visible:border-brand-blue focus-visible:ring-brand-blue/20 dark:border-slate-600 dark:bg-slate-950/80"
+            />
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              {t('views.units.addModal.listingDescriptionHint')}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="loc-add-lot-area">{t('views.units.addModal.lotAreaSqm')}</Label>
+            <Input
+              id="loc-add-lot-area"
+              type="text"
+              inputMode="decimal"
+              value={form.lotAreaSqm}
+              onChange={(e) => setForm((f) => ({ ...f, lotAreaSqm: e.target.value }))}
+              placeholder="450"
+              className={FIELD}
+            />
+          </div>
+          <div className="flex items-end gap-6 pb-1">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={form.featured}
+                onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+              />
+              {t('views.units.addModal.featured')}
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={form.isNewListing}
+                onChange={(e) => setForm((f) => ({ ...f, isNewListing: e.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+              />
+              {t('views.units.addModal.isNewListing')}
+            </label>
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="loc-add-amenities">{t('views.units.addModal.amenities')}</Label>
+            <Input
+              id="loc-add-amenities"
+              value={form.amenities}
+              onChange={(e) => setForm((f) => ({ ...f, amenities: e.target.value }))}
+              placeholder={t('views.units.addModal.amenitiesPlaceholder')}
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="loc-add-features">{t('views.units.addModal.features')}</Label>
+            <Input
+              id="loc-add-features"
+              value={form.features}
+              onChange={(e) => setForm((f) => ({ ...f, features: e.target.value }))}
+              placeholder={t('views.units.addModal.featuresPlaceholder')}
+              className={FIELD}
             />
           </div>
         </div>

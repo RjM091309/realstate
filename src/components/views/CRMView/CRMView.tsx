@@ -1466,7 +1466,7 @@ export function CRMView() {
               </div>
               {canCreate && activeTab === 'tenants' ? (
                 <Button type="button" className="h-9 shrink-0 rounded-xl bg-brand-blue text-white shadow-sm hover:bg-[#3d7ab8]" onClick={openRegister}>
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="h-4 w-4" />
                   {t('views.crm.registerTenant')}
                 </Button>
               ) : null}

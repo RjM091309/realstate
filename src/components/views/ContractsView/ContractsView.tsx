@@ -750,7 +750,7 @@ export function ContractsView() {
               className="h-10 shrink-0 rounded-xl bg-brand-blue text-white shadow-sm hover:bg-[#3d7ab8]"
               onClick={openCreateModal}
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               {t('views.contracts.newLeaseWorkflow')}
             </Button>
           ) : null}

@@ -40,11 +40,22 @@ function parsePhotosJson(raw) {
   }
 }
 
-function resolveUnitPhotos(row) {
+export function resolveUnitPhotos(row) {
   const fromJson = parsePhotosJson(row.photos_json);
   if (fromJson.length > 0) return fromJson;
   const cover = row.photo_data ? normalizePhotoDataUrl(row.photo_data) : null;
   return cover ? [cover] : [];
+}
+
+export function parseStringArrayJson(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => String(item ?? '').trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function rowToUnit(row) {
@@ -74,6 +85,16 @@ function rowToUnit(row) {
     areaSqm: row.area_sqm == null ? undefined : Number(row.area_sqm),
     bedrooms: row.bedrooms == null ? undefined : Number(row.bedrooms),
     bathrooms: row.bathrooms == null ? undefined : Number(row.bathrooms),
+    listingType: row.listing_type ? String(row.listing_type) : 'monthly_rental',
+    marketValue: row.market_value == null ? undefined : Number(row.market_value),
+    developer: row.developer ? String(row.developer) : undefined,
+    listingDescription: row.listing_description ? String(row.listing_description) : undefined,
+    lotAreaSqm: row.lot_area_sqm == null ? undefined : Number(row.lot_area_sqm),
+    floorsLabel: row.floors_label ? String(row.floors_label) : undefined,
+    amenities: parseStringArrayJson(row.amenities_json),
+    features: parseStringArrayJson(row.features_json),
+    featured: Boolean(Number(row.featured ?? 0)),
+    isNewListing: Boolean(Number(row.is_new_listing ?? 0)),
     monthlyRate: Number(row.monthly_rate),
     photoDataUrl: photos[0] ?? null,
     photos,
@@ -100,6 +121,16 @@ function payloadToUnit(id, parsed) {
     areaSqm: parsed.areaSqm,
     bedrooms: parsed.bedrooms,
     bathrooms: parsed.bathrooms,
+    listingType: parsed.listingType,
+    marketValue: parsed.marketValue,
+    developer: parsed.developer,
+    listingDescription: parsed.listingDescription,
+    lotAreaSqm: parsed.lotAreaSqm,
+    floorsLabel: parsed.floorsLabel,
+    amenities: parsed.amenities ?? [],
+    features: parsed.features ?? [],
+    featured: Boolean(parsed.featured),
+    isNewListing: Boolean(parsed.isNewListing),
     monthlyRate: parsed.monthlyRate,
     photoDataUrl: parsed.photoDataUrl,
     photos: parsed.photos ?? [],
@@ -223,6 +254,52 @@ function validatePayload(body) {
   const areaSqm = parseMetric(body.areaSqm, { max: 99999, allowDecimal: true });
   const bedrooms = parseMetric(body.bedrooms, { max: 255, allowDecimal: false });
   const bathrooms = parseMetric(body.bathrooms, { max: 255, allowDecimal: false });
+  const lotAreaSqm = parseMetric(body.lotAreaSqm, { max: 999999, allowDecimal: true });
+
+  const LISTING_TYPES = new Set(['monthly_rental', 'selling', 'short_term_rental', 'pre_selling']);
+  const listingTypeRaw = String(body.listingType ?? '').trim();
+  const listingType = LISTING_TYPES.has(listingTypeRaw) ? listingTypeRaw : 'monthly_rental';
+
+  const marketValueRaw = body.marketValue;
+  let marketValue = null;
+  if (marketValueRaw !== null && marketValueRaw !== undefined && String(marketValueRaw).trim() !== '') {
+    const n = Number(marketValueRaw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    marketValue = Math.round(n * 100) / 100;
+  }
+
+  const developerRaw = body.developer;
+  const developer =
+    developerRaw === null || developerRaw === undefined
+      ? null
+      : String(developerRaw).trim().slice(0, 160) || null;
+
+  // Public marketing copy only — never falls back to more_details/special_remarks,
+  // which are internal admin notes and must not be shown on the public website.
+  const listingDescriptionRaw = body.listingDescription;
+  const listingDescription =
+    listingDescriptionRaw === null || listingDescriptionRaw === undefined
+      ? null
+      : String(listingDescriptionRaw).trim().slice(0, 2000) || null;
+
+  const floorsLabelRaw = body.floorsLabel;
+  const floorsLabel =
+    floorsLabelRaw === null || floorsLabelRaw === undefined
+      ? null
+      : String(floorsLabelRaw).trim().slice(0, 80) || null;
+
+  const parseStringList = (raw) => {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item) => String(item ?? '').trim().slice(0, 80))
+      .filter(Boolean)
+      .slice(0, 30);
+  };
+  const amenities = parseStringList(body.amenities);
+  const features = parseStringList(body.features);
+
+  const featured = Boolean(body.featured);
+  const isNewListing = Boolean(body.isNewListing);
 
   return {
     unitNumber,
@@ -245,6 +322,16 @@ function validatePayload(body) {
     specialRemarks,
     parkingSlot,
     furnishing,
+    listingType,
+    marketValue,
+    developer,
+    listingDescription,
+    lotAreaSqm,
+    floorsLabel,
+    amenities,
+    features,
+    featured,
+    isNewListing,
   };
 }
 
@@ -314,6 +401,16 @@ export async function createUnit(req, res) {
       areaSqm: parsed.areaSqm,
       bedrooms: parsed.bedrooms,
       bathrooms: parsed.bathrooms,
+      listingType: parsed.listingType,
+      marketValue: parsed.marketValue,
+      developer: parsed.developer,
+      listingDescription: parsed.listingDescription,
+      lotAreaSqm: parsed.lotAreaSqm,
+      floorsLabel: parsed.floorsLabel,
+      amenitiesJson: JSON.stringify(parsed.amenities ?? []),
+      featuresJson: JSON.stringify(parsed.features ?? []),
+      featured: parsed.featured,
+      isNewListing: parsed.isNewListing,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       photosJson: JSON.stringify(parsed.photos ?? []),
@@ -369,6 +466,16 @@ export async function updateUnit(req, res) {
       areaSqm: parsed.areaSqm,
       bedrooms: parsed.bedrooms,
       bathrooms: parsed.bathrooms,
+      listingType: parsed.listingType,
+      marketValue: parsed.marketValue,
+      developer: parsed.developer,
+      listingDescription: parsed.listingDescription,
+      lotAreaSqm: parsed.lotAreaSqm,
+      floorsLabel: parsed.floorsLabel,
+      amenitiesJson: JSON.stringify(parsed.amenities ?? []),
+      featuresJson: JSON.stringify(parsed.features ?? []),
+      featured: parsed.featured,
+      isNewListing: parsed.isNewListing,
       monthlyRate: parsed.monthlyRate,
       photoDataUrl: parsed.photoDataUrl,
       photosJson: JSON.stringify(parsed.photos ?? []),

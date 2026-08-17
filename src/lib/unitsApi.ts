@@ -23,6 +23,17 @@ export type UnitWriteBody = {
   parkingSlot?: string;
   furnishing?: Unit['furnishing'];
   inventory: Unit['inventory'];
+  /** Public real estate website sync fields. */
+  listingType?: Unit['listingType'];
+  marketValue?: number;
+  developer?: string;
+  listingDescription?: string;
+  lotAreaSqm?: number;
+  floorsLabel?: string;
+  amenities?: string[];
+  features?: string[];
+  featured?: boolean;
+  isNewListing?: boolean;
 };
 
 export async function fetchUnits(): Promise<Unit[]> {

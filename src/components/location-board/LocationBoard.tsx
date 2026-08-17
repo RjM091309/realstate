@@ -37,9 +37,9 @@ export const locBoard = {
   iconBtn:
     'inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200',
   editBtn:
-    'inline-flex h-7 w-7 items-center justify-center rounded-md bg-sky-100 text-sky-700 transition hover:bg-sky-200 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30',
+    'inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-sky-600 transition hover:bg-sky-100 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:hover:text-sky-300',
   deleteBtn:
-    'inline-flex h-7 w-7 items-center justify-center rounded-md bg-rose-100 text-rose-600 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30',
+    'inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:hover:text-rose-300',
   primaryCta:
     'h-10 rounded-xl bg-slate-800 px-4 text-xs font-black uppercase tracking-widest text-white shadow-sm hover:bg-slate-900',
 } as const;

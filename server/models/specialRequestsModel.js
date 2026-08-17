@@ -36,6 +36,7 @@ export async function listSpecialRequestsByBranch(branchId) {
       sr.details,
       sr.status,
       sr.vendor_id,
+      sr.scheduled_date,
       sr.estimated_cost,
       sr.actual_cost,
       sr.resolved_at,
@@ -76,15 +77,22 @@ export async function updateSpecialRequestStatus(id, branchId, status) {
   return result.affectedRows;
 }
 
-/** Assign/clear a vendor and record estimated/actual repair cost for a ticket. */
+/** Assign/clear a vendor, record estimated/actual repair cost, and/or set the scheduled work date for a ticket. */
 export async function updateSpecialRequestCosts(id, branchId, payload) {
   const [result] = await pool.query(
     `
     UPDATE special_request
-    SET vendor_id = ?, estimated_cost = ?, actual_cost = ?, updated_at = NOW()
+    SET vendor_id = ?, estimated_cost = ?, actual_cost = ?, scheduled_date = ?, updated_at = NOW()
     WHERE id = ? AND branch_id = ?
     `,
-    [payload.vendorId ?? null, payload.estimatedCost ?? null, payload.actualCost ?? null, id, branchId],
+    [
+      payload.vendorId ?? null,
+      payload.estimatedCost ?? null,
+      payload.actualCost ?? null,
+      payload.scheduledDate ?? null,
+      id,
+      branchId,
+    ],
   );
   return result.affectedRows;
 }
@@ -101,6 +109,7 @@ export async function getSpecialRequestById(id, branchId) {
       sr.details,
       sr.status,
       sr.vendor_id,
+      sr.scheduled_date,
       sr.estimated_cost,
       sr.actual_cost,
       sr.resolved_at,

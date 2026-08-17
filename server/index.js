@@ -32,10 +32,17 @@ import { landlordsRouter } from './routes/landlordsRoutes.js';
 import { invoicesRouter } from './routes/invoicesRoutes.js';
 import { auditLogsRouter } from './routes/auditLogsRoutes.js';
 import { notificationsRouter } from './routes/notificationsRoutes.js';
+import { propertyViewingsRouter } from './routes/propertyViewingsRoutes.js';
+import { publicRouter } from './routes/publicRoutes.js';
 
 const app = express();
 const apiPort = Number(process.env.API_PORT ?? 2550);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Public marketing-site feed (read-only, no auth, no cookies) — deliberately open to
+// any origin, and mounted ahead of the strict admin CORS check below so a disallowed
+// Origin there can never block it. Never add authenticated/admin routes to this router.
+app.use('/api/public', cors({ origin: true }), express.json(), publicRouter);
 
 // Allowed browser origins for cookies/credentialed requests — comma-separated in `.env`.
 // Defaults to the local Vite dev/preview origin only; add production origin(s) via CORS_ORIGIN.
@@ -145,6 +152,7 @@ app.use('/api/landlords', landlordsRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/property-viewings', propertyViewingsRouter);
 
 void (async () => {
   try {

@@ -149,12 +149,12 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
 
       {/* Logo */}
       <div className={cn('transition-all duration-300', isCollapsed ? 'px-4 pt-5 pb-4' : 'px-5 pt-6 pb-4')}>
-        <div className={cn('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
+        <div className={cn('flex items-center', isCollapsed ? 'justify-center' : 'gap-1')}>
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-orange text-white shadow-lg shadow-brand-orange/20"
+            className="flex h-14 w-14 shrink-0 items-center justify-center text-brand-orange"
             aria-hidden
           >
-            <Building2 className="h-[18px] w-[18px]" strokeWidth={2} />
+            <Building2 className="h-12 w-12" strokeWidth={2} />
           </div>
           <span
             className={cn(

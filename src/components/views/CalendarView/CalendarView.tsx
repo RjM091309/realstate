@@ -10,6 +10,15 @@ import {
   Plus,
   Trash2,
   Pencil,
+  Wrench,
+  ClipboardCheck,
+  Eye,
+  Clock,
+  Filter,
+  List as ListIcon,
+  LayoutGrid,
+  CalendarRange,
+  CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +36,9 @@ import {
   parseISO,
   startOfWeek,
   endOfWeek,
-  isSameMonth
+  isSameMonth,
+  addDays,
+  subDays,
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +55,15 @@ import {
   type CalendarEvent,
   type CalendarEventType,
 } from '@/lib/calendarEventsApi';
+import { fetchMaintenanceRequests, type MaintenanceRequestRow } from '@/lib/specialRequestsApi';
+import { fetchInspectionsForCalendar, type InspectionCalendarRow } from '@/lib/unitInspectionApi';
+import {
+  createPropertyViewing,
+  deletePropertyViewing,
+  fetchPropertyViewings,
+  updatePropertyViewing,
+  type PropertyViewing,
+} from '@/lib/propertyViewingsApi';
 import { StatusBadge } from '@/components/status-badge';
 import { contractStatusVariant, paymentStatusVariant } from '@/lib/statusBadge';
 import type { Contract, Payment, Tenant, Unit } from '@/types';
@@ -123,6 +143,39 @@ function yearRentTotal(monthlyRent: number | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n * 12 : 0;
 }
 
+/** Canonical key used by the filter bar; distinct from `typeLabel` (display text). */
+type EventFilterKey =
+  | 'move_in'
+  | 'move_out'
+  | 'lease_expiration'
+  | 'payment'
+  | 'maintenance'
+  | 'inspection'
+  | 'property_viewing'
+  | 'other';
+
+const ALL_FILTER_KEYS: EventFilterKey[] = [
+  'move_in',
+  'move_out',
+  'lease_expiration',
+  'payment',
+  'maintenance',
+  'inspection',
+  'property_viewing',
+  'other',
+];
+
+const FILTER_DEFS: { key: EventFilterKey; dot: string; labelKey: string }[] = [
+  { key: 'move_in', dot: 'bg-emerald-500', labelKey: 'moveIn' },
+  { key: 'move_out', dot: 'bg-rose-500', labelKey: 'moveOut' },
+  { key: 'lease_expiration', dot: 'bg-orange-500', labelKey: 'leaseExpiration' },
+  { key: 'payment', dot: 'bg-amber-500', labelKey: 'paymentDue' },
+  { key: 'maintenance', dot: 'bg-red-500', labelKey: 'maintenance' },
+  { key: 'inspection', dot: 'bg-brand-blue', labelKey: 'inspection' },
+  { key: 'property_viewing', dot: 'bg-purple-500', labelKey: 'propertyViewing' },
+  { key: 'other', dot: 'bg-slate-500', labelKey: 'other' },
+];
+
 type UiEvent = {
   id: string;
   date: Date;
@@ -133,7 +186,14 @@ type UiEvent = {
   colorHex?: string | null;
   icon: React.ReactNode;
   source: 'derived' | 'custom';
+  filterKey: EventFilterKey;
   raw?: CalendarEvent;
+  /** Present only for auto-generated Property Viewing events — these ARE editable/deletable. */
+  viewingRaw?: PropertyViewing;
+  /** Present only for auto-generated Maintenance events — read-only, managed from Maintenance Monitoring. */
+  maintenanceRaw?: MaintenanceRequestRow;
+  /** Present only for auto-generated (real) Inspection events — read-only, managed from the contract's inspection flow. */
+  inspectionRaw?: InspectionCalendarRow;
   contractId?: string | null;
   paymentId?: string | null;
 };
@@ -145,6 +205,9 @@ function eventAccent(ev: Pick<UiEvent, 'color' | 'colorHex'>): string {
   if (ev.color.includes('blue')) return '#3b82f6';
   if (ev.color.includes('amber')) return '#f59e0b';
   if (ev.color.includes('indigo')) return '#4B89CD';
+  if (ev.color.includes('orange')) return '#f97316';
+  if (ev.color.includes('red')) return '#ef4444';
+  if (ev.color.includes('purple')) return '#a855f7';
   return '#64748b';
 }
 
@@ -169,6 +232,15 @@ function eventChipClass(color: string): string {
   }
   if (color.includes('indigo')) {
     return 'bg-brand-blue/10 text-brand-blue border-l-brand-blue dark:bg-brand-blue/25 dark:text-blue-200 dark:border-l-brand-blue';
+  }
+  if (color.includes('orange')) {
+    return 'bg-orange-100 text-orange-800 border-l-orange-500 dark:bg-orange-500/25 dark:text-orange-200 dark:border-l-orange-400';
+  }
+  if (color.includes('red')) {
+    return 'bg-red-100 text-red-800 border-l-red-500 dark:bg-red-500/25 dark:text-red-200 dark:border-l-red-400';
+  }
+  if (color.includes('purple')) {
+    return 'bg-purple-100 text-purple-800 border-l-purple-500 dark:bg-purple-500/25 dark:text-purple-200 dark:border-l-purple-400';
   }
   return 'bg-slate-100 text-slate-700 border-l-slate-400 dark:bg-slate-700/50 dark:text-slate-200 dark:border-l-slate-400';
 }
@@ -208,21 +280,29 @@ function findPaymentScheduleForEvent(
   return row?.id ?? null;
 }
 
+/** Broader than `CalendarEventType` — the form also supports creating a Property Viewing,
+ *  which is backed by its own `property_viewing` table/API rather than `calendar_event`. */
+type CalendarFormEventType = CalendarEventType | 'property_viewing';
+
 type EventForm = {
-  eventType: CalendarEventType;
+  eventType: CalendarFormEventType;
   eventDate: string;
+  eventTime: string;
   title: string;
   unitId: string;
   colorCode: string;
+  prospectContact: string;
 };
 
 function defaultEventForm(today: Date, unitId: string): EventForm {
   return {
     eventType: 'inspection',
     eventDate: format(today, 'yyyy-MM-dd'),
+    eventTime: '',
     title: 'Inspection',
     unitId,
     colorCode: '#4B89CD',
+    prospectContact: '',
   };
 }
 
@@ -240,10 +320,17 @@ export function CalendarView() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [customEvents, setCustomEvents] = useState<CalendarEvent[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequestRow[]>([]);
+  const [inspections, setInspections] = useState<InspectionCalendarRow[]>([]);
+  const [propertyViewings, setPropertyViewings] = useState<PropertyViewing[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('month');
+  const [activeFilters, setActiveFilters] = useState<Set<EventFilterKey>>(() => new Set(ALL_FILTER_KEYS));
 
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventFormMode, setEventFormMode] = useState<'create' | 'edit'>('create');
+  const [editingKind, setEditingKind] = useState<'calendar_event' | 'property_viewing'>('calendar_event');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState<EventForm>(() => defaultEventForm(new Date(), ''));
 
@@ -284,6 +371,24 @@ export function CalendarView() {
           hadError = true;
           setCustomEvents([]);
         }
+        try {
+          setMaintenanceRequests(await fetchMaintenanceRequests());
+        } catch {
+          hadError = true;
+          setMaintenanceRequests([]);
+        }
+        try {
+          setInspections(await fetchInspectionsForCalendar());
+        } catch {
+          hadError = true;
+          setInspections([]);
+        }
+        try {
+          setPropertyViewings(await fetchPropertyViewings());
+        } catch {
+          hadError = true;
+          setPropertyViewings([]);
+        }
         if (hadError) toast.warning(t('views.calendar.loadError'));
       } finally {
         setLoading(false);
@@ -313,6 +418,7 @@ export function CalendarView() {
         color: 'bg-emerald-500',
         icon: <ArrowRight className="w-3 h-3" />,
         source: 'derived' as const,
+        filterKey: 'move_in' as const,
         contractId: c.id,
       })),
       ...contracts.map((c) => ({
@@ -323,8 +429,22 @@ export function CalendarView() {
         color: 'bg-rose-500',
         icon: <ArrowLeft className="w-3 h-3" />,
         source: 'derived' as const,
+        filterKey: 'move_out' as const,
         contractId: c.id,
       })),
+      ...contracts
+        .filter((c) => c.status === 'Active')
+        .map((c) => ({
+          id: `lease-exp-${c.id}`,
+          date: startOfDay(parseISO(c.endDate)),
+          typeLabel: t('views.calendar.eventTypes.leaseExpiration'),
+          unitId: c.unitId,
+          color: 'bg-orange-500',
+          icon: <Clock className="w-3 h-3" />,
+          source: 'derived' as const,
+          filterKey: 'lease_expiration' as const,
+          contractId: c.id,
+        })),
       ...payments.map((p) => ({
         id: `payment-due-${p.id}`,
         date: startOfDay(parseISO(p.dueDate)),
@@ -336,8 +456,49 @@ export function CalendarView() {
         color: p.status === 'Paid' ? 'bg-blue-500' : 'bg-amber-500',
         icon: <DollarSign className="w-3 h-3" />,
         source: 'derived' as const,
+        filterKey: 'payment' as const,
         contractId: p.contractId,
         paymentId: p.id,
+      })),
+      ...maintenanceRequests
+        .filter((r) => !!r.scheduledDate)
+        .map((r) => {
+          const contract = contracts.find((c) => c.id === r.contractId);
+          return {
+            id: `maintenance-${r.id}`,
+            date: startOfDay(parseISO(String(r.scheduledDate))),
+            typeLabel: t('views.calendar.eventTypes.maintenance'),
+            unitId: contract?.unitId ?? '',
+            color: 'bg-red-500',
+            icon: <Wrench className="w-3 h-3" />,
+            source: 'derived' as const,
+            filterKey: 'maintenance' as const,
+            contractId: r.contractId,
+            maintenanceRaw: r,
+          };
+        }),
+      ...inspections.map((row) => ({
+        id: `auto-inspection-${row.id}`,
+        date: startOfDay(parseISO(String(row.scheduledDate))),
+        typeLabel: t('views.calendar.eventTypes.inspection'),
+        unitId: row.unitId,
+        color: 'bg-brand-blue',
+        icon: <ClipboardCheck className="w-3 h-3" />,
+        source: 'derived' as const,
+        filterKey: 'inspection' as const,
+        contractId: row.contractId,
+        inspectionRaw: row,
+      })),
+      ...propertyViewings.map((v) => ({
+        id: `viewing-${v.id}`,
+        date: startOfDay(parseISO(v.scheduledAt.slice(0, 10))),
+        typeLabel: t('views.calendar.eventTypes.propertyViewing'),
+        unitId: v.unitId,
+        color: 'bg-purple-500',
+        icon: <Eye className="w-3 h-3" />,
+        source: 'derived' as const,
+        filterKey: 'property_viewing' as const,
+        viewingRaw: v,
       })),
     ];
 
@@ -387,6 +548,17 @@ export function CalendarView() {
           <Info className="w-3 h-3" />
         );
 
+      const filterKey: EventFilterKey =
+        e.eventType === 'move_in'
+          ? 'move_in'
+          : e.eventType === 'move_out'
+            ? 'move_out'
+            : e.eventType === 'payment_due' || e.eventType === 'payment_received'
+              ? 'payment'
+              : e.eventType === 'inspection'
+                ? 'inspection'
+                : 'other';
+
       return {
         id: `custom-${e.id}`,
         date,
@@ -395,36 +567,50 @@ export function CalendarView() {
         color,
         colorHex: hex,
         icon,
-        source: 'custom',
+        source: 'custom' as const,
+        filterKey,
         raw: e,
         contractId: e.contractId,
       };
     });
 
     return [...derived, ...custom].filter((ev) => ev.unitId);
-  }, [contracts, customEvents, payments, t]);
+  }, [contracts, customEvents, inspections, maintenanceRequests, payments, propertyViewings, t]);
+
+  const filteredEvents = useMemo(
+    () => events.filter((e) => activeFilters.has(e.filterKey)),
+    [events, activeFilters],
+  );
 
   const unitOptions = useMemo(
     () => units.map((u) => ({ value: u.id, label: `${u.unitNumber} - ${u.buildingName}` })),
     [units],
   );
 
-  const eventTypeOptions = useMemo(
-    () => [
+  const eventTypeOptions = useMemo(() => {
+    const base = [
       { value: 'inspection', label: t('views.calendar.eventTypes.inspection') },
       { value: 'other', label: t('views.calendar.eventTypes.other') },
       { value: 'move_in', label: t('views.calendar.eventTypes.moveIn') },
       { value: 'move_out', label: t('views.calendar.eventTypes.moveOut') },
       { value: 'payment_due', label: t('views.calendar.eventTypes.paymentDue') },
       { value: 'payment_received', label: t('views.calendar.eventTypes.paymentReceived') },
-    ],
-    [t],
-  );
+    ];
+    // Property Viewing is backed by its own table — only offerable when not converting
+    // an existing calendar_event (type conversion between the two tables isn't supported).
+    if (eventFormMode === 'create' || editingKind === 'property_viewing') {
+      base.push({ value: 'property_viewing', label: t('views.calendar.eventTypes.propertyViewing') });
+    }
+    return base;
+  }, [editingKind, eventFormMode, t]);
+
+  const isPropertyViewingForm = eventForm.eventType === 'property_viewing';
 
   const openCreateEvent = useCallback(() => {
     const day = selectedDay ?? new Date();
     const fallbackUnit = units[0]?.id ?? '';
     setEventFormMode('create');
+    setEditingKind('calendar_event');
     setEditingEventId(null);
     setEventForm(defaultEventForm(day, fallbackUnit));
     setEventModalOpen(true);
@@ -442,6 +628,24 @@ export function CalendarView() {
 
   const openEditEvent = useCallback(
     (ev: UiEvent) => {
+      if (ev.filterKey === 'property_viewing' && ev.viewingRaw) {
+        const v = ev.viewingRaw;
+        const [datePart, timePart] = v.scheduledAt.split(' ');
+        setEventFormMode('edit');
+        setEditingKind('property_viewing');
+        setEditingEventId(v.id);
+        setEventForm({
+          eventType: 'property_viewing',
+          eventDate: datePart,
+          eventTime: (timePart ?? '').slice(0, 5),
+          title: v.prospectName,
+          unitId: v.unitId,
+          colorCode: '',
+          prospectContact: v.prospectContact ?? '',
+        });
+        setEventModalOpen(true);
+        return;
+      }
       if (ev.source !== 'custom' || !ev.raw) return;
       const raw = ev.raw;
       const unitIdFromContract =
@@ -454,13 +658,16 @@ export function CalendarView() {
           : '';
       const unitId = unitIdFromContract ?? unitIdFromPayment ?? unitIdFromMeta ?? units[0]?.id ?? '';
       setEventFormMode('edit');
+      setEditingKind('calendar_event');
       setEditingEventId(raw.id);
       setEventForm({
         eventType: raw.eventType,
         eventDate: raw.eventDate,
+        eventTime: '',
         title: raw.title,
         unitId,
         colorCode: raw.colorCode ?? '',
+        prospectContact: '',
       });
       setEventModalOpen(true);
     },
@@ -470,6 +677,7 @@ export function CalendarView() {
   const closeEventModal = useCallback(() => {
     setEventModalOpen(false);
     setEventFormMode('create');
+    setEditingKind('calendar_event');
     setEditingEventId(null);
   }, []);
 
@@ -478,12 +686,40 @@ export function CalendarView() {
       toast.error(t('views.calendar.validationRequired'));
       return;
     }
+
+    if (isPropertyViewingForm) {
+      const scheduledAt = eventForm.eventTime
+        ? `${eventForm.eventDate} ${eventForm.eventTime}:00`
+        : eventForm.eventDate;
+      const body = {
+        unitId: eventForm.unitId,
+        prospectName: eventForm.title.trim(),
+        prospectContact: eventForm.prospectContact.trim() || null,
+        scheduledAt,
+      };
+      try {
+        if (eventFormMode === 'edit' && editingEventId) {
+          const updated = await updatePropertyViewing(editingEventId, body);
+          setPropertyViewings((prev) => prev.map((v) => (v.id === editingEventId ? updated : v)));
+          toast.success(t('views.calendar.updated'));
+        } else {
+          const created = await createPropertyViewing(body);
+          setPropertyViewings((prev) => [created, ...prev]);
+          toast.success(t('views.calendar.created'));
+        }
+        closeEventModal();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('views.calendar.saveError'));
+      }
+      return;
+    }
+
     const unit = units.find((u) => u.id === eventForm.unitId);
     const buildingHint = unit ? `${unit.unitNumber} - ${unit.buildingName}` : '';
     const contract = pickContractForCalendarEvent(
       contracts,
       eventForm.unitId,
-      eventForm.eventType,
+      eventForm.eventType as CalendarEventType,
       eventForm.eventDate,
     );
     const contractId = contract?.id ?? null;
@@ -492,11 +728,11 @@ export function CalendarView() {
         payments,
         eventForm.unitId,
         eventForm.eventDate,
-        eventForm.eventType,
+        eventForm.eventType as CalendarEventType,
         contractId,
       ) ?? null;
     const body = {
-      eventType: eventForm.eventType,
+      eventType: eventForm.eventType as CalendarEventType,
       eventDate: eventForm.eventDate,
       title: eventForm.title.trim(),
       colorCode: eventForm.colorCode.trim() || null,
@@ -518,10 +754,32 @@ export function CalendarView() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('views.calendar.saveError'));
     }
-  }, [closeEventModal, contracts, editingEventId, eventForm, eventFormMode, payments, t, units]);
+  }, [
+    closeEventModal,
+    contracts,
+    editingEventId,
+    eventForm,
+    eventFormMode,
+    isPropertyViewingForm,
+    payments,
+    t,
+    units,
+  ]);
 
   const removeEvent = useCallback(
     async (ev: UiEvent) => {
+      if (ev.filterKey === 'property_viewing' && ev.viewingRaw) {
+        const viewing = ev.viewingRaw;
+        if (!window.confirm(t('views.calendar.deleteConfirm', { title: viewing.prospectName }))) return;
+        try {
+          await deletePropertyViewing(viewing.id);
+          setPropertyViewings((prev) => prev.filter((v) => v.id !== viewing.id));
+          toast.success(t('views.calendar.deleted'));
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : t('views.calendar.deleteError'));
+        }
+        return;
+      }
       if (ev.source !== 'custom' || !ev.raw) return;
       const raw = ev.raw;
       if (!window.confirm(t('views.calendar.deleteConfirm', { title: raw.title }))) return;
@@ -536,18 +794,84 @@ export function CalendarView() {
     [t],
   );
 
+  const isEventEditable = useCallback(
+    (ev: UiEvent) => (ev.source === 'custom' && !!ev.raw) || (ev.filterKey === 'property_viewing' && !!ev.viewingRaw),
+    [],
+  );
+
   const openPreview = useCallback((type: 'contract' | 'invoice', id: string) => {
     const url = `${window.location.origin}/preview?type=${type}&id=${encodeURIComponent(id)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const goNext = () => {
+    if (viewMode === 'week') {
+      const d = addDays(selectedDay ?? currentMonth, 7);
+      setSelectedDay(d);
+      setCurrentMonth(d);
+    } else if (viewMode === 'day') {
+      const d = addDays(selectedDay ?? currentMonth, 1);
+      setSelectedDay(d);
+      setCurrentMonth(d);
+    } else {
+      setCurrentMonth(addMonths(currentMonth, 1));
+    }
+  };
+  const goPrev = () => {
+    if (viewMode === 'week') {
+      const d = subDays(selectedDay ?? currentMonth, 7);
+      setSelectedDay(d);
+      setCurrentMonth(d);
+    } else if (viewMode === 'day') {
+      const d = subDays(selectedDay ?? currentMonth, 1);
+      setSelectedDay(d);
+      setCurrentMonth(d);
+    } else {
+      setCurrentMonth(subMonths(currentMonth, 1));
+    }
+  };
+
+  const weekDays = useMemo(() => {
+    const base = selectedDay ?? currentMonth;
+    return eachDayOfInterval({ start: startOfWeek(base), end: endOfWeek(base) });
+  }, [selectedDay, currentMonth]);
+
+  const listEvents = useMemo(() => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    return [...filteredEvents]
+      .filter((e) => e.date >= start && e.date <= end)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [filteredEvents, currentMonth]);
+
+  const headerLabel = useMemo(() => {
+    if (viewMode === 'week') {
+      const start = weekDays[0];
+      const end = weekDays[weekDays.length - 1];
+      if (!start || !end) return format(currentMonth, 'MMMM yyyy');
+      return isSameMonth(start, end)
+        ? `${format(start, 'MMM d')} – ${format(end, 'd, yyyy')}`
+        : `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`;
+    }
+    if (viewMode === 'day') {
+      return format(selectedDay ?? currentMonth, 'EEEE, MMM d, yyyy');
+    }
+    return format(currentMonth, 'MMMM yyyy');
+  }, [currentMonth, selectedDay, viewMode, weekDays]);
+
+  const toggleFilter = useCallback((key: EventFilterKey) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const selectedDayEvents = useMemo(() => {
     if (!selectedDay) return [];
-    return events.filter((e) => isSameDay(e.date, selectedDay));
-  }, [selectedDay, events]);
+    return filteredEvents.filter((e) => isSameDay(e.date, selectedDay));
+  }, [selectedDay, filteredEvents]);
 
   const resolveEventLine = useCallback(
     (event: UiEvent) => {
@@ -638,114 +962,288 @@ export function CalendarView() {
               {t('views.calendar.addEvent')}
             </Button>
           ) : null}
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
+            {(
+              [
+                { key: 'month' as const, label: t('views.calendar.viewMode.month'), icon: LayoutGrid },
+                { key: 'week' as const, label: t('views.calendar.viewMode.week'), icon: CalendarRange },
+                { key: 'day' as const, label: t('views.calendar.viewMode.day'), icon: CalendarDays },
+                { key: 'list' as const, label: t('views.calendar.viewMode.list'), icon: ListIcon },
+              ]
+            ).map((mode) => (
+              <Button
+                key={mode.key}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode(mode.key)}
+                className={cn(
+                  'h-8 px-2.5 text-xs font-bold transition-colors',
+                  viewMode === mode.key
+                    ? 'bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/20 dark:text-brand-blue'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-brand-blue hover:bg-brand-blue/10 dark:hover:bg-brand-blue/10',
+                )}
+              >
+                <mode.icon className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">{mode.label}</span>
+              </Button>
+            ))}
+          </div>
           <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 const today = new Date();
                 setCurrentMonth(today);
                 setSelectedDay(today);
-              }} 
+              }}
               className="h-8 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-brand-blue hover:bg-brand-blue/10 dark:hover:bg-brand-blue/10 transition-colors"
             >
               {t('views.calendar.today')}
             </Button>
             <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
+            <Button variant="ghost" size="icon" onClick={goPrev} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="px-4 font-bold text-sm min-w-[140px] text-center text-slate-700 dark:text-slate-200">
-              {format(currentMonth, 'MMMM yyyy')}
+              {headerLabel}
             </div>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
+            <Button variant="ghost" size="icon" onClick={goNext} className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-brand-blue dark:hover:text-brand-blue">
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-black/50 overflow-hidden bg-slate-200/70 dark:bg-slate-900/90 backdrop-blur-sm">
-        <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b border-slate-300/60 dark:border-slate-800 bg-slate-200/80 dark:bg-slate-900/70">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="p-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 divide-x divide-y divide-slate-300/50 border-b border-slate-300/50 bg-slate-200/60 dark:divide-slate-800 dark:border-slate-800 dark:bg-transparent">
-            {calendarGridDays.map((day) => {
-              const dayEvents = events.filter((e) => isSameDay(e.date, day));
-              const isSelected = selectedDay && isSameDay(day, selectedDay);
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isTday = isToday(day);
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/50">
+        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <Filter className="w-3.5 h-3.5" />
+          {t('views.calendar.filters')}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setActiveFilters(new Set(ALL_FILTER_KEYS))}
+          className={cn(
+            'h-7 rounded-full px-3 text-[11px] font-bold',
+            activeFilters.size === ALL_FILTER_KEYS.length
+              ? 'bg-slate-800 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300',
+          )}
+        >
+          {t('views.calendar.filterAll')}
+        </Button>
+        {FILTER_DEFS.map((def) => {
+          const active = activeFilters.has(def.key);
+          return (
+            <Button
+              key={def.key}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleFilter(def.key)}
+              className={cn(
+                'h-7 rounded-full px-3 text-[11px] font-bold flex items-center gap-1.5 transition-opacity',
+                active ? 'opacity-100' : 'opacity-40 hover:opacity-70',
+                eventChipClass(def.dot),
+              )}
+            >
+              <span className={cn('w-2 h-2 rounded-full', def.dot)} />
+              {t(`views.calendar.eventTypes.${def.labelKey}`)}
+            </Button>
+          );
+        })}
+      </div>
 
-              return (
-                <div
-                  key={day.toString()}
-                  onClick={() => setSelectedDay(day)}
-                  className={cn(
-                    "min-h-[100px] p-2 cursor-pointer transition-all duration-200 relative group",
-                    !isCurrentMonth
-                      ? "bg-slate-100/80 text-slate-400 dark:bg-slate-950/40 dark:text-slate-600"
-                      : "bg-white text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300 dark:shadow-none",
-                    isSelected
-                      ? "bg-slate-200 ring-2 ring-inset ring-brand-blue/40 shadow-md dark:bg-brand-blue/10 dark:ring-1 dark:ring-brand-blue/20 dark:ring-brand-blue/25 dark:shadow-none z-10"
-                      : "hover:bg-white/90 dark:hover:bg-slate-800/50"
-                  )}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className={cn(
-                      "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
-                      isTday
-                        ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20 dark:shadow-brand-blue/40"
-                        : isSelected
-                          ? "text-brand-blue bg-slate-300/60 dark:text-brand-blue dark:bg-brand-blue/20"
-                          : "text-slate-500 dark:text-slate-400 group-hover:text-brand-blue dark:group-hover:text-brand-blue"
-                    )}>
-                      {format(day, 'd')}
-                    </span>
-                    {dayEvents.length > 0 && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-none">
-                        {dayEvents.length}
-                      </Badge>
+      {viewMode === 'month' ? (
+        <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-black/50 overflow-hidden bg-slate-200/70 dark:bg-slate-900/90 backdrop-blur-sm">
+          <CardContent className="p-0">
+            <div className="grid grid-cols-7 border-b border-slate-300/60 dark:border-slate-800 bg-slate-200/80 dark:bg-slate-900/70">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                <div key={d} className="p-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 divide-x divide-y divide-slate-300/50 border-b border-slate-300/50 bg-slate-200/60 dark:divide-slate-800 dark:border-slate-800 dark:bg-transparent">
+              {calendarGridDays.map((day) => {
+                const dayEvents = filteredEvents.filter((e) => isSameDay(e.date, day));
+                const isSelected = selectedDay && isSameDay(day, selectedDay);
+                const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isTday = isToday(day);
+
+                return (
+                  <div
+                    key={day.toString()}
+                    onClick={() => setSelectedDay(day)}
+                    className={cn(
+                      "min-h-[100px] p-2 cursor-pointer transition-all duration-200 relative group",
+                      !isCurrentMonth
+                        ? "bg-slate-100/80 text-slate-400 dark:bg-slate-950/40 dark:text-slate-600"
+                        : "bg-white text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300 dark:shadow-none",
+                      isSelected
+                        ? "bg-slate-200 ring-2 ring-inset ring-brand-blue/40 shadow-md dark:bg-brand-blue/10 dark:ring-1 dark:ring-brand-blue/20 dark:ring-brand-blue/25 dark:shadow-none z-10"
+                        : "hover:bg-white/90 dark:hover:bg-slate-800/50"
                     )}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <span className={cn(
+                        "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
+                        isTday
+                          ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20 dark:shadow-brand-blue/40"
+                          : isSelected
+                            ? "text-brand-blue bg-slate-300/60 dark:text-brand-blue dark:bg-brand-blue/20"
+                            : "text-slate-500 dark:text-slate-400 group-hover:text-brand-blue dark:group-hover:text-brand-blue"
+                      )}>
+                        {format(day, 'd')}
+                      </span>
+                      {dayEvents.length > 0 && (
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-none">
+                          {dayEvents.length}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="space-y-1 mt-2">
+                      {dayEvents.slice(0, 3).map((ev) => (
+                        <div
+                          key={ev.id}
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-md border-l-2 truncate flex items-center gap-1 font-semibold',
+                            !ev.colorHex && eventChipClass(ev.color || 'bg-slate-500'),
+                          )}
+                          style={
+                            ev.colorHex
+                              ? {
+                                  backgroundColor: `${ev.colorHex}33`,
+                                  color: ev.colorHex,
+                                  borderLeftColor: ev.colorHex,
+                                }
+                              : undefined
+                          }
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                          <span className="truncate">{ev.typeLabel}</span>
+                        </div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-1">
+                          +{dayEvents.length - 3} {t('views.calendar.more', 'more')}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1 mt-2">
-                    {dayEvents.slice(0, 3).map((ev) => (
-                      <div
-                        key={ev.id}
-                        className={cn(
-                          'text-[10px] px-2 py-0.5 rounded-md border-l-2 truncate flex items-center gap-1 font-semibold',
-                          !ev.colorHex && eventChipClass(ev.color || 'bg-slate-500'),
-                        )}
-                        style={
-                          ev.colorHex
-                            ? {
-                                backgroundColor: `${ev.colorHex}33`,
-                                color: ev.colorHex,
-                                borderLeftColor: ev.colorHex,
-                              }
-                            : undefined
-                        }
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                        <span className="truncate">{ev.typeLabel}</span>
-                      </div>
-                    ))}
-                    {dayEvents.length > 3 && (
-                      <div className="text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-1">
-                        +{dayEvents.length - 3} {t('views.calendar.more', 'more')}
-                      </div>
-                    )}
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {viewMode === 'week' ? (
+        <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-black/50 overflow-hidden bg-slate-200/70 dark:bg-slate-900/90 backdrop-blur-sm">
+          <CardContent className="p-0">
+            <div className="grid grid-cols-7 border-b border-slate-300/60 dark:border-slate-800 bg-slate-200/80 dark:bg-slate-900/70">
+              {weekDays.map((d) => (
+                <div key={d.toString()} className="p-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {format(d, 'EEE')}
+                  </div>
+                  <div className={cn('mt-0.5 text-xs font-bold', isToday(d) ? 'text-brand-blue' : 'text-slate-600 dark:text-slate-300')}>
+                    {format(d, 'd')}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 divide-x divide-slate-300/50 dark:divide-slate-800">
+              {weekDays.map((day) => {
+                const dayEvents = filteredEvents.filter((e) => isSameDay(e.date, day));
+                const isSelected = selectedDay && isSameDay(day, selectedDay);
+                return (
+                  <div
+                    key={day.toString()}
+                    onClick={() => setSelectedDay(day)}
+                    className={cn(
+                      'min-h-[220px] p-2 cursor-pointer transition-all duration-200',
+                      isSelected
+                        ? 'bg-slate-200 ring-2 ring-inset ring-brand-blue/40 dark:bg-brand-blue/10 dark:ring-1 dark:ring-brand-blue/25'
+                        : 'bg-white hover:bg-white/90 dark:bg-slate-900 dark:hover:bg-slate-800/50',
+                    )}
+                  >
+                    <div className="space-y-1">
+                      {dayEvents.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className={cn(
+                            'text-[10px] px-2 py-1 rounded-md border-l-2 truncate flex items-center gap-1 font-semibold',
+                            !ev.colorHex && eventChipClass(ev.color || 'bg-slate-500'),
+                          )}
+                          style={
+                            ev.colorHex
+                              ? { backgroundColor: `${ev.colorHex}33`, color: ev.colorHex, borderLeftColor: ev.colorHex }
+                              : undefined
+                          }
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                          <span className="truncate">{ev.typeLabel}</span>
+                        </div>
+                      ))}
+                      {dayEvents.length === 0 && (
+                        <p className="text-[10px] text-slate-300 dark:text-slate-600 italic pt-2 text-center">—</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {viewMode === 'list' ? (
+        <Card className="border-none shadow-md dark:shadow-black/30">
+          <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
+            {listEvents.length > 0 ? (
+              listEvents.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(ev.date);
+                    openDetails(ev);
+                  }}
+                  className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="w-20 shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {format(ev.date, 'MMM d')}
+                  </div>
+                  <div
+                    className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0',
+                      !ev.colorHex && (ev.color || 'bg-slate-500'),
+                    )}
+                    style={ev.colorHex ? { backgroundColor: ev.colorHex } : undefined}
+                  >
+                    {ev.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{ev.typeLabel}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {units.find((u) => u.id === ev.unitId)?.unitNumber ?? '—'} · {units.find((u) => u.id === ev.unitId)?.buildingName ?? ''}
+                    </p>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
+                <ListIcon className="w-12 h-12 mb-3 opacity-20" />
+                <p className="text-sm italic">{t('views.calendar.listEmpty')}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 border-none shadow-md dark:shadow-black/30">
@@ -790,7 +1288,7 @@ export function CalendarView() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 transition-opacity">
-                        {event.source === 'custom' && canUpdate ? (
+                        {isEventEditable(event) && canUpdate ? (
                           <Button
                             type="button"
                             variant="ghost"
@@ -802,7 +1300,7 @@ export function CalendarView() {
                             {t('views.calendar.edit')}
                           </Button>
                         ) : null}
-                        {event.source === 'custom' && canDelete ? (
+                        {isEventEditable(event) && canDelete ? (
                           <Button
                             type="button"
                             variant="ghost"
@@ -874,6 +1372,34 @@ export function CalendarView() {
                 </div>
                 <DollarSign className="w-3 h-3 text-slate-300 dark:text-slate-600" />
               </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.eventTypes.leaseExpiration')}</span>
+                </div>
+                <Clock className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.eventTypes.maintenance')}</span>
+                </div>
+                <Wrench className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-brand-blue"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.eventTypes.inspection')}</span>
+                </div>
+                <ClipboardCheck className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t('views.calendar.eventTypes.propertyViewing')}</span>
+                </div>
+                <Eye className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+              </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -904,7 +1430,7 @@ export function CalendarView() {
       >
         <div className="unit-form-fields flex flex-col gap-5">
           <div className="space-y-1.5">
-            <Label>{t('views.calendar.eventTitle')}</Label>
+            <Label>{isPropertyViewingForm ? t('views.calendar.prospectName') : t('views.calendar.eventTitle')}</Label>
             <Input
               className={CALENDAR_FORM_INPUT}
               value={eventForm.title}
@@ -928,10 +1454,31 @@ export function CalendarView() {
                 className={CALENDAR_SELECT_CLASS}
                 options={eventTypeOptions}
                 value={eventForm.eventType}
-                onChange={(v) => setEventForm((p) => ({ ...p, eventType: (v ?? 'other') as CalendarEventType }))}
+                onChange={(v) => setEventForm((p) => ({ ...p, eventType: (v ?? 'other') as CalendarFormEventType }))}
               />
             </div>
           </div>
+          {isPropertyViewingForm ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+              <div className="min-w-0 space-y-1.5">
+                <Label>{t('views.calendar.viewingTime')}</Label>
+                <Input
+                  type="time"
+                  className={cn(CALENDAR_FORM_INPUT, 'w-full')}
+                  value={eventForm.eventTime}
+                  onChange={(e) => setEventForm((p) => ({ ...p, eventTime: e.target.value }))}
+                />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label>{t('views.calendar.prospectContact')}</Label>
+                <Input
+                  className={CALENDAR_FORM_INPUT}
+                  value={eventForm.prospectContact}
+                  onChange={(e) => setEventForm((p) => ({ ...p, prospectContact: e.target.value }))}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label>{t('views.calendar.unit')}</Label>
             <Select2
@@ -942,15 +1489,17 @@ export function CalendarView() {
               onChange={(v) => setEventForm((p) => ({ ...p, unitId: (v ?? '') as string }))}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>{t('views.calendar.color')}</Label>
-            <Input
-              className={CALENDAR_FORM_INPUT}
-              placeholder="#4B89CD"
-              value={eventForm.colorCode}
-              onChange={(e) => setEventForm((p) => ({ ...p, colorCode: e.target.value }))}
-            />
-          </div>
+          {!isPropertyViewingForm ? (
+            <div className="space-y-1.5">
+              <Label>{t('views.calendar.color')}</Label>
+              <Input
+                className={CALENDAR_FORM_INPUT}
+                placeholder="#4B89CD"
+                value={eventForm.colorCode}
+                onChange={(e) => setEventForm((p) => ({ ...p, colorCode: e.target.value }))}
+              />
+            </div>
+          ) : null}
         </div>
       </Modal>
 
@@ -1016,7 +1565,7 @@ export function CalendarView() {
                 {t('views.contracts.table.viewContract')}
               </Button>
             ) : null}
-            {detailsEvent?.source === 'custom' && canUpdate ? (
+            {detailsEvent && isEventEditable(detailsEvent) && canUpdate ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -1026,7 +1575,7 @@ export function CalendarView() {
                 {t('views.calendar.edit')}
               </Button>
             ) : null}
-            {detailsEvent?.source === 'custom' && canDelete ? (
+            {detailsEvent && isEventEditable(detailsEvent) && canDelete ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -1055,6 +1604,65 @@ export function CalendarView() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
+              {detailsEvent.viewingRaw ? (
+                <DetailCard title={t('views.calendar.details.viewingInfo')} className="sm:col-span-2">
+                  <Field
+                    label={t('views.calendar.details.prospect')}
+                    value={detailsEvent.viewingRaw.prospectName}
+                  />
+                  <Field
+                    label={t('views.calendar.details.phone')}
+                    value={detailsEvent.viewingRaw.prospectContact || '—'}
+                  />
+                  <Field
+                    label={t('views.calendar.details.status')}
+                    value={
+                      <StatusBadge
+                        tone={
+                          detailsEvent.viewingRaw.status === 'completed'
+                            ? 'success'
+                            : detailsEvent.viewingRaw.status === 'cancelled' ||
+                                detailsEvent.viewingRaw.status === 'no_show'
+                              ? 'neutral'
+                              : 'info'
+                        }
+                      >
+                        {detailsEvent.viewingRaw.status}
+                      </StatusBadge>
+                    }
+                  />
+                  <Field label={t('views.calendar.details.agent')} value={detailsEvent.viewingRaw.agentName || '—'} />
+                  {detailsEvent.viewingRaw.notes ? (
+                    <div className="sm:col-span-2">
+                      <Field label={t('views.calendar.details.remarks')} value={detailsEvent.viewingRaw.notes} />
+                    </div>
+                  ) : null}
+                </DetailCard>
+              ) : null}
+
+              {detailsEvent.maintenanceRaw ? (
+                <DetailCard title={t('views.calendar.details.maintenanceInfo')} className="sm:col-span-2">
+                  <Field label={t('views.calendar.details.maintenanceTitle')} value={detailsEvent.maintenanceRaw.title} />
+                  <Field
+                    label={t('views.calendar.details.status')}
+                    value={String(detailsEvent.maintenanceRaw.status).replace('_', ' ')}
+                  />
+                  <div className="sm:col-span-2">
+                    <Field label={t('views.calendar.details.remarks')} value={detailsEvent.maintenanceRaw.details || '—'} />
+                  </div>
+                </DetailCard>
+              ) : null}
+
+              {detailsEvent.inspectionRaw ? (
+                <DetailCard title={t('views.calendar.details.inspectionInfo')} className="sm:col-span-2">
+                  <Field
+                    label={t('views.calendar.details.status')}
+                    value={String(detailsEvent.inspectionRaw.status).replace(/_/g, ' ')}
+                  />
+                  <Field label={t('views.calendar.details.contractNo')} value={detailsEvent.inspectionRaw.contractNo || '—'} />
+                </DetailCard>
+              ) : null}
+
               {detailsContext.tenant ? (
                 <DetailCard title={t('views.calendar.details.tenantInfo')}>
                   <Field

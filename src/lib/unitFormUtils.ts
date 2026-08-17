@@ -1,4 +1,4 @@
-import type { InventoryItem, Unit, UnitStatus, UnitType } from '@/types';
+import type { InventoryItem, Unit, UnitListingType, UnitStatus, UnitType } from '@/types';
 import type { UnitWriteBody } from '@/lib/unitsApi';
 
 export const UNIT_FORM_TYPES: UnitType[] = [
@@ -18,6 +18,14 @@ export const UNIT_FORM_TYPES: UnitType[] = [
 ];
 
 export const UNIT_FORM_STATUSES: UnitStatus[] = ['Available', 'Occupied', 'Maintenance', 'Reserved'];
+
+/** Public real estate website listing intent — shown on the Unit form's "Website Listing" section. */
+export const UNIT_FORM_LISTING_TYPES: { value: UnitListingType; label: string }[] = [
+  { value: 'monthly_rental', label: 'Monthly Rental' },
+  { value: 'selling', label: 'For Sale' },
+  { value: 'short_term_rental', label: 'Short-term Rental' },
+  { value: 'pre_selling', label: 'Pre-Selling' },
+];
 
 export const UNIT_FORM_FURNISHING = [
   'Unfurnished',
@@ -137,6 +145,19 @@ export type UnitFormState = {
   specialRemarks: string;
   parkingSlot: string;
   furnishing: string;
+  /** Public website sync fields. */
+  listingType: UnitListingType;
+  marketValue: string;
+  developer: string;
+  /** Public marketing copy shown on the website — distinct from moreDetails/specialRemarks. */
+  listingDescription: string;
+  lotAreaSqm: string;
+  floorsLabel: string;
+  /** Comma-separated in the form UI; split into an array on save. */
+  amenities: string;
+  features: string;
+  featured: boolean;
+  isNewListing: boolean;
 };
 
 export function unitDisplayMetrics(type: UnitType): { sqm: number; beds: number; baths: number } {
@@ -177,8 +198,26 @@ export function defaultUnitForm(partial?: Partial<UnitFormState>): UnitFormState
     specialRemarks: '',
     parkingSlot: '',
     furnishing: '',
+    listingType: 'monthly_rental',
+    marketValue: '',
+    developer: '',
+    listingDescription: '',
+    lotAreaSqm: '',
+    floorsLabel: '',
+    amenities: '',
+    features: '',
+    featured: false,
+    isNewListing: false,
     ...partial,
   };
+}
+
+/** "Infinity Pool, Gym, Concierge" → ['Infinity Pool', 'Gym', 'Concierge'] */
+export function parseCommaList(raw: string): string[] {
+  return String(raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function ordinalFloor(n: number): string {
@@ -326,6 +365,16 @@ export function unitFormToWriteBody(
     parkingSlot: form.parkingSlot.trim() || undefined,
     furnishing: (form.furnishing.trim() || undefined) as UnitWriteBody['furnishing'],
     inventory,
+    listingType: form.listingType,
+    marketValue: parseMetricInput(form.marketValue) ?? undefined,
+    developer: form.developer.trim() || undefined,
+    listingDescription: form.listingDescription.trim() || undefined,
+    lotAreaSqm: parseMetricInput(form.lotAreaSqm) ?? undefined,
+    floorsLabel: form.floorsLabel.trim() || undefined,
+    amenities: parseCommaList(form.amenities),
+    features: parseCommaList(form.features),
+    featured: form.featured,
+    isNewListing: form.isNewListing,
   };
 }
 
@@ -360,5 +409,15 @@ export function unitToFormState(unit: Unit): UnitFormState {
     specialRemarks: unit.specialRemarks ?? '',
     parkingSlot: unit.parkingSlot ?? '',
     furnishing: unit.furnishing ?? '',
+    listingType: unit.listingType ?? 'monthly_rental',
+    marketValue: unit.marketValue != null ? String(unit.marketValue) : '',
+    developer: unit.developer ?? '',
+    listingDescription: unit.listingDescription ?? '',
+    lotAreaSqm: unit.lotAreaSqm != null ? String(unit.lotAreaSqm) : '',
+    floorsLabel: unit.floorsLabel ?? '',
+    amenities: (unit.amenities ?? []).join(', '),
+    features: (unit.features ?? []).join(', '),
+    featured: unit.featured ?? false,
+    isNewListing: unit.isNewListing ?? false,
   };
 }

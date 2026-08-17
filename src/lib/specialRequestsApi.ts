@@ -17,6 +17,7 @@ export type MaintenanceRequestRow = {
   vendorName?: string | null;
   estimatedCost?: number | null;
   actualCost?: number | null;
+  scheduledDate?: string | null;
   resolvedAt?: string | null;
   createdBy?: string | null;
   createdAt: string;

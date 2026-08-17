@@ -6,6 +6,7 @@ import {
   failInspectionAction,
   downloadInspectionReport,
   getContractInspection,
+  listBranchInspectionsForCalendar,
   patchChecklistItem,
   patchInspection,
   patchInventoryItem,
@@ -18,6 +19,7 @@ import {
 const router = Router();
 router.use(requireAuth);
 
+router.get('/', listBranchInspectionsForCalendar);
 router.get('/contracts/:contractId', getContractInspection);
 router.post('/contracts/:contractId/start', startContractInspection);
 

@@ -7,6 +7,23 @@ import type {
 
 const BASE = '/api/unit-inspections';
 
+export type InspectionCalendarRow = {
+  id: string;
+  contractId: string;
+  unitId: string;
+  status: string;
+  scheduledDate: string | null;
+  contractNo: string;
+  unitLabel: string;
+  buildingName: string;
+  tenantName: string;
+};
+
+export async function fetchInspectionsForCalendar(): Promise<InspectionCalendarRow[]> {
+  const { inspections } = await apiFetch<{ inspections: InspectionCalendarRow[] }>(BASE);
+  return inspections;
+}
+
 export async function fetchContractInspection(contractId: string): Promise<UnitInspectionPayload> {
   return apiFetch<UnitInspectionPayload>(`${BASE}/contracts/${encodeURIComponent(contractId)}`);
 }

@@ -297,7 +297,7 @@ export function BrokersPanel({ canCreate, canUpdate, canDelete }: BrokersPanelPr
               className="h-10 shrink-0 rounded-xl bg-brand-blue px-4 text-white shadow-sm hover:bg-[#3d7ab8]"
               onClick={openCreate}
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               {t('views.crm.brokers.addAgency')}
             </Button>
           ) : null}

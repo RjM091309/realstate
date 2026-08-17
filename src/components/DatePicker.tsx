@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CalendarDays, ChevronDown } from 'lucide-react';
-import { Box, Button, Popover, Typography } from '@mui/material';
+import { Box, Button, Popover } from '@mui/material';
 import { alpha, styled } from '@mui/material/styles';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay } from '@mui/x-date-pickers/PickersDay';
@@ -8,15 +8,15 @@ import { cn } from '@/lib/utils';
 
 const CALENDAR_COLORS = {
   panelBg: '#ffffff',
-  panelBorder: '#e2e8f0',
+  panelBorder: '#eef1f5',
   surfaceSoft: '#f8fafc',
-  textPrimary: '#0f172a',
-  textSecondary: '#475569',
-  accent: '#334155',
-  accentHover: '#1e293b',
-  rangeFill: '#e2e8f0',
-  rangeFillHover: '#cbd5e1',
-  selectedText: '#f8fafc',
+  textPrimary: '#334155',
+  textSecondary: '#94a3b8',
+  accent: '#3b82f6',
+  accentHover: '#2563eb',
+  rangeFill: '#eff6ff',
+  rangeFillHover: '#dbeafe',
+  selectedText: '#ffffff',
 };
 
 function formatRange(value: [Date | null, Date | null], placeholder: string = 'Enter Date') {
@@ -43,30 +43,30 @@ const RangePickersDay = styled(PickersDay, {
   shouldForwardProp: (prop) =>
     prop !== 'isRangeMiddle' && prop !== 'isRangeStart' && prop !== 'isRangeEnd',
 })<RangeDayProps>(({ theme, isRangeMiddle, isRangeStart, isRangeEnd }) => {
-  const stripBg = theme.palette.mode === 'dark' ? alpha('#94a3b8', 0.34) : CALENDAR_COLORS.rangeFill;
+  const stripBg = theme.palette.mode === 'dark' ? alpha('#3b82f6', 0.18) : CALENDAR_COLORS.rangeFill;
   const stripText = theme.palette.mode === 'dark' ? '#e2e8f0' : CALENDAR_COLORS.textPrimary;
-  const selectedBg = theme.palette.mode === 'dark' ? '#e2e8f0' : CALENDAR_COLORS.accent;
-  const selectedText = theme.palette.mode === 'dark' ? '#0f172a' : CALENDAR_COLORS.selectedText;
+  const selectedText = theme.palette.mode === 'dark' ? '#93c5fd' : CALENDAR_COLORS.accent;
 
   return {
+    fontWeight: 400,
     ...(isRangeMiddle && {
       borderRadius: 0,
       backgroundColor: stripBg,
       color: stripText,
-      fontWeight: 600,
       '&:hover, &:focus': {
         backgroundColor:
-          theme.palette.mode === 'dark' ? alpha('#94a3b8', 0.48) : CALENDAR_COLORS.rangeFillHover,
+          theme.palette.mode === 'dark' ? alpha('#3b82f6', 0.28) : CALENDAR_COLORS.rangeFillHover,
       },
     }),
     ...((isRangeStart || isRangeEnd) && {
       zIndex: 1,
-      backgroundColor: selectedBg,
+      backgroundColor: 'transparent',
       color: selectedText,
-      fontWeight: 700,
+      fontWeight: 600,
       borderRadius: '50%',
+      border: `1.5px solid ${theme.palette.mode === 'dark' ? '#93c5fd' : CALENDAR_COLORS.accent}`,
       '&:hover, &:focus': {
-        backgroundColor: theme.palette.mode === 'dark' ? '#cbd5e1' : CALENDAR_COLORS.accentHover,
+        backgroundColor: theme.palette.mode === 'dark' ? alpha('#3b82f6', 0.16) : CALENDAR_COLORS.rangeFill,
       },
     }),
   };
@@ -262,10 +262,10 @@ export function DatePicker({
           paper: {
             sx: {
               overflow: 'hidden',
-              borderRadius: 2.5,
+              borderRadius: 2,
               border: `1px solid ${CALENDAR_COLORS.panelBorder}`,
               backgroundColor: CALENDAR_COLORS.panelBg,
-              boxShadow: 'none',
+              boxShadow: '0 8px 24px -8px rgba(15, 23, 42, 0.12)',
               width: { xs: 'calc(100vw - 12px)', sm: 'max-content' },
               maxWidth: 'calc(100vw - 16px)',
               maxHeight: { xs: 'min(88vh, 640px)', sm: 'none' },
@@ -274,42 +274,6 @@ export function DatePicker({
           },
         }}
       >
-        <Box
-          sx={(t) => ({
-            px: { xs: 1, sm: 1.25 },
-            pt: { xs: 0.75, sm: 1 },
-            pb: { xs: 0.5, sm: 0.75 },
-            bgcolor: t.palette.mode === 'dark' ? '#0f172a' : CALENDAR_COLORS.surfaceSoft,
-            color: t.palette.mode === 'dark' ? '#f8fafc' : CALENDAR_COLORS.textPrimary,
-            borderBottom: `1px solid ${CALENDAR_COLORS.panelBorder}`,
-          })}
-        >
-          <Typography
-            variant="overline"
-            sx={{
-              opacity: 1,
-              letterSpacing: '0.1em',
-              fontWeight: 700,
-              lineHeight: 1.2,
-              fontSize: { xs: 10, sm: 11 },
-              color: CALENDAR_COLORS.textSecondary,
-            }}
-          >
-            {mode === 'single' ? 'SELECTED DATE' : 'SELECTED RANGE'}
-          </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              fontWeight: 600,
-              mt: 0.25,
-              lineHeight: 1.35,
-              fontSize: { xs: '1rem', sm: '1.3rem' },
-            }}
-          >
-            {rangeText}
-          </Typography>
-        </Box>
-
         <Box
           sx={{
             display: 'grid',
@@ -409,10 +373,11 @@ export function DatePicker({
                 margin: 0,
                 minHeight: 0,
               },
-              '& .MuiPickersCalendarHeader-label': { fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 600 },
+              '& .MuiPickersCalendarHeader-label': { fontSize: { xs: '0.95rem', sm: '1rem' }, fontWeight: 500 },
               '& .MuiPickersCalendarHeader-label, & .MuiDayCalendar-weekDayLabel': {
                 color: CALENDAR_COLORS.textSecondary,
               },
+              '& .MuiPickersCalendarHeader-switchViewButton': { display: 'none' },
               '& .MuiIconButton-root': {
                 color: CALENDAR_COLORS.textSecondary,
                 '&:hover': { backgroundColor: CALENDAR_COLORS.surfaceSoft },
@@ -423,13 +388,18 @@ export function DatePicker({
               '& .MuiDayCalendar-weekDayLabel': {
                 width: { xs: 32, sm: 36 },
                 fontSize: { xs: 11, sm: 12 },
+                fontWeight: 500,
               },
               '& .MuiPickersDay-root': {
                 width: { xs: 32, sm: 36 },
                 height: { xs: 32, sm: 36 },
                 fontSize: { xs: 13, sm: 14 },
                 color: CALENDAR_COLORS.textPrimary,
+                border: '1px solid transparent',
                 '&:hover': { backgroundColor: CALENDAR_COLORS.surfaceSoft },
+              },
+              '& .MuiPickersDay-today': {
+                border: `1px solid ${CALENDAR_COLORS.panelBorder}`,
               },
             }}
             slots={

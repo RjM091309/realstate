@@ -23,6 +23,8 @@ import {
   Car,
   Armchair,
   DollarSign,
+  Tag,
+  Sparkles,
 } from 'lucide-react';
 import { format, parseISO, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -564,6 +566,76 @@ export function UnitDetailsModal({
                           <strong className="block break-words text-xs font-bold text-slate-900 sm:text-sm dark:text-slate-100">
                             {furnishingLabel}
                           </strong>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+
+                {(() => {
+                  const listingType = unit.listingType ?? 'monthly_rental';
+                  const listingTypeLabel = t(`views.units.addModal.listingTypeOptions.${listingType}`);
+                  const showSalePrice =
+                    (listingType === 'selling' || listingType === 'pre_selling') &&
+                    unit.marketValue != null &&
+                    unit.marketValue > 0;
+                  const amenities = unit.amenities ?? [];
+                  const features = unit.features ?? [];
+                  const tags = [...amenities, ...features];
+                  const hasWebsiteInfo =
+                    showSalePrice ||
+                    Boolean(unit.developer) ||
+                    Boolean(unit.listingDescription) ||
+                    tags.length > 0 ||
+                    unit.featured ||
+                    unit.isNewListing;
+                  if (!hasWebsiteInfo) return null;
+                  return (
+                    <div className="space-y-2.5 rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2.5 py-1 font-semibold text-brand-blue">
+                          <Tag className="h-3 w-3" />
+                          {listingTypeLabel}
+                        </span>
+                        {unit.featured ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                            <Sparkles className="h-3 w-3" />
+                            {t('views.units.addModal.featured')}
+                          </span>
+                        ) : null}
+                        {unit.isNewListing ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
+                            {t('views.units.addModal.isNewListing')}
+                          </span>
+                        ) : null}
+                      </div>
+                      {showSalePrice ? (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <DollarSign className="h-3.5 w-3.5 text-brand-blue" />
+                          {t('views.units.addModal.marketValue')}: ₱{Number(unit.marketValue).toLocaleString()}
+                        </div>
+                      ) : null}
+                      {unit.developer ? (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <Building className="h-3.5 w-3.5 text-brand-blue" />
+                          {unit.developer}
+                        </div>
+                      ) : null}
+                      {unit.listingDescription ? (
+                        <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                          {unit.listingDescription}
+                        </p>
+                      ) : null}
+                      {tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                            >
+                              {tag}
+                            </span>
+                          ))}
                         </div>
                       ) : null}
                     </div>

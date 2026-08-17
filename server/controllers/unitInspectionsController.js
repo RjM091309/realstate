@@ -18,6 +18,7 @@ import {
   listChecklistItems,
   listInspectionLogs,
   listInspectionPhotos,
+  listInspectionsByBranch,
   listInventoryVerifications,
   refreshInspectionMetrics,
   rowToChecklist,
@@ -75,6 +76,38 @@ async function assertContractAccess(contractId, branchId) {
   const contract = await getContractById(contractId, branchId);
   if (!contract) return { error: 'Contract not found', status: 404 };
   return { contract };
+}
+
+/** Lightweight branch-wide feed for the Calendar's auto-generated "Inspection" events. */
+export async function listBranchInspectionsForCalendar(req, res) {
+  const ctx = await getAuthContext(req, res);
+  if (!ctx) return;
+  if (!canRead(ctx.session)) {
+    res.status(403).json({ error: 'No permission to view inspections' });
+    return;
+  }
+  try {
+    const rows = await listInspectionsByBranch(ctx.session.branchId);
+    res.json({
+      inspections: rows.map((r) => {
+        const tower = r.unit_tower ? `${r.unit_tower} · ` : '';
+        return {
+          id: String(r.id),
+          contractId: String(r.contract_id),
+          unitId: String(r.unit_id),
+          status: String(r.status),
+          scheduledDate: r.scheduled_move_in ? String(r.scheduled_move_in).slice(0, 10) : null,
+          contractNo: String(r.contract_no ?? ''),
+          unitLabel: `${tower}${r.unit_number ?? ''}`.trim() || '—',
+          buildingName: String(r.building_name ?? ''),
+          tenantName: String(r.tenant_name ?? '').trim() || '—',
+        };
+      }),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load inspections' });
+  }
 }
 
 export async function getContractInspection(req, res) {

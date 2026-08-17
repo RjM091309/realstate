@@ -13,6 +13,13 @@ function mapToUnitStatus(status) {
   return STATUS_MAP_TO_UNIT[status] ?? DEFAULT_UNIT_STATUS;
 }
 
+const LISTING_TYPES = new Set(['monthly_rental', 'selling', 'short_term_rental', 'pre_selling']);
+const DEFAULT_LISTING_TYPE = 'monthly_rental';
+
+function mapToListingType(listingType) {
+  return LISTING_TYPES.has(listingType) ? listingType : DEFAULT_LISTING_TYPE;
+}
+
 export async function listUnitsByBranch(branchId) {
   const [rows] = await pool.query(
     `
@@ -44,7 +51,17 @@ export async function listUnitsByBranch(branchId) {
       COALESCE(u.photos_json, '[]') AS photos_json,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
       u.more_details AS more_details,
-      u.special_remarks AS special_remarks
+      u.special_remarks AS special_remarks,
+      u.listing_type AS listing_type,
+      u.market_value AS market_value,
+      u.developer AS developer,
+      u.listing_description AS listing_description,
+      u.lot_area_sqm AS lot_area_sqm,
+      u.floors_label AS floors_label,
+      COALESCE(u.amenities_json, '[]') AS amenities_json,
+      COALESCE(u.features_json, '[]') AS features_json,
+      u.featured AS featured,
+      u.is_new_listing AS is_new_listing
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
@@ -126,13 +143,22 @@ export async function insertUnit(branchId, payload) {
       bathrooms,
       listing_type,
       monthly_rent,
+      market_value,
+      developer,
+      listing_description,
+      lot_area_sqm,
+      floors_label,
+      amenities_json,
+      features_json,
+      featured,
+      is_new_listing,
       photo_data,
       photos_json,
       status,
       inventory_json,
       more_details,
       special_remarks
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'monthly_rental', ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       propertyId,
@@ -146,7 +172,17 @@ export async function insertUnit(branchId, payload) {
       payload.areaSqm ?? null,
       payload.bedrooms ?? null,
       payload.bathrooms ?? null,
+      mapToListingType(payload.listingType),
       payload.monthlyRate,
+      payload.marketValue ?? null,
+      payload.developer ?? null,
+      payload.listingDescription ?? null,
+      payload.lotAreaSqm ?? null,
+      payload.floorsLabel ?? null,
+      payload.amenitiesJson ?? '[]',
+      payload.featuresJson ?? '[]',
+      payload.featured ? 1 : 0,
+      payload.isNewListing ? 1 : 0,
       payload.photoDataUrl ?? null,
       payload.photosJson ?? '[]',
       mapToUnitStatus(payload.status),
@@ -191,7 +227,17 @@ export async function updateUnitById(id, branchId, payload) {
       area_sqm = ?,
       bedrooms = ?,
       bathrooms = ?,
+      listing_type = ?,
       monthly_rent = ?,
+      market_value = ?,
+      developer = ?,
+      listing_description = ?,
+      lot_area_sqm = ?,
+      floors_label = ?,
+      amenities_json = ?,
+      features_json = ?,
+      featured = ?,
+      is_new_listing = ?,
       photo_data = ?,
       photos_json = ?,
       status = ?,
@@ -212,7 +258,17 @@ export async function updateUnitById(id, branchId, payload) {
       payload.areaSqm ?? null,
       payload.bedrooms ?? null,
       payload.bathrooms ?? null,
+      mapToListingType(payload.listingType),
       payload.monthlyRate,
+      payload.marketValue ?? null,
+      payload.developer ?? null,
+      payload.listingDescription ?? null,
+      payload.lotAreaSqm ?? null,
+      payload.floorsLabel ?? null,
+      payload.amenitiesJson ?? '[]',
+      payload.featuresJson ?? '[]',
+      payload.featured ? 1 : 0,
+      payload.isNewListing ? 1 : 0,
       payload.photoDataUrl ?? null,
       payload.photosJson ?? '[]',
       mapToUnitStatus(payload.status),
@@ -256,7 +312,17 @@ export async function getUnitById(id, branchId) {
       COALESCE(u.photos_json, '[]') AS photos_json,
       COALESCE(u.inventory_json, '[]') AS inventory_json,
       u.more_details AS more_details,
-      u.special_remarks AS special_remarks
+      u.special_remarks AS special_remarks,
+      u.listing_type AS listing_type,
+      u.market_value AS market_value,
+      u.developer AS developer,
+      u.listing_description AS listing_description,
+      u.lot_area_sqm AS lot_area_sqm,
+      u.floors_label AS floors_label,
+      COALESCE(u.amenities_json, '[]') AS amenities_json,
+      COALESCE(u.features_json, '[]') AS features_json,
+      u.featured AS featured,
+      u.is_new_listing AS is_new_listing
     FROM unit u
     JOIN property pr ON pr.id = u.property_id
     JOIN area a ON a.id = pr.area_id
@@ -392,4 +458,54 @@ export async function restoreDeletedBuilding(branchId, locationName, buildingNam
     [branchId, location, building],
   );
   return Number(result.affectedRows ?? 0);
+}
+
+/**
+ * Public marketing site feed: active units that are currently Available or
+ * Reserved, across all branches. No auth — never include tenant/contract/
+ * financial data here, only unit/listing fields meant to be public.
+ */
+export async function listPublicUnitListings() {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      u.id,
+      u.unit_no AS unit_number,
+      pr.name AS building_name,
+      pr.common_address AS common_address,
+      pr.legal_address AS legal_address,
+      a.name AS area,
+      u.unit_type AS unit_type,
+      CASE u.status
+        WHEN 'vacant' THEN 'Available'
+        WHEN 'reserved' THEN 'Reserved'
+        ELSE u.status
+      END AS status,
+      u.area_sqm AS area_sqm,
+      u.bedrooms AS bedrooms,
+      u.bathrooms AS bathrooms,
+      u.parking_slot AS parking_slot,
+      u.floors_label AS floors_label,
+      u.listing_type AS listing_type,
+      u.monthly_rent AS monthly_rate,
+      u.market_value AS market_value,
+      u.developer AS developer,
+      u.listing_description AS listing_description,
+      u.lot_area_sqm AS lot_area_sqm,
+      COALESCE(u.amenities_json, '[]') AS amenities_json,
+      COALESCE(u.features_json, '[]') AS features_json,
+      u.featured AS featured,
+      u.is_new_listing AS is_new_listing,
+      u.photo_data AS photo_data,
+      COALESCE(u.photos_json, '[]') AS photos_json,
+      u.more_details AS more_details,
+      u.special_remarks AS special_remarks
+    FROM unit u
+    JOIN property pr ON pr.id = u.property_id
+    JOIN area a ON a.id = pr.area_id
+    WHERE u.active = 1 AND u.status IN ('vacant', 'reserved')
+    ORDER BY u.featured DESC, u.id DESC
+    `,
+  );
+  return rows;
 }
