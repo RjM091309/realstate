@@ -13,15 +13,15 @@ export const locBoard = {
     'flex flex-1 items-center justify-center rounded-[10px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-xs text-slate-400 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-500',
   listItem:
     'group grid min-h-11 cursor-pointer items-center gap-x-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0 transition-all duration-[180ms] ease hover:bg-sky-50/90 dark:border-slate-800 dark:hover:bg-sky-500/10',
-  listItemCity: 'grid-cols-[minmax(0,1fr)_5.5rem] items-center',
-  listItemBrgy: 'grid-cols-[minmax(0,1fr)_5.5rem] items-center',
+  listItemCity: 'grid-cols-[minmax(0,1fr)_4.5rem] items-center',
+  listItemBrgy: 'grid-cols-[minmax(0,1fr)_4.5rem] items-center',
   listItemActive:
     'bg-brand-blue/5 shadow-[inset_4px_0_0_#4B89CD] dark:bg-brand-blue/10',
   // Keep natural casing so city/barangay renames are visibly different in the list.
   listName:
-    'min-w-0 whitespace-normal break-words text-[14px] font-semibold leading-snug text-slate-600 dark:text-slate-300',
+    'min-w-0 truncate whitespace-nowrap text-[14px] font-semibold leading-snug text-slate-600 dark:text-slate-300',
   listNameBrgy:
-    'min-w-0 whitespace-normal break-words text-[14px] font-semibold leading-snug text-slate-600 dark:text-slate-300',
+    'min-w-0 truncate whitespace-nowrap text-[14px] font-semibold leading-snug text-slate-600 dark:text-slate-300',
   listMeta: 'text-[11px] font-medium text-slate-400',
   listTrailing: 'group/trailing relative flex h-8 w-full items-center justify-end',
   listCountBadge:
@@ -65,8 +65,28 @@ export function LocPanel({
   return (
     <div className={cn(locBoard.panel, className)}>
       <div className={locBoard.panelHeader}>
-        <span className={locBoard.panelTitle}>{title}</span>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {onHeaderClick ? (
+          <button
+            type="button"
+            onClick={onHeaderClick}
+            title={headerTitle}
+            className={cn(
+              'group/sort -mx-1.5 -my-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition',
+              'hover:bg-slate-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 dark:hover:bg-slate-800/80',
+            )}
+          >
+            {typeof title === 'string' ? (
+              <span className={cn(locBoard.panelTitle, 'group-hover/sort:text-brand-blue')}>{title}</span>
+            ) : (
+              title
+            )}
+          </button>
+        ) : typeof title === 'string' ? (
+          <span className={locBoard.panelTitle}>{title}</span>
+        ) : (
+          title
+        )}
+        {actions ? <div className="relative z-10 flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
       <div className={cn(locBoard.panelBody, bodyClassName)}>{children}</div>
     </div>
