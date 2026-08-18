@@ -464,7 +464,7 @@ export function AddUnitByLocationView() {
   const locations = useMemo(() => {
     // CITY panel is driven by DB `city` rows only (with cityId).
     // Fold ordinal/bare aliases so "1. Clark" and "Clark" never both show.
-    const map = new Map<string, { cityId: string; name: string; unitCount: number }>();
+    const map = new Map<string, { cityId: string; name: string; brgyCount: number }>();
 
     for (const city of managedCities) {
       const name = String(city.name ?? '').trim();
@@ -473,33 +473,34 @@ export function AddUnitByLocationView() {
       if (!key) continue;
       const prev = map.get(key);
       if (!prev) {
-        map.set(key, { cityId: city.cityId, name, unitCount: 0 });
+        map.set(key, { cityId: city.cityId, name, brgyCount: 0 });
         continue;
       }
       // Prefer numbered category label ("1. Clark") over bare ("Clark").
       if (hasLocationOrdinalPrefix(name) && !hasLocationOrdinalPrefix(prev.name)) {
-        map.set(key, { cityId: city.cityId, name, unitCount: prev.unitCount });
+        map.set(key, { cityId: city.cityId, name, brgyCount: prev.brgyCount });
       }
     }
 
-    for (const u of units) {
-      const raw = locationKey(u);
-      if (!raw || raw === '—') continue;
+    for (const brgy of managedBrgys) {
+      const brgyCityId = String(brgy.cityId ?? '').trim();
+      if (!brgyCityId) continue;
       for (const loc of map.values()) {
-        if (sameLocation(loc.name, raw) || locationAliasKey(loc.name) === locationAliasKey(raw)) {
-          loc.unitCount += 1;
+        if (String(loc.cityId) === brgyCityId) {
+          loc.brgyCount += 1;
         }
       }
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      compareByCountSort(
-        { name: a.name, count: a.unitCount },
-        { name: b.name, count: b.unitCount },
-        cityCountSort,
-      ),
-    );
-  }, [cityCountSort, managedCities, units]);
+    return Array.from(map.values()).sort((a, b) => {
+      const aNum = a.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
+      const bNum = b.name.match(/^#?(\d+)[.)\]:\-]\s+/u);
+      if (aNum && bNum) return Number(aNum[1]) - Number(bNum[1]);
+      if (aNum) return -1;
+      if (bNum) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [managedCities, managedBrgys]);
 
   const persistExtraLocations = useCallback((next: string[]) => {
     // Dedupe only — do not force-append seeded city names.
@@ -1551,8 +1552,8 @@ export function AddUnitByLocationView() {
           {t('views.addUnitByLocation.loading')}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,16.5rem)_minmax(0,16.5rem)_minmax(0,1fr)] lg:items-stretch">
-          <div className="min-w-0">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-stretch">
+          <div className="lg:col-span-3 xl:col-span-3">
             <LocPanel
               title={panelSortTitle(panelLocation, cityCountSort)}
               onHeaderClick={toggleCityCountSort}
@@ -1605,12 +1606,12 @@ export function AddUnitByLocationView() {
                       <div className={locBoard.listTrailing}>
                         <span
                           className={locBoard.listCountBadge}
-                          title={t('views.addUnitByLocation.cityUnitCount', {
-                            count: loc.unitCount,
-                            panel: panelUnits,
+                          title={t('views.addUnitByLocation.cityBrgyCount', {
+                            count: loc.brgyCount,
+                            panel: panelBuilding,
                           })}
                         >
-                          {loc.unitCount}
+                          {loc.brgyCount}
                         </span>
                         <div className={locBoard.listActions}>
                           <button
@@ -1644,7 +1645,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="min-w-0">
+          <div className="lg:col-span-2 xl:col-span-2">
             <LocPanel
               title={panelSortTitle(panelBuilding, brgyCountSort)}
               onHeaderClick={toggleBrgyCountSort}
@@ -1743,7 +1744,7 @@ export function AddUnitByLocationView() {
             </LocPanel>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 lg:col-span-7 xl:col-span-7">
             <LocPanel
               title={panelUnits}
               bodyClassName="max-h-[min(720px,65vh)]"
@@ -1862,18 +1863,8 @@ export function AddUnitByLocationView() {
               ) : filteredUnits.length === 0 ? (
                 <LocEmpty>{t('views.addUnitByLocation.emptyUnits')}</LocEmpty>
               ) : (
-                <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                  <table className="w-full min-w-[52rem] table-fixed border-collapse text-left text-xs">
-                    <colgroup>
-                      <col className="w-[10%]" />
-                      <col className="w-[28%]" />
-                      <col className="w-[14%]" />
-                      <col className="w-[8%]" />
-                      <col className="w-[10%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[10%]" />
-                      <col className="w-[8%]" />
-                    </colgroup>
+                <div className="max-lg:overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                  <table className="w-full table-auto border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
                         {renderSortTh('unit', t('views.units.table.unit'))}

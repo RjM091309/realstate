@@ -7,7 +7,6 @@ import {
   FileImage,
   FileText,
   Home,
-  Mail,
   Phone,
   ScrollText,
   ShieldCheck,
@@ -17,7 +16,7 @@ import { Modal } from '@/components/modal';
 import { Button, modalOutlineButtonClass, modalPrimaryButtonClass } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { contractStatusVariant } from '@/lib/statusBadge';
+import { contractStatusVariant, type StatusBadgeVariant } from '@/lib/statusBadge';
 import { formatLandlordDateTime } from '@/lib/landlordUtils';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +40,7 @@ export type TenantDetailsLease = {
 };
 
 export type TenantDetailsTenant = {
+  id?: string;
   name: string;
   email?: string;
   phone?: string;
@@ -217,7 +217,7 @@ export function TenantDetailsModal({
     setBlacklistReasonDraft(tenant?.blacklistReason ?? '');
   }, [tenant?.id, tenant?.blacklistReason, isOpen]);
 
-  const leaseStatusTone = (status?: string): 'success' | 'warning' | 'danger' | 'neutral' => {
+  const leaseStatusTone = (status?: string): StatusBadgeVariant => {
     if (!status) return 'neutral';
     return contractStatusVariant(status);
   };
@@ -227,7 +227,7 @@ export function TenantDetailsModal({
   const statusControlsDisabled = !canUpdateStatus || statusSaving;
 
   const tenantStatusBadge = tenant ? (
-    isBlacklisted ? (
+    (tenant.isBlacklisted ?? tenant.active === false) ? (
       <StatusBadge tone="danger" className={TENANT_BADGE}>
         {t('views.crm.table.blacklisted')}
       </StatusBadge>
@@ -351,18 +351,55 @@ export function TenantDetailsModal({
                   <ProfileField
                     label={t('views.crm.tenantModal.email')}
                     value={
-                      tenant.email ? (
-                        <a
-                          href={`mailto:${tenant.email}`}
-                          className="inline-flex items-center gap-1.5 text-brand-blue hover:underline dark:text-sky-400"
-                        >
-                          <Mail className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                          {formatDisplayText(tenant.email, 'email')}
-                        </a>
-                      ) : (
-                        '—'
-                      )
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-x-5 gap-y-2">
+                          <label
+                            htmlFor="tenant-profile-kyc"
+                            className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                          >
+                            <input
+                              id="tenant-profile-kyc"
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 accent-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+                              checked={kycVerified}
+                              disabled={statusControlsDisabled}
+                              onChange={(e) => onKycVerifiedChange?.(e.target.checked)}
+                            />
+                            {t('views.crm.tenantModal.kycVerified')}
+                          </label>
+                          <label
+                            htmlFor="tenant-profile-blacklist"
+                            className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                          >
+                            <input
+                              id="tenant-profile-blacklist"
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 accent-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+                              checked={isBlacklisted}
+                              disabled={statusControlsDisabled}
+                              onChange={(e) => onBlacklistedChange?.(e.target.checked)}
+                            />
+                            {t('views.crm.tenantModal.blacklisted')}
+                          </label>
+                        </div>
+                        {isBlacklisted ? (
+                          canUpdateStatus && onBlacklistReasonSave ? (
+                            <input
+                              type="text"
+                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
+                              placeholder={t('views.crm.tenantModal.blacklistReason')}
+                              value={blacklistReasonDraft}
+                              disabled={statusControlsDisabled}
+                              onChange={(e) => setBlacklistReasonDraft(e.target.value)}
+                              onBlur={() => onBlacklistReasonSave(blacklistReasonDraft)}
+                            />
+                          ) : tenant.blacklistReason ? (
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{tenant.blacklistReason}</p>
+                          ) : null
+                        ) : null}
+                      </div>
                     }
+                    span={2}
                   />
                   <ProfileField
                     label={t('views.crm.tenantModal.phone')}
