@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   Eye,
   Clock,
+  Filter,
   List as ListIcon,
   LayoutGrid,
   CalendarRange,
@@ -162,6 +163,17 @@ const ALL_FILTER_KEYS: EventFilterKey[] = [
   'inspection',
   'property_viewing',
   'other',
+];
+
+const FILTER_DEFS: { key: EventFilterKey; dot: string; labelKey: string }[] = [
+  { key: 'move_in', dot: 'bg-emerald-500', labelKey: 'moveIn' },
+  { key: 'move_out', dot: 'bg-rose-500', labelKey: 'moveOut' },
+  { key: 'lease_expiration', dot: 'bg-orange-500', labelKey: 'leaseExpiration' },
+  { key: 'payment', dot: 'bg-amber-500', labelKey: 'paymentDue' },
+  { key: 'maintenance', dot: 'bg-red-500', labelKey: 'maintenance' },
+  { key: 'inspection', dot: 'bg-brand-blue', labelKey: 'inspection' },
+  { key: 'property_viewing', dot: 'bg-purple-500', labelKey: 'propertyViewing' },
+  { key: 'other', dot: 'bg-slate-500', labelKey: 'other' },
 ];
 
 type UiEvent = {
@@ -847,6 +859,15 @@ export function CalendarView() {
     return format(currentMonth, 'MMMM yyyy');
   }, [currentMonth, selectedDay, viewMode, weekDays]);
 
+  const toggleFilter = useCallback((key: EventFilterKey) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   const selectedDayEvents = useMemo(() => {
     if (!selectedDay) return [];
     return filteredEvents.filter((e) => isSameDay(e.date, selectedDay));
@@ -993,6 +1014,47 @@ export function CalendarView() {
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/50">
+        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <Filter className="w-3.5 h-3.5" />
+          {t('views.calendar.filters')}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setActiveFilters(new Set(ALL_FILTER_KEYS))}
+          className={cn(
+            'h-7 rounded-full px-3 text-[11px] font-bold',
+            activeFilters.size === ALL_FILTER_KEYS.length
+              ? 'bg-slate-800 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300',
+          )}
+        >
+          {t('views.calendar.filterAll')}
+        </Button>
+        {FILTER_DEFS.map((def) => {
+          const active = activeFilters.has(def.key);
+          return (
+            <Button
+              key={def.key}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleFilter(def.key)}
+              className={cn(
+                'h-7 rounded-full px-3 text-[11px] font-bold flex items-center gap-1.5 transition-opacity',
+                active ? 'opacity-100' : 'opacity-40 hover:opacity-70',
+                eventChipClass(def.dot),
+              )}
+            >
+              <span className={cn('w-2 h-2 rounded-full', def.dot)} />
+              {t(`views.calendar.eventTypes.${def.labelKey}`)}
+            </Button>
+          );
+        })}
       </div>
 
       {viewMode === 'month' ? (

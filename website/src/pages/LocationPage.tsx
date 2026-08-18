@@ -45,7 +45,7 @@ const LOCATIONS: Record<LocationKey, {
     name: 'Clark Freeport Zone',
     tagline: 'Live Where Opportunity Meets Lifestyle.',
     description: "Clark Freeport Zone is Central Luzon's premier integrated city for business, aviation, hospitality, and residential living. Formerly the site of a major US Air Force base, Clark has transformed into one of the Philippines' most dynamic economic zones, attracting multinational corporations, five-star hotels, and premium residential developments.",
-    heroImage: '/free-port.png',
+    heroImage: 'https://images.unsplash.com/photo-1585821478570-da8b54e0e599?w=1920&h=1080&fit=crop&auto=format',
     facts: [
       { label: 'Area', value: '4,400 hectares' },
       { label: 'Distance to NLEX', value: '5 minutes' },
@@ -102,7 +102,7 @@ const LOCATIONS: Record<LocationKey, {
     name: 'Mabalacat City',
     tagline: 'Gateway to Clark.',
     description: "Mabalacat City serves as the northern gateway to Clark Freeport Zone, offering a compelling mix of affordability and strategic location. With rapid urbanization fueled by Clark's expansion, Mabalacat has become an attractive destination for property investors seeking value appreciation and rental income from Clark's growing workforce.",
-    heroImage: '/dau-view.png',
+    heroImage: 'https://images.unsplash.com/photo-1670946637333-7db60b7b9a7a?w=1920&h=1080&fit=crop&auto=format',
     facts: [
       { label: 'Area', value: '83.2 sq km' },
       { label: 'Distance to Clark', value: '8 km' },
@@ -130,7 +130,7 @@ const LOCATIONS: Record<LocationKey, {
     name: 'City of San Fernando',
     tagline: 'The Capital of Pampanga.',
     description: "As the provincial capital of Pampanga, the City of San Fernando is the administrative, commercial, and cultural center of the region. Known globally for its Giant Lantern Festival, San Fernando offers a well-established urban infrastructure, premium residential enclaves, and a growing property market underpinned by government and commercial development.",
-    heroImage: '/azure.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1511721464821-5641710d5bf2?w=1920&h=1080&fit=crop&auto=format',
     facts: [
       { label: 'Designation', value: 'Provincial Capital' },
       { label: 'Distance to Clark', value: '18 km' },

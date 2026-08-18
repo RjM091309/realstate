@@ -1,5 +1,4 @@
 import { listPublicUnitListings } from '../models/unitsModel.js';
-import { listPublicAgentProfiles } from '../models/authModel.js';
 import { resolveUnitPhotos, parseStringArrayJson } from './unitsController.js';
 
 /** Admin `unit_type` values → public website `PropertyType`. */
@@ -86,40 +85,5 @@ export async function listPublicListings(_req, res) {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load listings' });
-  }
-}
-
-const FALLBACK_AGENT_PHOTO =
-  'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500&h=500&fit=crop&auto=format';
-
-function mapUserRowToAgent(row) {
-  const name = `${String(row.FIRSTNAME ?? '').trim()} ${String(row.LASTNAME ?? '').trim()}`.trim();
-  return {
-    id: String(row.IDNO),
-    name: name || 'Agent',
-    // Falls back to the account's role (e.g. "Leasing Agent") when no custom title was set.
-    title: String(row.TITLE ?? '').trim() || String(row.roleName ?? '').trim() || 'Real Estate Agent',
-    phone: String(row.PHONE ?? '').trim(),
-    email: String(row.EMAIL ?? '').trim(),
-    image: String(row.AVATAR_URL ?? '').trim() || FALLBACK_AGENT_PHOTO,
-    specialization: parseStringArrayJson(row.SPECIALIZATION_JSON),
-    listings: Number(row.LISTINGS_COUNT ?? 0),
-    experience: Number(row.YEARS_EXPERIENCE ?? 0),
-    bio: String(row.BIO ?? '').trim(),
-  };
-}
-
-/**
- * Public, unauthenticated feed for the marketing website's "Our Agents" section —
- * only staff explicitly opted in via SHOW_ON_WEBSITE, mapped into the website's
- * Agent shape. Never expose account/login fields (username, role permissions, etc.).
- */
-export async function listPublicAgents(_req, res) {
-  try {
-    const rows = await listPublicAgentProfiles();
-    res.json({ agents: rows.map(mapUserRowToAgent) });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Failed to load agents' });
   }
 }

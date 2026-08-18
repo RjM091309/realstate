@@ -546,17 +546,6 @@ export async function resetPasswordWithMasterKey(req, res) {
   }
 }
 
-function parseSpecializationJson(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((item) => String(item ?? '').trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
 function mapStaffUserRow(r) {
   const rawAvatar = r.AVATAR_URL;
   return {
@@ -572,15 +561,6 @@ function mapStaffUserRow(r) {
     pendingApproval: Boolean(Number(r.PENDING_APPROVAL ?? 0)),
     avatarUrl:
       rawAvatar != null && String(rawAvatar).trim() !== '' ? String(rawAvatar) : null,
-    // Public website "agent" profile — optional, only shown when showOnWebsite is true.
-    email: r.EMAIL != null ? String(r.EMAIL) : '',
-    phone: r.PHONE != null ? String(r.PHONE) : '',
-    title: r.TITLE != null ? String(r.TITLE) : '',
-    bio: r.BIO != null ? String(r.BIO) : '',
-    specialization: parseSpecializationJson(r.SPECIALIZATION_JSON),
-    yearsExperience: r.YEARS_EXPERIENCE == null ? null : Number(r.YEARS_EXPERIENCE),
-    listingsCount: Number(r.LISTINGS_COUNT ?? 0),
-    showOnWebsite: Boolean(Number(r.SHOW_ON_WEBSITE ?? 0)),
   };
 }
 
@@ -778,59 +758,6 @@ export async function updateStaffUser(req, res) {
       }
     }
 
-    // Public website "agent" profile — every field optional; only relevant when showOnWebsite is on.
-    const publicProfileFields = {};
-    if (req.body?.email !== undefined) {
-      const email = String(req.body.email ?? '').trim();
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        res.status(400).json({ error: 'Invalid email address' });
-        return;
-      }
-      publicProfileFields.email = email || null;
-    }
-    if (req.body?.phone !== undefined) {
-      publicProfileFields.phone = String(req.body.phone ?? '').trim() || null;
-    }
-    if (req.body?.title !== undefined) {
-      publicProfileFields.title = String(req.body.title ?? '').trim() || null;
-    }
-    if (req.body?.bio !== undefined) {
-      publicProfileFields.bio = String(req.body.bio ?? '').trim() || null;
-    }
-    if (req.body?.specialization !== undefined) {
-      const raw = req.body.specialization;
-      const list = Array.isArray(raw) ? raw.map((s) => String(s ?? '').trim()).filter(Boolean) : [];
-      publicProfileFields.specializationJson = list.length ? JSON.stringify(list) : null;
-    }
-    if (req.body?.yearsExperience !== undefined) {
-      const raw = req.body.yearsExperience;
-      if (raw === null || String(raw).trim() === '') {
-        publicProfileFields.yearsExperience = null;
-      } else {
-        const n = Number(raw);
-        if (!Number.isFinite(n) || n < 0) {
-          res.status(400).json({ error: 'Years of experience must be a non-negative number' });
-          return;
-        }
-        publicProfileFields.yearsExperience = n;
-      }
-    }
-    if (req.body?.listingsCount !== undefined) {
-      const n = Number(req.body.listingsCount);
-      if (!Number.isFinite(n) || n < 0) {
-        res.status(400).json({ error: 'Listings count must be a non-negative number' });
-        return;
-      }
-      publicProfileFields.listingsCount = n;
-    }
-    if (req.body?.showOnWebsite !== undefined) {
-      if (typeof req.body.showOnWebsite !== 'boolean') {
-        res.status(400).json({ error: 'showOnWebsite must be a boolean' });
-        return;
-      }
-      publicProfileFields.showOnWebsite = req.body.showOnWebsite;
-    }
-
     await updateUserStaffFields(targetId, {
       firstName,
       lastName,
@@ -838,7 +765,6 @@ export async function updateStaffUser(req, res) {
       roleId,
       branchId,
       ...(activeNext !== undefined ? { active: activeNext } : {}),
-      ...publicProfileFields,
     });
 
     if (password) {

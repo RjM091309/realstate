@@ -1998,6 +1998,8 @@
       "paymentPaid": "Payment Paid",
       "paymentPending": "Payment (Pending)",
       "infoText": "The timeline provides a visual overview of all unit-related operations. Click on any date or unit cell to view detailed events for that specific day.",
+      "filters": "Filters",
+      "filterAll": "All",
       "listEmpty": "No events found for this period.",
       "prospectName": "Prospect Name",
       "prospectContact": "Prospect Contact (optional)",
