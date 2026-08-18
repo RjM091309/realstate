@@ -1998,8 +1998,6 @@
       "paymentPaid": "납부(완료)",
       "paymentPending": "납부(대기)",
       "infoText": "타임라인은 유닛 관련 운영을 한눈에 보여줍니다. 날짜 또는 유닛 셀을 클릭하면 해당 일자의 상세 이벤트를 볼 수 있습니다.",
-      "filters": "필터",
-      "filterAll": "전체",
       "listEmpty": "이 기간에 예정된 이벤트가 없습니다.",
       "prospectName": "고객 이름",
       "prospectContact": "고객 연락처 (선택)",

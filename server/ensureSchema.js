@@ -652,6 +652,38 @@ export async function ensureSchema() {
     }
   }
 
+  /** Optional public-facing agent profile shown on the marketing website (see server/routes/publicRoutes.js). */
+  async function ensureUserPublicProfileColumns() {
+    const [rows] = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_info'
+        AND column_name IN ('EMAIL', 'PHONE', 'TITLE', 'BIO', 'SPECIALIZATION_JSON', 'YEARS_EXPERIENCE', 'LISTINGS_COUNT', 'SHOW_ON_WEBSITE')
+      `,
+    );
+    const existing = new Set(rows.map((r) => String(r.column_name)));
+
+    const addColumn = async (name, ddl) => {
+      if (existing.has(name)) return;
+      try {
+        await pool.query(`ALTER TABLE \`user_info\` ADD COLUMN ${ddl}`);
+      } catch (error) {
+        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    };
+
+    await addColumn('EMAIL', '`EMAIL` VARCHAR(190) NULL DEFAULT NULL AFTER `AVATAR_URL`');
+    await addColumn('PHONE', '`PHONE` VARCHAR(30) NULL DEFAULT NULL AFTER `EMAIL`');
+    await addColumn('TITLE', '`TITLE` VARCHAR(120) NULL DEFAULT NULL AFTER `PHONE`');
+    await addColumn('BIO', '`BIO` TEXT NULL AFTER `TITLE`');
+    await addColumn('SPECIALIZATION_JSON', '`SPECIALIZATION_JSON` TEXT NULL AFTER `BIO`');
+    await addColumn('YEARS_EXPERIENCE', '`YEARS_EXPERIENCE` INT NULL DEFAULT NULL AFTER `SPECIALIZATION_JSON`');
+    await addColumn('LISTINGS_COUNT', '`LISTINGS_COUNT` INT NOT NULL DEFAULT 0 AFTER `YEARS_EXPERIENCE`');
+    await addColumn('SHOW_ON_WEBSITE', '`SHOW_ON_WEBSITE` TINYINT(1) NOT NULL DEFAULT 0 AFTER `LISTINGS_COUNT`');
+  }
+
   /** Marks self-service sign-ups awaiting an administrator's approve/reject decision. */
   async function ensureUserPendingApprovalColumn() {
     const [rows] = await pool.query(
@@ -916,6 +948,7 @@ export async function ensureSchema() {
   `);
 
   await ensureUserAvatarColumn();
+  await ensureUserPublicProfileColumns();
   await ensureUserPendingApprovalColumn();
 
   await pool.query(`UPDATE \`user_role\` SET \`ENCODED_BY\` = 1 WHERE \`IDNo\` IN (1, 2, 3, 4, 5)`);

@@ -427,26 +427,26 @@ function LocationsSection({ navigate }: { navigate: HomePageProps['navigate'] })
     {
       name: 'Clark Freeport Zone',
       count: 48,
-      image: 'https://images.unsplash.com/photo-1585821478570-da8b54e0e599?w=600&h=400&fit=crop&auto=format',
+      image: '/free-port.png',
       tag: 'Most Popular',
       locKey: 'clark',
     },
     {
       name: 'Angeles City',
       count: 32,
-      image: 'https://images.unsplash.com/photo-1496116013258-67a0855f9f82?w=600&h=400&fit=crop&auto=format',
+      image: '/angeles-view.jpg',
       locKey: 'angeles',
     },
     {
       name: 'Mabalacat City',
       count: 18,
-      image: 'https://images.unsplash.com/photo-1670946637333-7db60b7b9a7a?w=600&h=400&fit=crop&auto=format',
+      image: '/dau-view.png',
       locKey: 'mabalacat',
     },
     {
       name: 'San Fernando',
       count: 24,
-      image: 'https://images.unsplash.com/photo-1737939711208-7878ad113cf7?w=600&h=400&fit=crop&auto=format',
+      image: '/azure.jpg',
       locKey: 'san-fernando',
     },
   ]

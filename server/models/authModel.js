@@ -158,9 +158,12 @@ export async function getBranchByIdActive(branchId) {
   return rows[0] ?? null;
 }
 
+const PUBLIC_PROFILE_COLUMNS = `u.EMAIL, u.PHONE, u.TITLE, u.BIO, u.SPECIALIZATION_JSON, u.YEARS_EXPERIENCE, u.LISTINGS_COUNT, u.SHOW_ON_WEBSITE`;
+
 export async function listStaffUsersJoined() {
   const [rows] = await pool.query(
     `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.PENDING_APPROVAL, u.AVATAR_URL,
+            ${PUBLIC_PROFILE_COLUMNS},
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -173,6 +176,7 @@ export async function listStaffUsersJoined() {
 export async function getStaffUserJoined(userId) {
   const [rows] = await pool.query(
     `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.USERNAME, u.PERMISSIONS, u.BRANCH_ID, u.ACTIVE, u.PENDING_APPROVAL, u.AVATAR_URL,
+            ${PUBLIC_PROFILE_COLUMNS},
             r.ROLE AS roleName, b.name AS branchName
      FROM user_info u
      LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
@@ -186,11 +190,30 @@ export async function getStaffUserJoined(userId) {
 
 export async function findUserRowById(userId) {
   const [rows] = await pool.query(
-    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE, PENDING_APPROVAL, AVATAR_URL
+    `SELECT IDNO, USERNAME, FIRSTNAME, LASTNAME, PERMISSIONS, BRANCH_ID, ACTIVE, PENDING_APPROVAL, AVATAR_URL,
+            EMAIL, PHONE, TITLE, BIO, SPECIALIZATION_JSON, YEARS_EXPERIENCE, LISTINGS_COUNT, SHOW_ON_WEBSITE
      FROM user_info WHERE IDNO = ? LIMIT 1`,
     [userId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Public, unauthenticated feed for the marketing website's "Our Agents" section
+ * (see server/routes/publicRoutes.js). Only staff explicitly opted in via
+ * SHOW_ON_WEBSITE appear — most staff (Finance, Property Manager, ...) never should.
+ */
+export async function listPublicAgentProfiles() {
+  const [rows] = await pool.query(
+    `SELECT u.IDNO, u.FIRSTNAME, u.LASTNAME, u.AVATAR_URL,
+            ${PUBLIC_PROFILE_COLUMNS},
+            r.ROLE AS roleName
+     FROM user_info u
+     LEFT JOIN user_role r ON r.IDNo = u.PERMISSIONS
+     WHERE u.SHOW_ON_WEBSITE = 1 AND u.ACTIVE = 1
+     ORDER BY u.IDNO ASC`,
+  );
+  return rows;
 }
 
 export async function usernameTakenByOther(username, excludeUserId) {
@@ -234,6 +257,38 @@ export async function updateUserStaffFields(userId, fields) {
   if (fields.active != null) {
     parts.push('ACTIVE = ?');
     vals.push(fields.active ? 1 : 0);
+  }
+  if (fields.email !== undefined) {
+    parts.push('EMAIL = ?');
+    vals.push(fields.email);
+  }
+  if (fields.phone !== undefined) {
+    parts.push('PHONE = ?');
+    vals.push(fields.phone);
+  }
+  if (fields.title !== undefined) {
+    parts.push('TITLE = ?');
+    vals.push(fields.title);
+  }
+  if (fields.bio !== undefined) {
+    parts.push('BIO = ?');
+    vals.push(fields.bio);
+  }
+  if (fields.specializationJson !== undefined) {
+    parts.push('SPECIALIZATION_JSON = ?');
+    vals.push(fields.specializationJson);
+  }
+  if (fields.yearsExperience !== undefined) {
+    parts.push('YEARS_EXPERIENCE = ?');
+    vals.push(fields.yearsExperience);
+  }
+  if (fields.listingsCount != null) {
+    parts.push('LISTINGS_COUNT = ?');
+    vals.push(fields.listingsCount);
+  }
+  if (fields.showOnWebsite != null) {
+    parts.push('SHOW_ON_WEBSITE = ?');
+    vals.push(fields.showOnWebsite ? 1 : 0);
   }
   if (!parts.length) return;
   parts.push('EDITED_DT = NOW()');
