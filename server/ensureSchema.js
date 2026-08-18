@@ -376,7 +376,7 @@ export async function ensureSchema() {
         AND column_name IN ('nationality', 'document_type', 'document_no', 'expiry_date', 'file_path')
       `,
     );
-    const existing = new Set(rows.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    const existing = new Set(rows.map((r) => String(r.column_name)));
 
     // Keep each ALTER separate so one failure doesn't block others.
     if (!existing.has('nationality')) {
@@ -418,15 +418,6 @@ export async function ensureSchema() {
   }
 
   async function ensureUnitPhotoColumn() {
-    async function addColumnIfMissing(sql) {
-      try {
-        await pool.query(sql);
-      } catch (error) {
-        // Concurrent API boots can race on ALTER TABLE; ignore duplicate-column in that case.
-        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
-      }
-    }
-
     const [rows] = await pool.query(
       `
       SELECT column_name
@@ -496,19 +487,19 @@ export async function ensureSchema() {
         AND column_name IN ('area_sqm', 'bedrooms', 'bathrooms')
       `,
     );
-    const existingMetrics = new Set(metricRows.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    const existingMetrics = new Set(metricRows.map((r) => String(r.column_name)));
     if (!existingMetrics.has('area_sqm')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`area_sqm\` DECIMAL(8,2) NULL DEFAULT NULL AFTER \`unit_type\``,
       );
     }
     if (!existingMetrics.has('bedrooms')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`bedrooms\` TINYINT UNSIGNED NULL DEFAULT NULL AFTER \`area_sqm\``,
       );
     }
     if (!existingMetrics.has('bathrooms')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`bathrooms\` TINYINT UNSIGNED NULL DEFAULT NULL AFTER \`bedrooms\``,
       );
     }
@@ -566,15 +557,6 @@ export async function ensureSchema() {
    * extends `listing_type` with 'pre_selling' so units can sync to the public site.
    */
   async function ensureUnitListingColumns() {
-    async function addColumnIfMissing(sql) {
-      try {
-        await pool.query(sql);
-      } catch (error) {
-        // Concurrent API boots can race on ALTER TABLE; ignore duplicate-column in that case.
-        if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
-      }
-    }
-
     const [listingTypeRows] = await pool.query(
       `
       SELECT COLUMN_TYPE
@@ -603,47 +585,47 @@ export async function ensureSchema() {
         )
       `,
     );
-    const existing = new Set(existingRows.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    const existing = new Set(existingRows.map((r) => String(r.column_name)));
 
     if (!existing.has('developer')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`developer\` VARCHAR(160) NULL DEFAULT NULL AFTER \`market_value\``,
       );
     }
     if (!existing.has('listing_description')) {
       // Dedicated public marketing copy — separate from more_details/special_remarks,
       // which are internal admin notes and must never be shown on the public website.
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`listing_description\` TEXT NULL DEFAULT NULL AFTER \`developer\``,
       );
     }
     if (!existing.has('lot_area_sqm')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`lot_area_sqm\` DECIMAL(8,2) NULL DEFAULT NULL AFTER \`developer\``,
       );
     }
     if (!existing.has('floors_label')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`floors_label\` VARCHAR(80) NULL DEFAULT NULL AFTER \`lot_area_sqm\``,
       );
     }
     if (!existing.has('amenities_json')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`amenities_json\` LONGTEXT NULL AFTER \`floors_label\``,
       );
     }
     if (!existing.has('features_json')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`features_json\` LONGTEXT NULL AFTER \`amenities_json\``,
       );
     }
     if (!existing.has('featured')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`featured\` TINYINT(1) NOT NULL DEFAULT 0 AFTER \`features_json\``,
       );
     }
     if (!existing.has('is_new_listing')) {
-      await addColumnIfMissing(
+      await pool.query(
         `ALTER TABLE \`unit\` ADD COLUMN \`is_new_listing\` TINYINT(1) NOT NULL DEFAULT 0 AFTER \`featured\``,
       );
     }
@@ -1821,7 +1803,7 @@ export async function ensureSchema() {
         AND column_name IN ('vendor_id', 'estimated_cost', 'actual_cost', 'resolved_at', 'scheduled_date')
       `,
     );
-    const existingSrCostCols = new Set(srCostCols.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    const existingSrCostCols = new Set(srCostCols.map((r) => String(r.column_name)));
 
     if (!existingSrCostCols.has('scheduled_date')) {
       // When maintenance work is scheduled/targeted — drives the auto-generated Calendar "Maintenance" event.
@@ -2184,7 +2166,7 @@ export async function ensureSchema() {
       `,
       landlordCols,
     );
-    const existingLandlord = new Set(landlordRows.map((r) => String(r.COLUMN_NAME ?? r.column_name)));
+    const existingLandlord = new Set(landlordRows.map((r) => String(r.column_name)));
 
     const landlordAlters = [
       ['first_name', `ALTER TABLE \`landlord_profile\` ADD COLUMN \`first_name\` VARCHAR(80) NULL DEFAULT NULL AFTER \`full_name\``],

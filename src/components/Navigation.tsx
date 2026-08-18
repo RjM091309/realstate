@@ -322,7 +322,7 @@ export function Sidebar({ activeTab, setActiveTab, allowedTabIds, isAdmin, onLog
           title={isCollapsed ? t('nav.viewWebsite') : undefined}
           onClick={() =>
             window.open(
-              `${window.location.protocol}//${window.location.hostname}:2552`,
+              `${window.location.protocol}//${window.location.hostname}:8443`,
               '_blank',
               'noopener,noreferrer',
             )

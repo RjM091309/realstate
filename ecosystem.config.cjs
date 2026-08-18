@@ -1,7 +1,7 @@
 /**
  * PM2 — development only.
  * Loads `.env` from project root (same as `npm run dev:api` / server).
- * API on 2550 (API_PORT), admin Vite UI on 2551, public website on 2552 —
+ * API on 2550 (API_PORT), admin Vite UI on 2551, public website on 8443 —
  * see vite.config.ts / website/vite.config.ts and `.env`.
  *
  *   pm2 start ecosystem.config.cjs
@@ -72,9 +72,9 @@ module.exports = {
       name: 'realstate-website-dev',
       cwd: path.join(__dirname, 'website'),
       script: 'node_modules/vite/bin/vite.js',
-      args: '--host=0.0.0.0 --port=2552 --strictPort',
+      args: '--host=0.0.0.0 --port=8443 --strictPort',
       interpreter: 'node',
-      env: { NODE_ENV: 'development', PORT: '2552' },
+      env: { NODE_ENV: 'development' },
     },
   ],
 };
