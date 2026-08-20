@@ -2,12 +2,14 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-charcoal: #1a1a1a;
+  --color-charcoal: #202020;
   --color-charcoal-800: #2d2d2d;
-  --color-cream: #faf9f7;
-  --color-parchment: #f4f2ee;
-  --color-gold: #c9a96e;
-  --color-gold-dark: #a8855a;
+  --color-navy: #0f1f3d;
+  --color-navy-800: #1a2f52;
+  --color-cream: #f5f3ee;
+  --color-parchment: #ece8e0;
+  --color-gold: #c8a45d;
+  --color-gold-dark: #a0834a;
   --color-warm-gray: #787060;
   --color-line: #e2ddd5;
   --color-line-dark: #ccc7be;
@@ -27,8 +29,8 @@ html {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #faf9f7;
-  color: #1a1a1a;
+  background-color: #f5f3ee;
+  color: #202020;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -36,7 +38,7 @@ body {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2ddd5; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #c9a96e; }
+::-webkit-scrollbar-thumb:hover { background: #c8a45d; }
 
 @keyframes heroZoom {
   from { transform: scale(1); }
@@ -87,7 +89,7 @@ body {
 .delay-6 { animation-delay: 0.9s; }
 
 .skeleton {
-  background: linear-gradient(90deg, #f4f2ee 25%, #eae7e0 50%, #f4f2ee 75%);
+  background: linear-gradient(90deg, #ece8e0 25%, #e0dbd0 50%, #ece8e0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
@@ -101,12 +103,13 @@ body {
 }
 
 .card-lift {
-  transition: box-shadow 0.35s ease, transform 0.35s ease;
+  box-shadow: 0 1px 2px rgba(15, 31, 61, 0.05), 0 1px 3px rgba(15, 31, 61, 0.04);
+  transition: box-shadow 0.35s ease, transform 0.35s ease, border-color 0.35s ease;
 }
 
 .card-lift:hover {
-  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.14);
-  transform: translateY(-3px);
+  box-shadow: 0 22px 48px -16px rgba(15, 31, 61, 0.22), 0 8px 20px -10px rgba(200, 164, 93, 0.25);
+  transform: translateY(-4px);
 }
 
 .gold-underline {
@@ -120,7 +123,7 @@ body {
   left: 0;
   width: 0;
   height: 1px;
-  background: #c9a96e;
+  background: #c8a45d;
   transition: width 0.3s ease;
 }
 
@@ -143,6 +146,6 @@ input[type="range"]::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #c9a96e;
+  background: #c8a45d;
   cursor: pointer;
 }

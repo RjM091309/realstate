@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { agents } from '../lib/data'
+import { useRef, useState } from 'react'
+import { agents, type Agent } from '../lib/data'
 import { useLiveProperties } from '../lib/useLiveProperties'
 import PropertyCard from '../components/PropertyCard'
+import { applyAgentOverride, saveAgentOverride, useAgentOverride } from '../lib/agentOverrides'
+import { fileToWebP } from '../lib/imageUtils'
 import type { Page } from '../components/Navigation'
 import type { ToastType } from '../components/Toast'
 
@@ -33,12 +35,71 @@ const REVIEWS = [
 ]
 
 export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) {
-  const agent = agents.find((a) => a.id === agentId) || agents[0]
+  const baseAgent = agents.find((a) => a.id === agentId) || agents[0]
+  const override = useAgentOverride(baseAgent.id)
+  const agent = applyAgentOverride(baseAgent, override)
   const { properties } = useLiveProperties()
   const agentListings = properties.slice(0, 4)
   const [activeTab, setActiveTab] = useState<'listings' | 'about' | 'reviews'>('listings')
   const [contactOpen, setContactOpen] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState<Pick<Agent, 'name' | 'title' | 'phone' | 'email' | 'image' | 'bio'> & { specialization: string }>({
+    name: agent.name,
+    title: agent.title,
+    phone: agent.phone,
+    email: agent.email,
+    image: agent.image,
+    bio: agent.bio,
+    specialization: agent.specialization.join(', '),
+  })
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const openEdit = () => {
+    setEditForm({
+      name: agent.name,
+      title: agent.title,
+      phone: agent.phone,
+      email: agent.email,
+      image: agent.image,
+      bio: agent.bio,
+      specialization: agent.specialization.join(', '),
+    })
+    setEditOpen(true)
+  }
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const webpDataUrl = await fileToWebP(file, { maxSize: 500, quality: 0.85 })
+      setEditForm((f) => ({ ...f, image: webpDataUrl }))
+    } catch (err) {
+      console.warn('[AgentPage] photo conversion failed', err)
+      toast('Could not process that image. Try a different photo.', 'error')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    saveAgentOverride(agent.id, {
+      name: editForm.name.trim() || agent.name,
+      title: editForm.title.trim() || agent.title,
+      phone: editForm.phone.trim() || agent.phone,
+      email: editForm.email.trim() || agent.email,
+      image: editForm.image,
+      bio: editForm.bio.trim() || agent.bio,
+      specialization: editForm.specialization.split(',').map((s) => s.trim()).filter(Boolean),
+    })
+    setEditOpen(false)
+    toast('Profile updated!')
+  }
 
   const stars = (n: number) => Array.from({ length: 5 }, (_, i) => (
     <span key={i} className={i < n ? 'text-gold' : 'text-line'}>★</span>
@@ -53,37 +114,45 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
   return (
     <div className="min-h-screen bg-cream">
       {/* Hero / Profile Header */}
-      <div className="relative overflow-hidden bg-charcoal">
+      <div className="relative overflow-hidden bg-navy">
         <div className="absolute inset-0">
           <img
             src="https://images.unsplash.com/photo-1598258710957-db8614c2881e?w=1600&h=600&fit=crop&auto=format"
             alt="Clark skyline"
             className="w-full h-full object-cover opacity-20"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-charcoal via-charcoal/90 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/90 to-transparent" />
         </div>
 
         <div className="relative z-10 max-w-screen-2xl mx-auto px-6 lg:px-12 pt-28 pb-14">
-          <nav className="flex items-center gap-2 text-[11px] font-display text-white/40 mb-8">
-            <button onClick={() => navigate('home')} className="hover:text-white/70 transition-colors">Home</button>
-            <span>/</span>
-            <button onClick={() => navigate('properties')} className="hover:text-white/70 transition-colors">Agents</button>
-            <span>/</span>
-            <span className="text-white/60">{agent.name}</span>
+          <nav className="flex items-center justify-between gap-2 mb-8">
+            <div className="flex items-center gap-2 text-[11px] font-display text-white/40">
+              <button onClick={() => navigate('home')} className="hover:text-white/70 transition-colors">Home</button>
+              <span>/</span>
+              <button onClick={() => navigate('properties')} className="hover:text-white/70 transition-colors">Agents</button>
+              <span>/</span>
+              <span className="text-white/60">{agent.name}</span>
+            </div>
+            <button
+              onClick={openEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 text-[11px] font-display text-white/70 hover:text-white hover:border-white/40 hover:bg-white/10 transition-all"
+            >
+              ✎ Edit Profile
+            </button>
           </nav>
 
           <div className="flex flex-col md:flex-row items-start md:items-end gap-8">
             {/* Photo */}
             <div className="relative flex-shrink-0">
-              <div className="w-28 h-28 lg:w-36 lg:h-36 overflow-hidden border-2 border-gold">
+              <div className="w-28 h-28 lg:w-36 lg:h-36 rounded-full overflow-hidden ring-4 ring-gold shadow-lg">
                 <img
                   src={agent.image}
                   alt={agent.name}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-gold flex items-center justify-center">
-                <span className="text-white text-[9px] font-display font-bold">✓</span>
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gold flex items-center justify-center ring-4 ring-navy">
+                <span className="text-white text-[10px] font-display font-bold">✓</span>
               </div>
             </div>
 
@@ -91,13 +160,13 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
             <div className="flex-1">
               <div className="flex flex-wrap items-start gap-2 mb-2">
                 {agent.specialization.map((s) => (
-                  <span key={s} className="px-2.5 py-1 bg-gold/20 border border-gold/30 text-gold text-[9px] font-display font-semibold tracking-[0.1em] uppercase">
+                  <span key={s} className="px-3 py-1 rounded-full bg-gold/20 border border-gold/30 text-gold text-[9px] font-display font-semibold tracking-[0.1em] uppercase">
                     {s}
                   </span>
                 ))}
               </div>
               <h1 className="font-serif text-white text-3xl lg:text-4xl mb-1">{agent.name}</h1>
-              <p className="text-white/60 font-display text-sm mb-4">{agent.title} · Clark Estates</p>
+              <p className="text-white/60 font-display text-sm mb-4">{agent.title} · Clark Real States</p>
               <div className="flex flex-wrap gap-5">
                 <div>
                   <p className="font-serif text-white text-2xl">{agent.listings}</p>
@@ -125,13 +194,13 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
             <div className="flex flex-col gap-3 flex-shrink-0">
               <button
                 onClick={() => setContactOpen(true)}
-                className="px-6 py-3 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+                className="px-6 py-3 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-white hover:text-navy hover:shadow-md transition-all"
               >
                 Send Message
               </button>
               <a
                 href={`tel:${agent.phone}`}
-                className="px-6 py-3 border border-white/30 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:border-white/60 transition-colors text-center"
+                className="px-6 py-3 rounded-full border border-white/30 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:border-white hover:bg-white/10 transition-all text-center"
               >
                 {agent.phone}
               </a>
@@ -141,16 +210,16 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-line sticky top-16 z-30">
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
-          <div className="flex gap-0">
+      <div className="bg-white/95 backdrop-blur-md border-b border-line/60 sticky top-16 z-30 shadow-[0_8px_24px_-16px_rgba(15,31,61,0.18)]">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 py-3">
+          <div className="inline-flex items-center gap-0.5 bg-parchment/60 rounded-full p-1">
             {(['listings', 'about', 'reviews'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-4 text-[11px] font-display font-semibold tracking-[0.12em] uppercase capitalize transition-colors ${
+                className={`px-5 py-2 rounded-full text-[11px] font-display font-semibold tracking-[0.1em] uppercase capitalize transition-all ${
                   activeTab === tab
-                    ? 'text-charcoal border-b-2 border-gold -mb-px'
+                    ? 'bg-navy text-white shadow-sm'
                     : 'text-warm-gray hover:text-charcoal'
                 }`}
               >
@@ -189,7 +258,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
               <p className="text-[11px] font-display font-semibold tracking-[0.2em] uppercase text-gold mb-4">Specializations</p>
               <div className="flex flex-wrap gap-2">
                 {agent.specialization.map((s) => (
-                  <span key={s} className="px-4 py-2 bg-parchment border border-line text-xs font-display text-charcoal">
+                  <span key={s} className="px-4 py-2 rounded-full bg-parchment text-xs font-display text-charcoal">
                     {s}
                   </span>
                 ))}
@@ -197,19 +266,19 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
             </div>
 
             <div className="border-t border-line pt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-5 bg-parchment border border-line">
+              <div className="p-5 rounded-xl bg-parchment/70">
                 <p className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray mb-1">Languages</p>
                 <p className="text-sm font-display text-charcoal">Filipino, English</p>
               </div>
-              <div className="p-5 bg-parchment border border-line">
+              <div className="p-5 rounded-xl bg-parchment/70">
                 <p className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray mb-1">License No.</p>
                 <p className="text-sm font-display text-charcoal">PRC-RE-2016-{agent.id}0042</p>
               </div>
-              <div className="p-5 bg-parchment border border-line">
+              <div className="p-5 rounded-xl bg-parchment/70">
                 <p className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray mb-1">Email</p>
                 <p className="text-sm font-display text-charcoal">{agent.email}</p>
               </div>
-              <div className="p-5 bg-parchment border border-line">
+              <div className="p-5 rounded-xl bg-parchment/70">
                 <p className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray mb-1">Phone</p>
                 <p className="text-sm font-display text-charcoal">{agent.phone}</p>
               </div>
@@ -219,7 +288,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
 
         {activeTab === 'reviews' && (
           <div className="animate-fade-in max-w-2xl">
-            <div className="flex items-center gap-6 mb-10 p-6 bg-white border border-line">
+            <div className="flex items-center gap-6 mb-10 p-6 rounded-2xl bg-parchment/60">
               <div className="text-center">
                 <p className="font-serif text-5xl text-charcoal">4.9</p>
                 <div className="flex gap-0.5 justify-center my-1">{stars(5)}</div>
@@ -231,9 +300,9 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
                   return (
                     <div key={rating} className="flex items-center gap-3 mb-1.5">
                       <span className="text-[10px] font-display text-warm-gray w-4">{rating}</span>
-                      <div className="flex-1 h-1.5 bg-parchment">
+                      <div className="flex-1 h-1.5 rounded-full bg-white overflow-hidden">
                         <div
-                          className="h-full bg-gold transition-all"
+                          className="h-full rounded-full bg-gold transition-all"
                           style={{ width: `${(count / REVIEWS.length) * 100}%` }}
                         />
                       </div>
@@ -246,7 +315,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
 
             <div className="flex flex-col gap-5">
               {REVIEWS.map((r, i) => (
-                <div key={i} className="p-6 bg-white border border-line">
+                <div key={i} className="p-6 rounded-2xl bg-white border border-line/70 card-lift">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-sm font-display font-semibold text-charcoal">{r.name}</p>
@@ -268,13 +337,13 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/60 backdrop-blur-sm"
           onClick={() => setContactOpen(false)}
         >
-          <div className="bg-white w-full max-w-lg p-8 animate-slide-down" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl animate-slide-down" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-6">
               <div>
                 <p className="text-[10px] font-display tracking-[0.2em] uppercase text-gold mb-1">Contact Agent</p>
                 <h3 className="font-serif text-charcoal text-xl">{agent.name}</h3>
               </div>
-              <button onClick={() => setContactOpen(false)} className="text-warm-gray hover:text-charcoal text-xl">✕</button>
+              <button onClick={() => setContactOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-warm-gray hover:bg-parchment hover:text-charcoal transition-colors">✕</button>
             </div>
             <form className="flex flex-col gap-4" onSubmit={handleContact}>
               <div>
@@ -283,7 +352,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
                   placeholder="Full name"
                 />
               </div>
@@ -295,7 +364,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
                     required
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                    className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
                     placeholder="you@email.com"
                   />
                 </div>
@@ -305,7 +374,7 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
                     type="tel"
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="w-full border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                    className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
                     placeholder="+63 9XX"
                   />
                 </div>
@@ -317,13 +386,141 @@ export default function AgentPage({ agentId, navigate, toast }: AgentPageProps) 
                   rows={4}
                   value={form.message}
                   onChange={(e) => setForm({ ...form, message: e.target.value })}
-                  className="w-full border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors resize-none"
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors resize-none"
                   placeholder="How can I help you?"
                 />
               </div>
-              <button type="submit" className="py-3.5 bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:bg-gold-dark transition-colors">
+              <button type="submit" className="py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:bg-navy transition-colors">
                 Send Message
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {editOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/60 backdrop-blur-sm"
+          onClick={() => setEditOpen(false)}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl animate-slide-down max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <p className="text-[10px] font-display tracking-[0.2em] uppercase text-gold mb-1">Edit Profile</p>
+                <h3 className="font-serif text-charcoal text-xl">Update your info</h3>
+              </div>
+              <button onClick={() => setEditOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-warm-gray hover:bg-parchment hover:text-charcoal transition-colors">✕</button>
+            </div>
+
+            <form className="flex flex-col gap-4" onSubmit={handleSaveEdit}>
+              {/* Photo upload */}
+              <div className="flex items-center gap-4 mb-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative w-20 h-20 rounded-full overflow-hidden ring-2 ring-parchment flex-shrink-0 group"
+                >
+                  <img src={editForm.image} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/60 transition-colors flex items-center justify-center">
+                    <span className="text-white text-[10px] font-display uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+                      {uploading ? '...' : 'Change'}
+                    </span>
+                  </div>
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-4 py-2 rounded-full border border-line text-xs font-display font-semibold tracking-[0.1em] uppercase text-charcoal hover:border-navy transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? 'Processing…' : 'Upload Photo'}
+                  </button>
+                  <p className="text-[10px] font-display text-warm-gray mt-1.5">Auto-converted to WebP</p>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Full Name</label>
+                <input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Title</label>
+                <input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                  placeholder="e.g. Senior Property Consultant"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Phone</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                    placeholder="+63 9XX XXX XXXX"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                    placeholder="you@email.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Specializations</label>
+                <input
+                  value={editForm.specialization}
+                  onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors"
+                  placeholder="Comma-separated, e.g. Luxury Condominiums, Pre-Selling"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Bio</label>
+                <textarea
+                  rows={4}
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  className="w-full rounded-lg border border-line px-4 py-3 text-sm font-display outline-none focus:border-gold transition-colors resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(false)}
+                  className="flex-1 py-3.5 rounded-full border border-line text-xs font-display font-semibold tracking-[0.15em] uppercase text-warm-gray hover:border-navy hover:text-navy transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="flex-1 py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:bg-navy transition-colors disabled:opacity-50"
+                >
+                  Save Changes
+                </button>
+              </div>
             </form>
           </div>
         </div>

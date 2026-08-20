@@ -54,14 +54,14 @@ export default function ImageCarousel({ images, interval = 5000, className = '' 
           <button
             onClick={prev}
             aria-label="Previous photo"
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 backdrop-blur-sm flex items-center justify-center text-charcoal hover:bg-white transition-colors z-10"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-navy hover:bg-white hover:scale-105 transition-all z-10"
           >
             ‹
           </button>
           <button
             onClick={next}
             aria-label="Next photo"
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 backdrop-blur-sm flex items-center justify-center text-charcoal hover:bg-white transition-colors z-10"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-navy hover:bg-white hover:scale-105 transition-all z-10"
           >
             ›
           </button>
@@ -73,13 +73,13 @@ export default function ImageCarousel({ images, interval = 5000, className = '' 
                 onClick={() => goTo(i)}
                 aria-label={`Go to photo ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === active ? 'w-6 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/75'
+                  i === active ? 'w-6 bg-gold' : 'w-1.5 bg-white/50 hover:bg-white/75'
                 }`}
               />
             ))}
           </div>
 
-          <div className="absolute bottom-4 right-4 text-[10px] font-display text-white/80 bg-black/30 px-2 py-0.5 z-10">
+          <div className="absolute bottom-4 right-4 text-[10px] font-display text-white/90 bg-black/30 backdrop-blur-sm rounded-full px-2.5 py-1 z-10">
             {active + 1} / {images.length}
           </div>
         </>

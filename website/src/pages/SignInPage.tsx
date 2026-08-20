@@ -27,7 +27,7 @@ export default function SignInPage({ navigate, toast }: SignInPageProps) {
               <div className="w-1.5 h-3 bg-gold/50 -ml-0.5" />
             </div>
             <span className="font-display font-semibold tracking-[0.18em] text-xs uppercase text-charcoal">
-              Clark Estates
+              Clark Real States
             </span>
           </button>
           <h1 className="font-serif text-charcoal text-2xl lg:text-3xl mb-2">
@@ -40,7 +40,7 @@ export default function SignInPage({ navigate, toast }: SignInPageProps) {
           </p>
         </div>
 
-        <div className="bg-white border border-line p-8 shadow-sm">
+        <div className="bg-white rounded-2xl border border-line/70 p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {mode === 'signup' && (
               <div>
@@ -52,7 +52,7 @@ export default function SignInPage({ navigate, toast }: SignInPageProps) {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full text-sm font-display text-charcoal border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
+                  className="w-full text-sm font-display text-charcoal rounded-lg border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
                   placeholder="Juan Dela Cruz"
                 />
               </div>
@@ -67,7 +67,7 @@ export default function SignInPage({ navigate, toast }: SignInPageProps) {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full text-sm font-display text-charcoal border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
+                className="w-full text-sm font-display text-charcoal rounded-lg border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
                 placeholder="you@example.com"
               />
             </div>
@@ -82,14 +82,14 @@ export default function SignInPage({ navigate, toast }: SignInPageProps) {
                 minLength={6}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full text-sm font-display text-charcoal border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
+                className="w-full text-sm font-display text-charcoal rounded-lg border border-line px-4 py-3 outline-none focus:border-gold transition-colors"
                 placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors mt-2"
+              className="w-full py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-navy hover:shadow-md transition-all mt-2"
             >
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>

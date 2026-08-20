@@ -200,7 +200,7 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
   return (
     <div className="min-h-screen bg-cream">
       {/* Hero */}
-      <section className="relative h-[80vh] min-h-[540px] flex items-end overflow-hidden bg-charcoal">
+      <section className="relative h-[80vh] min-h-[540px] flex items-end overflow-hidden bg-navy">
         <div className="absolute inset-0">
           <img
             src={loc.heroImage}
@@ -210,8 +210,8 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
           <div
             className={`absolute inset-0 bg-gradient-to-t ${
               loc.heroOverlay === 'light'
-                ? 'from-charcoal/75 via-charcoal/20 to-transparent'
-                : 'from-charcoal/95 via-charcoal/50 to-charcoal/20'
+                ? 'from-navy/75 via-navy/20 to-transparent'
+                : 'from-navy/95 via-navy/50 to-navy/20'
             }`}
           />
         </div>
@@ -236,7 +236,7 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
       </section>
 
       {/* Quick Facts */}
-      <div className="bg-charcoal border-t border-white/10">
+      <div className="bg-navy border-t border-white/10">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-white/10">
             {loc.facts.map((f) => (
@@ -259,7 +259,7 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
               <p className="text-charcoal font-display text-sm leading-relaxed mb-6">{loc.description}</p>
               <button
                 onClick={() => navigate('properties')}
-                className="px-7 py-3 border border-charcoal text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:bg-charcoal hover:text-white transition-all"
+                className="px-7 py-3 rounded-full border border-navy text-xs font-display font-semibold tracking-[0.15em] uppercase text-navy hover:bg-navy hover:text-white shadow-sm hover:shadow-md transition-all"
               >
                 View {loc.name} Properties
               </button>
@@ -289,9 +289,10 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
             </div>
             <button
               onClick={() => navigate('properties')}
-              className="text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-gold transition-colors flex items-center gap-2"
+              className="group text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-navy transition-colors flex items-center gap-2"
             >
-              All Properties <span>→</span>
+              All Properties
+              <span className="w-7 h-7 rounded-full bg-parchment flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-colors">→</span>
             </button>
           </div>
           {cityProps.length > 0 ? (
@@ -301,7 +302,7 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 border border-line bg-white">
+            <div className="text-center py-16 rounded-2xl border border-line/70 bg-white">
               <p className="text-warm-gray font-display text-sm mb-3">No listings currently available in {loc.name}.</p>
               <button onClick={() => navigate('properties')} className="text-xs font-display font-semibold tracking-[0.15em] uppercase text-gold">
                 Browse All Locations →
@@ -322,13 +323,13 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
                 <button
                   key={n.name}
                   onClick={() => navigate('location' as Page, n.key)}
-                  className="group flex items-center justify-between p-5 border border-line bg-parchment hover:border-gold transition-colors text-left"
+                  className="group flex items-center justify-between p-5 rounded-2xl bg-parchment/70 hover:bg-parchment card-lift text-left"
                 >
                   <div>
-                    <h3 className="font-display font-semibold text-charcoal text-sm mb-0.5 group-hover:text-gold transition-colors">{n.name}</h3>
+                    <h3 className="font-display font-semibold text-charcoal text-sm mb-0.5 group-hover:text-navy transition-colors">{n.name}</h3>
                     <p className="text-[11px] font-display text-warm-gray">{n.distance} from {loc.name.split(' ')[0]}</p>
                   </div>
-                  <span className="text-warm-gray group-hover:text-gold transition-colors group-hover:translate-x-1 transition-transform">→</span>
+                  <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-warm-gray group-hover:bg-gold group-hover:text-white transition-all group-hover:translate-x-0.5">→</span>
                 </button>
               ))}
             </div>
@@ -337,7 +338,7 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
       </section>
 
       {/* CTA */}
-      <section className="bg-charcoal py-14 lg:py-18">
+      <section className="bg-navy py-14 lg:py-18">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <p className="text-gold text-[11px] font-display font-semibold tracking-[0.25em] uppercase mb-2">Find Your Property</p>
@@ -346,13 +347,13 @@ export default function LocationPage({ location, navigate, toast }: LocationPage
           <div className="flex gap-3 flex-shrink-0">
             <button
               onClick={() => navigate('properties')}
-              className="px-7 py-3 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+              className="px-7 py-3 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-white hover:text-navy hover:shadow-md transition-all"
             >
               Browse Properties
             </button>
             <button
               onClick={() => { toast('Request sent! An agent will contact you shortly.') }}
-              className="px-7 py-3 border border-white/30 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:border-white/60 transition-colors"
+              className="px-7 py-3 rounded-full border border-white/30 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:border-white hover:bg-white/10 transition-all"
             >
               Talk to an Agent
             </button>

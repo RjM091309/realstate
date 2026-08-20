@@ -18,15 +18,15 @@ type AppState = {
 }
 
 const PAGE_TITLES: Partial<Record<Page, string>> = {
-  home: 'Clark Estates — Premium Real Estate in Pampanga',
-  properties: 'Properties — Clark Estates',
-  property: 'Property Detail — Clark Estates',
-  condominiums: 'Condominiums — Clark Estates',
-  agent: 'Agent Profile — Clark Estates',
-  location: 'Location Guide — Clark Estates',
-  about: 'About Us — Clark Estates',
-  saved: 'Saved Properties — Clark Estates',
-  signin: 'Sign In — Clark Estates',
+  home: 'Clark Real States — Premium Real Estate in Pampanga',
+  properties: 'Properties — Clark Real States',
+  property: 'Property Detail — Clark Real States',
+  condominiums: 'Condominiums — Clark Real States',
+  agent: 'Agent Profile — Clark Real States',
+  location: 'Location Guide — Clark Real States',
+  about: 'About Us — Clark Real States',
+  saved: 'Saved Properties — Clark Real States',
+  signin: 'Sign In — Clark Real States',
 }
 
 export default function App() {
@@ -39,7 +39,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    document.title = PAGE_TITLES[state.page] ?? 'Clark Estates'
+    document.title = PAGE_TITLES[state.page] ?? 'Clark Real States'
   }, [state.page])
 
   return (

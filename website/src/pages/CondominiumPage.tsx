@@ -115,7 +115,7 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
   const availableCount = allUnits.filter((u) => u.tower === selectedTower && u.status === 'Available').length
 
   return (
-    <div className="bg-white border border-line">
+    <div className="bg-white rounded-2xl border border-line/70 shadow-sm overflow-hidden">
       {/* Explorer Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 border-b border-line">
         <div>
@@ -124,13 +124,13 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
         </div>
         <div className="flex flex-wrap gap-3">
           {/* Tower Selector */}
-          <div className="flex border border-line">
+          <div className="flex items-center gap-0.5 bg-parchment/60 rounded-full p-1">
             {towers.map((t) => (
               <button
                 key={t}
                 onClick={() => { setSelectedTower(t); setSelectedFloor(null); setSelectedUnit(null) }}
-                className={`px-4 py-2 text-xs font-display font-semibold tracking-[0.1em] uppercase transition-colors ${
-                  selectedTower === t ? 'bg-charcoal text-white' : 'text-warm-gray hover:text-charcoal'
+                className={`px-4 py-1.5 rounded-full text-xs font-display font-semibold tracking-[0.1em] uppercase transition-all ${
+                  selectedTower === t ? 'bg-navy text-white shadow-sm' : 'text-warm-gray hover:text-charcoal'
                 }`}
               >
                 {t}
@@ -173,9 +173,9 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
                 <div key={floor} className="flex items-center gap-2">
                   <button
                     onClick={() => setSelectedFloor(selectedFloor === floor ? null : floor)}
-                    className={`w-10 h-8 flex-shrink-0 text-[11px] font-display font-semibold transition-colors ${
+                    className={`w-10 h-8 flex-shrink-0 rounded-lg text-[11px] font-display font-semibold transition-colors ${
                       selectedFloor === floor
-                        ? 'bg-charcoal text-white'
+                        ? 'bg-navy text-white'
                         : 'bg-parchment text-warm-gray hover:bg-line'
                     }`}
                   >
@@ -191,7 +191,7 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
                             setSelectedUnit(unit)
                           }
                         }}
-                        className={`flex-1 h-10 border text-[9px] font-display font-semibold transition-all ${STATUS_COLORS[unit.status]} ${
+                        className={`flex-1 h-10 rounded-lg border text-[9px] font-display font-semibold transition-all ${STATUS_COLORS[unit.status]} ${
                           selectedUnit?.id === unit.id ? 'ring-2 ring-gold ring-offset-1' : ''
                         }`}
                         title={`${unit.number} — ${unit.type} — ${unit.status}`}
@@ -217,7 +217,7 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
                   <h4 className="font-serif text-charcoal text-2xl">{selectedUnit.number}</h4>
                   <p className="text-xs font-display text-warm-gray mt-0.5">{selectedUnit.tower} · Floor {selectedUnit.floor}</p>
                 </div>
-                <span className={`px-2 py-1 text-[9px] font-display font-semibold tracking-[0.1em] uppercase ${
+                <span className={`px-3 py-1 rounded-full text-[9px] font-display font-semibold tracking-[0.1em] uppercase ${
                   selectedUnit.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                 }`}>
                   {selectedUnit.status}
@@ -233,7 +233,7 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
                   { label: 'View', value: selectedUnit.view },
                   { label: 'Floor', value: `${selectedUnit.floor}th` },
                 ].map(({ label, value }) => (
-                  <div key={label} className="p-3 bg-parchment">
+                  <div key={label} className="p-3 rounded-lg bg-parchment">
                     <p className="text-[9px] font-display tracking-[0.12em] uppercase text-warm-gray mb-0.5">{label}</p>
                     <p className="text-xs font-display font-semibold text-charcoal">{value}</p>
                   </div>
@@ -248,13 +248,13 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => toast(`Reservation request sent for Unit ${selectedUnit.number}!`)}
-                  className="py-3 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+                  className="py-3 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-navy hover:shadow-md transition-all"
                 >
                   Reserve This Unit
                 </button>
                 <button
                   onClick={() => toast(`Inquiry sent for Unit ${selectedUnit.number}.`, 'info')}
-                  className="py-3 border border-line text-xs font-display font-semibold tracking-[0.12em] uppercase text-charcoal hover:border-charcoal transition-colors"
+                  className="py-3 rounded-full border border-line text-xs font-display font-semibold tracking-[0.12em] uppercase text-charcoal hover:border-navy transition-colors"
                 >
                   Send Inquiry
                 </button>
@@ -262,7 +262,7 @@ function UnitExplorer({ condoId, toast }: { condoId: string; toast: (msg: string
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-12 h-12 border-2 border-line flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-parchment flex items-center justify-center mb-4">
                 <span className="text-warm-gray text-lg">⊞</span>
               </div>
               <p className="font-display text-sm text-charcoal font-semibold mb-1">Select a Unit</p>
@@ -294,14 +294,14 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
   return (
     <div className="min-h-screen bg-cream">
       {/* Hero */}
-      <section className="relative h-[72vh] min-h-[500px] flex items-end overflow-hidden bg-charcoal">
+      <section className="relative h-[72vh] min-h-[500px] flex items-end overflow-hidden bg-navy">
         <div className="absolute inset-0 overflow-hidden">
           <img
             src="/clark-view.png"
             alt="Clark condominium skyline"
             className="animate-hero-zoom w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-charcoal/92 via-charcoal/45 to-charcoal/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-navy/92 via-navy/45 to-navy/20" />
         </div>
         <div className="relative z-10 max-w-screen-2xl mx-auto px-6 lg:px-12 pb-14 w-full">
           <nav className="flex items-center gap-2 text-[11px] font-display text-white/40 mb-6">
@@ -322,17 +322,17 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
       </section>
 
       {/* Development Tabs */}
-      <div className="bg-white border-b border-line sticky top-16 z-30">
+      <div className="bg-white/95 backdrop-blur-md border-b border-line/60 sticky top-16 z-30 shadow-[0_8px_24px_-16px_rgba(15,31,61,0.18)]">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
-          <div className="flex gap-0 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto py-3">
             {condominiums.map((condo) => (
               <button
                 key={condo.id}
                 onClick={() => setActiveCondo(condo)}
-                className={`flex-shrink-0 px-6 py-4 text-[11px] font-display font-semibold tracking-[0.1em] uppercase transition-colors border-b-2 ${
+                className={`flex-shrink-0 px-5 py-2 rounded-full text-[11px] font-display font-semibold tracking-[0.1em] uppercase transition-all ${
                   activeCondo.id === condo.id
-                    ? 'text-charcoal border-gold'
-                    : 'text-warm-gray border-transparent hover:text-charcoal'
+                    ? 'bg-navy text-white shadow-sm'
+                    : 'bg-parchment/60 text-warm-gray hover:text-charcoal'
                 }`}
               >
                 {condo.name}
@@ -354,7 +354,7 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
                 className="absolute inset-0 w-full h-full object-cover animate-fade-in"
               />
               <div className="absolute top-4 left-4">
-                <span className={`px-2.5 py-1 text-[10px] font-display font-semibold tracking-[0.1em] uppercase ${statusColor(activeCondo.status)}`}>
+                <span className={`px-3 py-1 rounded-full shadow-sm text-[10px] font-display font-semibold tracking-[0.1em] uppercase ${statusColor(activeCondo.status)}`}>
                   {activeCondo.status}
                 </span>
               </div>
@@ -407,7 +407,7 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
                 <p className="text-[9px] font-display tracking-[0.2em] uppercase text-warm-gray mb-2">Amenities</p>
                 <div className="flex flex-wrap gap-1.5">
                   {activeCondo.amenities.map((a) => (
-                    <span key={a} className="px-2.5 py-1.5 bg-white border border-line text-[10px] font-display text-warm-gray">
+                    <span key={a} className="px-3 py-1.5 rounded-full bg-white text-[10px] font-display text-warm-gray shadow-sm">
                       {a}
                     </span>
                   ))}
@@ -416,13 +416,13 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
               <div className="flex gap-3">
                 <button
                   onClick={() => toast(`Inquiry sent for ${activeCondo.name}!`)}
-                  className="flex-1 py-3 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+                  className="flex-1 py-3 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-navy hover:shadow-md transition-all"
                 >
                   Inquire Now
                 </button>
                 <button
                   onClick={() => { const el = document.getElementById('unit-explorer'); el?.scrollIntoView({ behavior: 'smooth' }) }}
-                  className="flex-1 py-3 border border-charcoal text-charcoal text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-charcoal hover:text-white transition-colors"
+                  className="flex-1 py-3 rounded-full border border-navy text-navy text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-navy hover:text-white transition-colors"
                 >
                   Explore Units
                 </button>
@@ -433,16 +433,16 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
       </section>
 
       {/* Amenity Gallery */}
-      <section className="py-2 px-2 bg-white">
+      <section className="py-6 px-6 lg:px-12 bg-white">
         <div className="max-w-screen-2xl mx-auto">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-3">
             {[
               'https://images.unsplash.com/photo-1776361984975-84bbbb539f80?w=500&h=340&fit=crop&auto=format',
               'https://images.unsplash.com/photo-1776363497229-616cc7a541fe?w=500&h=340&fit=crop&auto=format',
               'https://images.unsplash.com/photo-1784704161960-26770b684595?w=500&h=340&fit=crop&auto=format',
               'https://images.unsplash.com/photo-1743638082396-58706d3bdffb?w=500&h=340&fit=crop&auto=format',
             ].map((img, i) => (
-              <div key={i} className="overflow-hidden img-zoom-container" style={{ aspectRatio: '4/3' }}>
+              <div key={i} className="overflow-hidden rounded-xl img-zoom-container" style={{ aspectRatio: '4/3' }}>
                 <img src={img} alt={`Amenity ${i + 1}`} className="img-zoom w-full h-full object-cover" loading="lazy" />
               </div>
             ))}
@@ -464,15 +464,15 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
               { type: '2 Bedroom', area: '68–95 sqm', price: '₱8.8M', available: 16, beds: '2' },
               { type: '3 Bedroom', area: '110–165 sqm', price: '₱14M', available: 6, beds: '3' },
             ].map((unit) => (
-              <div key={unit.type} className="bg-white border border-line p-6 hover:border-gold-dark transition-colors cursor-pointer group">
+              <div key={unit.type} className="bg-white rounded-2xl border border-line/70 p-6 card-lift hover:border-gold/50 cursor-pointer group">
                 <p className="text-[9px] font-display tracking-[0.15em] uppercase text-warm-gray mb-1">Unit Type</p>
                 <h3 className="font-serif text-charcoal text-xl mb-4">{unit.type}</h3>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-xs font-display border-b border-line pb-1.5">
+                <div className="space-y-2 mb-4 p-3 bg-parchment/60 rounded-lg">
+                  <div className="flex justify-between text-xs font-display border-b border-line/70 pb-1.5">
                     <span className="text-warm-gray">Area</span>
                     <span className="text-charcoal">{unit.area}</span>
                   </div>
-                  <div className="flex justify-between text-xs font-display border-b border-line pb-1.5">
+                  <div className="flex justify-between text-xs font-display border-b border-line/70 pb-1.5">
                     <span className="text-warm-gray">From</span>
                     <span className="text-charcoal font-semibold">{unit.price}</span>
                   </div>
@@ -483,7 +483,7 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
                     </span>
                   </div>
                 </div>
-                <button className="w-full py-2 text-[10px] font-display font-semibold tracking-[0.12em] uppercase border border-line text-warm-gray group-hover:border-gold group-hover:text-gold transition-colors">
+                <button className="w-full py-2 rounded-full text-[10px] font-display font-semibold tracking-[0.12em] uppercase border border-line text-warm-gray group-hover:border-gold group-hover:text-gold transition-colors">
                   View Floor Plan
                 </button>
               </div>
@@ -520,9 +520,10 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
             </div>
             <button
               onClick={() => navigate('properties')}
-              className="text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-gold transition-colors flex items-center gap-2"
+              className="group text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-navy transition-colors flex items-center gap-2"
             >
-              All Properties <span>→</span>
+              All Properties
+              <span className="w-7 h-7 rounded-full bg-parchment flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-colors">→</span>
             </button>
           </div>
           <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-700 delay-150 ${v3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -534,7 +535,7 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
       </section>
 
       {/* CTA */}
-      <section className="bg-charcoal py-16 lg:py-20">
+      <section className="bg-navy py-16 lg:py-20">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 text-center">
           <p className="text-gold text-[11px] font-display font-semibold tracking-[0.3em] uppercase mb-3">Reserve Your Unit</p>
           <h2 className="font-serif text-white text-2xl lg:text-3xl mb-4">
@@ -545,7 +546,7 @@ export default function CondominiumPage({ navigate, toast }: CondominiumPageProp
           </p>
           <button
             onClick={() => toast("Request sent! A specialist will contact you within 24 hours.")}
-            className="px-8 py-3.5 bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:bg-gold-dark transition-colors"
+            className="px-8 py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase shadow-sm hover:bg-white hover:text-navy hover:shadow-md transition-all"
           >
             Talk to a Specialist
           </button>

@@ -1,5 +1,6 @@
 import type { Page } from '../components/Navigation'
 import { agents } from '../lib/data'
+import { useAgentsWithOverrides } from '../lib/agentOverrides'
 
 interface AboutPageProps {
   navigate: (page: Page, id?: string) => void
@@ -28,10 +29,11 @@ const VALUES = [
 ]
 
 export default function AboutPage({ navigate }: AboutPageProps) {
+  const liveAgents = useAgentsWithOverrides(agents)
   return (
     <div className="min-h-screen bg-cream">
       {/* Page Header */}
-      <div className="bg-charcoal pt-24 pb-16 px-6 lg:px-12">
+      <div className="bg-navy pt-24 pb-16 px-6 lg:px-12">
         <div className="max-w-screen-2xl mx-auto">
           <nav className="flex items-center gap-2 text-[11px] font-display text-white/40 mb-4">
             <button onClick={() => navigate('home')} className="hover:text-white/70 transition-colors">Home</button>
@@ -45,7 +47,7 @@ export default function AboutPage({ navigate }: AboutPageProps) {
             Helping Pampanga find home since 2009.
           </h1>
           <p className="text-white/55 font-display text-sm max-w-xl leading-relaxed">
-            Clark Estates is a boutique real estate brokerage focused exclusively on Clark, Pampanga,
+            Clark Real States is a boutique real estate brokerage focused exclusively on Clark, Pampanga,
             and the surrounding growth corridors of Central Luzon.
           </p>
         </div>
@@ -93,7 +95,7 @@ export default function AboutPage({ navigate }: AboutPageProps) {
 
           <div className="grid gap-6">
             {VALUES.map((v) => (
-              <div key={v.title} className="bg-white p-6 lg:p-8 border-l-2 border-gold">
+              <div key={v.title} className="bg-parchment/60 rounded-2xl p-6 lg:p-8 border-l-4 border-gold hover:bg-parchment transition-colors">
                 <h3 className="font-serif text-charcoal text-lg mb-2">{v.title}</h3>
                 <p className="text-warm-gray font-display text-sm leading-relaxed">{v.text}</p>
               </div>
@@ -114,20 +116,21 @@ export default function AboutPage({ navigate }: AboutPageProps) {
             </div>
             <button
               onClick={() => navigate('agent', agents[0]?.id)}
-              className="gold-underline text-xs font-display font-semibold tracking-[0.12em] uppercase text-charcoal self-start md:self-auto"
+              className="group text-xs font-display font-semibold tracking-[0.12em] uppercase text-charcoal hover:text-navy transition-colors flex items-center gap-2 self-start md:self-auto"
             >
-              View All Agents →
+              View All Agents
+              <span className="w-7 h-7 rounded-full bg-parchment flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-colors">→</span>
             </button>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {agents.slice(0, 4).map((a) => (
+            {liveAgents.slice(0, 4).map((a) => (
               <button
                 key={a.id}
                 onClick={() => navigate('agent', a.id)}
                 className="text-left group"
               >
-                <div className="overflow-hidden mb-3" style={{ aspectRatio: '3/4' }}>
+                <div className="overflow-hidden rounded-2xl mb-3 card-lift" style={{ aspectRatio: '3/4' }}>
                   <img
                     src={a.image}
                     alt={a.name}
@@ -144,7 +147,7 @@ export default function AboutPage({ navigate }: AboutPageProps) {
       </div>
 
       {/* CTA */}
-      <div className="bg-charcoal">
+      <div className="bg-navy">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 py-16 lg:py-20 text-center">
           <h2 className="font-serif text-white text-2xl lg:text-3xl mb-4">Ready to find your place?</h2>
           <p className="text-white/50 font-display text-sm mb-8 max-w-md mx-auto">
@@ -153,13 +156,13 @@ export default function AboutPage({ navigate }: AboutPageProps) {
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => navigate('properties')}
-              className="px-7 py-3.5 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+              className="px-7 py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-white hover:text-navy hover:shadow-md transition-all"
             >
               Browse Properties
             </button>
             <button
               onClick={() => navigate('agent', agents[0]?.id)}
-              className="px-7 py-3.5 border border-white/25 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:bg-white/10 transition-colors"
+              className="px-7 py-3.5 rounded-full border border-white/25 text-white text-xs font-display font-semibold tracking-[0.12em] uppercase hover:border-white hover:bg-white/10 transition-all"
             >
               Talk to an Agent
             </button>

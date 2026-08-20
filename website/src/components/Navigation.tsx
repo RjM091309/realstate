@@ -59,7 +59,7 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
           <button
             onClick={() => { navigate('home'); setMenuOpen(false) }}
             className="flex items-center gap-2.5 group"
-            aria-label="Clark Estates Home"
+            aria-label="Clark Real States Home"
           >
             <div className="flex items-center gap-1">
               <div className="w-1.5 h-5 bg-gold" />
@@ -67,7 +67,7 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
             </div>
             <div className="flex flex-col leading-none">
               <span className={`font-display font-semibold tracking-[0.18em] text-xs uppercase transition-colors duration-300 ${isTransparent ? 'text-white' : 'text-charcoal'}`}>
-                Clark Estates
+                Clark Real States
               </span>
               <span className={`font-display tracking-[0.12em] text-[9px] uppercase transition-colors duration-300 ${isTransparent ? 'text-white/60' : 'text-warm-gray'}`}>
                 Pampanga
@@ -101,7 +101,7 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
                 <span className={`text-[8px] transition-transform duration-200 ${locOpen ? 'rotate-180' : ''}`}>▾</span>
               </button>
               {locOpen && (
-                <div className="absolute top-full left-0 mt-2 bg-white border border-line shadow-xl min-w-[200px] py-2 animate-slide-down">
+                <div className="absolute top-full left-0 mt-2 bg-white rounded-2xl border border-line/70 shadow-xl min-w-[200px] py-2 animate-slide-down overflow-hidden">
                   {LOCATION_LINKS.map((l) => (
                     <button
                       key={l.key}
@@ -155,7 +155,7 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
             </button>
             <button
               onClick={() => navigate('properties')}
-              className="px-5 py-2.5 bg-gold text-white text-[11px] font-display font-semibold tracking-[0.12em] uppercase hover:bg-gold-dark transition-colors"
+              className="px-5 py-2.5 rounded-full bg-gold text-white text-[11px] font-display font-semibold tracking-[0.12em] uppercase shadow-sm hover:bg-navy hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
             >
               List a Property
             </button>
@@ -210,7 +210,7 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
                 <button
                   key={l.key}
                   onClick={() => { navigate('location', l.key); setMenuOpen(false) }}
-                  className="px-3 py-1.5 border border-line text-xs font-display text-warm-gray hover:border-gold hover:text-charcoal transition-colors"
+                  className="px-3 py-1.5 rounded-full border border-line text-xs font-display text-warm-gray hover:border-gold hover:text-charcoal transition-colors"
                 >
                   {l.label}
                 </button>
@@ -220,13 +220,13 @@ export default function Navigation({ currentPage, navigate }: NavigationProps) {
           <div className="flex flex-col gap-3 pt-4 border-t border-line">
             <button
               onClick={() => { navigate('signin'); setMenuOpen(false) }}
-              className="py-3 border border-line text-xs font-display font-medium tracking-[0.12em] uppercase text-charcoal"
+              className="py-3 rounded-full border border-line text-xs font-display font-medium tracking-[0.12em] uppercase text-charcoal"
             >
               Sign In
             </button>
             <button
               onClick={() => { navigate('properties'); setMenuOpen(false) }}
-              className="py-3 bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase"
+              className="py-3 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.12em] uppercase shadow-sm"
             >
               List a Property
             </button>

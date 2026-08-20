@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import PropertyCard from '../components/PropertyCard'
 import ImageCarousel from '../components/ImageCarousel'
+import Dropdown, { DropdownItem } from '../components/Dropdown'
 import { condominiums, agents, formatPrice } from '../lib/data'
 import { useLiveProperties } from '../lib/useLiveProperties'
+import { useAgentsWithOverrides } from '../lib/agentOverrides'
 import type { Page } from '../components/Navigation'
 
 const CLARK_SHOWCASE_IMAGES = [
@@ -40,7 +42,7 @@ function HeroSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
   const [priceRange, setPriceRange] = useState('')
 
   return (
-    <section className="relative h-[88vh] min-h-[600px] flex items-center overflow-hidden bg-charcoal">
+    <section className="relative h-[88vh] min-h-[600px] flex items-center overflow-hidden bg-navy">
       {/* Hero image */}
       <div className="absolute inset-0 overflow-hidden">
         <img
@@ -48,8 +50,8 @@ function HeroSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
           alt="Clark, Pampanga skyline"
           className="animate-hero-zoom w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-charcoal/35 via-charcoal/15 to-charcoal/60" />
-        <div className="absolute inset-0 bg-gradient-to-r from-charcoal/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-navy/35 via-navy/15 to-navy/60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-navy/20 to-transparent" />
       </div>
 
       {/* Content */}
@@ -71,86 +73,108 @@ function HeroSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
         {/* Search Bar */}
         <div className="animate-fade-up delay-3 w-full max-w-4xl">
           <div
-            className="bg-black/30 backdrop-blur-xl border border-white/20"
+            className="rounded-2xl overflow-hidden bg-black/30 backdrop-blur-xl border border-white/20"
             style={{ boxShadow: '0 32px 80px -12px rgba(0,0,0,0.5)' }}
           >
             {/* Tabs */}
-            <div className="flex border-b border-white/15">
-              {(['Buy', 'Rent'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-7 py-3.5 text-sm font-display font-semibold tracking-[0.1em] uppercase transition-colors ${
-                    activeTab === tab
-                      ? 'text-white border-b-2 border-gold -mb-px'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+            <div className="px-4 pt-4 pb-1">
+              <div className="inline-flex items-center gap-0.5 bg-white/10 rounded-full p-1">
+                {(['Buy', 'Rent'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-6 py-2 rounded-full text-xs font-display font-semibold tracking-[0.12em] uppercase transition-all ${
+                      activeTab === tab
+                        ? 'bg-gold text-navy shadow-sm'
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Inputs */}
-            <div className="flex flex-col md:flex-row">
-              <div className="flex-1 px-5 py-4 border-b md:border-b-0 md:border-r border-white/15">
-                <label className="block text-xs font-display font-semibold tracking-[0.15em] uppercase text-white/70 mb-2">
-                  Location
-                </label>
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full text-base font-display font-medium text-white bg-transparent outline-none appearance-none cursor-pointer"
+            <div className="flex flex-col md:flex-row md:items-stretch">
+              <div className="relative flex-1 px-5 pt-2 pb-4 md:pb-5 border-b md:border-b-0 md:border-r border-white/15 hover:bg-white/5 transition-colors">
+                <Dropdown
+                  triggerClassName="w-full text-left"
+                  trigger={() => (
+                    <>
+                      <span className="block text-[10px] font-display font-semibold tracking-[0.15em] uppercase text-white/60 mb-1.5">
+                        Location
+                      </span>
+                      <span className="block text-base font-display font-medium text-white pr-5">
+                        {location || 'All Locations'}
+                      </span>
+                      <span className="pointer-events-none absolute right-4 bottom-4 md:bottom-5 text-[9px] text-gold">▾</span>
+                    </>
+                  )}
                 >
-                  <option value="" className="text-charcoal">All Locations</option>
-                  <option className="text-charcoal">Clark Freeport Zone</option>
-                  <option className="text-charcoal">Angeles City</option>
-                  <option className="text-charcoal">Mabalacat City</option>
-                  <option className="text-charcoal">San Fernando</option>
-                  <option className="text-charcoal">Porac</option>
-                  <option className="text-charcoal">Arayat</option>
-                </select>
+                  {(close) => (
+                    <div className="min-w-[200px]">
+                      {['', 'Clark Freeport Zone', 'Angeles City', 'Mabalacat City', 'San Fernando', 'Porac', 'Arayat'].map((l) => (
+                        <DropdownItem key={l} active={location === l} onClick={() => { setLocation(l); close() }}>{l || 'All Locations'}</DropdownItem>
+                      ))}
+                    </div>
+                  )}
+                </Dropdown>
               </div>
 
-              <div className="flex-1 px-5 py-4 border-b md:border-b-0 md:border-r border-white/15">
-                <label className="block text-xs font-display font-semibold tracking-[0.15em] uppercase text-white/70 mb-2">
-                  Property Type
-                </label>
-                <select
-                  value={propertyType}
-                  onChange={(e) => setPropertyType(e.target.value)}
-                  className="w-full text-base font-display font-medium text-white bg-transparent outline-none appearance-none cursor-pointer"
+              <div className="relative flex-1 px-5 pt-2 pb-4 md:pb-5 border-b md:border-b-0 md:border-r border-white/15 hover:bg-white/5 transition-colors">
+                <Dropdown
+                  triggerClassName="w-full text-left"
+                  trigger={() => (
+                    <>
+                      <span className="block text-[10px] font-display font-semibold tracking-[0.15em] uppercase text-white/60 mb-1.5">
+                        Property Type
+                      </span>
+                      <span className="block text-base font-display font-medium text-white pr-5">
+                        {propertyType || 'Any Type'}
+                      </span>
+                      <span className="pointer-events-none absolute right-4 bottom-4 md:bottom-5 text-[9px] text-gold">▾</span>
+                    </>
+                  )}
                 >
-                  <option value="" className="text-charcoal">Any Type</option>
-                  <option className="text-charcoal">Condominium</option>
-                  <option className="text-charcoal">House & Lot</option>
-                  <option className="text-charcoal">Land</option>
-                  <option className="text-charcoal">Commercial</option>
-                  <option className="text-charcoal">Townhouse</option>
-                </select>
+                  {(close) => (
+                    <div className="min-w-[180px]">
+                      {['', 'Condominium', 'House & Lot', 'Land', 'Commercial', 'Townhouse'].map((t) => (
+                        <DropdownItem key={t} active={propertyType === t} onClick={() => { setPropertyType(t); close() }}>{t || 'Any Type'}</DropdownItem>
+                      ))}
+                    </div>
+                  )}
+                </Dropdown>
               </div>
 
-              <div className="flex-1 px-5 py-4 border-b md:border-b-0 md:border-r border-white/15">
-                <label className="block text-xs font-display font-semibold tracking-[0.15em] uppercase text-white/70 mb-2">
-                  Price Range
-                </label>
-                <select
-                  value={priceRange}
-                  onChange={(e) => setPriceRange(e.target.value)}
-                  className="w-full text-base font-display font-medium text-white bg-transparent outline-none appearance-none cursor-pointer"
+              <div className="relative flex-1 px-5 pt-2 pb-4 md:pb-5 border-b md:border-b-0 md:border-r border-white/15 hover:bg-white/5 transition-colors">
+                <Dropdown
+                  triggerClassName="w-full text-left"
+                  trigger={() => (
+                    <>
+                      <span className="block text-[10px] font-display font-semibold tracking-[0.15em] uppercase text-white/60 mb-1.5">
+                        Price Range
+                      </span>
+                      <span className="block text-base font-display font-medium text-white pr-5">
+                        {priceRange || 'Any Price'}
+                      </span>
+                      <span className="pointer-events-none absolute right-4 bottom-4 md:bottom-5 text-[9px] text-gold">▾</span>
+                    </>
+                  )}
                 >
-                  <option value="" className="text-charcoal">Any Price</option>
-                  <option className="text-charcoal">Under ₱5M</option>
-                  <option className="text-charcoal">₱5M – ₱10M</option>
-                  <option className="text-charcoal">₱10M – ₱20M</option>
-                  <option className="text-charcoal">₱20M – ₱50M</option>
-                  <option className="text-charcoal">Above ₱50M</option>
-                </select>
+                  {(close) => (
+                    <div className="min-w-[180px]">
+                      {['', 'Under ₱5M', '₱5M – ₱10M', '₱10M – ₱20M', '₱20M – ₱50M', 'Above ₱50M'].map((p) => (
+                        <DropdownItem key={p} active={priceRange === p} onClick={() => { setPriceRange(p); close() }}>{p || 'Any Price'}</DropdownItem>
+                      ))}
+                    </div>
+                  )}
+                </Dropdown>
               </div>
 
               <button
                 onClick={() => navigate('properties')}
-                className="px-8 py-4 bg-gold text-white font-display font-semibold text-sm tracking-[0.1em] uppercase hover:bg-gold-dark transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                className="m-2 md:my-2 px-8 py-4 rounded-xl bg-gold text-white font-display font-semibold text-sm tracking-[0.1em] uppercase hover:bg-navy transition-colors duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 Search Properties
                 <span>→</span>
@@ -291,7 +315,7 @@ function DiscoverClark({ navigate }: { navigate: HomePageProps['navigate'] }) {
             </ul>
             <button
               onClick={() => navigate('properties')}
-              className="self-start px-7 py-3 border border-charcoal text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:bg-charcoal hover:text-white transition-all"
+              className="self-start px-7 py-3 rounded-full border border-navy text-xs font-display font-semibold tracking-[0.15em] uppercase text-navy hover:bg-navy hover:text-white shadow-sm hover:shadow-md transition-all"
             >
               Explore Clark Properties
             </button>
@@ -301,7 +325,7 @@ function DiscoverClark({ navigate }: { navigate: HomePageProps['navigate'] }) {
           <div
             className={`relative min-h-[340px] lg:min-h-0 transition-all duration-700 delay-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
           >
-            <div className="absolute inset-0 lg:-inset-0 overflow-hidden">
+            <div className="absolute inset-0 lg:-inset-0 overflow-hidden rounded-2xl">
               <ImageCarousel images={CLARK_SHOWCASE_IMAGES} />
             </div>
           </div>
@@ -328,9 +352,10 @@ function CondominiumSection({ navigate }: { navigate: HomePageProps['navigate'] 
           </div>
           <button
             onClick={() => navigate('condominiums')}
-            className="text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-gold transition-colors flex items-center gap-2 md:mb-2"
+            className="group text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-navy transition-colors flex items-center gap-2 md:mb-2"
           >
-            All Developments <span>→</span>
+            All Developments
+            <span className="w-7 h-7 rounded-full bg-parchment flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-colors">→</span>
           </button>
         </div>
 
@@ -338,7 +363,7 @@ function CondominiumSection({ navigate }: { navigate: HomePageProps['navigate'] 
           {condominiums.map((condo, i) => (
             <article
               key={condo.id}
-              className="group cursor-pointer overflow-hidden bg-white card-lift border border-line"
+              className="group cursor-pointer overflow-hidden bg-white rounded-2xl border border-line/70 card-lift"
               onClick={() => navigate('condominiums')}
               style={{ transitionDelay: `${i * 80}ms` }}
             >
@@ -351,7 +376,7 @@ function CondominiumSection({ navigate }: { navigate: HomePageProps['navigate'] 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/20 to-transparent" />
                 <div className="absolute top-4 left-4">
-                  <span className={`px-2.5 py-1 text-[9px] font-display font-semibold tracking-[0.1em] uppercase ${
+                  <span className={`px-3 py-1 rounded-full shadow-sm text-[9px] font-display font-semibold tracking-[0.1em] uppercase ${
                     condo.status === 'Ready for Occupancy' ? 'bg-emerald-600 text-white' :
                     condo.status === 'Completed' ? 'bg-charcoal text-white' :
                     condo.status === 'Pre-Selling' ? 'bg-gold text-white' :
@@ -366,12 +391,13 @@ function CondominiumSection({ navigate }: { navigate: HomePageProps['navigate'] 
                 </div>
               </div>
 
-              <div className="p-5">
+              <div className="p-5 relative">
+                <div className="absolute top-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
                 <p className="text-xs font-display text-warm-gray flex items-center gap-1 mb-3">
                   <span className="text-gold text-[9px]">◆</span>
                   {condo.location}
                 </p>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 py-2.5 px-3 bg-parchment/70 rounded-lg">
                   <div>
                     <p className="text-[10px] font-display text-warm-gray tracking-wide mb-0.5">
                       {condo.priceMode === 'rent' ? 'Estimated starting rent' : 'Starting From'}
@@ -401,12 +427,12 @@ function CondominiumSection({ navigate }: { navigate: HomePageProps['navigate'] 
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   {condo.amenities.slice(0, 3).map((a) => (
-                    <span key={a} className="px-2 py-0.5 bg-parchment text-[9px] font-display text-warm-gray tracking-wide">
+                    <span key={a} className="px-2.5 py-1 rounded-full bg-parchment text-[9px] font-display text-warm-gray tracking-wide">
                       {a}
                     </span>
                   ))}
                   {condo.amenities.length > 3 && (
-                    <span className="px-2 py-0.5 bg-parchment text-[9px] font-display text-warm-gray">
+                    <span className="px-2.5 py-1 rounded-full bg-parchment text-[9px] font-display text-gold-dark font-medium">
                       +{condo.amenities.length - 3} more
                     </span>
                   )}
@@ -468,7 +494,7 @@ function LocationsSection({ navigate }: { navigate: HomePageProps['navigate'] })
             <button
               key={loc.name}
               onClick={() => navigate('location', (loc as any).locKey)}
-              className="group relative overflow-hidden img-zoom-container text-left"
+              className="group relative overflow-hidden rounded-2xl img-zoom-container text-left card-lift"
               style={{ aspectRatio: '3/4', transitionDelay: `${i * 60}ms` }}
             >
               <img
@@ -480,7 +506,7 @@ function LocationsSection({ navigate }: { navigate: HomePageProps['navigate'] })
               <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/30 to-transparent" />
               <div className="absolute top-3 left-3">
                 {loc.tag && (
-                  <span className="px-2 py-0.5 bg-gold text-white text-[9px] font-display font-semibold tracking-[0.1em] uppercase">
+                  <span className="px-2.5 py-1 rounded-full shadow-sm bg-gold text-white text-[9px] font-display font-semibold tracking-[0.1em] uppercase">
                     {loc.tag}
                   </span>
                 )}
@@ -499,6 +525,7 @@ function LocationsSection({ navigate }: { navigate: HomePageProps['navigate'] })
 
 function AgentsSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
   const { ref, visible } = useReveal()
+  const liveAgents = useAgentsWithOverrides(agents)
 
   return (
     <section ref={ref} className="py-20 lg:py-28 bg-white">
@@ -514,22 +541,23 @@ function AgentsSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
           </div>
           <button
             onClick={() => navigate('properties')}
-            className="text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-gold transition-colors flex items-center gap-2 md:mb-2"
+            className="group text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:text-navy transition-colors flex items-center gap-2 md:mb-2"
           >
-            Meet All Agents <span>→</span>
+            Meet All Agents
+            <span className="w-7 h-7 rounded-full bg-parchment flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-colors">→</span>
           </button>
         </div>
 
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-700 delay-150 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          {agents.map((agent, i) => (
+          {liveAgents.map((agent, i) => (
             <article
               key={agent.id}
-              className="border border-line p-6 hover:border-gold-dark transition-colors group cursor-pointer"
+              className="rounded-2xl border border-line/70 p-6 card-lift hover:border-gold/50 group cursor-pointer"
               onClick={() => navigate('agent', agent.id)}
               style={{ transitionDelay: `${i * 80}ms` }}
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-16 h-16 overflow-hidden flex-shrink-0">
+                <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-parchment">
                   <img
                     src={agent.image}
                     alt={agent.name}
@@ -542,7 +570,7 @@ function AgentsSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
                   <p className="text-[11px] font-display text-warm-gray mt-0.5">{agent.title}</p>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {agent.specialization.slice(0, 2).map((s) => (
-                      <span key={s} className="px-1.5 py-0.5 bg-parchment text-[9px] font-display text-warm-gray">
+                      <span key={s} className="px-2 py-0.5 rounded-full bg-parchment text-[9px] font-display text-warm-gray">
                         {s}
                       </span>
                     ))}
@@ -559,7 +587,7 @@ function AgentsSection({ navigate }: { navigate: HomePageProps['navigate'] }) {
                   <p className="text-[11px] font-display text-warm-gray">{agent.listings} Listings</p>
                   <p className="text-[11px] font-display text-warm-gray">{agent.experience} Years Exp.</p>
                 </div>
-                <button className="px-4 py-2 border border-charcoal text-[10px] font-display font-semibold tracking-[0.12em] uppercase text-charcoal hover:bg-charcoal hover:text-white transition-colors">
+                <button className="px-4 py-2 rounded-full border border-navy text-[10px] font-display font-semibold tracking-[0.12em] uppercase text-navy hover:bg-navy hover:text-white transition-colors">
                   Contact
                 </button>
               </div>
@@ -599,11 +627,11 @@ function CTABanner({ navigate }: { navigate: HomePageProps['navigate'] }) {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={() => navigate('properties')}
-            className="px-8 py-3.5 bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:bg-gold-dark transition-colors"
+            className="px-8 py-3.5 rounded-full bg-gold text-white text-xs font-display font-semibold tracking-[0.15em] uppercase shadow-sm hover:bg-white hover:text-navy hover:shadow-md transition-all"
           >
             Browse Properties
           </button>
-          <button className="px-8 py-3.5 border border-white/40 text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:border-white/80 transition-colors">
+          <button className="px-8 py-3.5 rounded-full border border-white/40 text-white text-xs font-display font-semibold tracking-[0.15em] uppercase hover:border-white hover:bg-white/10 transition-all">
             Talk to an Agent
           </button>
         </div>

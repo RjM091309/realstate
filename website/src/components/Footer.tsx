@@ -8,7 +8,7 @@ export default function Footer({ navigate }: FooterProps) {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="bg-charcoal text-white">
+    <footer className="bg-navy text-white">
       <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
 
         {/* Main */}
@@ -23,7 +23,7 @@ export default function Footer({ navigate }: FooterProps) {
                   <div className="w-1.5 h-3 bg-gold/50 -ml-0.5" />
                 </div>
                 <div className="flex flex-col leading-none">
-                  <span className="font-display font-semibold tracking-[0.18em] text-xs uppercase text-white">Clark Estates</span>
+                  <span className="font-display font-semibold tracking-[0.18em] text-xs uppercase text-white">Clark Real States</span>
                   <span className="font-display tracking-[0.12em] text-[9px] uppercase text-white/40">Pampanga</span>
                 </div>
               </button>
@@ -32,7 +32,7 @@ export default function Footer({ navigate }: FooterProps) {
               </p>
               <div className="flex gap-2">
                 {['FB', 'IG', 'LI', 'YT'].map((s) => (
-                  <button key={s} className="w-8 h-8 border border-white/15 flex items-center justify-center text-[10px] font-display text-white/40 hover:border-gold hover:text-gold transition-colors">
+                  <button key={s} className="w-8 h-8 rounded-full border border-white/15 flex items-center justify-center text-[10px] font-display text-white/40 hover:border-gold hover:bg-gold hover:text-white transition-all">
                     {s}
                   </button>
                 ))}
@@ -133,7 +133,7 @@ export default function Footer({ navigate }: FooterProps) {
 
         {/* Bottom */}
         <div className="py-5 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-[11px] font-display text-white/25">© {year} Clark Estates. All rights reserved.</p>
+          <p className="text-[11px] font-display text-white/25">© {year} Clark Real States. All rights reserved.</p>
           <div className="flex items-center gap-5">
             {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map((item) => (
               <button key={item} className="text-[11px] font-display text-white/25 hover:text-white/55 transition-colors">

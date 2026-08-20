@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import PropertyCard from '../components/PropertyCard'
+import Dropdown, { DropdownItem } from '../components/Dropdown'
 import { CITIES, PROPERTY_TYPES, type PropertyType } from '../lib/data'
 import { useLiveProperties } from '../lib/useLiveProperties'
 import type { Page } from '../components/Navigation'
@@ -57,7 +58,7 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
   return (
     <div className="min-h-screen bg-cream">
       {/* Page Header */}
-      <div className="bg-charcoal pt-24 pb-10 px-6 lg:px-12">
+      <div className="bg-navy pt-24 pb-10 px-6 lg:px-12">
         <div className="max-w-screen-2xl mx-auto">
           <nav className="flex items-center gap-2 text-[11px] font-display text-white/40 mb-4">
             <button onClick={() => navigate('home')} className="hover:text-white/70 transition-colors">Home</button>
@@ -70,50 +71,62 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
       </div>
 
       {/* Filter Bar */}
-      <div className="sticky top-16 z-40 bg-white border-b border-line shadow-sm">
+      <div className="sticky top-16 z-40 bg-white/95 backdrop-blur-md border-b border-line/60 shadow-[0_8px_24px_-16px_rgba(15,31,61,0.18)]">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 py-3.5">
             {/* Desktop Filters */}
-            <div className="hidden lg:flex items-center gap-4 flex-1 flex-wrap">
-              {/* City */}
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[9px] font-display tracking-[0.15em] uppercase text-warm-gray">Location</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="text-xs font-display text-charcoal bg-transparent outline-none appearance-none pr-4 cursor-pointer border-b border-line pb-0.5"
-                >
-                  {CITIES.map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <div className="w-px h-8 bg-line" />
+            <div className="hidden lg:flex items-center gap-2 flex-1 flex-wrap">
+              {/* Location */}
+              <Dropdown
+                triggerClassName="relative flex flex-col gap-0 bg-parchment/60 hover:bg-parchment rounded-full pl-4 pr-8 py-1.5 transition-colors text-left"
+                trigger={() => (
+                  <>
+                    <span className="text-[8px] font-display tracking-[0.16em] uppercase text-warm-gray leading-none block">Location</span>
+                    <span className="text-xs font-display font-medium text-charcoal leading-tight block">{city}</span>
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[8px] text-gold-dark">▾</span>
+                  </>
+                )}
+              >
+                {(close) => (
+                  <div className="max-h-72 overflow-y-auto min-w-[180px]">
+                    {CITIES.map((c) => (
+                      <DropdownItem key={c} active={city === c} onClick={() => { setCity(c); close() }}>{c}</DropdownItem>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
 
               {/* Type */}
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[9px] font-display tracking-[0.15em] uppercase text-warm-gray">Type</label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as PropertyType | '')}
-                  className="text-xs font-display text-charcoal bg-transparent outline-none appearance-none pr-4 cursor-pointer border-b border-line pb-0.5"
-                >
-                  <option value="">Any Type</option>
-                  {PROPERTY_TYPES.map((t) => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-
-              <div className="w-px h-8 bg-line" />
+              <Dropdown
+                triggerClassName="relative flex flex-col gap-0 bg-parchment/60 hover:bg-parchment rounded-full pl-4 pr-8 py-1.5 transition-colors text-left"
+                trigger={() => (
+                  <>
+                    <span className="text-[8px] font-display tracking-[0.16em] uppercase text-warm-gray leading-none block">Type</span>
+                    <span className="text-xs font-display font-medium text-charcoal leading-tight block">{type || 'Any Type'}</span>
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[8px] text-gold-dark">▾</span>
+                  </>
+                )}
+              >
+                {(close) => (
+                  <div className="min-w-[180px]">
+                    <DropdownItem active={type === ''} onClick={() => { setType(''); close() }}>Any Type</DropdownItem>
+                    {PROPERTY_TYPES.map((t) => (
+                      <DropdownItem key={t} active={type === t} onClick={() => { setType(t); close() }}>{t}</DropdownItem>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
 
               {/* Status */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5 bg-parchment/60 rounded-full p-1">
                 {(['All', 'For Sale', 'For Rent', 'Pre-Selling'] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatus(s)}
-                    className={`px-3 py-1.5 text-[10px] font-display font-medium tracking-[0.08em] uppercase transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-display font-medium tracking-[0.06em] uppercase transition-all ${
                       status === s
-                        ? 'bg-charcoal text-white'
-                        : 'text-warm-gray hover:text-charcoal border border-line'
+                        ? 'bg-navy text-white shadow-sm'
+                        : 'text-warm-gray hover:text-charcoal'
                     }`}
                   >
                     {s}
@@ -121,31 +134,31 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
                 ))}
               </div>
 
-              <div className="w-px h-8 bg-line" />
-
               {/* Beds */}
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[9px] font-display tracking-[0.15em] uppercase text-warm-gray">Min Beds</label>
-                <select
-                  value={minBeds}
-                  onChange={(e) => setMinBeds(Number(e.target.value))}
-                  className="text-xs font-display text-charcoal bg-transparent outline-none appearance-none pr-4 cursor-pointer border-b border-line pb-0.5"
-                >
-                  <option value={0}>Any</option>
-                  <option value={1}>1+</option>
-                  <option value={2}>2+</option>
-                  <option value={3}>3+</option>
-                  <option value={4}>4+</option>
-                </select>
-              </div>
-
-              <div className="w-px h-8 bg-line" />
+              <Dropdown
+                triggerClassName="relative flex flex-col gap-0 bg-parchment/60 hover:bg-parchment rounded-full pl-4 pr-8 py-1.5 transition-colors text-left"
+                trigger={() => (
+                  <>
+                    <span className="text-[8px] font-display tracking-[0.16em] uppercase text-warm-gray leading-none block">Min Beds</span>
+                    <span className="text-xs font-display font-medium text-charcoal leading-tight block">{minBeds === 0 ? 'Any' : `${minBeds}+`}</span>
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[8px] text-gold-dark">▾</span>
+                  </>
+                )}
+              >
+                {(close) => (
+                  <div className="min-w-[100px]">
+                    {[0, 1, 2, 3, 4].map((n) => (
+                      <DropdownItem key={n} active={minBeds === n} onClick={() => { setMinBeds(n); close() }}>{n === 0 ? 'Any' : `${n}+`}</DropdownItem>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
 
               {/* Price */}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 bg-parchment/60 rounded-full px-4 py-1.5 min-w-[150px]">
                 <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-display tracking-[0.15em] uppercase text-warm-gray">Max Price</label>
-                  <span className="text-[10px] font-display text-charcoal ml-4">{priceLabel(maxPrice)}</span>
+                  <label className="text-[8px] font-display tracking-[0.16em] uppercase text-warm-gray leading-none">Max Price</label>
+                  <span className="text-[10px] font-display font-semibold text-navy ml-4">{priceLabel(maxPrice)}</span>
                 </div>
                 <input
                   type="range"
@@ -154,16 +167,16 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
                   step={1000000}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-32"
+                  className="w-full"
                 />
               </div>
 
               {hasFilters && (
                 <button
                   onClick={clearFilters}
-                  className="text-[10px] font-display text-warm-gray hover:text-charcoal underline ml-2"
+                  className="flex items-center gap-1 text-[10px] font-display font-medium text-warm-gray hover:text-gold-dark transition-colors ml-1"
                 >
-                  Clear
+                  <span>✕</span> Clear
                 </button>
               )}
             </div>
@@ -172,41 +185,63 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
             <div className="flex lg:hidden items-center justify-between gap-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 border border-line text-xs font-display font-medium tracking-[0.1em] uppercase text-charcoal"
+                className="relative flex items-center gap-2 px-4 py-2 rounded-full border border-line bg-parchment/50 text-xs font-display font-medium tracking-[0.1em] uppercase text-charcoal"
               >
                 {showFilters ? '✕ Close' : '⊞ Filters'}
                 {hasFilters && <span className="w-1.5 h-1.5 bg-gold rounded-full" />}
               </button>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="text-xs font-display text-charcoal bg-transparent outline-none border-b border-line pb-0.5 cursor-pointer"
+              <Dropdown
+                align="right"
+                triggerClassName="relative bg-parchment/50 rounded-full pl-3 pr-7 py-2 text-left"
+                trigger={() => (
+                  <>
+                    <span className="text-xs font-display text-charcoal">{SORT_OPTIONS.find((o) => o.value === sort)?.label}</span>
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[8px] text-gold-dark">▾</span>
+                  </>
+                )}
               >
-                {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+                {(close) => (
+                  <div className="min-w-[170px]">
+                    {SORT_OPTIONS.map((o) => (
+                      <DropdownItem key={o.value} active={sort === o.value} onClick={() => { setSort(o.value); close() }}>{o.label}</DropdownItem>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
             </div>
 
             {/* Right side: Sort + View */}
-            <div className="hidden lg:flex items-center gap-4 ml-auto">
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="text-xs font-display text-charcoal bg-transparent outline-none border-b border-line pb-0.5 cursor-pointer appearance-none"
+            <div className="hidden lg:flex items-center gap-3 ml-auto">
+              <Dropdown
+                align="right"
+                triggerClassName="relative bg-parchment/60 hover:bg-parchment rounded-full pl-4 pr-7 py-2 transition-colors text-left"
+                trigger={() => (
+                  <>
+                    <span className="text-xs font-display font-medium text-charcoal">{SORT_OPTIONS.find((o) => o.value === sort)?.label}</span>
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[8px] text-gold-dark">▾</span>
+                  </>
+                )}
               >
-                {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+                {(close) => (
+                  <div className="min-w-[170px]">
+                    {SORT_OPTIONS.map((o) => (
+                      <DropdownItem key={o.value} active={sort === o.value} onClick={() => { setSort(o.value); close() }}>{o.label}</DropdownItem>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
 
-              <div className="flex gap-1">
+              <div className="flex items-center gap-0.5 bg-parchment/60 rounded-full p-1">
                 <button
                   onClick={() => setView('grid')}
-                  className={`p-2 text-lg transition-colors ${view === 'grid' ? 'text-charcoal' : 'text-line-dark hover:text-warm-gray'}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${view === 'grid' ? 'bg-white text-navy shadow-sm' : 'text-warm-gray hover:text-charcoal'}`}
                   aria-label="Grid view"
                 >
                   ⊞
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={`p-2 text-lg transition-colors ${view === 'list' ? 'text-charcoal' : 'text-line-dark hover:text-warm-gray'}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${view === 'list' ? 'bg-white text-navy shadow-sm' : 'text-warm-gray hover:text-charcoal'}`}
                   aria-label="List view"
                 >
                   ≡
@@ -221,23 +256,51 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Location</label>
-                  <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full text-sm font-display border border-line py-2 px-3 bg-white outline-none">
-                    {CITIES.map((c) => <option key={c}>{c}</option>)}
-                  </select>
+                  <Dropdown
+                    triggerClassName="w-full flex items-center justify-between rounded-lg border border-line py-2 px-3 bg-white text-left"
+                    trigger={() => (
+                      <>
+                        <span className="text-sm font-display text-charcoal">{city}</span>
+                        <span className="text-[9px] text-gold-dark">▾</span>
+                      </>
+                    )}
+                  >
+                    {(close) => (
+                      <div className="max-h-56 overflow-y-auto min-w-[160px]">
+                        {CITIES.map((c) => (
+                          <DropdownItem key={c} active={city === c} onClick={() => { setCity(c); close() }}>{c}</DropdownItem>
+                        ))}
+                      </div>
+                    )}
+                  </Dropdown>
                 </div>
                 <div>
                   <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-1.5">Property Type</label>
-                  <select value={type} onChange={(e) => setType(e.target.value as PropertyType | '')} className="w-full text-sm font-display border border-line py-2 px-3 bg-white outline-none">
-                    <option value="">Any Type</option>
-                    {PROPERTY_TYPES.map((t) => <option key={t}>{t}</option>)}
-                  </select>
+                  <Dropdown
+                    triggerClassName="w-full flex items-center justify-between rounded-lg border border-line py-2 px-3 bg-white text-left"
+                    trigger={() => (
+                      <>
+                        <span className="text-sm font-display text-charcoal">{type || 'Any Type'}</span>
+                        <span className="text-[9px] text-gold-dark">▾</span>
+                      </>
+                    )}
+                  >
+                    {(close) => (
+                      <div className="min-w-[160px]">
+                        <DropdownItem active={type === ''} onClick={() => { setType(''); close() }}>Any Type</DropdownItem>
+                        {PROPERTY_TYPES.map((t) => (
+                          <DropdownItem key={t} active={type === t} onClick={() => { setType(t); close() }}>{t}</DropdownItem>
+                        ))}
+                      </div>
+                    )}
+                  </Dropdown>
                 </div>
               </div>
               <div className="mb-4">
                 <label className="text-[10px] font-display tracking-[0.15em] uppercase text-warm-gray block mb-2">Status</label>
                 <div className="flex flex-wrap gap-2">
                   {(['All', 'For Sale', 'For Rent', 'Pre-Selling'] as const).map((s) => (
-                    <button key={s} onClick={() => setStatus(s)} className={`px-3 py-1.5 text-[10px] font-display tracking-wide uppercase border ${status === s ? 'bg-charcoal text-white border-charcoal' : 'border-line text-warm-gray'}`}>
+                    <button key={s} onClick={() => setStatus(s)} className={`px-3 py-1.5 rounded-full text-[10px] font-display tracking-wide uppercase border transition-colors ${status === s ? 'bg-navy text-white border-navy' : 'border-line text-warm-gray'}`}>
                       {s}
                     </button>
                   ))}
@@ -245,11 +308,11 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
               </div>
               <div className="flex items-center gap-2 mt-3">
                 {hasFilters && (
-                  <button onClick={clearFilters} className="flex-1 py-2.5 border border-line text-xs font-display tracking-[0.1em] uppercase text-warm-gray">
+                  <button onClick={clearFilters} className="flex-1 py-2.5 rounded-full border border-line text-xs font-display tracking-[0.1em] uppercase text-warm-gray">
                     Clear Filters
                   </button>
                 )}
-                <button onClick={() => setShowFilters(false)} className="flex-1 py-2.5 bg-charcoal text-white text-xs font-display tracking-[0.1em] uppercase">
+                <button onClick={() => setShowFilters(false)} className="flex-1 py-2.5 rounded-full bg-navy text-white text-xs font-display tracking-[0.1em] uppercase">
                   Show Results
                 </button>
               </div>
@@ -270,7 +333,7 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-white overflow-hidden">
+              <div key={i} className="bg-white rounded-2xl border border-line/70 overflow-hidden">
                 <div className="skeleton" style={{ aspectRatio: '4/3' }} />
                 <div className="p-4 space-y-2">
                   <div className="skeleton h-3 w-1/3 rounded" />
@@ -281,15 +344,15 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-24">
-            <p className="text-4xl mb-4">◎</p>
+          <div className="text-center py-24 bg-white rounded-2xl border border-line/70">
+            <p className="text-4xl mb-4 text-gold">◎</p>
             <h3 className="font-serif text-charcoal text-xl mb-2">No properties found</h3>
             <p className="text-warm-gray font-display text-sm mb-6">
               Try adjusting your filters or exploring nearby locations.
             </p>
             <button
               onClick={clearFilters}
-              className="px-6 py-3 border border-charcoal text-xs font-display font-semibold tracking-[0.15em] uppercase text-charcoal hover:bg-charcoal hover:text-white transition-colors"
+              className="px-6 py-3 rounded-full bg-navy text-xs font-display font-semibold tracking-[0.15em] uppercase text-white hover:bg-gold transition-colors"
             >
               Clear All Filters
             </button>
@@ -313,7 +376,7 @@ export default function PropertiesPage({ navigate }: PropertiesPageProps) {
         {/* Load More placeholder */}
         {filtered.length > 0 && (
           <div className="text-center mt-12">
-            <button className="px-10 py-3.5 border border-line text-xs font-display font-semibold tracking-[0.15em] uppercase text-warm-gray hover:border-charcoal hover:text-charcoal transition-colors">
+            <button className="px-10 py-3.5 rounded-full border border-line bg-white text-xs font-display font-semibold tracking-[0.15em] uppercase text-warm-gray hover:border-gold hover:text-navy shadow-sm hover:shadow-md transition-all">
               Load More Properties
             </button>
           </div>
